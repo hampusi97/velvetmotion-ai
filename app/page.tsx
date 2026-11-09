@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject" | "forum" | "login";
+type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject" | "forum" | "login" | "affiliate";
 
 interface MediaItem {
   id: string;
@@ -73,6 +73,9 @@ export default function VelvetMotion() {
   const [rejectImage, setRejectImage] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [referrals, setReferrals] = useState(0);
+  const [earnings, setEarnings] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const rejectFileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -86,6 +89,12 @@ export default function VelvetMotion() {
     if (email) {
       setLoggedIn(true);
       setUserEmail(email);
+      let code = localStorage.getItem("velvet-ref-code");
+      if (!code) {
+        code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        localStorage.setItem("velvet-ref-code", code);
+      }
+      setReferralCode(code);
     }
     setForumPaid(paid);
 
@@ -93,10 +102,22 @@ export default function VelvetMotion() {
     const s = localStorage.getItem("velvet-saved");
     const t = localStorage.getItem("velvet-tributes");
     const st = localStorage.getItem("velvet-streak");
+    const refs = localStorage.getItem("velvet-referrals");
+    const earn = localStorage.getItem("velvet-earnings");
     if (g) setGallery(JSON.parse(g));
     if (s) setSavedSessions(JSON.parse(s));
     if (t) setTributes(Number(t));
     if (st) setStreak(Number(st));
+    if (refs) setReferrals(Number(refs));
+    if (earn) setEarnings(Number(earn));
+
+    // Capture referral from URL
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref && !localStorage.getItem("velvet-referred-by")) {
+      localStorage.setItem("velvet-referred-by", ref);
+      // In real app this would credit the referrer via backend
+    }
 
     const last = localStorage.getItem("velvet-last-daily");
     const today = new Date().toDateString();
@@ -132,6 +153,12 @@ export default function VelvetMotion() {
     localStorage.setItem("velvet-email", loginEmail);
     setUserEmail(loginEmail);
     setLoggedIn(true);
+    let code = localStorage.getItem("velvet-ref-code");
+    if (!code) {
+      code = Math.random().toString(36).substring(2, 8).toUpperCase();
+      localStorage.setItem("velvet-ref-code", code);
+    }
+    setReferralCode(code);
     setView("home");
   };
 
@@ -143,11 +170,27 @@ export default function VelvetMotion() {
   };
 
   const unlockForum = () => {
-    // In production this would redirect to Stripe Checkout
-    // For demo: simulate successful payment
     localStorage.setItem("velvet-forum-paid", "true");
     setForumPaid(true);
+
+    // Credit the referrer (demo)
+    const referredBy = localStorage.getItem("velvet-referred-by");
+    if (referredBy) {
+      const currentRefs = Number(localStorage.getItem("velvet-referrals") || 0) + 1;
+      const currentEarn = Number(localStorage.getItem("velvet-earnings") || 0) + 3.00; // 30% of $9.99
+      localStorage.setItem("velvet-referrals", String(currentRefs));
+      localStorage.setItem("velvet-earnings", String(currentEarn));
+      setReferrals(currentRefs);
+      setEarnings(currentEarn);
+    }
+
     setView("forum");
+  };
+
+  const copyReferralLink = () => {
+    const link = `${window.location.origin}?ref=${referralCode}`;
+    navigator.clipboard.writeText(link);
+    alert("Referral link copied!");
   };
 
   const saveGallery = (items: MediaItem[]) => {
@@ -320,25 +363,11 @@ export default function VelvetMotion() {
             <p className="text-zinc-500 text-sm mt-2">Required for Forum and most features</p>
           </div>
           <div className="space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={loginEmail}
-              onChange={e => setLoginEmail(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-pink-500 outline-none"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-pink-500 outline-none"
-            />
-            <button onClick={handleLogin} className="w-full py-3.5 rounded-xl bg-pink-600 font-semibold hover:bg-pink-500">
-              Login / Create Account
-            </button>
+            <input type="email" placeholder="Email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-pink-500 outline-none" />
+            <input type="password" placeholder="Password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-pink-500 outline-none" />
+            <button onClick={handleLogin} className="w-full py-3.5 rounded-xl bg-pink-600 font-semibold hover:bg-pink-500">Login / Create Account</button>
           </div>
-          <p className="text-xs text-zinc-600 text-center mt-6">Demo login — any email + password works. Real auth (Clerk/Supabase) can replace this.</p>
+          <p className="text-xs text-zinc-600 text-center mt-6">Demo login — any email + password works.</p>
         </div>
       </div>
     );
@@ -351,9 +380,7 @@ export default function VelvetMotion() {
           <div className="bg-zinc-900 border border-pink-500/50 rounded-3xl p-7 max-w-sm w-full text-center shadow-2xl shadow-pink-900/40">
             <div className="text-pink-400 text-xs font-bold mb-3 tracking-[0.2em]">SHE SENT YOU SOMETHING</div>
             <p className="text-lg mb-7 leading-relaxed">{dailyMsg}</p>
-            <button onClick={() => setShowDaily(false)} className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500 transition">
-              Open
-            </button>
+            <button onClick={() => setShowDaily(false)} className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500 transition">Open</button>
           </div>
         </div>
       )}
@@ -368,9 +395,7 @@ export default function VelvetMotion() {
         </div>
         <div className="flex items-center gap-2">
           {view !== "home" && (
-            <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1.5 rounded-full bg-zinc-900 border border-pink-900/40">
-              ← Home
-            </button>
+            <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1.5 rounded-full bg-zinc-900 border border-pink-900/40">← Home</button>
           )}
           <button onClick={handleLogout} className="text-xs text-zinc-500 px-2 py-1">Logout</button>
         </div>
@@ -389,59 +414,78 @@ export default function VelvetMotion() {
               <div className="font-bold text-lg">Story Packs</div>
               <div className="text-xs text-white/90 mt-1">BNWO • Cuck • Blacked</div>
             </button>
-
             <button onClick={() => setView("crush")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Crush Helper</div>
               <div className="text-xs text-zinc-400 mt-1">Upload any girl</div>
             </button>
-
             <button onClick={() => setView("joi")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">JOI Center</div>
               <div className="text-xs text-zinc-400 mt-1">All styles + Voice</div>
             </button>
-
             <button onClick={startBNWO} className="p-5 rounded-2xl bg-zinc-900/80 border border-pink-900/40 text-left hover:border-pink-500/70 transition">
               <div className="font-bold text-pink-300">BNWO</div>
               <div className="text-xs text-zinc-400 mt-1">Whiteboy training</div>
             </button>
-
             <button onClick={() => setView("tinder")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Tinder</div>
               <div className="text-xs text-zinc-400 mt-1">Be her or talk</div>
             </button>
-
             <button onClick={() => setView("reject")} className="p-5 rounded-2xl bg-gradient-to-br from-red-900/80 to-pink-900/60 border border-red-900/40 text-left hover:scale-[1.02] transition">
               <div className="font-bold text-red-300">Rejection</div>
               <div className="text-xs text-white/70 mt-1">Screenshot revenge</div>
             </button>
-
             <button onClick={startGroup} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Group Chat</div>
               <div className="text-xs text-zinc-400 mt-1">Multiple girls</div>
             </button>
-
             <button onClick={() => setView("gallery")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Gallery</div>
               <div className="text-xs text-zinc-400 mt-1">{gallery.length} saved</div>
             </button>
-
             <button onClick={() => setView("saved")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Saved</div>
               <div className="text-xs text-zinc-400 mt-1">{savedSessions.length} sessions</div>
             </button>
-
-            <button onClick={() => setView("forum")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition col-span-2">
-              <div className="font-bold flex items-center gap-2">Forum {forumPaid ? "" : "🔒"}</div>
-              <div className="text-xs text-zinc-400 mt-1">{forumPaid ? "See other guys’ girls" : "Login + pay to unlock"}</div>
+            <button onClick={() => setView("forum")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
+              <div className="font-bold">Forum {forumPaid ? "" : "🔒"}</div>
+              <div className="text-xs text-zinc-400 mt-1">{forumPaid ? "Unlocked" : "Pay to unlock"}</div>
+            </button>
+            <button onClick={() => setView("affiliate")} className="p-5 rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-900 text-left hover:scale-[1.02] transition col-span-2">
+              <div className="font-bold">Affiliate Program</div>
+              <div className="text-xs text-white/80 mt-1">Earn 30% when people pay via your link</div>
             </button>
           </div>
 
           <div className="mt-8 p-5 rounded-2xl bg-zinc-900/60 border border-pink-900/40">
             <div className="text-pink-300 font-semibold mb-2">Tribute System</div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Generate a photo → cum on it → mark as tribute. Forum requires payment.
-            </p>
+            <p className="text-xs text-zinc-400 leading-relaxed">Generate a photo → cum on it → mark as tribute.</p>
           </div>
+        </main>
+      )}
+
+      {view === "affiliate" && (
+        <main className="max-w-lg mx-auto p-4 pb-20">
+          <h2 className="text-xl font-bold text-pink-400 mb-2">Affiliate Program</h2>
+          <p className="text-zinc-500 text-sm mb-6">Share your link. Earn 30% of every Forum payment from people you refer.</p>
+
+          <div className="p-5 rounded-2xl bg-zinc-900 border border-emerald-900/40 mb-6">
+            <div className="text-xs text-zinc-500 mb-1">Your referral link</div>
+            <div className="font-mono text-sm break-all text-emerald-300 mb-4">{typeof window !== "undefined" ? `${window.location.origin}?ref=${referralCode}` : `?ref=${referralCode}`}</div>
+            <button onClick={copyReferralLink} className="w-full py-3 rounded-xl bg-emerald-600 font-medium hover:bg-emerald-500">Copy Link</button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-center">
+              <div className="text-2xl font-bold text-pink-400">{referrals}</div>
+              <div className="text-xs text-zinc-500 mt-1">Referrals</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-center">
+              <div className="text-2xl font-bold text-emerald-400">${earnings.toFixed(2)}</div>
+              <div className="text-xs text-zinc-500 mt-1">Earnings</div>
+            </div>
+          </div>
+
+          <p className="text-xs text-zinc-600 leading-relaxed">Demo system. In production this would be backed by a real database and Stripe Connect so payouts happen automatically.</p>
         </main>
       )}
 
@@ -453,10 +497,8 @@ export default function VelvetMotion() {
               <div className="text-5xl mb-4">🔒</div>
               <p className="text-lg font-medium mb-2">Forum is locked</p>
               <p className="text-zinc-400 text-sm mb-8">Unlock access to other users’ girls, posts, and generated sets.</p>
-              <button onClick={unlockForum} className="w-full py-4 rounded-2xl bg-pink-600 font-semibold text-lg hover:bg-pink-500">
-                Unlock Forum — $9.99 / month
-              </button>
-              <p className="text-xs text-zinc-600 mt-4">Demo button — real Stripe Checkout can replace this.</p>
+              <button onClick={unlockForum} className="w-full py-4 rounded-2xl bg-pink-600 font-semibold text-lg hover:bg-pink-500">Unlock Forum — $9.99 / month</button>
+              <p className="text-xs text-zinc-600 mt-4">Demo button — real Stripe Checkout can replace this. Affiliates earn 30%.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -476,21 +518,13 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* Other views remain functional */}
+      {/* Remaining views (reject, packs, joi, tinder, crush, gallery, saved, chat) are unchanged from previous version */}
       {view === "reject" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Rejection Revenge</h2>
           <p className="text-zinc-500 text-sm mb-6">Screenshot the girl who rejected you on Tinder → pretend to be her or make her yours</p>
           <div onClick={() => rejectFileRef.current?.click()} className="border-2 border-dashed border-red-900/50 rounded-2xl p-8 text-center cursor-pointer hover:border-pink-500/60 mb-6 bg-zinc-900/40">
-            {rejectImage ? (
-              <img src={rejectImage} alt="Rejected" className="w-40 h-52 object-cover rounded-xl mx-auto border border-pink-900/40" />
-            ) : (
-              <>
-                <div className="text-4xl mb-3">📱</div>
-                <div className="text-sm text-zinc-400">Upload Tinder screenshot</div>
-                <div className="text-xs text-zinc-600 mt-1">The girl who swiped left</div>
-              </>
-            )}
+            {rejectImage ? <img src={rejectImage} alt="Rejected" className="w-40 h-52 object-cover rounded-xl mx-auto border border-pink-900/40" /> : <><div className="text-4xl mb-3">📱</div><div className="text-sm text-zinc-400">Upload Tinder screenshot</div><div className="text-xs text-zinc-600 mt-1">The girl who swiped left</div></>}
           </div>
           <input ref={rejectFileRef} type="file" accept="image/*" className="hidden" onChange={handleRejectUpload} />
           {rejectImage && (
