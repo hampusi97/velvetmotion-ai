@@ -15,7 +15,7 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Tinder Roleplay
 - BNWO Section
 - Group Chat / Multi-girl rooms
-- Personal Gallery with collections, search, and export
+- Personal Gallery with collections, search, and **Export All** (downloads every photo & video)
 - Saved Sessions + Continue last session
 - Tribute System
 - Streak + Coins + Coins shop
@@ -27,10 +27,9 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - She missed you messages
 - Streak rewards
 - Forum (monthly or lifetime unlock)
-- Affiliate Program (30% commission, owner Coinbase wallet, user payout methods)
+- Affiliate Program
 - Leaderboard
 - Daily messages
-- Share image to friend
 
 ## Getting Started
 
