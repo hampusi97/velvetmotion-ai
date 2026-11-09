@@ -7,10 +7,16 @@ Professional NSFW AI Girlfriend / Fantasy platform (fictional characters only).
 - Age Gate (18+)
 - Login system
 - Unlimited free chat + photo/video generation
-- **Improved UI** — cleaner cards, better spacing, smoother interactions, polished homescreen
-- **16 Fictional Girls** with customizable voice, personality, kinks, and memory
+- Improved UI
+- **16 Fictional Girls** with expanded customization:
+  - Voice style
+  - Personality traits
+  - Kink checklist
+  - Intensity level
+  - Nickname / how she addresses you
+  - Session memory
 - Multi-girl groups
-- Expanded story scenarios and packs
+- Expanded story scenarios
 - Crush Helper
 - Rejection Revenge
 - Story Packs
