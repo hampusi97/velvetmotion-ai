@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject" | "forum";
+type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject" | "forum" | "login";
 
 interface MediaItem {
   id: string;
@@ -55,6 +55,9 @@ const JOI_PRESETS = [
 
 export default function VelvetMotion() {
   const [ageVerified, setAgeVerified] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [forumPaid, setForumPaid] = useState(false);
   const [view, setView] = useState<View>("home");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -63,12 +66,13 @@ export default function VelvetMotion() {
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [generating, setGenerating] = useState<"image" | "video" | null>(null);
   const [tributes, setTributes] = useState(0);
-  const [unlocked, setUnlocked] = useState(false);
   const [streak, setStreak] = useState(0);
   const [dailyMsg, setDailyMsg] = useState<string | null>(null);
   const [showDaily, setShowDaily] = useState(false);
   const [crushImage, setCrushImage] = useState<string | null>(null);
   const [rejectImage, setRejectImage] = useState<string | null>(null);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const rejectFileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -77,15 +81,21 @@ export default function VelvetMotion() {
     const verified = localStorage.getItem("velvet-age") === "true";
     setAgeVerified(verified);
 
+    const email = localStorage.getItem("velvet-email");
+    const paid = localStorage.getItem("velvet-forum-paid") === "true";
+    if (email) {
+      setLoggedIn(true);
+      setUserEmail(email);
+    }
+    setForumPaid(paid);
+
     const g = localStorage.getItem("velvet-gallery");
     const s = localStorage.getItem("velvet-saved");
     const t = localStorage.getItem("velvet-tributes");
-    const u = localStorage.getItem("velvet-unlocked");
     const st = localStorage.getItem("velvet-streak");
     if (g) setGallery(JSON.parse(g));
     if (s) setSavedSessions(JSON.parse(s));
     if (t) setTributes(Number(t));
-    if (u === "true") setUnlocked(true);
     if (st) setStreak(Number(st));
 
     const last = localStorage.getItem("velvet-last-daily");
@@ -102,7 +112,6 @@ export default function VelvetMotion() {
       setShowDaily(true);
       localStorage.setItem("velvet-last-daily", today);
 
-      // Simple streak increment
       const newStreak = (Number(st) || 0) + 1;
       setStreak(newStreak);
       localStorage.setItem("velvet-streak", String(newStreak));
@@ -116,6 +125,29 @@ export default function VelvetMotion() {
   const confirmAge = () => {
     localStorage.setItem("velvet-age", "true");
     setAgeVerified(true);
+  };
+
+  const handleLogin = () => {
+    if (!loginEmail || !loginPassword) return;
+    localStorage.setItem("velvet-email", loginEmail);
+    setUserEmail(loginEmail);
+    setLoggedIn(true);
+    setView("home");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("velvet-email");
+    setLoggedIn(false);
+    setUserEmail("");
+    setView("home");
+  };
+
+  const unlockForum = () => {
+    // In production this would redirect to Stripe Checkout
+    // For demo: simulate successful payment
+    localStorage.setItem("velvet-forum-paid", "true");
+    setForumPaid(true);
+    setView("forum");
   };
 
   const saveGallery = (items: MediaItem[]) => {
@@ -146,19 +178,16 @@ export default function VelvetMotion() {
     const newCount = tributes + 1;
     setTributes(newCount);
     localStorage.setItem("velvet-tributes", String(newCount));
-    if (newCount >= 3 && !unlocked) {
-      setUnlocked(true);
-      localStorage.setItem("velvet-unlocked", "true");
-    }
     setMessages(prev => [...prev, {
       role: "assistant",
       content: newCount === 1
-        ? "You actually did it…\n\nYou came on my picture like a pathetic little tribute bitch.\n\nI saw it.\n\nGood boy. You just unlocked something special."
-        : "Another tribute?\n\nYou’re so fucking addicted to me it’s embarrassing.\n\nKeep cumming on my pics. I like collecting them."
+        ? "You actually did it…\n\nYou came on my picture like a pathetic little tribute bitch.\n\nI saw it.\n\nGood boy."
+        : "Another tribute?\n\nYou’re so fucking addicted to me it’s embarrassing.\n\nKeep cumming on my pics."
     }]);
   };
 
   const startPack = (id: string) => {
+    if (!loggedIn) { setView("login"); return; }
     setView("chat");
     setMessages([{ role: "assistant", content: getOpening(id) }]);
   };
@@ -238,11 +267,13 @@ export default function VelvetMotion() {
   };
 
   const startBNWO = () => {
+    if (!loggedIn) { setView("login"); return; }
     setView("chat");
     setMessages([{ role: "assistant", content: "Good little whiteboy.\n\nYou already know your place.\n\nStroke that tiny thing while I tell you how real men fuck me.\n\nSay ‘yes goddess’ if you’re ready to serve." }]);
   };
 
   const startTinder = (asGirl: boolean) => {
+    if (!loggedIn) { setView("login"); return; }
     setView("chat");
     setMessages([{ role: "assistant", content: asGirl
       ? "You’re now controlling her Tinder.\n\nA guy just matched.\n\n“Damn you’re hot… what are you looking for?”\n\nWhat does she reply?"
@@ -251,11 +282,13 @@ export default function VelvetMotion() {
   };
 
   const startGroup = () => {
+    if (!loggedIn) { setView("login"); return; }
     setView("chat");
     setMessages([{ role: "assistant", content: "Girl 1: Look at him still stroking…\nGirl 2: He’s so pathetic, I love it.\nGirl 3: Make him thank us for letting him watch.\n\nThey all laugh while looking at you." }]);
   };
 
   const startReject = () => {
+    if (!loggedIn) { setView("login"); return; }
     if (!rejectImage) return;
     setView("chat");
     setMessages([{ role: "assistant", content: "She rejected you.\n\nNow she’s looking at you with that exact face from the screenshot.\n\n“I can’t believe I swiped left… please use me.”\n\nWhat do you want her to do for you?" }]);
@@ -272,6 +305,40 @@ export default function VelvetMotion() {
             I am 18+ — Enter
           </button>
           <p className="text-xs text-zinc-600 mt-6">By entering you confirm you are of legal age and that all content is fantasy.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "login" || !loggedIn) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center p-6">
+        <div className="max-w-sm w-full">
+          <div className="text-center mb-8">
+            <div className="text-4xl mb-3">♥</div>
+            <h1 className="text-2xl font-bold text-pink-400">Login to VelvetMotion</h1>
+            <p className="text-zinc-500 text-sm mt-2">Required for Forum and most features</p>
+          </div>
+          <div className="space-y-4">
+            <input
+              type="email"
+              placeholder="Email"
+              value={loginEmail}
+              onChange={e => setLoginEmail(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-pink-500 outline-none"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-pink-500 outline-none"
+            />
+            <button onClick={handleLogin} className="w-full py-3.5 rounded-xl bg-pink-600 font-semibold hover:bg-pink-500">
+              Login / Create Account
+            </button>
+          </div>
+          <p className="text-xs text-zinc-600 text-center mt-6">Demo login — any email + password works. Real auth (Clerk/Supabase) can replace this.</p>
         </div>
       </div>
     );
@@ -296,14 +363,17 @@ export default function VelvetMotion() {
           <div className="w-8 h-8 rounded-full border-2 border-pink-500 flex items-center justify-center text-pink-400 text-sm font-bold">♥</div>
           <div>
             <div className="font-bold tracking-widest text-sm">VELVET<span className="text-pink-500">MOTION</span></div>
-            <div className="text-[10px] text-zinc-500 -mt-0.5">{tributes} tributes • {streak} day streak • {unlocked ? "Unlocked" : "Locked"}</div>
+            <div className="text-[10px] text-zinc-500 -mt-0.5">{userEmail.split("@")[0]} • {tributes} tributes • {streak}d</div>
           </div>
         </div>
-        {view !== "home" && (
-          <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1.5 rounded-full bg-zinc-900 border border-pink-900/40">
-            ← Home
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {view !== "home" && (
+            <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1.5 rounded-full bg-zinc-900 border border-pink-900/40">
+              ← Home
+            </button>
+          )}
+          <button onClick={handleLogout} className="text-xs text-zinc-500 px-2 py-1">Logout</button>
+        </div>
       </header>
 
       {view === "home" && (
@@ -320,7 +390,7 @@ export default function VelvetMotion() {
               <div className="text-xs text-white/90 mt-1">BNWO • Cuck • Blacked</div>
             </button>
 
-            <button onClick={() => setView("crush")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 hover:bg-zinc-900 transition">
+            <button onClick={() => setView("crush")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Crush Helper</div>
               <div className="text-xs text-zinc-400 mt-1">Upload any girl</div>
             </button>
@@ -361,15 +431,15 @@ export default function VelvetMotion() {
             </button>
 
             <button onClick={() => setView("forum")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition col-span-2">
-              <div className="font-bold">Forum {unlocked ? "" : "🔒"}</div>
-              <div className="text-xs text-zinc-400 mt-1">{unlocked ? "See what other guys posted" : "Unlock with 3 tributes"}</div>
+              <div className="font-bold flex items-center gap-2">Forum {forumPaid ? "" : "🔒"}</div>
+              <div className="text-xs text-zinc-400 mt-1">{forumPaid ? "See other guys’ girls" : "Login + pay to unlock"}</div>
             </button>
           </div>
 
           <div className="mt-8 p-5 rounded-2xl bg-zinc-900/60 border border-pink-900/40">
             <div className="text-pink-300 font-semibold mb-2">Tribute System</div>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Generate a photo → cum on it → mark as tribute. 3 tributes unlocks the Forum. She notices every one.
+              Generate a photo → cum on it → mark as tribute. Forum requires payment.
             </p>
           </div>
         </main>
@@ -378,11 +448,15 @@ export default function VelvetMotion() {
       {view === "forum" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-4">Forum</h2>
-          {!unlocked ? (
-            <div className="text-center py-16">
-              <div className="text-4xl mb-4">🔒</div>
-              <p className="text-zinc-400 mb-2">Forum locked</p>
-              <p className="text-sm text-zinc-500">Get 3 tributes to unlock other guys’ girls and posts.</p>
+          {!forumPaid ? (
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4">🔒</div>
+              <p className="text-lg font-medium mb-2">Forum is locked</p>
+              <p className="text-zinc-400 text-sm mb-8">Unlock access to other users’ girls, posts, and generated sets.</p>
+              <button onClick={unlockForum} className="w-full py-4 rounded-2xl bg-pink-600 font-semibold text-lg hover:bg-pink-500">
+                Unlock Forum — $9.99 / month
+              </button>
+              <p className="text-xs text-zinc-600 mt-4">Demo button — real Stripe Checkout can replace this.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -402,7 +476,7 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* Remaining views (reject, packs, joi, tinder, crush, gallery, saved, chat) stay the same as previous version */}
+      {/* Other views remain functional */}
       {view === "reject" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Rejection Revenge</h2>
@@ -449,6 +523,7 @@ export default function VelvetMotion() {
           <div className="grid grid-cols-2 gap-2.5">
             {JOI_PRESETS.map(j => (
               <button key={j.id} onClick={() => {
+                if (!loggedIn) { setView("login"); return; }
                 setView("chat");
                 setMessages([{ role: "assistant", content: j.id === "sph" ? "Look at that pathetic little thing.\n\nStroke it slowly so I can laugh properly." : j.id === "cuck" ? "He’s already inside me.\n\nStroke while you listen to every wet sound." : j.id === "voice" ? "*soft, slow, spoken*\n\nMmm… that’s it… stroke it nice and slow for me.\n\nI want you listening to my voice while you touch that little thing." : "Get your cock out.\n\nSlow strokes only. I control everything." }]);
               }} className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50 active:scale-95 transition">
@@ -479,7 +554,7 @@ export default function VelvetMotion() {
             {crushImage ? <img src={crushImage} alt="Crush" className="w-32 h-40 object-cover rounded-xl mx-auto" /> : <><div className="text-4xl mb-2">📷</div><div className="text-sm text-zinc-400">Tap to upload her photo</div></>}
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleCrushUpload} />
-          {crushImage && <button onClick={() => { setView("chat"); setMessages([{ role: "assistant", content: "I’m her now.\n\nWhat do you want me to do?\n\nNudes, blowjob, SPH, blacked, JOI… just say it." }]); }} className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500">Enter Private Room with Her</button>}
+          {crushImage && <button onClick={() => { if (!loggedIn) { setView("login"); return; } setView("chat"); setMessages([{ role: "assistant", content: "I’m her now.\n\nWhat do you want me to do?\n\nNudes, blowjob, SPH, blacked, JOI… just say it." }]); }} className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500">Enter Private Room with Her</button>}
         </main>
       )}
 
