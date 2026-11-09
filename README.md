@@ -6,9 +6,10 @@ NSFW AI Girlfriend / Fantasy platform built for maximum addiction.
 
 - **Age Gate** – Simple 18+ confirmation (persists)
 - **Login System** – Required for most features (demo email/password, persists)
-- **Homescreen Dashboard** – Easy access to every function (polished UI)
-- **Crush Helper** – Upload any photo → generate explicit photos & videos of her
-- **Rejection Revenge** – Upload a Tinder screenshot of a girl who rejected you → pretend to be her or make her yours
+- **Unlimited Chat & Generations** – Text chat + all photo/video generation are always free
+- **Homescreen Dashboard** – Easy access to every function
+- **Crush Helper** – Upload any photo → generate explicit photos & videos of her (free)
+- **Rejection Revenge** – Upload a Tinder screenshot of a girl who rejected you
 - **Story Packs** – One-tap BNWO, Cuck, Blacked, Taboo scenarios
 - **JOI Center** – Classic, SPH, CEI, Ruin, Edge, Cuck, Blacked, Findom, Voice
 - **Tinder Roleplay** – Play as her or talk to her as the beta
@@ -18,10 +19,11 @@ NSFW AI Girlfriend / Fantasy platform built for maximum addiction.
 - **Saved Sessions** – Resume any previous JOI or story
 - **Tribute System** – Cum on pics → she notices and reacts
 - **Streak Counter** – Daily open increases streak
-- **Forum** – Requires login + payment ($9.99/month demo unlock)
-- **Affiliate Program** – Shareable referral link. Earn 30% of Forum payments from people who use your link (demo tracking)
-- **Daily Messages** – “She sent you something” so she feels alive every day
-- **Image & Video generation buttons** inside chat
+- **Coins** – Daily free coins + bonus coins for sharing your link
+- **Forum** – Paid unlock ($9.99/month demo). Other users’ girls and posts
+- **Affiliate Program** – Shareable referral link. Earn 30% of Forum payments + free coins when you share
+- **Leaderboard** – Demo top referrers
+- **Daily Messages** – “She sent you something”
 
 ## Getting Started
 
@@ -38,12 +40,12 @@ Open [http://localhost:3000](http://localhost:3000)
 - Real generation requires NSFW image/video APIs + uncensored LLM
 - Using real people’s photos without consent is illegal in many places
 - Always frame as fantasy / fictional characters for legal safety
-- Login, payment, and affiliate tracking are currently demo (localStorage). Replace with Clerk/Supabase + Stripe + Stripe Connect for production.
+- Login, payment, coins, and affiliate tracking are currently demo (localStorage). Replace with real auth + Stripe + Stripe Connect for production.
 
 ## Stack
 
 - Next.js 15 + TypeScript + Tailwind
-- localStorage for auth, payment, referrals, gallery, sessions, tributes & streak
+- localStorage for everything (swap to a real backend later)
 
 ## Roadmap
 
