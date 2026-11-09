@@ -4,9 +4,11 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 **All content is fantasy. You should only upload photos of yourself.**
 
+These disclaimers are shown in the site UI (age gate and top banner).
+
 ## Features
 
-- Age Gate (18+)
+- Age Gate (18+) with fantasy disclaimer
 - Login system
 - Unlimited free chat + photo/video generation
 - Improved UI
