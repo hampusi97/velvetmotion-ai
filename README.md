@@ -8,12 +8,12 @@ Professional NSFW AI Girlfriend / Fantasy platform (fictional characters only).
 - Login system
 - Unlimited free chat + photo/video generation
 - Homescreen dashboard
-- **Fictional Girls** — 8 unique characters with customizable:
-  - Voice style (soft, husky, commanding, breathy, etc.)
+- **12 Fictional Girls** with customizable:
+  - Voice style (soft, husky, commanding, breathy, playful, etc.)
   - Personality traits
   - Kink checklist
   - Session memory
-- Crush Helper (upload any photo → nudes, sex videos, etc.)
+- Crush Helper
 - Rejection Revenge
 - Story Packs
 - JOI Center
