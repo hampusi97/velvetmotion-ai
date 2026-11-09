@@ -20,7 +20,10 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Timed JOI sessions
 - Continue Last Session button
 - Session memory
-- **Suggest a Feature** button (users can request anything)
+- Suggest a Feature button
+- **Favorite Girl** pin
+- **Mood system**
+- **Daily Challenge** (edge + tribute)
 - Crush Helper
 - Rejection Revenge
 - Story Packs
