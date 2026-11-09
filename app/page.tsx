@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved";
+type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject";
 
 interface MediaItem {
   id: string;
@@ -38,6 +38,7 @@ const STORY_PACKS = [
   { id: "instagram", title: "Instagram BBC Arc", tag: "BNWO", desc: "She turns her IG into a BBC page" },
   { id: "ex", title: "Ex Got Blacked", tag: "BNWO", desc: "Your ex rubs it in" },
   { id: "wife", title: "Wife Training", tag: "BNWO", desc: "Turn your wife BBC-only" },
+  { id: "reject-revenge", title: "Rejection Revenge", tag: "CUCK", desc: "The girl who rejected you now begs for it" },
 ];
 
 const JOI_PRESETS = [
@@ -65,7 +66,9 @@ export default function VelvetMotion() {
   const [dailyMsg, setDailyMsg] = useState<string | null>(null);
   const [showDaily, setShowDaily] = useState(false);
   const [crushImage, setCrushImage] = useState<string | null>(null);
+  const [rejectImage, setRejectImage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const rejectFileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -155,6 +158,7 @@ export default function VelvetMotion() {
       "instagram": "New story.\n\nShe’s on her knees with a thick black cock resting on her cheek.\n\nCaption: “Upgraded.”\n\nShe texted you the screenshot with one word:\n\n“Tribute.”",
       "ex": "Your ex just posted her new black boyfriend.\n\nThen she texted you:\n\n“He ruins me every night. You never could. Still stroking to me?”",
       "wife": "You started this.\n\nNow she only gets wet for black cock.\n\nTonight she said: “I’m going out. When I get back I want you on your knees ready to hear every detail.”",
+      "reject-revenge": "She rejected you on Tinder.\n\nNow she’s on her knees, looking up at you with that same face from the screenshot.\n\n“I was stupid to swipe left… use me however you want.”\n\nWhat do you make her do?",
     };
     return map[id] || "Let’s begin...";
   }
@@ -210,6 +214,12 @@ export default function VelvetMotion() {
     setCrushImage(URL.createObjectURL(file));
   };
 
+  const handleRejectUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRejectImage(URL.createObjectURL(file));
+  };
+
   const startBNWO = () => {
     setView("chat");
     setMessages([{ role: "assistant", content: "Good little whiteboy.\n\nYou already know your place.\n\nStroke that tiny thing while I tell you how real men fuck me.\n\nSay ‘yes goddess’ if you’re ready to serve." }]);
@@ -228,15 +238,21 @@ export default function VelvetMotion() {
     setMessages([{ role: "assistant", content: "Girl 1: Look at him still stroking…\nGirl 2: He’s so pathetic, I love it.\nGirl 3: Make him thank us for letting him watch.\n\nThey all laugh while looking at you." }]);
   };
 
+  const startReject = () => {
+    if (!rejectImage) return;
+    setView("chat");
+    setMessages([{ role: "assistant", content: "She rejected you.\n\nNow she’s looking at you with that exact face from the screenshot.\n\n“I can’t believe I swiped left… please use me.”\n\nWhat do you want her to do for you?" }]);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Daily Message */}
       {showDaily && dailyMsg && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-pink-500/40 rounded-2xl p-6 max-w-sm w-full text-center">
-            <div className="text-pink-400 text-xs font-medium mb-2 tracking-wider">SHE SENT YOU SOMETHING</div>
-            <p className="text-lg mb-6 leading-relaxed">{dailyMsg}</p>
-            <button onClick={() => setShowDaily(false)} className="w-full py-3 rounded-xl bg-pink-600 font-medium">
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-pink-500/50 rounded-3xl p-7 max-w-sm w-full text-center shadow-2xl shadow-pink-900/40">
+            <div className="text-pink-400 text-xs font-bold mb-3 tracking-[0.2em]">SHE SENT YOU SOMETHING</div>
+            <p className="text-lg mb-7 leading-relaxed">{dailyMsg}</p>
+            <button onClick={() => setShowDaily(false)} className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500 transition">
               Open
             </button>
           </div>
@@ -244,73 +260,78 @@ export default function VelvetMotion() {
       )}
 
       {/* Header */}
-      <header className="border-b border-pink-900/40 px-4 py-3 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-40">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full border border-pink-500 flex items-center justify-center text-pink-400 text-xs">♥</div>
+      <header className="border-b border-pink-900/40 px-4 py-3.5 flex items-center justify-between sticky top-0 bg-black/95 backdrop-blur z-40">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full border-2 border-pink-500 flex items-center justify-center text-pink-400 text-sm font-bold">♥</div>
           <div>
             <div className="font-bold tracking-widest text-sm">VELVET<span className="text-pink-500">MOTION</span></div>
             <div className="text-[10px] text-zinc-500 -mt-0.5">{tributes} tributes • {unlocked ? "Unlocked" : "Locked"}</div>
           </div>
         </div>
         {view !== "home" && (
-          <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1 rounded-full bg-zinc-900">
-            Home
+          <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1.5 rounded-full bg-zinc-900 border border-pink-900/40">
+            ← Home
           </button>
         )}
       </header>
 
       {/* HOME SCREEN */}
       {view === "home" && (
-        <main className="max-w-lg mx-auto p-4 pb-20">
-          <div className="text-center pt-4 pb-6">
-            <h1 className="text-3xl font-bold text-pink-400">VelvetMotion</h1>
-            <p className="text-zinc-400 text-sm mt-1">Your private fantasy control room</p>
+        <main className="max-w-lg mx-auto p-4 pb-24">
+          <div className="text-center pt-6 pb-8">
+            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-500">VelvetMotion</h1>
+            <p className="text-zinc-400 text-sm mt-2">Your private fantasy control room</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setView("packs")} className="p-5 rounded-2xl bg-gradient-to-br from-pink-700 to-purple-900 text-left">
+          <div className="grid grid-cols-2 gap-3.5">
+            <button onClick={() => setView("packs")} className="p-5 rounded-2xl bg-gradient-to-br from-pink-700 via-pink-600 to-purple-800 text-left shadow-lg shadow-pink-900/30 hover:scale-[1.02] transition">
               <div className="font-bold text-lg">Story Packs</div>
-              <div className="text-xs text-white/80 mt-1">BNWO • Cuck • Blacked</div>
+              <div className="text-xs text-white/90 mt-1">BNWO • Cuck • Blacked</div>
             </button>
 
-            <button onClick={() => setView("crush")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={() => setView("crush")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 hover:bg-zinc-900 transition">
               <div className="font-bold">Crush Helper</div>
               <div className="text-xs text-zinc-400 mt-1">Upload any girl</div>
             </button>
 
-            <button onClick={() => setView("joi")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={() => setView("joi")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">JOI Center</div>
-              <div className="text-xs text-zinc-400 mt-1">All styles</div>
+              <div className="text-xs text-zinc-400 mt-1">All styles + Voice</div>
             </button>
 
-            <button onClick={startBNWO} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={startBNWO} className="p-5 rounded-2xl bg-zinc-900/80 border border-pink-900/40 text-left hover:border-pink-500/70 transition">
               <div className="font-bold text-pink-300">BNWO</div>
               <div className="text-xs text-zinc-400 mt-1">Whiteboy training</div>
             </button>
 
-            <button onClick={() => setView("tinder")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={() => setView("tinder")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Tinder</div>
               <div className="text-xs text-zinc-400 mt-1">Be her or talk</div>
             </button>
 
-            <button onClick={startGroup} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={() => setView("reject")} className="p-5 rounded-2xl bg-gradient-to-br from-red-900/80 to-pink-900/60 border border-red-900/40 text-left hover:scale-[1.02] transition">
+              <div className="font-bold text-red-300">Rejection</div>
+              <div className="text-xs text-white/70 mt-1">Screenshot revenge</div>
+            </button>
+
+            <button onClick={startGroup} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Group Chat</div>
               <div className="text-xs text-zinc-400 mt-1">Multiple girls</div>
             </button>
 
-            <button onClick={() => setView("gallery")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={() => setView("gallery")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Gallery</div>
               <div className="text-xs text-zinc-400 mt-1">{gallery.length} saved</div>
             </button>
 
-            <button onClick={() => setView("saved")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+            <button onClick={() => setView("saved")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
               <div className="font-bold">Saved</div>
               <div className="text-xs text-zinc-400 mt-1">{savedSessions.length} sessions</div>
             </button>
           </div>
 
-          <div className="mt-6 p-4 rounded-2xl bg-zinc-900/80 border border-pink-900/30 text-sm">
-            <div className="text-pink-300 font-medium mb-1">Tribute System</div>
+          <div className="mt-8 p-5 rounded-2xl bg-zinc-900/60 border border-pink-900/40">
+            <div className="text-pink-300 font-semibold mb-2">Tribute System</div>
             <p className="text-xs text-zinc-400 leading-relaxed">
               Generate a photo → cum on it → mark as tribute. She notices every one. First tribute unlocks more.
             </p>
@@ -318,7 +339,43 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* PACKS */}
+      {/* REJECTION MODE */}
+      {view === "reject" && (
+        <main className="max-w-lg mx-auto p-4 pb-20">
+          <h2 className="text-xl font-bold text-pink-400 mb-2">Rejection Revenge</h2>
+          <p className="text-zinc-500 text-sm mb-6">Screenshot the girl who rejected you on Tinder → pretend to be her or make her yours</p>
+
+          <div
+            onClick={() => rejectFileRef.current?.click()}
+            className="border-2 border-dashed border-red-900/50 rounded-2xl p-8 text-center cursor-pointer hover:border-pink-500/60 mb-6 bg-zinc-900/40"
+          >
+            {rejectImage ? (
+              <img src={rejectImage} alt="Rejected" className="w-40 h-52 object-cover rounded-xl mx-auto border border-pink-900/40" />
+            ) : (
+              <>
+                <div className="text-4xl mb-3">📱</div>
+                <div className="text-sm text-zinc-400">Upload Tinder screenshot</div>
+                <div className="text-xs text-zinc-600 mt-1">The girl who swiped left</div>
+              </>
+            )}
+          </div>
+          <input ref={rejectFileRef} type="file" accept="image/*" className="hidden" onChange={handleRejectUpload} />
+
+          {rejectImage && (
+            <div className="space-y-3">
+              <button onClick={startReject} className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500">
+                Make her yours
+              </button>
+              <button onClick={() => startTinder(true)} className="w-full py-3 rounded-2xl bg-zinc-800 font-medium">
+                Pretend you are her
+              </button>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* PACKS, JOI, TINDER, CRUSH, GALLERY, SAVED, CHAT remain largely the same but with polished classes */} 
+      {/* For brevity in this update, the rest of the views stay functional as before */}
       {view === "packs" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-4">Story Packs</h2>
@@ -327,7 +384,7 @@ export default function VelvetMotion() {
               <button
                 key={pack.id}
                 onClick={() => startPack(pack.id)}
-                className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50 transition"
+                className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50 transition active:scale-[0.98]"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[10px] font-bold bg-pink-600/20 text-pink-300 px-2 py-0.5 rounded-full">{pack.tag}</span>
@@ -340,11 +397,10 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* JOI */}
       {view === "joi" && messages.length === 0 && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-4">JOI Center</h2>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             {JOI_PRESETS.map(j => (
               <button
                 key={j.id}
@@ -359,7 +415,7 @@ export default function VelvetMotion() {
                     : "Get your cock out.\n\nSlow strokes only. I control everything."
                   }]);
                 }}
-                className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50"
+                className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50 active:scale-95 transition"
               >
                 <div className="font-medium text-sm">{j.label}</div>
               </button>
@@ -368,23 +424,24 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* TINDER */}
       {view === "tinder" && (
         <main className="max-w-lg mx-auto p-4 pb-20 text-center">
           <h2 className="text-xl font-bold text-pink-400 mb-4">Tinder Roleplay</h2>
           <p className="text-zinc-400 text-sm mb-8">Play as your crush and chat guys up, or talk to her as the beta.</p>
           <div className="space-y-3">
-            <button onClick={() => startTinder(true)} className="w-full py-4 rounded-2xl bg-pink-600 font-medium">
+            <button onClick={() => startTinder(true)} className="w-full py-4 rounded-2xl bg-pink-600 font-medium hover:bg-pink-500">
               Play as the Girl
             </button>
-            <button onClick={() => startTinder(false)} className="w-full py-4 rounded-2xl bg-zinc-800 font-medium">
+            <button onClick={() => startTinder(false)} className="w-full py-4 rounded-2xl bg-zinc-800 font-medium hover:bg-zinc-700">
               Talk to Her as Yourself
+            </button>
+            <button onClick={() => setView("reject")} className="w-full py-3 rounded-2xl bg-red-900/40 border border-red-800 text-sm text-red-300">
+              Or upload a rejection screenshot →
             </button>
           </div>
         </main>
       )}
 
-      {/* CRUSH HELPER */}
       {view === "crush" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Crush Helper</h2>
@@ -392,7 +449,7 @@ export default function VelvetMotion() {
 
           <div
             onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-zinc-700 rounded-2xl p-8 text-center cursor-pointer hover:border-pink-500/40 mb-6"
+            className="border-2 border-dashed border-zinc-700 rounded-2xl p-8 text-center cursor-pointer hover:border-pink-500/40 mb-6 bg-zinc-900/30"
           >
             {crushImage ? (
               <img src={crushImage} alt="Crush" className="w-32 h-40 object-cover rounded-xl mx-auto" />
@@ -411,7 +468,7 @@ export default function VelvetMotion() {
                 setView("chat");
                 setMessages([{ role: "assistant", content: "I’m her now.\n\nWhat do you want me to do?\n\nNudes, blowjob, SPH, blacked, JOI… just say it." }]);
               }}
-              className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold"
+              className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold hover:bg-pink-500"
             >
               Enter Private Room with Her
             </button>
@@ -419,7 +476,6 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* GALLERY */}
       {view === "gallery" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-1">Your Gallery</h2>
@@ -459,7 +515,6 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* SAVED */}
       {view === "saved" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-4">Saved Sessions</h2>
@@ -471,7 +526,7 @@ export default function VelvetMotion() {
                 <button
                   key={s.id}
                   onClick={() => loadSession(s)}
-                  className="w-full p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left"
+                  className="w-full p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/40"
                 >
                   <div className="font-medium text-sm">{s.title}</div>
                   <div className="text-xs text-zinc-500 mt-1">{new Date(s.createdAt).toLocaleString()}</div>
@@ -482,9 +537,8 @@ export default function VelvetMotion() {
         </main>
       )}
 
-      {/* CHAT */}
       {view === "chat" && (
-        <div className="flex flex-col h-[calc(100vh-57px)] max-w-lg mx-auto">
+        <div className="flex flex-col h-[calc(100vh-61px)] max-w-lg mx-auto">
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
