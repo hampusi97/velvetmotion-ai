@@ -11,14 +11,14 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Improved fictional generation
 - Full Interactive Character Creator
 - 20 preset Fictional Girls + custom ones
-- **Enhanced Tinder Roleplay** — play as the girl or as the guy she matched with, with easy switching
+- Enhanced Tinder Roleplay (dual perspective)
+- **Improved BNWO Section** — Training, Cuck, and Worship modes
 - Multi-girl groups
 - Expanded story scenarios
 - Crush Helper
 - Rejection Revenge
 - Story Packs
 - JOI Center
-- BNWO Section
 - Group Chat
 - Personal Gallery with Export All
 - Saved Sessions
