@@ -21,9 +21,10 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Continue Last Session button
 - Session memory
 - Suggest a Feature button
-- **Favorite Girl** pin
-- **Mood system**
-- **Daily Challenge** (edge + tribute)
+- Favorite Girl pin
+- Mood system
+- Daily Challenge
+- **Goon Room** — chat with other guys (demo)
 - Crush Helper
 - Rejection Revenge
 - Story Packs
