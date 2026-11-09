@@ -8,22 +8,16 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 - Age Gate (18+)
 - Login system
-- Improved fictional generation (styles, Generate Nude / Sex Video buttons)
-- **Full Interactive Character Creator** — create your own fictional girls with:
-  - Custom name
-  - Voice style
-  - Personality
-  - Kinks
-  - Intensity slider
-  - Instant chat start
-- 20 preset Fictional Girls + your custom ones
+- Improved fictional generation
+- Full Interactive Character Creator
+- 20 preset Fictional Girls + custom ones
+- **Enhanced Tinder Roleplay** — play as the girl or as the guy she matched with, with easy switching
 - Multi-girl groups
 - Expanded story scenarios
 - Crush Helper
 - Rejection Revenge
 - Story Packs
 - JOI Center
-- Tinder Roleplay
 - BNWO Section
 - Group Chat
 - Personal Gallery with Export All
@@ -47,7 +41,6 @@ npm run dev
 - 18+ only
 - **All content is fantasy / fictional characters only**
 - Do not use real people’s photos
-- Generation uses enhanced fictional placeholders
 
 ## Stack
 
