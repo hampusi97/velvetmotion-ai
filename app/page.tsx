@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 
-type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject" | "forum" | "login" | "affiliate";
+type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved" | "reject" | "forum" | "login" | "affiliate" | "leaderboard";
 
 interface MediaItem {
   id: string;
@@ -67,6 +67,7 @@ export default function VelvetMotion() {
   const [generating, setGenerating] = useState<"image" | "video" | null>(null);
   const [tributes, setTributes] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [coins, setCoins] = useState(50);
   const [dailyMsg, setDailyMsg] = useState<string | null>(null);
   const [showDaily, setShowDaily] = useState(false);
   const [crushImage, setCrushImage] = useState<string | null>(null);
@@ -104,19 +105,19 @@ export default function VelvetMotion() {
     const st = localStorage.getItem("velvet-streak");
     const refs = localStorage.getItem("velvet-referrals");
     const earn = localStorage.getItem("velvet-earnings");
+    const c = localStorage.getItem("velvet-coins");
     if (g) setGallery(JSON.parse(g));
     if (s) setSavedSessions(JSON.parse(s));
     if (t) setTributes(Number(t));
     if (st) setStreak(Number(st));
     if (refs) setReferrals(Number(refs));
     if (earn) setEarnings(Number(earn));
+    if (c) setCoins(Number(c));
 
-    // Capture referral from URL
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
     if (ref && !localStorage.getItem("velvet-referred-by")) {
       localStorage.setItem("velvet-referred-by", ref);
-      // In real app this would credit the referrer via backend
     }
 
     const last = localStorage.getItem("velvet-last-daily");
@@ -136,6 +137,11 @@ export default function VelvetMotion() {
       const newStreak = (Number(st) || 0) + 1;
       setStreak(newStreak);
       localStorage.setItem("velvet-streak", String(newStreak));
+
+      // Daily free coins
+      const newCoins = (Number(c) || 50) + 20;
+      setCoins(newCoins);
+      localStorage.setItem("velvet-coins", String(newCoins));
     }
   }, []);
 
@@ -173,11 +179,10 @@ export default function VelvetMotion() {
     localStorage.setItem("velvet-forum-paid", "true");
     setForumPaid(true);
 
-    // Credit the referrer (demo)
     const referredBy = localStorage.getItem("velvet-referred-by");
     if (referredBy) {
       const currentRefs = Number(localStorage.getItem("velvet-referrals") || 0) + 1;
-      const currentEarn = Number(localStorage.getItem("velvet-earnings") || 0) + 3.00; // 30% of $9.99
+      const currentEarn = Number(localStorage.getItem("velvet-earnings") || 0) + 3.00;
       localStorage.setItem("velvet-referrals", String(currentRefs));
       localStorage.setItem("velvet-earnings", String(currentEarn));
       setReferrals(currentRefs);
@@ -190,7 +195,11 @@ export default function VelvetMotion() {
   const copyReferralLink = () => {
     const link = `${window.location.origin}?ref=${referralCode}`;
     navigator.clipboard.writeText(link);
-    alert("Referral link copied!");
+    // Bonus coins for sharing
+    const newCoins = coins + 10;
+    setCoins(newCoins);
+    localStorage.setItem("velvet-coins", String(newCoins));
+    alert("Referral link copied! +10 coins");
   };
 
   const saveGallery = (items: MediaItem[]) => {
@@ -269,6 +278,7 @@ export default function VelvetMotion() {
   }
 
   async function generateMedia(type: "image" | "video") {
+    // Generations are always free / unlimited as requested
     setGenerating(type);
     await new Promise(r => setTimeout(r, type === "video" ? 2600 : 1500));
 
@@ -390,7 +400,7 @@ export default function VelvetMotion() {
           <div className="w-8 h-8 rounded-full border-2 border-pink-500 flex items-center justify-center text-pink-400 text-sm font-bold">♥</div>
           <div>
             <div className="font-bold tracking-widest text-sm">VELVET<span className="text-pink-500">MOTION</span></div>
-            <div className="text-[10px] text-zinc-500 -mt-0.5">{userEmail.split("@")[0]} • {tributes} tributes • {streak}d</div>
+            <div className="text-[10px] text-zinc-500 -mt-0.5">{userEmail.split("@")[0]} • {coins} coins • {streak}d</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -406,7 +416,7 @@ export default function VelvetMotion() {
           <div className="text-center pt-6 pb-8">
             <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-500">VelvetMotion</h1>
             <p className="text-zinc-400 text-sm mt-2">Your private fantasy control room</p>
-            <div className="mt-3 text-xs text-pink-400">{streak} day streak</div>
+            <div className="mt-3 text-xs text-pink-400">{streak} day streak • {coins} coins</div>
           </div>
 
           <div className="grid grid-cols-2 gap-3.5">
@@ -450,28 +460,53 @@ export default function VelvetMotion() {
               <div className="font-bold">Forum {forumPaid ? "" : "🔒"}</div>
               <div className="text-xs text-zinc-400 mt-1">{forumPaid ? "Unlocked" : "Pay to unlock"}</div>
             </button>
-            <button onClick={() => setView("affiliate")} className="p-5 rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-900 text-left hover:scale-[1.02] transition col-span-2">
-              <div className="font-bold">Affiliate Program</div>
-              <div className="text-xs text-white/80 mt-1">Earn 30% when people pay via your link</div>
+            <button onClick={() => setView("affiliate")} className="p-5 rounded-2xl bg-gradient-to-br from-emerald-800 to-teal-900 text-left hover:scale-[1.02] transition">
+              <div className="font-bold">Affiliate</div>
+              <div className="text-xs text-white/80 mt-1">Earn 30% + free coins</div>
+            </button>
+            <button onClick={() => setView("leaderboard")} className="p-5 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-left hover:border-pink-500/50 transition">
+              <div className="font-bold">Leaderboard</div>
+              <div className="text-xs text-zinc-400 mt-1">Top referrers</div>
             </button>
           </div>
 
           <div className="mt-8 p-5 rounded-2xl bg-zinc-900/60 border border-pink-900/40">
-            <div className="text-pink-300 font-semibold mb-2">Tribute System</div>
-            <p className="text-xs text-zinc-400 leading-relaxed">Generate a photo → cum on it → mark as tribute.</p>
+            <div className="text-pink-300 font-semibold mb-2">Free forever</div>
+            <p className="text-xs text-zinc-400 leading-relaxed">Unlimited chat + unlimited photo & video generation. Forum and some extras are paid. Share your link to earn coins and money.</p>
           </div>
+        </main>
+      )}
+
+      {view === "leaderboard" && (
+        <main className="max-w-lg mx-auto p-4 pb-20">
+          <h2 className="text-xl font-bold text-pink-400 mb-4">Leaderboard</h2>
+          <div className="space-y-2">
+            <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 flex justify-between">
+              <span>You</span>
+              <span className="text-pink-400">{referrals} referrals</span>
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 flex justify-between text-zinc-500">
+              <span>Anonymous</span>
+              <span>24 referrals</span>
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 flex justify-between text-zinc-500">
+              <span>BetaKing</span>
+              <span>18 referrals</span>
+            </div>
+          </div>
+          <p className="text-xs text-zinc-600 mt-6 text-center">Demo leaderboard. Real one would show live data.</p>
         </main>
       )}
 
       {view === "affiliate" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Affiliate Program</h2>
-          <p className="text-zinc-500 text-sm mb-6">Share your link. Earn 30% of every Forum payment from people you refer.</p>
+          <p className="text-zinc-500 text-sm mb-6">Share your link. Earn 30% of Forum payments + free coins every time you share.</p>
 
           <div className="p-5 rounded-2xl bg-zinc-900 border border-emerald-900/40 mb-6">
             <div className="text-xs text-zinc-500 mb-1">Your referral link</div>
             <div className="font-mono text-sm break-all text-emerald-300 mb-4">{typeof window !== "undefined" ? `${window.location.origin}?ref=${referralCode}` : `?ref=${referralCode}`}</div>
-            <button onClick={copyReferralLink} className="w-full py-3 rounded-xl bg-emerald-600 font-medium hover:bg-emerald-500">Copy Link</button>
+            <button onClick={copyReferralLink} className="w-full py-3 rounded-xl bg-emerald-600 font-medium hover:bg-emerald-500">Copy Link (+10 coins)</button>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-6">
@@ -485,7 +520,7 @@ export default function VelvetMotion() {
             </div>
           </div>
 
-          <p className="text-xs text-zinc-600 leading-relaxed">Demo system. In production this would be backed by a real database and Stripe Connect so payouts happen automatically.</p>
+          <p className="text-xs text-zinc-600 leading-relaxed">Chat and all generations stay free forever. Affiliate rewards make sharing worth it.</p>
         </main>
       )}
 
@@ -496,9 +531,9 @@ export default function VelvetMotion() {
             <div className="text-center py-12">
               <div className="text-5xl mb-4">🔒</div>
               <p className="text-lg font-medium mb-2">Forum is locked</p>
-              <p className="text-zinc-400 text-sm mb-8">Unlock access to other users’ girls, posts, and generated sets.</p>
+              <p className="text-zinc-400 text-sm mb-8">Unlock access to other users’ girls and posts. Affiliates earn 30%.</p>
               <button onClick={unlockForum} className="w-full py-4 rounded-2xl bg-pink-600 font-semibold text-lg hover:bg-pink-500">Unlock Forum — $9.99 / month</button>
-              <p className="text-xs text-zinc-600 mt-4">Demo button — real Stripe Checkout can replace this. Affiliates earn 30%.</p>
+              <p className="text-xs text-zinc-600 mt-4">Demo button — real Stripe Checkout can replace this.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -512,19 +547,18 @@ export default function VelvetMotion() {
                 <div className="text-xs text-zinc-500 mt-1">SPH JOI of his crush • 8 tributes</div>
                 <div className="mt-3 h-32 bg-zinc-800 rounded-xl flex items-center justify-center text-zinc-600 text-sm">Blurred preview</div>
               </div>
-              <p className="text-xs text-zinc-600 text-center mt-6">More posts appear as other users generate content.</p>
             </div>
           )}
         </main>
       )}
 
-      {/* Remaining views (reject, packs, joi, tinder, crush, gallery, saved, chat) are unchanged from previous version */}
+      {/* Other views remain as before */}
       {view === "reject" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Rejection Revenge</h2>
           <p className="text-zinc-500 text-sm mb-6">Screenshot the girl who rejected you on Tinder → pretend to be her or make her yours</p>
           <div onClick={() => rejectFileRef.current?.click()} className="border-2 border-dashed border-red-900/50 rounded-2xl p-8 text-center cursor-pointer hover:border-pink-500/60 mb-6 bg-zinc-900/40">
-            {rejectImage ? <img src={rejectImage} alt="Rejected" className="w-40 h-52 object-cover rounded-xl mx-auto border border-pink-900/40" /> : <><div className="text-4xl mb-3">📱</div><div className="text-sm text-zinc-400">Upload Tinder screenshot</div><div className="text-xs text-zinc-600 mt-1">The girl who swiped left</div></>}
+            {rejectImage ? <img src={rejectImage} alt="Rejected" className="w-40 h-52 object-cover rounded-xl mx-auto border border-pink-900/40" /> : <><div className="text-4xl mb-3">📱</div><div className="text-sm text-zinc-400">Upload Tinder screenshot</div></>}
           </div>
           <input ref={rejectFileRef} type="file" accept="image/*" className="hidden" onChange={handleRejectUpload} />
           {rejectImage && (
@@ -583,7 +617,7 @@ export default function VelvetMotion() {
       {view === "crush" && (
         <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Crush Helper</h2>
-          <p className="text-zinc-500 text-sm mb-6">Upload any photo → generate nudes, sex videos, SPH, Blacked & more</p>
+          <p className="text-zinc-500 text-sm mb-6">Upload any photo → generate nudes, sex videos, SPH, Blacked & more (always free)</p>
           <div onClick={() => fileRef.current?.click()} className="border-2 border-dashed border-zinc-700 rounded-2xl p-8 text-center cursor-pointer hover:border-pink-500/40 mb-6 bg-zinc-900/30">
             {crushImage ? <img src={crushImage} alt="Crush" className="w-32 h-40 object-cover rounded-xl mx-auto" /> : <><div className="text-4xl mb-2">📷</div><div className="text-sm text-zinc-400">Tap to upload her photo</div></>}
           </div>
