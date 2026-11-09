@@ -10,14 +10,14 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Login system
 - Improved fictional generation
 - Full Interactive Character Creator
-- 23+ Fictional Girls (including original adult-film style characters) + custom ones
+- 23+ Fictional Girls + custom ones
 - Enhanced Tinder Roleplay
 - Improved BNWO Section
 - Multi-girl groups
 - Expanded story scenarios & JOI styles
-- Timed JOI sessions (in progress)
+- **Timed JOI sessions** with countdown
+- **Continue Last Session** button
 - Session memory
-- Continue last session
 - Crush Helper
 - Rejection Revenge
 - Story Packs
