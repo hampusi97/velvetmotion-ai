@@ -1,6 +1,8 @@
 # VelvetMotion AI
 
-Professional NSFW AI Girlfriend / Fantasy platform (fictional characters only).
+Professional NSFW AI Girlfriend / Fantasy platform.
+
+**All content is fantasy. You should only upload photos of yourself.**
 
 ## Features
 
@@ -8,16 +10,10 @@ Professional NSFW AI Girlfriend / Fantasy platform (fictional characters only).
 - Login system
 - Unlimited free chat + photo/video generation
 - Improved UI
-- **16 Fictional Girls** with expanded customization:
-  - Voice style
-  - Personality traits
-  - Kink checklist
-  - Intensity level
-  - Nickname / how she addresses you
-  - Session memory
+- 16 Fictional Girls with customizable voice, personality, kinks, and memory
 - Multi-girl groups
 - Expanded story scenarios
-- Crush Helper
+- Crush Helper (upload your own photos only)
 - Rejection Revenge
 - Story Packs
 - JOI Center
@@ -43,8 +39,9 @@ npm run dev
 ## Important
 
 - 18+ only
-- Fantasy / fictional characters only
-- Do not use real people’s photos without consent
+- **All content is fantasy**
+- **Only upload photos of yourself**
+- Do not use other people’s photos
 - Login, payment, and affiliate tracking are currently demo (localStorage)
 
 ## Stack
