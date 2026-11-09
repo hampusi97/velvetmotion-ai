@@ -4,7 +4,7 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 **All content is fantasy. Fictional characters only.**
 
-## All Features Implanted
+## Features
 
 - Age Gate (18+)
 - Login system
@@ -19,12 +19,13 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Expanded kinks & JOI styles
 - Timed JOI sessions
 - Continue Last Session button
-- Session memory
+- Session memory foundation
 - Suggest a Feature button
 - Favorite Girl pin
 - Mood system
 - Daily Challenge
-- Goon Room (chat with other guys)
+- Goon Room (demo)
+- Voice-style foundation
 - Crush Helper
 - Rejection Revenge
 - Story Packs
@@ -37,6 +38,13 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Affiliate Program
 - Leaderboard
 - Daily messages
+
+## Next high-impact ideas
+
+- Real backend for Goon Room + suggestions
+- Actual TTS for voice messages
+- Stronger persistent session memory
+- Mobile polish and animations
 
 ## Getting Started
 
