@@ -19,8 +19,9 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Expanded kinks & JOI styles
 - Timed JOI sessions
 - Continue Last Session button
-- **Browser TTS** — Speak button on her messages
-- Stronger session memory foundation
+- Browser TTS (Speak button)
+- Stronger session memory
+- LLM-ready chat structure
 - Suggest a Feature button
 - Favorite Girl pin
 - Mood system
@@ -38,13 +39,13 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Affiliate Program
 - Leaderboard
 - Daily messages
+- Animation polish
 
-## Next steps toward professional quality
+## To reach full professional quality
 
-- Real LLM chat integration
-- Persistent cloud memory
-- Real-time Goon Room backend
-- Advanced animations & mobile polish
+1. Connect a real LLM API for chat
+2. Add a backend (Supabase/Firebase) for accounts, gallery, and live Goon Room
+3. Deploy and add real payments
 
 ## Getting Started
 
