@@ -10,7 +10,7 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Login system
 - Improved fictional generation
 - Full Interactive Character Creator
-- **Generate New Girl** button (random fictional girl)
+- Generate New Girl button
 - 23+ Fictional Girls + custom ones
 - Romance Mode
 - Enhanced Tinder Roleplay
@@ -20,6 +20,7 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Timed JOI sessions
 - Continue Last Session button
 - Session memory
+- **Suggest a Feature** button (users can request anything)
 - Crush Helper
 - Rejection Revenge
 - Story Packs
