@@ -4,9 +4,10 @@ NSFW AI Girlfriend / Fantasy platform built for maximum addiction.
 
 ## Features
 
-- **Homescreen Dashboard** – Easy access to every function
+- **Homescreen Dashboard** – Easy access to every function (polished UI)
 - **Crush Helper** – Upload any photo → generate explicit photos & videos of her
-- **Story Packs** – One-tap BNWO, Cuck, Blacked, Taboo scenarios
+- **Rejection Revenge** – Upload a Tinder screenshot of a girl who rejected you → pretend to be her or make her yours
+- **Story Packs** – One-tap BNWO, Cuck, Blacked, Taboo scenarios (including Rejection Revenge pack)
 - **JOI Center** – Classic, SPH, CEI, Ruin, Edge, Cuck, Blacked, Findom, Voice
 - **Tinder Roleplay** – Play as her or talk to her as the beta
 - **BNWO Section** – Dedicated Black New World Order training
