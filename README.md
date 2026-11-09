@@ -19,13 +19,13 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Expanded kinks & JOI styles
 - Timed JOI sessions
 - Continue Last Session button
-- Session memory foundation
+- **Browser TTS** — Speak button on her messages
+- Stronger session memory foundation
 - Suggest a Feature button
 - Favorite Girl pin
 - Mood system
 - Daily Challenge
 - Goon Room (demo)
-- Voice-style foundation
 - Crush Helper
 - Rejection Revenge
 - Story Packs
@@ -39,12 +39,12 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Leaderboard
 - Daily messages
 
-## Next high-impact ideas
+## Next steps toward professional quality
 
-- Real backend for Goon Room + suggestions
-- Actual TTS for voice messages
-- Stronger persistent session memory
-- Mobile polish and animations
+- Real LLM chat integration
+- Persistent cloud memory
+- Real-time Goon Room backend
+- Advanced animations & mobile polish
 
 ## Getting Started
 
