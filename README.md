@@ -11,11 +11,11 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Improved fictional generation
 - Full Interactive Character Creator
 - 23+ Fictional Girls + custom ones
-- **Romance Mode** — she seems genuinely interested, not just sexual
+- Romance Mode
 - Enhanced Tinder Roleplay
 - Improved BNWO Section
 - Multi-girl groups
-- Expanded story scenarios & JOI styles
+- **Expanded kinks & JOI styles**: Classic, SPH, CEI, Ruin, Edge, Cuck, Blacked, Findom, Voice, Chastity, Cock Worship, Orgasm Denial, Public Risk, Group Use, Foot Fetish, BDSM Light, Breeding, Anal Focus
 - Timed JOI sessions
 - Continue Last Session button
 - Session memory
