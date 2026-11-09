@@ -6,17 +6,20 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 ## Features
 
-- Age Gate (18+) with fantasy disclaimer
+- Age Gate (18+)
 - Login system
-- **Improved fictional generation**:
-  - Better prompts and variety
-  - Style options (realistic, anime, close-up, full body, bedroom, shower)
-  - Stronger “Generate Nude” and “Generate Sex Video” buttons
-  - Higher-quality fictional placeholder media
-- 20 Fictional Girls with customizable voice, personality, kinks, intensity, nickname, and memory
+- Improved fictional generation (styles, Generate Nude / Sex Video buttons)
+- **Full Interactive Character Creator** — create your own fictional girls with:
+  - Custom name
+  - Voice style
+  - Personality
+  - Kinks
+  - Intensity slider
+  - Instant chat start
+- 20 preset Fictional Girls + your custom ones
 - Multi-girl groups
 - Expanded story scenarios
-- Crush Helper (fantasy framing)
+- Crush Helper
 - Rejection Revenge
 - Story Packs
 - JOI Center
@@ -27,7 +30,7 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Saved Sessions
 - Tribute System
 - Streak + Coins
-- Forum (paid unlock)
+- Forum (paid)
 - Affiliate Program
 - Leaderboard
 - Daily messages
@@ -44,7 +47,6 @@ npm run dev
 - 18+ only
 - **All content is fantasy / fictional characters only**
 - Do not use real people’s photos
-- Login, payment, and affiliate tracking are currently demo (localStorage)
 - Generation uses enhanced fictional placeholders
 
 ## Stack
