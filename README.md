@@ -4,18 +4,16 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 **All content is fantasy. You should only upload photos of yourself.**
 
-These disclaimers are shown in the site UI (age gate and top banner).
-
 ## Features
 
 - Age Gate (18+) with fantasy disclaimer
 - Login system
-- Unlimited free chat + photo/video generation
+- Unlimited free chat + photo/video generation (placeholders)
 - Improved UI
-- 16 Fictional Girls with customizable voice, personality, kinks, and memory
+- **20 Fictional Girls** with customizable voice, personality, kinks, intensity, nickname, and memory
 - Multi-girl groups
-- Expanded story scenarios
-- Crush Helper (upload your own photos only)
+- Expanded story scenarios and packs
+- Crush Helper (own photos only, fantasy framing)
 - Rejection Revenge
 - Story Packs
 - JOI Center
@@ -45,6 +43,7 @@ npm run dev
 - **Only upload photos of yourself**
 - Do not use other people’s photos
 - Login, payment, and affiliate tracking are currently demo (localStorage)
+- Generation uses placeholders
 
 ## Stack
 
