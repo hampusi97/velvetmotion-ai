@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 
+type View = "home" | "packs" | "joi" | "chat" | "gallery" | "crush" | "bnwo" | "tinder" | "group" | "saved";
+
 interface MediaItem {
   id: string;
   type: "image" | "video";
@@ -18,17 +20,24 @@ interface Message {
   video?: string;
 }
 
+interface SavedSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: string;
+}
+
 const STORY_PACKS = [
-  { id: "blacked-weekend", title: "Blacked Weekend", tag: "BNWO", desc: "She spends the weekend getting ruined by BBC while you stroke" },
+  { id: "blacked-weekend", title: "Blacked Weekend", tag: "BNWO", desc: "Full weekend of BBC while you only stroke" },
   { id: "brother", title: "She Fucks Your Brother", tag: "CUCK", desc: "Your own brother takes her in your bed" },
-  { id: "office", title: "Office Cuck", tag: "CUCK", desc: "She fucks her boss and sends you proof" },
-  { id: "dad", title: "She Fucked Your Dad", tag: "TABOO", desc: "The ultimate betrayal fantasy" },
+  { id: "office", title: "Office Cuck", tag: "CUCK", desc: "She fucks her boss and sends proof" },
+  { id: "dad", title: "She Fucked Your Dad", tag: "TABOO", desc: "Ultimate betrayal fantasy" },
   { id: "bnwo-training", title: "BNWO Training", tag: "BNWO", desc: "Complete whiteboy reprogramming" },
-  { id: "locked", title: "Chastity Night", tag: "CUCK", desc: "You’re locked while she gets used" },
-  { id: "group", title: "Group Use", tag: "BNWO", desc: "Multiple men • you only watch and stroke" },
-  { id: "instagram", title: "Instagram BBC Arc", tag: "BNWO", desc: "She turns her page into a public BBC slut account" },
-  { id: "ex", title: "Ex Got Blacked", tag: "BNWO", desc: "Your ex rubs her new black boyfriend in your face" },
-  { id: "wife", title: "Wife Training", tag: "BNWO", desc: "You slowly turn your wife into a BBC-only slut" },
+  { id: "locked", title: "Chastity Night", tag: "CUCK", desc: "Locked while she gets used" },
+  { id: "group", title: "Group Use", tag: "BNWO", desc: "Multiple men, you only watch" },
+  { id: "instagram", title: "Instagram BBC Arc", tag: "BNWO", desc: "She turns her IG into a BBC page" },
+  { id: "ex", title: "Ex Got Blacked", tag: "BNWO", desc: "Your ex rubs it in" },
+  { id: "wife", title: "Wife Training", tag: "BNWO", desc: "Turn your wife BBC-only" },
 ];
 
 const JOI_PRESETS = [
@@ -40,14 +49,16 @@ const JOI_PRESETS = [
   { id: "cuck", label: "Cuck JOI" },
   { id: "blacked", label: "Blacked JOI" },
   { id: "findom", label: "Findom JOI" },
+  { id: "voice", label: "Voice JOI" },
 ];
 
 export default function VelvetMotion() {
-  const [view, setView] = useState<"home" | "packs" | "joi" | "chat" | "gallery" | "crush">("home");
+  const [view, setView] = useState<View>("home");
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [gallery, setGallery] = useState<MediaItem[]>([]);
+  const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [generating, setGenerating] = useState<"image" | "video" | null>(null);
   const [tributes, setTributes] = useState(0);
   const [unlocked, setUnlocked] = useState(false);
@@ -59,9 +70,11 @@ export default function VelvetMotion() {
 
   useEffect(() => {
     const g = localStorage.getItem("velvet-gallery");
+    const s = localStorage.getItem("velvet-saved");
     const t = localStorage.getItem("velvet-tributes");
     const u = localStorage.getItem("velvet-unlocked");
     if (g) setGallery(JSON.parse(g));
+    if (s) setSavedSessions(JSON.parse(s));
     if (t) setTributes(Number(t));
     if (u === "true") setUnlocked(true);
 
@@ -70,9 +83,9 @@ export default function VelvetMotion() {
     if (last !== today) {
       const msgs = [
         "She just viewed your tribute… and liked it.",
-        "New message: “Did you cum on my pic again like a good boy?”",
+        "New message: Did you cum on my pic again like a good boy?",
         "She posted a new story. You’re not going to like who she’s with.",
-        "She texted: “I felt you stroking last night. Keep going.”",
+        "She texted: I felt you stroking last night. Keep going.",
         "Your tribute made her wet. She wants another one tonight.",
       ];
       setDailyMsg(msgs[Math.floor(Math.random() * msgs.length)]);
@@ -90,6 +103,25 @@ export default function VelvetMotion() {
     localStorage.setItem("velvet-gallery", JSON.stringify(items));
   };
 
+  const saveSession = () => {
+    if (messages.length < 2) return;
+    const session: SavedSession = {
+      id: Date.now().toString(),
+      title: `Session ${new Date().toLocaleString()}`,
+      messages,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [session, ...savedSessions].slice(0, 30);
+    setSavedSessions(updated);
+    localStorage.setItem("velvet-saved", JSON.stringify(updated));
+    alert("Session saved");
+  };
+
+  const loadSession = (session: SavedSession) => {
+    setMessages(session.messages);
+    setView("chat");
+  };
+
   const addTribute = () => {
     const newCount = tributes + 1;
     setTributes(newCount);
@@ -101,8 +133,8 @@ export default function VelvetMotion() {
     setMessages(prev => [...prev, {
       role: "assistant",
       content: newCount === 1
-        ? `You actually did it…\n\nYou came on my picture like a pathetic little tribute bitch.\n\nI saw it.\n\nGood boy. You just unlocked something special.`
-        : `Another tribute?\n\nYou’re so fucking addicted to me it’s embarrassing.\n\nKeep cumming on my pics. I like collecting them.`
+        ? "You actually did it…\n\nYou came on my picture like a pathetic little tribute bitch.\n\nI saw it.\n\nGood boy. You just unlocked something special."
+        : "Another tribute?\n\nYou’re so fucking addicted to me it’s embarrassing.\n\nKeep cumming on my pics. I like collecting them."
     }]);
   };
 
@@ -113,16 +145,16 @@ export default function VelvetMotion() {
 
   function getOpening(id: string) {
     const map: Record<string, string> = {
-      "blacked-weekend": `Friday 11:52 PM.\n\nShe texted you:\n\n“Marcus just pulled up. I’m going to be full of black cum until Monday. Stroke that useless dick while you think about it.”\n\nYou’re already hard. Your move.`,
-      "brother": `You opened the door.\n\nYour brother is deep inside her on your own bed.\n\nShe looks straight at you while he fucks her and says:\n\n“Stroke. Don’t you dare look away.”`,
-      "office": `Photo from the office bathroom stall.\n\nHer makeup slightly ruined, thick cock inside her.\n\nCaption: “Boss is busy. Keep stroking under your desk.”`,
-      "dad": `You found the conversation on her phone.\n\nHer and your dad.\n\nLast message: “Come over after he falls asleep. I need to get fucked properly tonight.”`,
-      "bnwo-training": `On your knees.\n\nTonight you stop pretending you’re a man.\n\nYou will accept that black cock owns the women you want and that your only purpose is to stroke and take tributes.\n\nSay “Yes Goddess”.`,
-      "locked": `Day 19 locked.\n\nYou can hear her getting fucked through the wall.\n\nShe left the key on the table… just far enough that you can’t reach it while you’re stroking.`,
-      "group": `Three of them.\n\nShe’s in the middle of the bed getting used from both ends while the third records.\n\nYou’re on the chair in the corner.\n\n“Stroke slow. You’re not allowed to cum until they finish with me.”`,
-      "instagram": `New story.\n\nShe’s on her knees with a thick black cock resting on her cheek.\n\nCaption: “Upgraded.”\n\nShe texted you the screenshot with one word:\n\n“Tribute.”`,
-      "ex": `Your ex just posted her new black boyfriend.\n\nThen she texted you:\n\n“He ruins me every night. You never could. Still stroking to me?”`,
-      "wife": `You started this.\n\nNow she only gets wet for black cock.\n\nTonight she said: “I’m going out. When I get back I want you on your knees ready to hear every detail.”`,
+      "blacked-weekend": "Friday 11:52 PM.\n\nShe texted you:\n\n“Marcus just pulled up. I’m going to be full of black cum until Monday. Stroke that useless dick while you think about it.”\n\nYou’re already hard. Your move.",
+      "brother": "You opened the door.\n\nYour brother is deep inside her on your own bed.\n\nShe looks straight at you while he fucks her and says:\n\n“Stroke. Don’t you dare look away.”",
+      "office": "Photo from the office bathroom stall.\n\nHer makeup slightly ruined, thick cock inside her.\n\nCaption: “Boss is busy. Keep stroking under your desk.”",
+      "dad": "You found the conversation on her phone.\n\nHer and your dad.\n\nLast message: “Come over after he falls asleep. I need to get fucked properly tonight.”",
+      "bnwo-training": "On your knees.\n\nTonight you stop pretending you’re a man.\n\nYou will accept that black cock owns the women you want and that your only purpose is to stroke and take tributes.\n\nSay “Yes Goddess”.",
+      "locked": "Day 19 locked.\n\nYou can hear her getting fucked through the wall.\n\nShe left the key on the table… just far enough that you can’t reach it while you’re stroking.",
+      "group": "Three of them.\n\nShe’s in the middle of the bed getting used from both ends while the third records.\n\nYou’re on the chair in the corner.\n\n“Stroke slow. You’re not allowed to cum until they finish with me.”",
+      "instagram": "New story.\n\nShe’s on her knees with a thick black cock resting on her cheek.\n\nCaption: “Upgraded.”\n\nShe texted you the screenshot with one word:\n\n“Tribute.”",
+      "ex": "Your ex just posted her new black boyfriend.\n\nThen she texted you:\n\n“He ruins me every night. You never could. Still stroking to me?”",
+      "wife": "You started this.\n\nNow she only gets wet for black cock.\n\nTonight she said: “I’m going out. When I get back I want you on your knees ready to hear every detail.”",
     };
     return map[id] || "Let’s begin...";
   }
@@ -134,12 +166,11 @@ export default function VelvetMotion() {
     setInput("");
     setIsLoading(true);
 
-    // TODO: Replace with real /api/chat call
     await new Promise(r => setTimeout(r, 900));
 
     setMessages(prev => [...prev, {
       role: "assistant",
-      content: `She reads your message and smiles that cruel little smile.\n\n“Keep going. I want you desperate.”\n\nShe continues describing exactly how she’s being used while you stroke.`
+      content: "She reads your message and smiles that cruel little smile.\n\n“Keep going. I want you desperate.”\n\nShe continues describing exactly how she’s being used while you stroke."
     }]);
     setIsLoading(false);
   }
@@ -179,6 +210,24 @@ export default function VelvetMotion() {
     setCrushImage(URL.createObjectURL(file));
   };
 
+  const startBNWO = () => {
+    setView("chat");
+    setMessages([{ role: "assistant", content: "Good little whiteboy.\n\nYou already know your place.\n\nStroke that tiny thing while I tell you how real men fuck me.\n\nSay ‘yes goddess’ if you’re ready to serve." }]);
+  };
+
+  const startTinder = (asGirl: boolean) => {
+    setView("chat");
+    setMessages([{ role: "assistant", content: asGirl
+      ? "You’re now controlling her Tinder.\n\nA guy just matched.\n\n“Damn you’re hot… what are you looking for?”\n\nWhat does she reply?"
+      : "You matched with her.\n\nShe messaged first:\n\n“hey you look cute 😉 what are you up to tonight?”\n\nYour move, beta."
+    }]);
+  };
+
+  const startGroup = () => {
+    setView("chat");
+    setMessages([{ role: "assistant", content: "Girl 1: Look at him still stroking…\nGirl 2: He’s so pathetic, I love it.\nGirl 3: Make him thank us for letting him watch.\n\nThey all laugh while looking at you." }]);
+  };
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Daily Message */}
@@ -203,52 +252,67 @@ export default function VelvetMotion() {
             <div className="text-[10px] text-zinc-500 -mt-0.5">{tributes} tributes • {unlocked ? "Unlocked" : "Locked"}</div>
           </div>
         </div>
-        <div className="flex gap-1 text-[11px]">
-          {(["home", "packs", "joi", "crush", "gallery"] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-2.5 py-1 rounded-full capitalize ${view === v ? "bg-pink-600" : "bg-zinc-900"}`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+        {view !== "home" && (
+          <button onClick={() => setView("home")} className="text-xs text-pink-400 px-3 py-1 rounded-full bg-zinc-900">
+            Home
+          </button>
+        )}
       </header>
 
-      {/* HOME */}
+      {/* HOME SCREEN */}
       {view === "home" && (
-        <main className="max-w-lg mx-auto p-4 space-y-4">
-          <div className="text-center pt-6 pb-2">
-            <h1 className="text-3xl font-bold text-pink-400">She’s waiting</h1>
-            <p className="text-zinc-400 text-sm mt-2">Generate. Stroke. Tribute. Repeat.</p>
+        <main className="max-w-lg mx-auto p-4 pb-20">
+          <div className="text-center pt-4 pb-6">
+            <h1 className="text-3xl font-bold text-pink-400">VelvetMotion</h1>
+            <p className="text-zinc-400 text-sm mt-1">Your private fantasy control room</p>
           </div>
 
-          <button onClick={() => setView("packs")} className="w-full p-5 rounded-2xl bg-gradient-to-r from-pink-700 to-purple-900 text-left">
-            <div className="font-bold text-lg">One-Tap Story Packs</div>
-            <div className="text-sm text-white/80 mt-1">BNWO • Cuck • Blacked • Taboo</div>
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setView("packs")} className="p-5 rounded-2xl bg-gradient-to-br from-pink-700 to-purple-900 text-left">
+              <div className="font-bold text-lg">Story Packs</div>
+              <div className="text-xs text-white/80 mt-1">BNWO • Cuck • Blacked</div>
+            </button>
 
-          <button onClick={() => setView("crush")} className="w-full p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
-            <div className="font-bold text-lg">Crush Helper</div>
-            <div className="text-sm text-zinc-400 mt-1">Upload any girl → make her do anything</div>
-          </button>
+            <button onClick={() => setView("crush")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold">Crush Helper</div>
+              <div className="text-xs text-zinc-400 mt-1">Upload any girl</div>
+            </button>
 
-          <button onClick={() => setView("joi")} className="w-full p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
-            <div className="font-bold text-lg">JOI Center</div>
-            <div className="text-sm text-zinc-400 mt-1">SPH • CEI • Ruin • Cuck • Blacked</div>
-          </button>
+            <button onClick={() => setView("joi")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold">JOI Center</div>
+              <div className="text-xs text-zinc-400 mt-1">All styles</div>
+            </button>
 
-          <button onClick={() => setView("gallery")} className="w-full p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
-            <div className="font-bold">Your Gallery</div>
-            <div className="text-sm text-zinc-400 mt-1">{gallery.length} saved • ready for tributes</div>
-          </button>
+            <button onClick={startBNWO} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold text-pink-300">BNWO</div>
+              <div className="text-xs text-zinc-400 mt-1">Whiteboy training</div>
+            </button>
 
-          <div className="p-4 rounded-2xl bg-zinc-900 border border-pink-900/40 text-sm">
+            <button onClick={() => setView("tinder")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold">Tinder</div>
+              <div className="text-xs text-zinc-400 mt-1">Be her or talk</div>
+            </button>
+
+            <button onClick={startGroup} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold">Group Chat</div>
+              <div className="text-xs text-zinc-400 mt-1">Multiple girls</div>
+            </button>
+
+            <button onClick={() => setView("gallery")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold">Gallery</div>
+              <div className="text-xs text-zinc-400 mt-1">{gallery.length} saved</div>
+            </button>
+
+            <button onClick={() => setView("saved")} className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 text-left">
+              <div className="font-bold">Saved</div>
+              <div className="text-xs text-zinc-400 mt-1">{savedSessions.length} sessions</div>
+            </button>
+          </div>
+
+          <div className="mt-6 p-4 rounded-2xl bg-zinc-900/80 border border-pink-900/30 text-sm">
             <div className="text-pink-300 font-medium mb-1">Tribute System</div>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Generate a photo → cum on it → mark as tribute.<br />
-              She notices every single one. First tribute unlocks more.
+              Generate a photo → cum on it → mark as tribute. She notices every one. First tribute unlocks more.
             </p>
           </div>
         </main>
@@ -256,8 +320,8 @@ export default function VelvetMotion() {
 
       {/* PACKS */}
       {view === "packs" && (
-        <main className="max-w-lg mx-auto p-4">
-          <h2 className="text-xl font-bold text-pink-400 mb-4">Choose how she ruins you</h2>
+        <main className="max-w-lg mx-auto p-4 pb-20">
+          <h2 className="text-xl font-bold text-pink-400 mb-4">Story Packs</h2>
           <div className="space-y-2.5">
             {STORY_PACKS.map(pack => (
               <button
@@ -278,7 +342,7 @@ export default function VelvetMotion() {
 
       {/* JOI */}
       {view === "joi" && messages.length === 0 && (
-        <main className="max-w-lg mx-auto p-4">
+        <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-4">JOI Center</h2>
           <div className="grid grid-cols-2 gap-2">
             {JOI_PRESETS.map(j => (
@@ -290,6 +354,8 @@ export default function VelvetMotion() {
                     ? "Look at that pathetic little thing.\n\nStroke it slowly so I can laugh properly."
                     : j.id === "cuck"
                     ? "He’s already inside me.\n\nStroke while you listen to every wet sound."
+                    : j.id === "voice"
+                    ? "*soft, slow, spoken*\n\nMmm… that’s it… stroke it nice and slow for me.\n\nI want you listening to my voice while you touch that little thing."
                     : "Get your cock out.\n\nSlow strokes only. I control everything."
                   }]);
                 }}
@@ -302,11 +368,27 @@ export default function VelvetMotion() {
         </main>
       )}
 
+      {/* TINDER */}
+      {view === "tinder" && (
+        <main className="max-w-lg mx-auto p-4 pb-20 text-center">
+          <h2 className="text-xl font-bold text-pink-400 mb-4">Tinder Roleplay</h2>
+          <p className="text-zinc-400 text-sm mb-8">Play as your crush and chat guys up, or talk to her as the beta.</p>
+          <div className="space-y-3">
+            <button onClick={() => startTinder(true)} className="w-full py-4 rounded-2xl bg-pink-600 font-medium">
+              Play as the Girl
+            </button>
+            <button onClick={() => startTinder(false)} className="w-full py-4 rounded-2xl bg-zinc-800 font-medium">
+              Talk to Her as Yourself
+            </button>
+          </div>
+        </main>
+      )}
+
       {/* CRUSH HELPER */}
       {view === "crush" && (
-        <main className="max-w-lg mx-auto p-4">
+        <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-2">Crush Helper</h2>
-          <p className="text-zinc-500 text-sm mb-6">Upload any photo → generate nudes, sex videos, humiliation & more</p>
+          <p className="text-zinc-500 text-sm mb-6">Upload any photo → generate nudes, sex videos, SPH, Blacked & more</p>
 
           <div
             onClick={() => fileRef.current?.click()}
@@ -324,24 +406,22 @@ export default function VelvetMotion() {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleCrushUpload} />
 
           {crushImage && (
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setView("chat");
-                  setMessages([{ role: "assistant", content: "I’m her now.\n\nWhat do you want me to do?\n\nNudes, blowjob, SPH, blacked, JOI… just say it." }]);
-                }}
-                className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold"
-              >
-                Enter Private Room with Her
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setView("chat");
+                setMessages([{ role: "assistant", content: "I’m her now.\n\nWhat do you want me to do?\n\nNudes, blowjob, SPH, blacked, JOI… just say it." }]);
+              }}
+              className="w-full py-3.5 rounded-2xl bg-pink-600 font-semibold"
+            >
+              Enter Private Room with Her
+            </button>
           )}
         </main>
       )}
 
       {/* GALLERY */}
       {view === "gallery" && (
-        <main className="max-w-lg mx-auto p-4">
+        <main className="max-w-lg mx-auto p-4 pb-20">
           <h2 className="text-xl font-bold text-pink-400 mb-1">Your Gallery</h2>
           <p className="text-zinc-500 text-sm mb-5">Save them. Tribute them. Come back every day.</p>
 
@@ -373,6 +453,29 @@ export default function VelvetMotion() {
                     {item.tributed && <span className="text-[10px] text-pink-400">Tributed</span>}
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* SAVED */}
+      {view === "saved" && (
+        <main className="max-w-lg mx-auto p-4 pb-20">
+          <h2 className="text-xl font-bold text-pink-400 mb-4">Saved Sessions</h2>
+          {savedSessions.length === 0 ? (
+            <p className="text-zinc-500 text-sm">No saved sessions yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {savedSessions.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => loadSession(s)}
+                  className="w-full p-4 rounded-xl bg-zinc-900 border border-zinc-800 text-left"
+                >
+                  <div className="font-medium text-sm">{s.title}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{new Date(s.createdAt).toLocaleString()}</div>
+                </button>
               ))}
             </div>
           )}
@@ -425,6 +528,9 @@ export default function VelvetMotion() {
               className="flex-1 py-2.5 rounded-full bg-pink-600/20 border border-pink-500/40 text-pink-300 text-xs font-medium"
             >
               {generating === "video" ? "Generating..." : "🎥 New Video"}
+            </button>
+            <button onClick={saveSession} className="px-3 py-2.5 rounded-full bg-zinc-800 text-xs">
+              Save
             </button>
           </div>
 
