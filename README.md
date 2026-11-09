@@ -8,11 +8,11 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 - Age Gate (18+)
 - Login system
-- Improved fictional generation
+- Improved fictional generation (styles + Generate Nude / Sex Video)
 - Full Interactive Character Creator
 - 20 preset Fictional Girls + custom ones
 - Enhanced Tinder Roleplay (dual perspective)
-- **Improved BNWO Section** — Training, Cuck, and Worship modes
+- Improved BNWO Section (Training, Cuck, Worship)
 - Multi-girl groups
 - Expanded story scenarios
 - Crush Helper
