@@ -1,10 +1,17 @@
 # VelvetMotion AI
 
+**Main repository** (combined from velvetmotion-ai + velvetmotionai).
+
 Professional NSFW AI Girlfriend / Fantasy platform.
 
 **All content is fantasy. Fictional characters only.**
 
-## Full Feature Set (pushed)
+## Repos
+
+- **This repo (velvetmotion-ai)** — Main working version with all features
+- [velvetmotionai](https://github.com/hampusi97/velvetmotionai) — Older public version (Python scripts + some Next.js)
+
+## Features
 
 - Age Gate (18+)
 - Login system
