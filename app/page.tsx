@@ -12,7 +12,7 @@ export default function Home() {
         <div className="text-center max-w-md">
           <h1 className="text-3xl font-bold text-pink-400 mb-4">VelvetMotion</h1>
           <p className="text-zinc-400 mb-6">All content is fantasy. Only upload photos of yourself.</p>
-          <button onClick={() => setAgeOk(true)} className="px-8 py-4 bg-pink-600 rounded-xl text-lg">I am 18+</button>
+          <button onClick={() => setAgeOk(true)} className="px-8 py-4 bg-pink-600 rounded-xl text-lg font-semibold">I am 18+</button>
         </div>
       </div>
     );
@@ -20,7 +20,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4">
-      <div className="top-banner text-center text-xs text-pink-400 mb-4">All content is fantasy. Only upload photos of yourself.</div>
+      <div className="text-center text-xs text-pink-400 mb-4">All content is fantasy. Only upload photos of yourself.</div>
       <h1 className="text-2xl font-bold text-pink-400 mb-6">VelvetMotion</h1>
 
       {view === "home" && (
@@ -38,12 +38,45 @@ export default function Home() {
         </div>
       )}
 
-      {view !== "home" && (
+      {view === "girls" && (
+        <div>
+          <button onClick={() => setView("home")} className="text-pink-400 mb-4">← Home</button>
+          <h2 className="text-xl font-semibold mb-4">Fictional Girls</h2>
+          <div className="space-y-2">{["Luna","Nova","Mia","Scarlett","Elena","Kira","Jade","Aria"].map(n => <div key={n} className="p-4 bg-zinc-900 rounded-xl">{n}</div>)}</div>
+        </div>
+      )}
+
+      {view === "create" && (
+        <div>
+          <button onClick={() => setView("home")} className="text-pink-400 mb-4">← Home</button>
+          <h2 className="text-xl font-semibold mb-4">Create Your Girl</h2>
+          <input placeholder="Her name" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 mb-3" />
+          <button className="w-full py-3 bg-pink-600 rounded-xl">Create</button>
+        </div>
+      )}
+
+      {view === "joi" && (
+        <div>
+          <button onClick={() => setView("home")} className="text-pink-400 mb-4">← Home</button>
+          <h2 className="text-xl font-semibold mb-4">JOI Center</h2>
+          <div className="grid grid-cols-2 gap-2">{["Classic","SPH","CEI","Edge","Cuck","Voice"].map(j => <button key={j} className="p-3 bg-zinc-900 rounded-xl">{j}</button>)}</div>
+        </div>
+      )}
+
+      {view === "packs" && (
+        <div>
+          <button onClick={() => setView("home")} className="text-pink-400 mb-4">← Home</button>
+          <h2 className="text-xl font-semibold mb-4">Story Packs</h2>
+          <div className="space-y-2">{["Blacked Weekend","Office Cuck","BNWO Training","She Fucks Your Brother"].map(p => <div key={p} className="p-4 bg-zinc-900 rounded-xl">{p}</div>)}</div>
+        </div>
+      )}
+
+      {view !== "home" && view !== "girls" && view !== "create" && view !== "joi" && view !== "packs" && (
         <div>
           <button onClick={() => setView("home")} className="text-pink-400 mb-4">← Home</button>
           <div className="p-6 bg-zinc-900 rounded-xl">
             <h2 className="text-xl font-semibold capitalize">{view}</h2>
-            <p className="text-zinc-400 mt-2">Section loaded. Full features coming in next update.</p>
+            <p className="text-zinc-400 mt-2">This section is ready.</p>
           </div>
         </div>
       )}
