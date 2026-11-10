@@ -1,42 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCharacter } from "@/lib/characters";
+import { generateReply, MAX_MESSAGE_LENGTH } from "@/lib/dialogue.mjs";
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
+  let body: { characterId?: unknown; messages?: unknown };
   try {
-    const { messages, systemPrompt } = await req.json();
-
-    // ======================================================
-    // REPLACE THIS WITH YOUR REAL UNCENSORED LLM CALL
-    // Examples: xAI Grok, Together AI, Fireworks, OpenRouter, etc.
-    // ======================================================
-
-    /*
-    const response = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "grok-3",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        temperature: 0.95,
-        max_tokens: 900,
-      }),
-    });
-
-    const data = await response.json();
-    const reply = data.choices[0].message.content;
-    */
-
-    // Temporary placeholder reply
-    const reply = `She looks at you with pure amusement mixed with contempt.\n\n“Keep stroking. That’s all you’re good for.”\n\nShe continues describing exactly what’s being done to her while you sit there like the beta you are.`;
-
-    return NextResponse.json({ reply });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to generate reply" }, { status: 500 });
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+
+  const characterId = typeof body.characterId === "string" ? body.characterId : "";
+  const character = getCharacter(characterId);
+  if (!character) {
+    return NextResponse.json({ error: "Unknown character" }, { status: 404 });
+  }
+
+  const incoming = Array.isArray(body.messages) ? body.messages.slice(-20) : [];
+  const messages: { role: "user" | "assistant"; content: string }[] = [];
+  for (const message of incoming) {
+    if (!message || typeof message !== "object") continue;
+    const role = (message as { role?: unknown }).role;
+    const content = (message as { content?: unknown }).content;
+    if ((role !== "user" && role !== "assistant") || typeof content !== "string") continue;
+    const trimmed = content.trim().slice(0, MAX_MESSAGE_LENGTH);
+    if (!trimmed) continue;
+    messages.push({ role, content: trimmed });
+  }
+
+  return NextResponse.json(generateReply(character, messages));
 }

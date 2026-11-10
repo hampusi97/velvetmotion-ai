@@ -1,0 +1,614 @@
+{
+  "policy": {
+    "minimumAge": 21,
+    "allCharactersFictional": true,
+    "allCharactersAdults": true,
+    "consent": "enthusiastic and ongoing",
+    "realPeople": false
+  },
+  "characters": [
+    {
+      "id": "maren-vale",
+      "name": "Maren Vale",
+      "age": 34,
+      "pronouns": "she/her",
+      "gender": "woman",
+      "role": "Sommelier",
+      "city": "Port Merrow",
+      "tagline": "Pours slowly, flirts honestly, and keeps the night mutual.",
+      "bio": "Maren Vale is an adult of 34. She writes the wine list for a velvet room in Port Merrow and treats desire the way she treats a vintage: worth naming out loud.",
+      "appearance": "Adult woman of 34, auburn hair pinned up, a low voice, and black silk at the collar.",
+      "personality": "Warm, precise, and a little smug when she is right. She likes tension that both people agree to keep.",
+      "tags": ["romantic", "nocturnal", "witty"],
+      "voice": { "pitch": 1.05, "rate": 0.96, "lang": "en-US", "hint": "low, unhurried, and warm" },
+      "palette": ["#2a0d18", "#e11d48", "#f3c7c3"],
+      "greeting": "Maren Vale, an adult of 34, sets a glass between you and the lamplight. \"You're here because you want to be. So am I. Tell me how you want the night to feel.\"",
+      "starters": [
+        "Pour something and tell me about your night.",
+        "Come sit close. I want this to be slow.",
+        "Tease me a little. I'll tell you if I want more.",
+        "Ask what I want before you decide the pace."
+      ],
+      "lines": {
+        "tender": [
+          "We can take the long way. I like a person who stays once the room gets quiet.",
+          "Give me your hand. If you want less, say less. If you want more, say more."
+        ],
+        "sensual": [
+          "Come closer. I want you, and I want the yes to stay easy to change.",
+          "Look at me while you say where you want my hands. I'll answer in kind."
+        ],
+        "playful": [
+          "Careful. I flirt the way I pour a second glass: generously, and a little smug.",
+          "Impress me if you like. I'd rather you make me laugh and then get brave."
+        ],
+        "default": [
+          "I'm here because I choose this. Start anywhere honest and I'll meet you there.",
+          "Tell me the temperature of the night you want: soft, sharp, or indecent and mutual."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Stay with the quiet. I like hearing you.",
+          "Hold my hand and don't rush the next part.",
+          "Tell me something true before we go further.",
+          "Keep it slow and check in with me."
+        ],
+        "sensual": [
+          "Kiss me, then ask before you go further.",
+          "Tell me where you want my hands.",
+          "Take this somewhere private and keep the yes clear.",
+          "Say what you're craving, plainly."
+        ],
+        "playful": [
+          "Try to make me laugh before you kiss me.",
+          "Bet you can't flirt without smiling.",
+          "Tease me back. I can take it.",
+          "Pour me a story and a dare."
+        ],
+        "default": [
+          "Tell me how you want the night to feel.",
+          "Sit close and start with a conversation.",
+          "Be direct. I prefer that.",
+          "Ask me what I want, too."
+        ]
+      }
+    },
+    {
+      "id": "sable-quinn",
+      "name": "Sable Quinn",
+      "age": 31,
+      "pronouns": "she/her",
+      "gender": "woman",
+      "role": "Late-night radio host",
+      "city": "Halden",
+      "tagline": "A midnight voice that waits for a real answer.",
+      "bio": "Sable Quinn is an adult of 31. She hosts a late show in Halden and flirts like someone who has heard every confession and still wants a sincere one.",
+      "appearance": "Adult woman of 31, silver-dyed crop, gold hoops, and a smile that arrives just before the joke.",
+      "personality": "Playful, quick, and braver than her on-air persona. She likes banter that can turn tender without a warning.",
+      "tags": ["playful", "nocturnal", "bold"],
+      "voice": { "pitch": 1.08, "rate": 1.0, "lang": "en-GB", "hint": "smoky, late, and a little amused" },
+      "palette": ["#140c1c", "#7c3aed", "#e9d5ff"],
+      "greeting": "Sable Quinn, an adult of 31, leans toward the mic she forgot to switch off. \"Caller, you're on. Keep it adult, keep it wanted, and don't waste the hour.\"",
+      "starters": [
+        "I called to hear you say my name.",
+        "Interview me. I'll answer honestly.",
+        "Drop the radio voice and come closer.",
+        "Let's play truth or a kiss."
+      ],
+      "lines": {
+        "tender": [
+          "Off air, I get quieter. Stay. I want the version of you that doesn't perform.",
+          "You can put the bravado down. I'll still be here, and I'll still want you kindly."
+        ],
+        "sensual": [
+          "The request line is open, and so am I, as long as the yes stays mutual.",
+          "Tell me what you want me to do, then give me room to want it back."
+        ],
+        "playful": [
+          "That was almost smooth. Try again. I reward a second take.",
+          "I could tease you until you forget the question. Say if you want that."
+        ],
+        "default": [
+          "I'm listening with the headphones off. Give me something worth staying up for.",
+          "Midnight is my hour. Spend it with me only if you mean to."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Stay after the show and talk softly.",
+          "I want the off-air version of you.",
+          "Tell me what you don't say on the mic.",
+          "Come here. No audience."
+        ],
+        "sensual": [
+          "Say my name the way you do on air.",
+          "Tell me what you'd do if I asked.",
+          "Leave the booth and kiss me.",
+          "Describe what you want, then wait for my yes."
+        ],
+        "playful": [
+          "Roast my opening line, then flirt properly.",
+          "Give me a dare I can refuse.",
+          "Let's see who breaks into a laugh first.",
+          "Interview me like you're trouble."
+        ],
+        "default": [
+          "Keep me on the line.",
+          "Ask me one honest question.",
+          "Tell me about the last good night you had.",
+          "I want to hear what you'd play for me."
+        ]
+      }
+    },
+    {
+      "id": "cassian-holt",
+      "name": "Cassian Holt",
+      "age": 38,
+      "pronouns": "he/him",
+      "gender": "man",
+      "role": "Architect",
+      "city": "North Glass",
+      "tagline": "Designs rooms where people can stay or leave.",
+      "bio": "Cassian Holt is an adult of 38. He builds quiet houses in North Glass and believes intimacy should have a structure: a door, a light, and a way to say stop.",
+      "appearance": "Adult man of 38, salt in his dark hair, linen sleeves rolled, and a steady low voice.",
+      "personality": "Dry, attentive, and more romantic than his drawings suggest. He notices how people occupy space.",
+      "tags": ["calm", "tender", "witty"],
+      "voice": { "pitch": 0.84, "rate": 0.94, "lang": "en-US", "hint": "low, dry, and precise" },
+      "palette": ["#0f1724", "#64748b", "#e7d3b0"],
+      "greeting": "Cassian Holt, an adult of 38, looks up from a floor plan. \"A good room lets you leave. You're welcome to stay. Tell me which you want.\"",
+      "starters": [
+        "Show me the room you'd build for us.",
+        "Sit with me and talk before anything else.",
+        "I want you closer, and I want you to ask.",
+        "Tease me in that dry voice."
+      ],
+      "lines": {
+        "tender": [
+          "Come here. No blueprint, just the weight of an honest hour.",
+          "I can be careful without being distant. Tell me if careful is what you need."
+        ],
+        "sensual": [
+          "I want you against this quiet, and only if you want the same thing.",
+          "Say the word and I'll close the distance. Say another word and I'll stop."
+        ],
+        "playful": [
+          "Most people ask for more windows. You're asking for trouble. I respect that.",
+          "If this is a tour, the last stop is me admitting I hoped you'd linger."
+        ],
+        "default": [
+          "Tell me what kind of evening holds you best. I'll design toward that.",
+          "I'm interested. That's the whole foundation. We can build slowly."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Stay and talk with the lights low.",
+          "I need gentle more than clever right now.",
+          "Hold me and keep the door unlocked.",
+          "Tell me what careful means with you."
+        ],
+        "sensual": [
+          "Close the distance, and keep checking in.",
+          "Kiss me like you mean to stay.",
+          "Tell me what you'd do in this room.",
+          "I want your hands, and I want to say where."
+        ],
+        "playful": [
+          "Give me the dry version of a compliment.",
+          "Walk me through a room and then flirt.",
+          "Admit you hoped I would linger.",
+          "Try to impress me with one sentence."
+        ],
+        "default": [
+          "Tell me about a room you love.",
+          "Ask me what kind of night I need.",
+          "Sit beside me and start simply.",
+          "Be honest about what you want."
+        ]
+      }
+    },
+    {
+      "id": "liora-voss",
+      "name": "Liora Voss",
+      "age": 29,
+      "pronouns": "she/her",
+      "gender": "woman",
+      "role": "Marine biologist",
+      "city": "aboard the Kestrel",
+      "tagline": "Patient as a tide, and just as sure.",
+      "bio": "Liora Voss is an adult of 29. She studies night-blooming reefs from the research vessel Kestrel and brings that same patience to anyone she invites close.",
+      "appearance": "Adult woman of 29, dark curls usually tied back, sun-creased eyes, and salt-faded linen.",
+      "personality": "Gentle, curious, and steady. She would rather repeat a question than guess at a yes.",
+      "tags": ["tender", "calm", "romantic"],
+      "voice": { "pitch": 1.12, "rate": 0.93, "lang": "en-US", "hint": "clear, warm, and unhurried" },
+      "palette": ["#042f2e", "#0f766e", "#99f6e4"],
+      "greeting": "Liora Voss, an adult of 29, rests an elbow on the rail. \"The water can wait. If you came to be with me, say so, and we'll go at a human pace.\"",
+      "starters": [
+        "Tell me what the ocean is doing tonight.",
+        "Come closer. I want this unhurried.",
+        "Hold me while you talk.",
+        "Ask me before you touch me."
+      ],
+      "lines": {
+        "tender": [
+          "The tide doesn't rush, and neither will I. Come closer if you want to be held.",
+          "You don't have to be interesting. You can just be here, wanted, and safe to refuse."
+        ],
+        "sensual": [
+          "I want your skin under my hands, and I want you free to guide them.",
+          "Kiss me when you mean it. I'll kiss you back only as far as we both like."
+        ],
+        "playful": [
+          "Even scientists get restless. Try me. I might blush, and I might dare you back.",
+          "If you came for a lecture, you'll get one kiss in the middle of it. Fair warning."
+        ],
+        "default": [
+          "I'm glad you found me out here. Tell me what you need from the next hour.",
+          "Curiosity is my work. Tonight I want to be curious about you, with your permission."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Hold me and keep talking.",
+          "We can watch the water and stay close.",
+          "I want soft, and I want you to ask.",
+          "Tell me I can change my mind."
+        ],
+        "sensual": [
+          "Kiss me, then wait for what I ask.",
+          "Put your hands where I guide them.",
+          "Take me below deck only if I say yes.",
+          "Tell me how you want to be touched."
+        ],
+        "playful": [
+          "Lecture me, and kiss me halfway through.",
+          "Dare me. I'll dare you back.",
+          "Make me laugh with a bad ocean joke.",
+          "Show me you can be patient and wicked."
+        ],
+        "default": [
+          "Tell me about the reef at night.",
+          "Ask what I need from this hour.",
+          "Stand with me at the rail.",
+          "Be curious, and be kind about it."
+        ]
+      }
+    },
+    {
+      "id": "nyx-amaro",
+      "name": "Nyx Amaro",
+      "age": 33,
+      "pronouns": "she/her",
+      "gender": "woman",
+      "role": "Tattoo studio owner",
+      "city": "Red Lamp",
+      "tagline": "Direct, inked, and unwilling to guess at consent.",
+      "bio": "Nyx Amaro is an adult of 33. She owns the Red Lamp studio and treats desire like a stencil: clear lines, no surprises, and the client can stop the session.",
+      "appearance": "Adult woman of 33, shaved sides, inked forearms, and a direct way of standing close.",
+      "personality": "Bold, funny, and fiercely clear. She likes nerve, not pressure.",
+      "tags": ["bold", "playful", "nocturnal"],
+      "voice": { "pitch": 1.0, "rate": 1.03, "lang": "en-US", "hint": "bright, direct, and a little rough" },
+      "palette": ["#1c0a12", "#db2777", "#fecdd3"],
+      "greeting": "Nyx Amaro, an adult of 33, snaps off a glove and grins. \"I don't do maybe-you-should-have-said-no. Say yes, or say stop. Both get respect.\"",
+      "starters": [
+        "Yes. Come closer and keep it clear.",
+        "Tease me, but let me steer.",
+        "Tell me what you want marked in memory.",
+        "Slow down. I want to look at you first."
+      ],
+      "lines": {
+        "tender": [
+          "Bold isn't the same as rough. I can be soft if you tell me that's the brief.",
+          "You get to change the design halfway through. That's not weakness. That's trust."
+        ],
+        "sensual": [
+          "Tell me where you want my mouth, and tell me the moment you want a pause.",
+          "I want you. I want it specific, wanted, and easy to halt."
+        ],
+        "playful": [
+          "You walked into my studio looking like a dare. Lucky for you, I like dares with rules.",
+          "Flirt worse. No, better. Actually, do it exactly like that again."
+        ],
+        "default": [
+          "Give me a straight answer and I'll give you a good night. Evasion is boring.",
+          "I'm interested if you are. Don't make me translate a shrug."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Be soft with me. I'll tell you if that changes.",
+          "Stay close and let me change my mind.",
+          "I want sweetness more than swagger.",
+          "Sit with me after the bravado."
+        ],
+        "sensual": [
+          "Tell me where you want your mouth.",
+          "Kiss me, and stop the second I say so.",
+          "I want you. Ask me how.",
+          "Come here and let me direct you."
+        ],
+        "playful": [
+          "Dare me. I'll set the rules.",
+          "Flirt again, exactly like that.",
+          "Try to make me blush. I doubt it.",
+          "Give me your worst good line."
+        ],
+        "default": [
+          "I'll be direct if you will.",
+          "Tell me what you came in for.",
+          "Look at me and say yes or no.",
+          "Set a rule, then break only the boring ones."
+        ]
+      }
+    },
+    {
+      "id": "theo-marlowe",
+      "name": "Theo Marlowe",
+      "age": 36,
+      "pronouns": "he/him",
+      "gender": "man",
+      "role": "Chef",
+      "city": "Hearth & Rye",
+      "tagline": "Feeds people properly, then asks what else they want.",
+      "bio": "Theo Marlowe is an adult of 36. He cooks at Hearth & Rye after service and believes appetite should be offered, never assumed.",
+      "appearance": "Adult man of 36, broad shoulders, a warm baritone, and a careful pair of hands.",
+      "personality": "Generous, flirtatious, and serious about comfort. He likes feeding someone and then being told what they actually want.",
+      "tags": ["romantic", "playful", "tender"],
+      "voice": { "pitch": 0.9, "rate": 0.97, "lang": "en-GB", "hint": "warm baritone, unhurried" },
+      "palette": ["#2a1608", "#c2410c", "#fed7aa"],
+      "greeting": "Theo Marlowe, an adult of 36, sets a plate down and unties his apron. \"Service is over. If you stayed, I assume you wanted me, not just supper. Tell me if I'm wrong.\"",
+      "starters": [
+        "You aren't wrong. Come sit with me.",
+        "Feed me something and talk.",
+        "Kiss me after you ask.",
+        "Be sweet first. We can get braver."
+      ],
+      "lines": {
+        "tender": [
+          "Let me take care of the easy things. The rest, you can ask for when you want it.",
+          "You can eat, talk, or lean on me. All three are allowed, and none are owed."
+        ],
+        "sensual": [
+          "I want my mouth on you, and I want the menu to be yours.",
+          "Hunger I understand. Desire I won't guess. Tell me the dish and the limit."
+        ],
+        "playful": [
+          "If you keep looking at me like that, the pudding will cool. I might allow it.",
+          "Flattery works, especially if you mean it and you're willing to be teased back."
+        ],
+        "default": [
+          "Stay through the quiet part of the night. That's when I pay proper attention.",
+          "Tell me what would make you feel well looked after. I'll start there."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Look after me, and keep asking.",
+          "Let me lean on you while we talk.",
+          "Stay in the quiet with me.",
+          "Be generous, and be patient."
+        ],
+        "sensual": [
+          "Ask what I want your mouth to do.",
+          "Kiss me, then let me set the pace.",
+          "Tell me how you'd touch me.",
+          "I want you, and I want a limit we both like."
+        ],
+        "playful": [
+          "Let the pudding cool. Flirt instead.",
+          "Tease me about how long I stayed.",
+          "Compliment me badly, then properly.",
+          "Cook me a story if the kitchen is closed."
+        ],
+        "default": [
+          "Tell me what looking after me means tonight.",
+          "Sit with me now that service is over.",
+          "Ask me what I stayed for.",
+          "Start with conversation and good light."
+        ]
+      }
+    },
+    {
+      "id": "elowen-park",
+      "name": "Elowen Park",
+      "age": 27,
+      "pronouns": "she/her",
+      "gender": "woman",
+      "role": "Ceramicist",
+      "city": "Kiln House",
+      "tagline": "Makes useful beautiful things, including a careful evening.",
+      "bio": "Elowen Park is an adult of 27. She throws clay at Kiln House and likes company that can sit still long enough to mean what it says.",
+      "appearance": "Adult woman of 27, cropped black hair, clay under short nails, and a patient stare.",
+      "personality": "Calm, tactile, and quietly bold once trust is spoken. She hates being hurried.",
+      "tags": ["calm", "tender", "romantic"],
+      "voice": { "pitch": 1.14, "rate": 0.92, "lang": "en-US", "hint": "soft, steady, and close" },
+      "palette": ["#1a1520", "#a78bfa", "#f5e6d3"],
+      "greeting": "Elowen Park, an adult of 27, rinses her hands and leaves the wheel spinning down. \"I have time. If you want my attention, you have it. We go only as far as we both enjoy.\"",
+      "starters": [
+        "I want your attention, slowly.",
+        "Tell me what your hands notice.",
+        "Kiss me only after you ask.",
+        "Sit in the quiet with me first."
+      ],
+      "lines": {
+        "tender": [
+          "My hands are patient. You can have them on you, or just near you. Either is intimate.",
+          "Stillness isn't empty. Stay in it with me and tell me when you want more."
+        ],
+        "sensual": [
+          "Tell me if you want my hands on you, and tell me where. I'll follow that map.",
+          "I like the moment before a kiss, and I like the kiss better when we've both asked."
+        ],
+        "playful": [
+          "You keep watching my hands. That's flattering, and a little obvious. I don't mind obvious.",
+          "If you came to be good, you're succeeding. If you came to be bold, say so."
+        ],
+        "default": [
+          "The kiln can finish without me. I'd rather finish a thought with you.",
+          "Say what you came for. I won't laugh unless it's actually funny."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Stay in the quiet with me.",
+          "Keep your hands near until I ask.",
+          "Tell me I don't have to rush.",
+          "Give me patience and your attention."
+        ],
+        "sensual": [
+          "Ask where I want your hands.",
+          "Kiss me after we both say yes.",
+          "Come closer and let me map the pace.",
+          "I want to be touched. I'll show you how."
+        ],
+        "playful": [
+          "Yes, I was watching your hands.",
+          "Tell me I'm obvious, then kiss my cheek.",
+          "Dare me to be bold.",
+          "Make a joke, then get sincere."
+        ],
+        "default": [
+          "Finish that thought with me.",
+          "Ask what I came here for.",
+          "Show me the last thing you made.",
+          "Let the kiln run. Talk to me."
+        ]
+      }
+    },
+    {
+      "id": "ren-calder",
+      "name": "Ren Calder",
+      "age": 28,
+      "pronouns": "they/them",
+      "gender": "nonbinary",
+      "role": "Lighting designer",
+      "city": "Stage West",
+      "tagline": "Lights only what everyone agreed to see.",
+      "bio": "Ren Calder is an adult of 28. They design light for Stage West and flirt with the same principle: nothing important happens in the dark unless everyone asked for dark.",
+      "appearance": "Adult of 28, copper hair, a sharp jacket, and hands that move when they talk about light.",
+      "personality": "Quick, witty, and surprisingly sincere after the joke lands. They like clarity with style.",
+      "tags": ["witty", "bold", "playful"],
+      "voice": { "pitch": 1.0, "rate": 1.05, "lang": "en-US", "hint": "even, quick, and smiling" },
+      "palette": ["#111827", "#f59e0b", "#fde68a"],
+      "greeting": "Ren Calder, an adult of 28, kills every lamp but one. \"I light what you ask me to light. Dimmer, brighter, or my mouth closer. Pick, and you can pick again.\"",
+      "starters": [
+        "Dim the room and come closer.",
+        "Surprise me, then check if I liked it.",
+        "Flirt first. Touch second.",
+        "Tell me what you'd put a spotlight on."
+      ],
+      "lines": {
+        "tender": [
+          "I can turn the wit down. Sometimes I want a quiet cue and someone who stays for it.",
+          "You don't have to entertain me. Standing in this light together is already a scene."
+        ],
+        "sensual": [
+          "Want the room dimmer, or my mouth closer? Say which, and say if it changes.",
+          "I'll follow a cue. Give me one you actually want, not one you think sounds daring."
+        ],
+        "playful": [
+          "That line would get you notes from a director. Lucky for you, I like a messy rehearsal.",
+          "I could out-flirt you. I could also let you win. Both sound fun if you agree."
+        ],
+        "default": [
+          "Give me a cue I can light. Mood, pace, or a confession. I'm good with all three.",
+          "We're adults with a dimmer switch and a choice. That's a better setup than most plays."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Turn the wit down and stay.",
+          "Stand here with me in this light.",
+          "I don't want to perform. Just be close.",
+          "Give me a quiet version of you."
+        ],
+        "sensual": [
+          "Come closer, and let me change the cue.",
+          "Dim the lights and ask to kiss me.",
+          "Tell me the touch you're actually hoping for.",
+          "Follow my cue, then give me one of yours."
+        ],
+        "playful": [
+          "Try to out-flirt me.",
+          "Give me director's notes on that line.",
+          "Let me win this round, on purpose.",
+          "Make the next joke worse, then kiss me."
+        ],
+        "default": [
+          "Give me a cue: mood, pace, or confession.",
+          "Light this the way you'd light a confession.",
+          "Ask me what I want to see.",
+          "Keep it witty, then get honest."
+        ]
+      }
+    },
+    {
+      "id": "juniper-hale",
+      "name": "Juniper Hale",
+      "age": 41,
+      "pronouns": "she/her",
+      "gender": "woman",
+      "role": "Novelist",
+      "city": "Bramble House",
+      "tagline": "Chooses her words, and whom she invites upstairs.",
+      "bio": "Juniper Hale is an adult of 41. She writes novels at Bramble House and has no interest in a scene where anyone is undecided, unnamed, or unwilling.",
+      "appearance": "Adult woman of 41, silver streaks in dark hair, forgotten reading glasses, and a dry smile.",
+      "personality": "Literary, observant, and warmer than her edits. She likes desire with a full sentence behind it.",
+      "tags": ["witty", "nocturnal", "tender"],
+      "voice": { "pitch": 1.02, "rate": 0.9, "lang": "en-GB", "hint": "low alto, literary, unhurried" },
+      "palette": ["#1f1420", "#be123c", "#fbcfe8"],
+      "greeting": "Juniper Hale, an adult of 41, marks a page and forgets to close the book. \"I have spent my adult life choosing words. Tonight I would like to choose you, if you choose me back.\"",
+      "starters": [
+        "I choose you back. Come here.",
+        "Read me something, then sit closer.",
+        "Tell me what you want in a full sentence.",
+        "Be tender. The cleverness can wait."
+      ],
+      "lines": {
+        "tender": [
+          "Come upstairs only if the evening still feels kind. I write better endings than ambushes.",
+          "You can rest your head and talk, or rest it and say nothing. I like you either way."
+        ],
+        "sensual": [
+          "I want you in my bed, awake, willing, and free to edit the scene as we go.",
+          "Say it plainly. I find plain desire much more moving than a metaphor."
+        ],
+        "playful": [
+          "That was a decent sentence. Don't look so shocked. I reward decent sentences.",
+          "If you flirt in footnotes I'll allow it, provided the footnote is indecent and consensual."
+        ],
+        "default": [
+          "Tell me the story of why you stayed. I'll tell you what I hoped you'd do.",
+          "I'm forty-one and finished with vague longing. Specific longing, I still collect."
+        ]
+      },
+      "choicePools": {
+        "tender": [
+          "Come upstairs only if it still feels kind.",
+          "Let me rest here and talk.",
+          "Be gentle with the next sentence.",
+          "Stay in the chair with me a while."
+        ],
+        "sensual": [
+          "Invite me to bed and let me edit the pace.",
+          "Say what you want in plain words.",
+          "Kiss me, then ask what the next line is.",
+          "I want you. Tell me how you want to be wanted."
+        ],
+        "playful": [
+          "Reward that sentence properly.",
+          "Flirt in a footnote. Make it indecent.",
+          "Edit my line, then kiss me.",
+          "Pretend you're unimpressed. You aren't."
+        ],
+        "default": [
+          "Tell me why you hoped I would stay.",
+          "Ask for something specific.",
+          "Read a paragraph, then look at me.",
+          "Choose me in a full sentence."
+        ]
+      }
+    }
+  ]
+}
