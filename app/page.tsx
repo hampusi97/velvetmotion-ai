@@ -1,10 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CharacterChat } from "@/components/CharacterChat";
 import { CharacterProfile } from "@/components/CharacterProfile";
 import { CharacterRoster } from "@/components/CharacterRoster";
 import { CHARACTERS, characterCategories, type Character } from "@/lib/characters";
+
+import { HomeView as HomeScreen } from "@/components/home-view";
+import { SiteHeader } from "@/components/site-header";
+import { containerClass } from "@/lib/cn";
+import { JoiBrowser } from "@/components/content/JoiBrowser";
+import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
+import { SectionView } from "@/components/section-view";
+import { findSection, type ViewId } from "@/lib/sections";
+import { UtilitySection } from "@/components/utility-section";
 
 type HomeView =
   | "home"
@@ -23,6 +32,7 @@ type View = HomeView | "profile" | "chat";
 
 export default function Home() {
   const [view, setView] = useState<View>("home");
+  const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
   const [listView, setListView] = useState<"girls" | "romance">("girls");
@@ -30,12 +40,28 @@ export default function Home() {
   const [category, setCategory] = useState("All");
   const [tag, setTag] = useState<string | null>(null);
 
+  const [adult, setAdult] = useState<boolean | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    const main = document.getElementById("main");
+    if (menuOpen) main?.setAttribute("inert", "");
+    else main?.removeAttribute("inert");
+  }, [menuOpen]);
+  const toggleMenu = useCallback(() => setMenuOpen(open => !open), []);
+  useEffect(() => { try { setAdult(localStorage.getItem("velvet-age") === "true"); } catch { setAdult(false); } }, []);
+  const navigate = (next: ViewId) => {
+    setMenuOpen(false);
+    if (next === "girls" || next === "romance" || next === "tinder") openRoster(next === "romance");
+    else setView(next);
+    window.scrollTo({top: 0});
+  };
+
   const categories = useMemo(() => ["All", ...characterCategories()], []);
   const tags = useMemo(
     () => Array.from(new Set(CHARACTERS.flatMap((character) => character.tags))).sort(),
     [],
   );
-  const selected = CHARACTERS.find((character) => character.id === selectedId) ?? null;
+  const selected = customCharacter?.id === selectedId ? customCharacter : CHARACTERS.find((character) => character.id === selectedId) ?? null;
 
   const openRoster = (romance: boolean) => {
     setRomanceMode(romance);
@@ -50,45 +76,44 @@ export default function Home() {
 
   const showRoster = view === "girls" || view === "romance";
 
-  return (
-    <div className="min-h-screen bg-black text-white p-4">
-      <div className="max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold text-pink-400 mb-4">VelvetMotion</h1>
+  if (adult === null) {
+    return <div className="min-h-screen bg-black" />;
+  }
 
-        {view === "home" && (
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => openRoster(false)} className="p-4 bg-zinc-900 rounded-xl">
-              Fictional Girls
-            </button>
-            <button onClick={() => setView("create")} className="p-4 bg-zinc-900 rounded-xl">
-              Create Girl
-            </button>
-            <button onClick={() => openRoster(true)} className="p-4 bg-zinc-900 rounded-xl">
-              Romance
-            </button>
-            <button onClick={() => setView("bnwo")} className="p-4 bg-zinc-900 rounded-xl">
-              BNWO
-            </button>
-            <button onClick={() => setView("tinder")} className="p-4 bg-zinc-900 rounded-xl">
-              Tinder
-            </button>
-            <button onClick={() => setView("joi")} className="p-4 bg-zinc-900 rounded-xl">
-              JOI
-            </button>
-            <button onClick={() => setView("room")} className="p-4 bg-zinc-900 rounded-xl">
-              Goon Room
-            </button>
-            <button onClick={() => setView("suggest")} className="p-4 bg-zinc-900 rounded-xl">
-              Suggest
-            </button>
-            <button onClick={() => setView("gallery")} className="p-4 bg-zinc-900 rounded-xl">
-              Gallery
-            </button>
-            <button onClick={() => setView("packs")} className="p-4 bg-zinc-900 rounded-xl">
-              Story Packs
-            </button>
-          </div>
-        )}
+  if (!adult) {
+    return (
+      <main className="min-h-screen bg-black text-white flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-3xl border border-pink-900/50 bg-zinc-950 p-6">
+          <h1 className="text-2xl font-bold text-pink-400 mb-2">VelvetMotion</h1>
+          <p className="text-sm text-zinc-300 leading-relaxed mb-4">
+            This is an adult fantasy site. Every character is fictional and 18 or older.
+            Nothing here is for minors.
+          </p>
+          <button
+            onClick={() => {
+              try {
+                localStorage.setItem("velvet-age", "true");
+              } catch {
+                /* private mode can block storage; the gate still lifts for this visit */
+              }
+              setAdult(true);
+            }}
+            className="w-full py-3 rounded-2xl bg-pink-600 font-semibold"
+          >
+            I am 18 or older
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-ink-950 text-white">
+      <SiteHeader view={view === "profile" || view === "chat" ? listView : view} menuOpen={menuOpen} onToggleMenu={toggleMenu} onNavigate={navigate} />
+      <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
+
+
+        {view === "home" && <HomeScreen onNavigate={navigate} />}
 
         {showRoster && (
           <CharacterRoster
@@ -131,15 +156,13 @@ export default function Home() {
           />
         )}
 
-        {view !== "home" && !showRoster && view !== "profile" && view !== "chat" && (
-          <button onClick={() => setView("home")} className="mt-4 text-pink-400">
-            ← Home
-          </button>
-        )}
-
-        {view !== "home" && !showRoster && view !== "profile" && view !== "chat" && (
-          <p className="mt-8 text-zinc-500 text-sm">Full features loading... Pull latest.</p>
-        )}
+        {view === "packs" && <><button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button><StoryPackBrowser /></>}
+        {view === "joi" && <><button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button><JoiBrowser /></>}
+        {["create", "suggest", "gallery", "room"].includes(view) && <UtilitySection view={view} onHome={() => setView("home")} onOpenCustom={(name) => {
+          const character: Character = { ...CHARACTERS[0], id: `custom-${name}`, name, tagline: "Your fictional character", initialMessage: `Hello, I'm ${name}.`, personality: "Friendly", traits: ["Custom"], background: "An original fictional adult character.", figure: "Fictional adult", kink: "Not specified", reply: "I'm listening.", category: "Custom" };
+          setCustomCharacter(character); setSelectedId(character.id); setRomanceMode(false); setView("chat");
+        }} />}
+        {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
       </div>
     </div>
   );

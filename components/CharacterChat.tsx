@@ -69,6 +69,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
   return (
     <div className="flex flex-col min-h-[80vh]">
+      <p className="mb-3 text-xs text-zinc-400">Demo chat uses local character replies. Live AI is not connected.</p>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="text-pink-400 text-sm">
           ← Profile

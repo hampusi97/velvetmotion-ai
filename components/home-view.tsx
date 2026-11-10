@@ -5,7 +5,7 @@ import { riseContainer, riseItem } from "@/lib/motion";
 import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
 
-const statusCopy = "Full features loading... Pull latest.";
+const statusCopy = "Explore the roster, profiles, and story players. Live AI, media generation, and group chat are not connected.";
 
 export function HomeView({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
   const reduce = useReducedMotion();

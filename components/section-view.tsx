@@ -50,7 +50,7 @@ export function SectionView({
         <div className="mt-4 rounded-3xl border border-white/10 bg-ink-800 p-5 shadow-card sm:p-6 md:p-8">
           <p className="max-w-2xl text-lg leading-relaxed text-cream">{section.summary}</p>
           <p className="mt-4 text-base leading-relaxed text-mist">
-            Full features loading... Pull latest.
+            This section is not connected.
           </p>
         </div>
       </div>
