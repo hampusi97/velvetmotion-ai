@@ -1,16 +1,33 @@
 # VelvetMotion AI
 
-**Functional NSFW AI Girlfriend / Fantasy site. All content is fantasy. Fictional characters only.**
+**Ready to deploy. Use the main branch.**
 
-## Publish it live (free)
+## Deploy to Vercel
 
 1. Go to [vercel.com](https://vercel.com)
-2. Sign in with GitHub
-3. Click **Add New** → **Project**
-4. Import `hampusi97/velvetmotion-ai`
-5. Click **Deploy**
+2. Import `hampusi97/velvetmotion-ai`
+3. Set the branch to **main**
+4. Click Deploy
 
-You’ll get a live URL like `https://velvetmotion-ai.vercel.app` in about a minute.
+Live URL will be something like: `https://velvetmotion-ai.vercel.app`
+
+## Features (working)
+
+- Age Gate
+- Fictional Girls + Create Girl
+- Chat with Speak (TTS)
+- JOI presets
+- Story Packs
+- BNWO modes
+- Tinder dual roleplay
+- Romance
+- Goon Room
+- Suggest a Feature
+- Gallery
+- Affiliate
+- Coins + Streak
+
+**All content is fantasy. Fictional characters only.**
 
 ## Run locally
 
@@ -20,24 +37,3 @@ cd velvetmotion-ai
 npm install
 npm run dev
 ```
-
-Open **http://localhost:3000**
-
-## Features
-
-- Age Gate
-- Homescreen with working buttons
-- Fictional Girls
-- Create Girl
-- Romance
-- BNWO
-- Tinder Roleplay
-- JOI Center
-- Goon Room
-- Suggest a Feature
-- Gallery
-- Story Packs
-
-## Stack
-
-Next.js 15 + TypeScript + Tailwind
