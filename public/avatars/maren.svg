@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" role="img" aria-label="Maren Voss placeholder portrait">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3a1020"/>
+      <stop offset="100%" stop-color="#c4a574"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="200" fill="url(#g)"/>
+  <circle cx="80" cy="74" r="30" fill="rgba(255,255,255,0.16)"/>
+  <path d="M34 184c10-40 26-56 46-56s36 16 46 56" fill="rgba(255,255,255,0.14)"/>
+  <text x="80" y="80" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#fff">MV</text>
+</svg>
