@@ -1,33 +1,18 @@
 # VelvetMotion AI
 
-**Ready to deploy. Use the main branch.**
-
-## Deploy to Vercel
-
-1. Go to [vercel.com](https://vercel.com)
-2. Import `hampusi97/velvetmotion-ai`
-3. Set the branch to **main**
-4. Click Deploy
-
-Live URL will be something like: `https://velvetmotion-ai.vercel.app`
-
-## Features (working)
-
-- Age Gate
-- Fictional Girls + Create Girl
-- Chat with Speak (TTS)
-- JOI presets
-- Story Packs
-- BNWO modes
-- Tinder dual roleplay
-- Romance
-- Goon Room
-- Suggest a Feature
-- Gallery
-- Affiliate
-- Coins + Streak
-
 **All content is fantasy. Fictional characters only.**
+
+## Deploy to Netlify
+
+1. Go to [netlify.com](https://netlify.com)
+2. Click **Add new site** → **Import an existing project**
+3. Connect to GitHub and select `hampusi97/velvetmotion-ai`
+4. Branch: **main**
+5. Build command: `npm run build`
+6. Publish directory: `.next`
+7. Click **Deploy**
+
+Netlify will auto-detect Next.js. The site will be live in a minute.
 
 ## Run locally
 
@@ -37,3 +22,5 @@ cd velvetmotion-ai
 npm install
 npm run dev
 ```
+
+Open **http://localhost:3000**
