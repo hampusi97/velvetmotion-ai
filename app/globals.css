@@ -3,22 +3,132 @@
 @tailwind utilities;
 
 :root {
-  --pink: #ec4899;
+  color-scheme: dark;
+  --rose: #f8c9d8;
+  --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  background: #07060a;
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(4.5rem + env(safe-area-inset-top));
 }
 
 body {
-  background: #000;
-  color: #fff;
+  min-height: 100dvh;
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(154, 35, 79, 0.28), transparent 60%),
+    radial-gradient(720px 480px at 100% 0%, rgba(70, 28, 48, 0.45), transparent 55%),
+    #07060a;
+  color: #f6efe9;
 }
 
-/* Custom scrollbar */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(520px 360px at 80% 110%, rgba(154, 35, 79, 0.16), transparent 60%);
+}
+
+::selection {
+  background: rgba(154, 35, 79, 0.45);
+  color: #f6efe9;
+}
+
+:focus-visible {
+  outline: 2px solid #f8c9d8;
+  outline-offset: 3px;
+}
+
+#main:focus,
+#main:focus-visible {
+  outline: none;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+.font-display {
+  font-weight: 560;
+}
+
+img,
+svg,
+video {
+  max-width: 100%;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+.feature-card,
+.press {
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.press:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .feature-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(248, 201, 216, 0.45);
+  }
+
+  .feature-card:hover:active {
+    transform: translateY(-2px) scale(0.985);
+  }
+}
+
+@media (hover: none) {
+  .feature-card:active {
+    transform: scale(0.985);
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #111;
+  background: #120e16;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #ec4899;
-  border-radius: 3px;
+  background: #9a234f;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-motion],
+  .feature-card,
+  .feature-card:hover,
+  .feature-card:active,
+  .feature-card:hover:active,
+  .press:active {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
