@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 200" role="img" aria-label="Tess Calder placeholder portrait">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7a2e16"/>
+      <stop offset="100%" stop-color="#f0b429"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="200" fill="url(#g)"/>
+  <circle cx="80" cy="72" r="28" fill="rgba(255,255,255,0.16)"/>
+  <path d="M32 186c12-44 28-60 48-60s36 16 48 60" fill="rgba(255,255,255,0.14)"/>
+  <text x="80" y="78" text-anchor="middle" font-family="Georgia, serif" font-size="18" fill="#fff">TC</text>
+</svg>
