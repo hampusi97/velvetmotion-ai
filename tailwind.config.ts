@@ -11,9 +11,9 @@ const config: Config = {
     extend: {
       colors: {
         ink: {
-          950: "#07060a",
-          900: "#120e16",
-          800: "#1c1622",
+          950: "rgb(var(--ink-950) / <alpha-value>)",
+          900: "rgb(var(--ink-900) / <alpha-value>)",
+          800: "rgb(var(--ink-800) / <alpha-value>)",
           700: "#2c2433",
         },
         rose: {

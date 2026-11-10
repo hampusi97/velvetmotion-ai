@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CharacterChat } from "@/components/CharacterChat";
 import { CharacterProfile } from "@/components/CharacterProfile";
 import { CharacterRoster } from "@/components/CharacterRoster";
@@ -14,6 +15,9 @@ import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
 import { SectionView } from "@/components/section-view";
 import { findSection, type ViewId } from "@/lib/sections";
 import { UtilitySection } from "@/components/utility-section";
+import { CoreDashboard } from "@/components/core-dashboard";
+import { claimDaily } from "@/lib/progress";
+import { useProgress } from "@/lib/use-progress";
 
 type HomeView =
   | "home"
@@ -31,6 +35,7 @@ type HomeView =
 type View = HomeView | "profile" | "chat";
 
 export default function Home() {
+  const { progress, ready, storageAvailable, update } = useProgress();
   const [view, setView] = useState<View>("home");
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -75,6 +80,15 @@ export default function Home() {
   };
 
   const showRoster = view === "girls" || view === "romance";
+  const resumeCharacter = CHARACTERS.find(character => character.id === progress.lastSession?.characterId);
+
+  const openChat = () => {
+    if (!selected) return;
+    if (CHARACTERS.some(character => character.id === selected.id)) {
+      void update(state => ({ ...state, lastSession: { characterId: selected.id, romanceMode, updatedAt: new Date().toISOString() } }));
+    }
+    setView("chat");
+  };
 
   if (adult === null) {
     return <div className="min-h-screen bg-black" />;
@@ -113,7 +127,27 @@ export default function Home() {
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
 
 
-        {view === "home" && <HomeScreen onNavigate={navigate} />}
+        {view === "home" && <>
+          <Link href="/companion" className="mt-6 inline-flex min-h-11 items-center rounded-full border border-pink-400/40 px-5 text-sm text-pink-300">Local companion · Windows setup</Link>
+          <CoreDashboard
+            progress={progress}
+            ready={ready}
+            storageAvailable={storageAvailable}
+            favorites={CHARACTERS.filter(character => progress.favoriteIds.includes(character.id))}
+            resumeName={resumeCharacter?.name}
+            onClaim={() => update(state => claimDaily(state, new Date()))}
+            onNightMode={() => { void update(state => ({ ...state, nightMode: !state.nightMode })); }}
+            onFavorite={id => { setSelectedId(id); setRomanceMode(false); setListView("girls"); setView("profile"); }}
+            onResume={() => {
+              if (!resumeCharacter || !progress.lastSession) return;
+              setSelectedId(resumeCharacter.id);
+              setRomanceMode(progress.lastSession.romanceMode);
+              setListView(progress.lastSession.romanceMode ? "romance" : "girls");
+              setView("chat");
+            }}
+          />
+          <HomeScreen onNavigate={navigate} />
+        </>}
 
         {showRoster && (
           <CharacterRoster
@@ -138,8 +172,10 @@ export default function Home() {
           <CharacterProfile
             character={selected}
             romanceMode={romanceMode}
+            favorite={progress.favoriteIds.includes(selected.id)}
+            onToggleFavorite={() => { void update(state => ({ ...state, favoriteIds: state.favoriteIds.includes(selected.id) ? state.favoriteIds.filter(id => id !== selected.id) : [...state.favoriteIds, selected.id] })); }}
             onBack={() => setView(listView)}
-            onChat={() => setView("chat")}
+            onChat={openChat}
             onTag={(nextTag) => {
               setTag(nextTag);
               setCategory("All");
@@ -150,6 +186,7 @@ export default function Home() {
 
         {view === "chat" && selected && (
           <CharacterChat
+            key={`${selected.id}:${romanceMode}`}
             character={selected}
             romanceMode={romanceMode}
             onBack={() => setView("profile")}
