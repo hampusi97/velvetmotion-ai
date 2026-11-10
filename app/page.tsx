@@ -35,13 +35,13 @@ export default function Home() {
   const [ageOk, setAgeOk] = useState(false);
   const [coins, setCoins] = useState(50);
   const [streak, setStreak] = useState(1);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [customName, setCustomName] = useState("");
-  const [customGirls, setCustomGirls] = useState([]);
-  const [suggestions, setSuggestions] = useState([]);
+  const [customGirls, setCustomGirls] = useState<{ name: string; tag: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState("");
-  const [gallery, setGallery] = useState([]);
+  const [gallery, setGallery] = useState<{ id: number; createdAt: string }[]>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("vm-coins");
@@ -50,7 +50,7 @@ export default function Home() {
     if (s) setStreak(parseInt(s));
   }, []);
 
-  const speak = (text) => {
+  const speak = (text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
     const u = new SpeechSynthesisUtterance(text.slice(0, 200));
     u.rate = 0.95;
