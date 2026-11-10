@@ -1,65 +1,28 @@
-# VelvetMotion AI
+# VelvetMotion
 
-Professional NSFW AI Girlfriend / Fantasy platform.
+Adults-only conversations with fictional characters. Every character is invented and written as an adult of 21 or older.
 
-**All content is fantasy. Fictional characters only.**
+## What it does
 
-## Features
+- 18+ age gate before any character content
+- Search, mood and gender filters, and favorites saved in the browser
+- Chat with tappable reply choices, plus a free-text box
+- Browser text-to-speech through the Web Speech API: play, pause, and resume per message, an auto-play switch, and per-character voice, pitch, and rate
+- Playback stops when you leave the conversation
+- If speech synthesis or system voices are missing, messages stay readable
+- Motion for messages, choices, cards, route changes, skeletons, and toasts, with `prefers-reduced-motion` respected
 
-- Age Gate (18+)
-- Login system
-- Improved fictional generation
-- Full Interactive Character Creator
-- Generate New Girl button
-- 23+ Fictional Girls + custom ones
-- Romance Mode
-- Enhanced Tinder Roleplay
-- Improved BNWO Section
-- Multi-girl groups
-- Expanded kinks & JOI styles
-- Timed JOI sessions
-- Continue Last Session button
-- Browser TTS (Speak button)
-- Stronger session memory
-- LLM-ready chat structure
-- Suggest a Feature button
-- Favorite Girl pin
-- Mood system
-- Daily Challenge
-- Goon Room (demo)
-- Crush Helper
-- Rejection Revenge
-- Story Packs
-- Group Chat
-- Personal Gallery with Export All
-- Saved Sessions
-- Tribute System
-- Streak + Coins + daily rewards
-- Forum (paid)
-- Affiliate Program
-- Leaderboard
-- Daily messages
-- Animation polish
+Speech uses voices already installed on the device. The app does not call a paid voice service, clone a real person's voice, or generate images from photographs.
 
-## To reach full professional quality
-
-1. Connect a real LLM API for chat
-2. Add a backend (Supabase/Firebase) for accounts, gallery, and live Goon Room
-3. Deploy and add real payments
-
-## Getting Started
+## Run
 
 ```bash
 npm install
+npm test
+npm run lint
 npm run dev
 ```
 
-## Important
+## Boundaries
 
-- 18+ only
-- **All content is fantasy / fictional characters only**
-- Do not use real people’s names or photos
-
-## Stack
-
-Next.js 15 + TypeScript + Tailwind
+Content is consensual fantasy between adults. Requests involving minors, family scenarios, non-consent, or racial humiliation are refused in character. No real people are depicted.
