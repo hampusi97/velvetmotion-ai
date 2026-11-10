@@ -3,10 +3,28 @@
 @tailwind utilities;
 
 :root {
+  --ink-950: 7 6 10;
+  --ink-900: 18 14 22;
+  --ink-800: 28 22 34;
   color-scheme: dark;
   --rose: #f8c9d8;
   --font-display: "Fraunces Variable", Georgia, "Times New Roman", serif;
   --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+html[data-night-mode="true"] {
+  --ink-950: 0 0 0;
+  --ink-900: 8 8 10;
+  --ink-800: 14 14 16;
+  background: #000;
+}
+
+html[data-night-mode="true"] body {
+  background: #000;
+}
+
+html[data-night-mode="true"] body::before {
+  background: none;
 }
 
 html {

@@ -7,6 +7,8 @@ import { speak } from "@/lib/speech";
 interface CharacterProfileProps {
   character: Character;
   romanceMode: boolean;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   onBack: () => void;
   onChat: () => void;
   onTag: (tag: string) => void;
@@ -15,6 +17,8 @@ interface CharacterProfileProps {
 export function CharacterProfile({
   character,
   romanceMode,
+  favorite,
+  onToggleFavorite,
   onBack,
   onChat,
   onTag,
@@ -42,6 +46,9 @@ export function CharacterProfile({
         {character.category}
         {romanceMode ? " · Romance mode" : ""}
       </p>
+      <button type="button" onClick={onToggleFavorite} aria-pressed={favorite} className="mt-3 min-h-11 rounded-full border border-pink-400/40 px-4 text-sm text-pink-300">
+        {favorite ? "Unpin favorite" : "Pin favorite"}
+      </button>
       <p className="text-zinc-300 mt-3">{character.tagline}</p>
 
       <div className="flex flex-wrap gap-2 mt-3">

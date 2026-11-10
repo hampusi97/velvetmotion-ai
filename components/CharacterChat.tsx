@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { fallbackReply, type Character } from "@/lib/characters";
 import { speak } from "@/lib/speech";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+import { parseChatHistory, type ChatMessage } from "@/lib/chat-history";
 
 interface CharacterChatProps {
   character: Character;
@@ -22,12 +18,25 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [historySaved, setHistorySaved] = useState(true);
+  const historyKey = `vm-chat-v1:${character.id}:${romanceMode ? "romance" : "chat"}`;
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMessages([{ role: "assistant", content: character.initialMessage }]);
+    let saved: ChatMessage[] = [];
+    try { saved = parseChatHistory(localStorage.getItem(historyKey)); }
+    catch { setHistorySaved(false); }
+    setMessages(saved.length ? saved : [{ role: "assistant", content: character.initialMessage }]);
     setInput("");
-  }, [character.id, character.initialMessage]);
+    setHistoryReady(true);
+  }, [historyKey, character.initialMessage]);
+
+  useEffect(() => {
+    if (!historyReady) return;
+    try { localStorage.setItem(historyKey, JSON.stringify(messages.slice(-100))); }
+    catch { setHistorySaved(false); }
+  }, [messages, historyReady, historyKey]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -70,6 +79,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   return (
     <div className="flex flex-col min-h-[80vh]">
       <p className="mb-3 text-xs text-zinc-400">Demo chat uses local character replies. Live AI is not connected.</p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p role="status" className="text-xs text-zinc-400">{historySaved ? "Up to 100 recent messages saved in this browser." : "Chat history cannot be saved in this browser."}</p>
+        <button type="button" disabled={isLoading || !historyReady} onClick={() => setMessages([{ role: "assistant", content: character.initialMessage }])} className="min-h-11 rounded-lg border border-zinc-700 px-3 text-xs disabled:opacity-40">Clear this chat</button>
+      </div>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="text-pink-400 text-sm">
           ← Profile
@@ -127,6 +140,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       >
         <input
           value={input}
+          maxLength={4000}
           onChange={(event) => setInput(event.target.value)}
           placeholder={`Message ${character.name.split(" ")[0]}`}
           className="flex-1 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-sm outline-none focus:border-pink-500"
