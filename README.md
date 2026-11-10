@@ -4,11 +4,11 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 
 **All content is fantasy. Fictional characters only.**
 
-## Features
+## Full Feature Set (pushed)
 
 - Age Gate (18+)
 - Login system
-- Improved fictional generation
+- Browser TTS (Speak button)
 - Full Interactive Character Creator
 - Generate New Girl button
 - 23+ Fictional Girls + custom ones
@@ -19,14 +19,12 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Expanded kinks & JOI styles
 - Timed JOI sessions
 - Continue Last Session button
-- Browser TTS (Speak button)
-- Stronger session memory
-- LLM-ready chat structure
+- Session memory
 - Suggest a Feature button
 - Favorite Girl pin
 - Mood system
 - Daily Challenge
-- Goon Room (demo)
+- Goon Room
 - Crush Helper
 - Rejection Revenge
 - Story Packs
@@ -39,13 +37,6 @@ Professional NSFW AI Girlfriend / Fantasy platform.
 - Affiliate Program
 - Leaderboard
 - Daily messages
-- Animation polish
-
-## To reach full professional quality
-
-1. Connect a real LLM API for chat
-2. Add a backend (Supabase/Firebase) for accounts, gallery, and live Goon Room
-3. Deploy and add real payments
 
 ## Getting Started
 
