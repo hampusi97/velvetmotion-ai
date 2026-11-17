@@ -25,8 +25,8 @@ const GALLERY_KEY = "vm-gallery";
 const CHAT_PREFIX = "vm-chat-";
 const INTIMACY_PREFIX = "vm-intimacy-";
 const DAILY_KEY = "vm-daily-claim";
-const DEFAULT_COINS = 500;
-const DAILY_REWARD = 75;
+const DEFAULT_COINS = 600;
+const DAILY_REWARD = 100;
 
 export function getCoins(): number {
   if (typeof window === "undefined") return DEFAULT_COINS;
@@ -185,10 +185,11 @@ export function bumpIntimacy(characterId: string, delta = 2) {
   return next;
 }
 
+/** Slightly more generous so free users can generate more. */
 export const GEN_COST: Record<string, number> = {
-  portrait: 8,
-  lingerie: 12,
-  nude: 15,
-  explicit: 20,
-  video: 35,
+  portrait: 6,
+  lingerie: 10,
+  nude: 14,
+  explicit: 18,
+  video: 28,
 };
