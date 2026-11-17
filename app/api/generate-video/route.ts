@@ -19,17 +19,17 @@ export async function POST(req: Request) {
     const pose = typeof body.pose === "string" ? body.pose : "intimate cinematic scene";
     const character = getCharacter(characterId);
 
-    const look = character?.figure || "beautiful adult woman 25 years old";
+    const look = character?.figure || "beautiful adult woman 24 years old";
     const name = character?.name || "companion";
     const base =
       promptIn.trim() ||
       [
         "masterpiece, best quality, photorealistic adult film still",
         look,
-        `${name} aesthetic, same woman throughout`,
+        `${name} aesthetic, same woman throughout the sequence`,
         pose,
-        "explicit sex scene, detailed anatomy, uncensored nsfw",
-        "cinematic lighting, shallow depth of field, film grain, 35mm",
+        "explicit sex scene, detailed anatomy, uncensored nsfw, aroused expression",
+        "cinematic lighting, shallow depth of field, film grain, 35mm, high detail",
       ].join(", ");
 
     const videoEndpoint = (process.env.AI_VIDEO_ENDPOINT || "").trim();
@@ -73,19 +73,18 @@ export async function POST(req: Request) {
     }
 
     // 2) Free cinematic multi-frame sequence (Pollinations Flux)
-    // Same base seed per character so face/body stays more consistent across frames.
-    const baseSeed = seedFromId(characterId || "default") + Math.floor(Math.random() * 50);
+    const baseSeed = seedFromId(characterId || "default") + Math.floor(Math.random() * 40);
     const framePrompts = [
-      `${base}, opening frame, establishing shot, looking at viewer`,
-      `${base}, mid sequence, motion, intimate angle, arched back`,
-      `${base}, climax frame, explicit, intense expression, film grain`,
-      `${base}, afterglow frame, soft light, satisfied, close-up face`,
+      `${base}, opening frame, establishing shot, looking at viewer, building tension`,
+      `${base}, mid sequence, motion, intimate angle, arched back, intense eye contact`,
+      `${base}, climax frame, explicit, intense expression, peak moment, film grain`,
+      `${base}, afterglow frame, soft light, satisfied expression, close-up face, intimate`,
     ];
 
     const frames = framePrompts.map((p, i) => {
-      const s = baseSeed + i * 17;
+      const s = baseSeed + i * 19;
       return `https://image.pollinations.ai/prompt/${encodeURIComponent(
-        p
+        p,
       )}?width=768&height=1152&nologo=true&seed=${s}&model=flux&enhance=true`;
     });
 
