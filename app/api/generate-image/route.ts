@@ -5,13 +5,13 @@ export const dynamic = "force-dynamic";
 
 const STYLES: Record<string, string> = {
   portrait:
-    "tasteful beauty portrait, soft cinematic lighting, sharp eyes, detailed skin texture, looking at viewer, magazine quality",
+    "tasteful beauty portrait, soft cinematic lighting, sharp eyes, detailed skin texture, looking at viewer, magazine quality, seductive expression",
   lingerie:
-    "wearing luxurious lingerie, bedroom ambient light, seductive pose, photorealistic, detailed fabric, intimate atmosphere",
+    "wearing luxurious sheer lingerie, bedroom ambient light, seductive pose, photorealistic, detailed fabric and lace, intimate atmosphere, arched back",
   nude:
-    "fully nude, naked body, bare breasts, natural skin detail, erotic fine-art photography, tasteful nsfw, soft shadows, highly detailed",
+    "fully nude, naked body, bare breasts, natural skin detail, erotic fine-art photography, tasteful nsfw, soft shadows, highly detailed, looking at viewer",
   explicit:
-    "explicit nude, sexual pose, detailed anatomy, uncensored nsfw, photorealistic, studio quality lighting, sharp focus",
+    "explicit nude, sexual pose, detailed anatomy, uncensored nsfw, photorealistic, studio quality lighting, sharp focus, aroused expression",
   video:
     "cinematic still from adult film, explicit scene, dramatic rim light, shallow depth of field, film grain, 35mm",
 };
@@ -29,20 +29,26 @@ export async function POST(req: Request) {
     const type = typeof body.type === "string" ? body.type : "portrait";
     const pose = typeof body.pose === "string" ? body.pose : "looking at viewer, seductive";
     const extra = typeof body.extra === "string" ? body.extra : "";
+    const dual = typeof body.dual === "string" ? body.dual : "";
     const character = getCharacter(characterId);
 
     const look = character?.figure || "beautiful adult woman, proportionate figure";
     const name = character?.name || "companion";
     const style = STYLES[type] || STYLES.portrait;
 
+    const dualPart = dual
+      ? `two beautiful adult women together, ${look}, and second woman ${dual}, intimate dual scene`
+      : `${look}`;
+
     const prompt = [
       "masterpiece, best quality, ultra detailed, photorealistic",
-      `beautiful adult woman 25 years old, ${look}`,
-      `${name} aesthetic, consistent face and body`,
+      "beautiful adult woman 24 years old",
+      dualPart,
+      `${name} aesthetic, consistent face and body across generations`,
       style,
       pose,
       extra,
-      "realistic skin pores, natural proportions, 8k uhd",
+      "realistic skin pores, natural proportions, 8k uhd, no text, no watermark",
     ]
       .filter(Boolean)
       .join(", ");
@@ -77,7 +83,7 @@ export async function POST(req: Request) {
     // Character-biased seed + small jitter so she stays recognizable across gens
     const seed = seedFromId(characterId || name) + Math.floor(Math.random() * 40);
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      prompt
+      prompt,
     )}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;
 
     return NextResponse.json({
