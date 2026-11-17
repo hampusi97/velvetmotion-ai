@@ -17,7 +17,8 @@ import { TributeBrowser } from "@/components/TributeBrowser";
 import { CreateGirlWizard } from "@/components/CreateGirlWizard";
 import { GoonRoom } from "@/components/GoonRoom";
 import { DiscoverSwipe } from "@/components/DiscoverSwipe";
-import { WorkspaceHub } from "@/components/WorkspaceHub";
+import { RouletteRoom } from "@/components/RouletteRoom";
+import { BlindfoldJoi } from "@/components/BlindfoldJoi";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
@@ -29,6 +30,8 @@ type HomeView =
   | "tinder"
   | "joi"
   | "room"
+  | "roulette"
+  | "blindfold"
   | "suggest"
   | "gallery"
   | "packs"
@@ -118,7 +121,7 @@ export default function Home() {
             VelvetMotion
           </h1>
           <p className="text-sm text-zinc-400 leading-relaxed mb-6 mt-3 text-center">
-            Adult fantasy companions. Chat, nudes, tributes, goon room. Every character is fictional and 21+.
+            Adult fantasy companions. Chat, nudes, tributes, roulette, blindfold JOI. Fictional 21+ only.
           </p>
           <button
             onClick={() => {
@@ -148,13 +151,7 @@ export default function Home() {
         onUserChange={setUser}
       />
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
-        {view === "home" && (
-          <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />
-        )}
-
-        {view === "workspace" && (
-          <WorkspaceHub onHome={() => setView("home")} />
-        )}
+        {view === "home" && <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />}
 
         {showRoster && (
           <CharacterRoster
@@ -195,7 +192,7 @@ export default function Home() {
           ) : (
             <div className="mx-auto max-w-md rounded-3xl border border-rose-500/30 bg-ink-900 p-8 text-center">
               <p className="text-lg font-medium text-cream">Log in to chat & generate</p>
-              <p className="mt-2 text-sm text-mist">Use Log in in the header (Google Sign-In or local username).</p>
+              <p className="mt-2 text-sm text-mist">Use Log in in the header (local username or Google).</p>
               <button type="button" onClick={() => setView("profile")} className="mt-6 text-sm text-rose-300">
                 ← Back to profile
               </button>
@@ -214,32 +211,26 @@ export default function Home() {
           />
         )}
 
-        {view === "room" && (
-          <GoonRoom onHome={() => setView("home")} onChat={openChatById} />
-        )}
+        {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} />}
+        {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
+        {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
 
         {view === "tribute" && (
           <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">
-              ← Home
-            </button>
+            <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
             <TributeBrowser onStartWithGirl={openChatById} />
           </>
         )}
 
         {view === "packs" && (
           <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400">
-              ← Home
-            </button>
+            <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
             <StoryPackBrowser />
           </>
         )}
         {view === "joi" && (
           <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400">
-              ← Home
-            </button>
+            <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
             <JoiBrowser />
           </>
         )}
@@ -270,6 +261,9 @@ export default function Home() {
           />
         )}
         {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
+        {view === "workspace" && (
+          <SectionView section={findSection("workspace")} onHome={() => setView("home")} />
+        )}
         {view === "tinder" && (
           <DiscoverSwipe
             onHome={() => setView("home")}

@@ -1,5 +1,4 @@
-/** Local & Firebase Google Auth user state. */
-import { auth, firebaseLogout } from "@/lib/firebase";
+/** Local username auth. Firebase Google is optional. */
 
 const USER_KEY = "vm-user";
 
@@ -13,25 +12,28 @@ export type LocalUser = {
 
 export function getUser(): LocalUser | null {
   if (typeof window === "undefined") return null;
-  if (auth.currentUser) {
-    return {
-      username:
-        auth.currentUser.displayName ||
-        auth.currentUser.email?.split("@")[0] ||
-        "Google User",
-      joinedAt: Date.now(),
-      uid: auth.currentUser.uid,
-      email: auth.currentUser.email,
-      isFirebase: true,
-    };
+  try {
+    // Optional Firebase current user
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fb = require("@/lib/firebase") as { auth?: { currentUser?: { displayName?: string | null; email?: string | null; uid: string } } };
+    const cu = fb.auth?.currentUser;
+    if (cu) {
+      return {
+        username: cu.displayName || cu.email?.split("@")[0] || "Google User",
+        joinedAt: Date.now(),
+        uid: cu.uid,
+        email: cu.email,
+        isFirebase: true,
+      };
+    }
+  } catch {
+    /* firebase not ready */
   }
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as LocalUser;
-    if (typeof parsed?.username === "string" && parsed.username.trim().length >= 2) {
-      return parsed;
-    }
+    if (typeof parsed?.username === "string" && parsed.username.trim().length >= 2) return parsed;
     return null;
   } catch {
     return null;
@@ -45,7 +47,7 @@ export function login(username: string): LocalUser | null {
   try {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   } catch {
-    /* private mode */
+    /* */
   }
   return user;
 }
@@ -56,5 +58,7 @@ export function logout() {
   } catch {
     /* */
   }
-  void firebaseLogout().catch(() => {});
+  void import("@/lib/firebase")
+    .then((m) => m.firebaseLogout?.())
+    .catch(() => {});
 }
