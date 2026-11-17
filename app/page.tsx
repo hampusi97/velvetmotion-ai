@@ -15,6 +15,7 @@ import { SectionView } from "@/components/section-view";
 import { findSection, type ViewId } from "@/lib/sections";
 import { UtilitySection } from "@/components/utility-section";
 import { TributeBrowser } from "@/components/TributeBrowser";
+import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
   | "home"
@@ -43,6 +44,7 @@ export default function Home() {
   const [tag, setTag] = useState<string | null>(null);
 
   const [adult, setAdult] = useState<boolean | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     const main = document.getElementById("main");
@@ -56,6 +58,7 @@ export default function Home() {
     } catch {
       setAdult(false);
     }
+    setUser(getUser());
   }, []);
   const navigate = (next: ViewId) => {
     setMenuOpen(false);
@@ -133,6 +136,7 @@ export default function Home() {
         menuOpen={menuOpen}
         onToggleMenu={toggleMenu}
         onNavigate={navigate}
+        onUserChange={setUser}
       />
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
         {view === "home" && <HomeScreen onNavigate={navigate} />}
@@ -171,11 +175,27 @@ export default function Home() {
         )}
 
         {view === "chat" && selected && (
-          <CharacterChat
-            character={selected}
-            romanceMode={romanceMode}
-            onBack={() => setView("profile")}
-          />
+          user ? (
+            <CharacterChat
+              character={selected}
+              romanceMode={romanceMode}
+              onBack={() => setView("profile")}
+            />
+          ) : (
+            <div className="mx-auto max-w-md rounded-3xl border border-rose-500/30 bg-ink-900 p-8 text-center">
+              <p className="text-lg font-medium text-cream">Log in to chat & generate</p>
+              <p className="mt-2 text-sm text-mist">
+                Use the Log in button in the header (local username on this device).
+              </p>
+              <button
+                type="button"
+                onClick={() => setView("profile")}
+                className="mt-6 text-sm text-rose-300"
+              >
+                ← Back to profile
+              </button>
+            </div>
+          )
         )}
 
         {view === "tribute" && (
