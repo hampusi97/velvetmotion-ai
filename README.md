@@ -1,10 +1,10 @@
 # VelvetMotion AI
 
-Candy.ai / AIGirlfriends-style platform: chat, real portraits, nudes, sex-video sequences, goon room, daily feed, gifts, undress ladder.
+Candy.ai-style AI girlfriend site — **100% free tier** with Pollinations (chat, images, 4-frame video sequences).
 
-**Fictional adults 21+ only.**
+Fictional adults **21+ only**.
 
-## Run
+## Quick start
 
 ```bash
 git clone https://github.com/hampusi97/velvetmotion-ai.git
@@ -13,40 +13,32 @@ npm install
 npm run dev
 ```
 
-http://localhost:3000 → age gate → **Log in** → Meet the girls / Goon Room / Create girl.
+http://localhost:3000 → age gate → **Log in** → Girls / Discover / Goon Room / Create.
 
 ## Deploy (Vercel)
 
-Import this repo on [vercel.com/new](https://vercel.com/new). Optional env:
+Import this repo on [vercel.com/new](https://vercel.com/new). Zero env vars required.
 
-```
-XAI_API_KEY=
-AI_CHAT_ENDPOINT=
-AI_CHAT_API_KEY=
-AI_IMAGE_ENDPOINT=
-AI_VIDEO_ENDPOINT=
-AI_VIDEO_API_KEY=
-```
+Optional (see `.env.example`):
 
-Zero keys = free Pollinations chat + images + 4-frame video sequences.
+| Var | Effect |
+|-----|--------|
+| `XAI_API_KEY` / `AI_CHAT_*` | Better chat |
+| `AI_IMAGE_*` | Custom image API |
+| `AI_VIDEO_*` | Real MP4 instead of still sequences |
 
 ## Features
 
-- **12 companions** with live Pollinations portraits (not blank SVGs only)
-- **Local login** required for chat & generate
-- **Chat memory** synced per girl (localStorage)
-- **Intimacy meter** + she texts first when high
-- **Undress ladder**: portrait → lingerie → nude → video → explicit by intimacy %
-- **Dual-girl** generate option
-- **Gifts** (coins) she remembers
-- **Daily feed** on home
-- **Goon Room** timed sessions (1–2 girls)
-- **Create girl** wizard: look, personality, relationship RP, photo upload
-- **Gallery**, tributes, JOI, story packs
-- **Sex video**: 4-frame cinematic sequence; real MP4 via `AI_VIDEO_ENDPOINT`
+- **Discover swipe** — Tinder-style deck, drag cards, spicy peek, match modal
+- **Roster** — live high-quality portraits (not blank SVGs)
+- **Chat** — free LLM + intimacy + gifts + undress ladder
+- **Generate** — portrait → lingerie → nude → explicit + dual-girl + sex-video frames
+- **Daily claim** — +75 coins / day
+- **Goon Room** — timed 1–2 girl sessions
+- **Create girl** — look, personality, relationship RP, photo upload
+- **Tributes / JOI / stories / vault**
+- **Optional Firebase** — Google sign-in + cloud sync when configured
 
-## Limits
+## Stack
 
-- Pollinations rate limits (~30s between heavy gens)
-- No real Instagram person cloning (upload your own reference art only)
-- Sync is per-browser until you add Supabase
+Next.js 15 · React 18 · Tailwind · Framer Motion · Pollinations · Firebase (optional)

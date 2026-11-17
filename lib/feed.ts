@@ -1,6 +1,7 @@
 import { CHARACTERS } from "@/lib/characters";
+import { resolveAvatar } from "@/lib/portraits";
 
-/** Lightweight "she posted today" feed — inspired by AIGirlfriends.ai living feed. */
+/** Lightweight "she posted today" feed — living companion energy. */
 
 export type FeedPost = {
   id: string;
@@ -45,7 +46,7 @@ export function buildFeed(limit = 12): FeedPost[] {
       id: `feed-${c.id}`,
       characterId: c.id,
       characterName: c.name.split(" ")[0],
-      avatar: c.avatar,
+      avatar: resolveAvatar(c.avatar, c.id, c.figure),
       text,
       mood,
       hoursAgo: (i * 2 + 1) % 14,

@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import Image from "next/image";
 import { filterCharacters, type Character } from "@/lib/characters";
-import { characterPortraitUrl } from "@/lib/portraits";
+import { resolveAvatar } from "@/lib/portraits";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -49,7 +48,7 @@ export function CharacterRoster({
         <p className="text-zinc-400 text-sm mt-1">
           {romanceMode
             ? "Affection first. Same cast — warmth before the heat."
-            : "Original fictional women, 21+. Real portraits · chat · nudes · video."}
+            : "Original fictional women, 21+. High-quality portraits · chat · nudes · video."}
         </p>
       </div>
 
@@ -110,10 +109,7 @@ export function CharacterRoster({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {visible.map((character) => {
-            const src =
-              character.avatar.startsWith("http") || character.avatar.startsWith("data:")
-                ? character.avatar
-                : characterPortraitUrl(character.id, character.figure);
+            const src = resolveAvatar(character.avatar, character.id, character.figure);
             return (
               <button
                 key={character.id}
