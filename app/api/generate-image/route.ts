@@ -16,6 +16,12 @@ const STYLES: Record<string, string> = {
     "cinematic still from adult film, explicit scene, dramatic rim light, shallow depth of field, film grain, 35mm",
 };
 
+function seedFromId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return (h % 800000000) + 100000;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -29,10 +35,10 @@ export async function POST(req: Request) {
     const name = character?.name || "companion";
     const style = STYLES[type] || STYLES.portrait;
 
-    let prompt = [
-      "masterpiece, best quality, ultra detailed",
+    const prompt = [
+      "masterpiece, best quality, ultra detailed, photorealistic",
       `beautiful adult woman 25 years old, ${look}`,
-      `${name} aesthetic`,
+      `${name} aesthetic, consistent face and body`,
       style,
       pose,
       extra,
@@ -68,8 +74,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const seed = Math.floor(Math.random() * 1e9);
-    // Classic free image API — enhance for quality
+    // Character-biased seed + small jitter so she stays recognizable across gens
+    const seed = seedFromId(characterId || name) + Math.floor(Math.random() * 40);
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
       prompt
     )}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;

@@ -1,4 +1,4 @@
-/** Client-side coins + generated media gallery (localStorage). */
+/** Client-side coins, gallery, and chat memory (localStorage sync). */
 
 export type GalleryItem = {
   id: string;
@@ -11,8 +11,19 @@ export type GalleryItem = {
   createdAt: number;
 };
 
+export type StoredMessage = {
+  role: "user" | "assistant";
+  content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  frames?: string[];
+  mediaType?: string;
+};
+
 const COINS_KEY = "vm-coins";
 const GALLERY_KEY = "vm-gallery";
+const CHAT_PREFIX = "vm-chat-";
+const INTIMACY_PREFIX = "vm-intimacy-";
 const DEFAULT_COINS = 500;
 
 export function getCoins(): number {
@@ -82,6 +93,50 @@ export function clearGallery() {
   } catch {
     /* */
   }
+}
+
+/** Persist chat thread per character (survives refresh). */
+export function loadChat(characterId: string): StoredMessage[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CHAT_PREFIX + characterId);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(-80) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveChat(characterId: string, messages: StoredMessage[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CHAT_PREFIX + characterId, JSON.stringify(messages.slice(-80)));
+  } catch {
+    /* quota */
+  }
+}
+
+export function getIntimacy(characterId: string, fallback = 50): number {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const v = localStorage.getItem(INTIMACY_PREFIX + characterId);
+    if (v === null) return fallback;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function bumpIntimacy(characterId: string, delta = 2) {
+  const next = Math.min(100, getIntimacy(characterId) + delta);
+  try {
+    localStorage.setItem(INTIMACY_PREFIX + characterId, String(next));
+  } catch {
+    /* */
+  }
+  return next;
 }
 
 /** Generation costs (coins). Chat is free. */
