@@ -6,6 +6,8 @@ export type SectionId =
   | "tinder"
   | "joi"
   | "room"
+  | "roulette"
+  | "blindfold"
   | "suggest"
   | "gallery"
   | "packs"
@@ -24,13 +26,6 @@ export type Section = {
 
 export const sections: Section[] = [
   {
-    id: "workspace",
-    title: "Workspace",
-    kicker: "Google",
-    summary: "Google Meet, Google Chat, Gmail, Drive & Firestore sync.",
-    art: "bg-[radial-gradient(110%_85%_at_20%_10%,#f472b6_0%,transparent_48%),linear-gradient(165deg,#31102f_0%,#0f0714_75%)]",
-  },
-  {
     id: "girls",
     title: "Girls",
     kicker: "Cast",
@@ -38,11 +33,46 @@ export const sections: Section[] = [
     art: "bg-[radial-gradient(120%_90%_at_18%_0%,#ff4d9a_0%,transparent_46%),linear-gradient(165deg,#4a2038_0%,#140910_72%)]",
   },
   {
+    id: "tinder",
+    title: "Discover",
+    kicker: "Swipe",
+    summary: "Tinder-style matches with spicy peek.",
+    art: "bg-[radial-gradient(68%_72%_at_92%_82%,#d98aa6_0%,transparent_46%),linear-gradient(160deg,#351828,#120910)]",
+  },
+  {
     id: "tribute",
     title: "Tribute",
     kicker: "Challenges",
-    summary: "Edge, goon, and cum challenges for the girls.",
+    summary: "Edge streaks unlock free dual-girl gens.",
     art: "bg-[radial-gradient(90%_80%_at_70%_20%,#e879f9_0%,transparent_50%),linear-gradient(160deg,#3b0764,#0c0a12)]",
+  },
+  {
+    id: "roulette",
+    title: "Roulette",
+    kicker: "Sprint",
+    summary: "Random girl + challenge · 8-minute goon.",
+    art: "bg-[radial-gradient(80%_70%_at_30%_20%,#f472b6_0%,transparent_50%),linear-gradient(160deg,#4a1030,#0c0a12)]",
+  },
+  {
+    id: "blindfold",
+    title: "Blindfold",
+    kicker: "Audio",
+    summary: "Voice JOI until intimacy unlocks the image.",
+    art: "bg-[radial-gradient(50%_50%_at_50%_40%,#52525b_0%,transparent_60%),linear-gradient(180deg,#18181b,#0a0a0a)]",
+  },
+  {
+    id: "joi",
+    title: "JOI",
+    kicker: "JOI",
+    summary: "Guided JOI sessions with timers.",
+    art: "bg-[radial-gradient(56%_56%_at_50%_38%,#f7d5e2_0%,transparent_58%),linear-gradient(180deg,#2c1524,#0e090d)]",
+  },
+  {
+    id: "room",
+    title: "Goon Room",
+    kicker: "Room",
+    summary: "Timed sessions with one or two girls.",
+    art: "bg-[radial-gradient(86%_60%_at_28%_100%,#8d3d5c_0%,transparent_52%),linear-gradient(200deg,#1a1018,#0b090c)]",
   },
   {
     id: "create",
@@ -59,20 +89,6 @@ export const sections: Section[] = [
     art: "bg-[radial-gradient(80%_90%_at_50%_100%,#e7a0b8_0%,transparent_48%),linear-gradient(180deg,#2c1624,#10080e)]",
   },
   {
-    id: "tinder",
-    title: "Discover",
-    kicker: "Swipe",
-    summary: "Swipe-style discovery.",
-    art: "bg-[radial-gradient(68%_72%_at_92%_82%,#d98aa6_0%,transparent_46%),linear-gradient(160deg,#351828,#120910)]",
-  },
-  {
-    id: "joi",
-    title: "JOI",
-    kicker: "JOI",
-    summary: "Guided JOI sessions.",
-    art: "bg-[radial-gradient(56%_56%_at_50%_38%,#f7d5e2_0%,transparent_58%),linear-gradient(180deg,#2c1524,#0e090d)]",
-  },
-  {
     id: "gallery",
     title: "Gallery",
     kicker: "Media",
@@ -87,18 +103,18 @@ export const sections: Section[] = [
     art: "bg-[radial-gradient(90%_80%_at_0%_0%,#f0c2a0_0%,transparent_42%),linear-gradient(150deg,#3d2030,#11090e)]",
   },
   {
+    id: "workspace",
+    title: "Workspace",
+    kicker: "Google",
+    summary: "Google Meet, Chat, Gmail, Drive sync.",
+    art: "bg-[radial-gradient(110%_85%_at_20%_10%,#f472b6_0%,transparent_48%),linear-gradient(165deg,#31102f_0%,#0f0714_75%)]",
+  },
+  {
     id: "bnwo",
     title: "BNWO",
     kicker: "BNWO",
     summary: "BNWO section.",
     art: "bg-[radial-gradient(70%_70%_at_8%_88%,#c45c7a_0%,transparent_50%),linear-gradient(145deg,#1b1020,#0c0a10)]",
-  },
-  {
-    id: "room",
-    title: "Goon Room",
-    kicker: "Room",
-    summary: "Open the Goon Room.",
-    art: "bg-[radial-gradient(86%_60%_at_28%_100%,#8d3d5c_0%,transparent_52%),linear-gradient(200deg,#1a1018,#0b090c)]",
   },
   {
     id: "suggest",
@@ -111,8 +127,6 @@ export const sections: Section[] = [
 
 export function findSection(id: SectionId): Section {
   const section = sections.find((item) => item.id === id);
-  if (!section) {
-    throw new Error(`Unknown section: ${id}`);
-  }
+  if (!section) throw new Error(`Unknown section: ${id}`);
   return section;
 }
