@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { fallbackReply, CHARACTERS, type Character } from "@/lib/characters";
 import { speak } from "@/lib/speech";
 import {
@@ -52,6 +51,11 @@ const POSES = [
   "straddling, intimate angle",
   "on all fours, arched back",
   "legs spread, explicit view",
+  "bent over, looking back",
+  "riding, intense eye contact",
+  "hands bound, submissive",
+  "against the wall, passionate",
+  "in lingerie, teasing undress",
 ];
 
 export function CharacterChat({ character, romanceMode, onBack }: CharacterChatProps) {
@@ -170,9 +174,9 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     speak(reply, character.voice);
   };
 
-  const generate = async () => {
+  const runGenerate = async (type: (typeof GEN_TYPES)[number]["id"], overrideDual = dualId) => {
     if (genLoading) return;
-    const meta = GEN_TYPES.find((t) => t.id === genType);
+    const meta = GEN_TYPES.find((t) => t.id === type);
     if (meta && intimacy < meta.minInt) {
       setMessages((m) => [
         ...m,
@@ -184,11 +188,11 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       setGenOpen(false);
       return;
     }
-    const cost = (GEN_COST[genType] ?? 15) + (dualId ? 15 : 0);
+    const cost = (GEN_COST[type] ?? 15) + (overrideDual ? 15 : 0);
     if (!spendCoins(cost)) {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: `Not enough coins (${cost} needed). Top up in Gallery.` },
+        { role: "assistant", content: `Not enough coins (${cost} needed). Claim daily or swipe more.` },
       ]);
       setGenOpen(false);
       refreshCoins();
@@ -196,12 +200,13 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     }
     refreshCoins();
     setGenLoading(true);
-    const dual = dualId ? CHARACTERS.find((c) => c.id === dualId) : null;
+    setGenType(type);
+    const dual = overrideDual ? CHARACTERS.find((c) => c.id === overrideDual) : null;
     const dualExtra = dual
       ? `, two women together, ${character.name} and ${dual.name}, dual girl explicit scene`
       : "";
     try {
-      if (genType === "video") {
+      if (type === "video") {
         const res = await fetch("/api/generate-video", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -245,9 +250,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             characterId: character.id,
-            type: genType,
+            type,
             pose,
             extra: (extra || "") + dualExtra,
+            dual: dual?.figure || "",
           }),
         });
         const data = await res.json();
@@ -255,7 +261,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           addToGallery({
             characterId: character.id,
             characterName: character.name,
-            type: genType,
+            type,
             url: data.url,
             prompt: data.prompt,
           });
@@ -265,7 +271,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               role: "assistant",
               content: dual ? `With ${dual.name.split(" ")[0]} — how do we look?` : "How do I look?",
               imageUrl: data.url,
-              mediaType: genType,
+              mediaType: type,
             },
           ]);
           setIntimacy(bumpIntimacy(character.id, 3));
@@ -289,7 +295,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     if (!spendCoins(g.cost)) {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: `Need ${g.cost} coins to send ${g.name}. Top up in Gallery.` },
+        { role: "assistant", content: `Need ${g.cost} coins to send ${g.name}. Claim daily or swipe.` },
       ]);
       setGiftOpen(false);
       return;
@@ -303,10 +309,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     setMessages((m) => [
       ...m,
       { role: "user", content: `(Sent gift: ${g.name})` },
-      {
-        role: "assistant",
-        content: replyLine,
-      },
+      { role: "assistant", content: replyLine },
     ]);
     void syncChatSessionToFirestore({
       characterId: character.id,
@@ -353,6 +356,29 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         >
           Generate
         </button>
+      </div>
+
+      {/* Quick generate strip */}
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        {(["lingerie", "nude", "explicit", "video"] as const).map((t) => {
+          const meta = GEN_TYPES.find((x) => x.id === t)!;
+          const locked = intimacy < meta.minInt;
+          return (
+            <button
+              key={t}
+              type="button"
+              disabled={genLoading || locked}
+              onClick={() => void runGenerate(t)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium border transition ${
+                locked
+                  ? "border-zinc-800 text-zinc-600"
+                  : "border-pink-500/40 bg-pink-500/10 text-pink-200 hover:bg-pink-500/20"
+              }`}
+            >
+              {meta.label}{locked ? " 🔒" : ""}
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex-1 space-y-3">
@@ -473,7 +499,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             <input
               value={extra}
               onChange={(e) => setExtra(e.target.value)}
-              placeholder="Extra: candle light, moaning…"
+              placeholder="Extra: candle light, moaning, dual kissing…"
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm"
             />
             <div className="flex justify-between text-sm">
@@ -483,7 +509,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             <button
               type="button"
               disabled={genLoading}
-              onClick={() => void generate()}
+              onClick={() => void runGenerate(genType)}
               className="w-full py-3 rounded-2xl bg-pink-600 font-medium disabled:opacity-50"
             >
               {genLoading ? "Generating…" : `Generate ${genType}`}
@@ -495,7 +521,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       {giftOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/70" onClick={() => setGiftOpen(false)} />
-          <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-zinc-800 bg-zinc-950 p-5 space-y-3">
+          <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-zinc-800 bg-zinc-950 p-5 space-y-3 max-h-[80vh] overflow-y-auto">
             <h3 className="font-semibold text-lg">Send a gift</h3>
             <p className="text-xs text-zinc-500">She remembers gifts in this browser. +intimacy.</p>
             {GIFTS.map((g) => (
@@ -508,8 +534,9 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
                 <span>
                   {g.name}
                   {giftIds.includes(g.id) ? " ✓" : ""}
+                  <span className="block text-[11px] text-zinc-500">{g.tag}</span>
                 </span>
-                <span className="text-amber-300">{g.cost}</span>
+                <span className="text-amber-300 text-xs">{g.cost} ◆</span>
               </button>
             ))}
           </div>
