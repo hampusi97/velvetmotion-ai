@@ -4,7 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { fallbackReply, type Character } from "@/lib/characters";
 import { speak } from "@/lib/speech";
-import { getCoins, spendCoins, addToGallery, GEN_COST } from "@/lib/storage";
+import {
+  getCoins,
+  spendCoins,
+  addToGallery,
+  GEN_COST,
+  loadChat,
+  saveChat,
+  bumpIntimacy,
+  getIntimacy,
+} from "@/lib/storage";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -55,12 +64,23 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [genLoading, setGenLoading] = useState(false);
   const [aiMode, setAiMode] = useState<string | null>(null);
   const [coins, setCoinsState] = useState(500);
+  const [intimacy, setIntimacy] = useState(character.intimacy);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setMessages([{ role: "assistant", content: character.initialMessage }]);
+    const saved = loadChat(character.id);
+    if (saved.length > 0) {
+      setMessages(saved);
+    } else {
+      setMessages([{ role: "assistant", content: character.initialMessage }]);
+    }
     setInput("");
-  }, [character.id, character.initialMessage]);
+    setIntimacy(getIntimacy(character.id, character.intimacy));
+  }, [character.id, character.initialMessage, character.intimacy]);
+
+  useEffect(() => {
+    if (messages.length > 0) saveChat(character.id, messages);
+  }, [messages, character.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -106,6 +126,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     }
 
     setMessages((current) => [...current, { role: "assistant", content: reply }]);
+    setIntimacy(bumpIntimacy(character.id, 2));
     setIsLoading(false);
     speak(reply, character.voice);
   };
@@ -118,7 +139,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         ...m,
         {
           role: "assistant",
-          content: `Not enough coins (${cost} needed). Chat is free — earn more coins on the home screen or wait for daily top-up.`,
+          content: `Not enough coins (${cost} needed). Chat is free — top up in Gallery.`,
         },
       ]);
       setGenOpen(false);
@@ -155,13 +176,14 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             {
               role: "assistant",
               content: data.fallback
-                ? "Cinematic sequence ready. Add AI_VIDEO_ENDPOINT for true motion MP4. Want another angle?"
+                ? "4-frame cinematic sex sequence ready. Set AI_VIDEO_ENDPOINT for real MP4. Dirtier angle?"
                 : "Here's the scene. Want it dirtier?",
               videoUrl: url,
               frames,
               mediaType: "video",
             },
           ]);
+          setIntimacy(bumpIntimacy(character.id, 4));
         }
       } else {
         const res = await fetch("/api/generate-image", {
@@ -192,6 +214,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               mediaType: genType,
             },
           ]);
+          setIntimacy(bumpIntimacy(character.id, 3));
         }
       }
       setGenOpen(false);
@@ -200,7 +223,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         ...m,
         {
           role: "assistant",
-          content: "Generation failed — wait a few seconds and try again (free tier rate limits).",
+          content: "Generation failed — wait ~30s and try again (free tier rate limits).",
         },
       ]);
     } finally {
@@ -219,7 +242,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           : aiMode === "premium"
             ? "Premium AI key active."
             : "Free AI chat on."}{" "}
-        Camera → nudes, explicit, sex video · {coins} coins
+        Chat synced · intimacy {intimacy}% · {coins} coins
       </p>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="text-pink-400 text-sm">
@@ -270,7 +293,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               />
             )}
             {message.frames && message.frames.length > 0 && (
-              <div className="mb-2 grid grid-cols-3 gap-1">
+              <div className="mb-2 grid grid-cols-2 gap-1">
                 {message.frames.map((src, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={i} src={src} alt={`frame ${i + 1}`} className="rounded-lg aspect-[3/4] object-cover" />
@@ -398,7 +421,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               {genLoading ? "Generating…" : `Generate ${genType}`}
             </button>
             <p className="text-[11px] text-zinc-600 text-center">
-              Free enhanced images via Pollinations. True motion video needs AI_VIDEO_ENDPOINT (fal / Runway).
+              Free Flux images + 4-frame sex sequences. Real MP4: set AI_VIDEO_ENDPOINT.
             </p>
           </div>
         </div>
