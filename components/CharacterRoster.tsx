@@ -46,9 +46,7 @@ export function CharacterRoster({
           {romanceMode ? "Romance" : "AI Girlfriends"}
         </h2>
         <p className="text-zinc-400 text-sm mt-1">
-          {romanceMode
-            ? "Affection first. Same cast — warmth before the heat."
-            : "Original fictional women, 21+. High-quality portraits · chat · nudes · video."}
+          {visible.length} companions · 21+ fictional · free chat & nudes
         </p>
       </div>
 
@@ -57,10 +55,9 @@ export function CharacterRoster({
         onChange={(event) => onQuery(event.target.value)}
         placeholder="Search name, vibe, kink…"
         className="w-full mb-3 px-4 py-3 rounded-2xl bg-zinc-900/80 border border-white/10 text-sm outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/40"
-        aria-label="Search companions"
       />
 
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-2" aria-label="Categories">
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-2">
         {categories.map((item) => {
           const active = category === item;
           return (
@@ -79,7 +76,7 @@ export function CharacterRoster({
         })}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-4" aria-label="Tags">
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-4">
         <button
           onClick={() => onTag(null)}
           className={`shrink-0 px-3 py-1 rounded-full text-xs border ${
@@ -114,22 +111,18 @@ export function CharacterRoster({
               <button
                 key={character.id}
                 onClick={() => onSelect(character)}
-                className="group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden transition hover:border-pink-500/60 hover:shadow-[0_0_40px_rgba(236,72,153,0.15)] hover:-translate-y-1"
+                className="girl-card group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden"
               >
                 <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt=""
-                    className="w-full h-full object-cover opacity-95 group-hover:opacity-100 transition"
-                  />
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <div className="absolute top-2 left-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] text-pink-200">
+                    {character.category}
+                  </div>
                   <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/50 to-transparent">
                     <div className="flex items-baseline justify-between gap-1">
                       <span className="font-semibold text-sm text-white truncate">{character.name}</span>
                       <span className="text-xs text-pink-300 shrink-0">{character.age}</span>
-                    </div>
-                    <div className="text-[10px] uppercase tracking-wider text-fuchsia-300/90 mt-0.5">
-                      {character.category}
                     </div>
                   </div>
                 </div>
