@@ -1,5 +1,4 @@
-/** Client-side coins, gallery, and chat memory (localStorage + Firestore sync). */
-import { saveMediaToFirestore, syncCoinsToFirestore } from "@/lib/firebase";
+/** Client-side coins, gallery, chat memory. Firebase sync is optional (never required). */
 
 export type GalleryItem = {
   id: string;
@@ -25,7 +24,9 @@ const COINS_KEY = "vm-coins";
 const GALLERY_KEY = "vm-gallery";
 const CHAT_PREFIX = "vm-chat-";
 const INTIMACY_PREFIX = "vm-intimacy-";
+const DAILY_KEY = "vm-daily-claim";
 const DEFAULT_COINS = 500;
+const DAILY_REWARD = 75;
 
 export function getCoins(): number {
   if (typeof window === "undefined") return DEFAULT_COINS;
@@ -47,7 +48,10 @@ export function setCoins(n: number) {
   } catch {
     /* private mode */
   }
-  void syncCoinsToFirestore(clamped).catch(() => {});
+  // Optional Firebase — never blocks free mode
+  void import("@/lib/firebase")
+    .then((m) => m.syncCoinsToFirestore?.(clamped))
+    .catch(() => {});
 }
 
 export function spendCoins(cost: number): boolean {
@@ -59,6 +63,31 @@ export function spendCoins(cost: number): boolean {
 
 export function addCoins(amount: number) {
   setCoins(getCoins() + amount);
+}
+
+/** Once per calendar day — free retention loop. */
+export function canClaimDaily(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const last = localStorage.getItem(DAILY_KEY);
+    if (!last) return true;
+    const d = new Date(last);
+    const now = new Date();
+    return d.toDateString() !== now.toDateString();
+  } catch {
+    return true;
+  }
+}
+
+export function claimDaily(): number {
+  if (!canClaimDaily()) return 0;
+  try {
+    localStorage.setItem(DAILY_KEY, new Date().toISOString());
+  } catch {
+    /* */
+  }
+  addCoins(DAILY_REWARD);
+  return DAILY_REWARD;
 }
 
 export function getGallery(): GalleryItem[] {
@@ -89,14 +118,18 @@ export function addToGallery(item: Omit<GalleryItem, "id" | "createdAt">) {
   const validType = (["portrait", "lingerie", "nude", "explicit", "video"].includes(item.type)
     ? item.type
     : "portrait") as "portrait" | "lingerie" | "nude" | "explicit" | "video";
-  void saveMediaToFirestore({
-    id: full.id,
-    characterId: full.characterId,
-    characterName: full.characterName,
-    type: validType,
-    url: full.url,
-    prompt: full.prompt,
-  }).catch(() => {});
+  void import("@/lib/firebase")
+    .then((m) =>
+      m.saveMediaToFirestore?.({
+        id: full.id,
+        characterId: full.characterId,
+        characterName: full.characterName,
+        type: validType,
+        url: full.url,
+        prompt: full.prompt,
+      }),
+    )
+    .catch(() => {});
   return full;
 }
 
@@ -109,7 +142,6 @@ export function clearGallery() {
   }
 }
 
-/** Persist chat thread per character (survives refresh). */
 export function loadChat(characterId: string): StoredMessage[] {
   if (typeof window === "undefined") return [];
   try {
@@ -153,7 +185,6 @@ export function bumpIntimacy(characterId: string, delta = 2) {
   return next;
 }
 
-/** Generation costs (coins). Chat is free. */
 export const GEN_COST: Record<string, number> = {
   portrait: 8,
   lingerie: 12,
