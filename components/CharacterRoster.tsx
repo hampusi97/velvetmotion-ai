@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Image from "next/image";
 import { filterCharacters, type Character } from "@/lib/characters";
+import { characterPortraitUrl } from "@/lib/portraits";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -48,7 +49,7 @@ export function CharacterRoster({
         <p className="text-zinc-400 text-sm mt-1">
           {romanceMode
             ? "Affection first. Same cast — warmth before the heat."
-            : "Original fictional women, 21+. Chat, nudes, tributes."}
+            : "Original fictional women, 21+. Real portraits · chat · nudes · video."}
         </p>
       </div>
 
@@ -95,9 +96,7 @@ export function CharacterRoster({
               key={item}
               onClick={() => onTag(active ? null : item)}
               className={`shrink-0 px-3 py-1 rounded-full text-xs border ${
-                active
-                  ? "bg-pink-500/20 border-pink-400 text-pink-200"
-                  : "border-zinc-800 text-zinc-400"
+                active ? "bg-pink-500/20 border-pink-400 text-pink-200" : "border-zinc-800 text-zinc-400"
               }`}
             >
               {item}
@@ -110,34 +109,38 @@ export function CharacterRoster({
         <p className="text-zinc-500 text-sm">No one matches that filter.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {visible.map((character) => (
-            <button
-              key={character.id}
-              onClick={() => onSelect(character)}
-              className="group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden transition hover:border-pink-500/60 hover:shadow-[0_0_40px_rgba(236,72,153,0.15)] hover:-translate-y-1"
-            >
-              <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
-                <Image
-                  src={character.avatar}
-                  alt=""
-                  width={320}
-                  height={420}
-                  unoptimized
-                  className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition"
-                />
-                <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/50 to-transparent">
-                  <div className="flex items-baseline justify-between gap-1">
-                    <span className="font-semibold text-sm text-white truncate">{character.name}</span>
-                    <span className="text-xs text-pink-300 shrink-0">{character.age}</span>
-                  </div>
-                  <div className="text-[10px] uppercase tracking-wider text-fuchsia-300/90 mt-0.5">
-                    {character.category}
+          {visible.map((character) => {
+            const src =
+              character.avatar.startsWith("http") || character.avatar.startsWith("data:")
+                ? character.avatar
+                : characterPortraitUrl(character.id, character.figure);
+            return (
+              <button
+                key={character.id}
+                onClick={() => onSelect(character)}
+                className="group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden transition hover:border-pink-500/60 hover:shadow-[0_0_40px_rgba(236,72,153,0.15)] hover:-translate-y-1"
+              >
+                <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={src}
+                    alt=""
+                    className="w-full h-full object-cover opacity-95 group-hover:opacity-100 transition"
+                  />
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/50 to-transparent">
+                    <div className="flex items-baseline justify-between gap-1">
+                      <span className="font-semibold text-sm text-white truncate">{character.name}</span>
+                      <span className="text-xs text-pink-300 shrink-0">{character.age}</span>
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-fuchsia-300/90 mt-0.5">
+                      {character.category}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <p className="text-[11px] text-zinc-400 p-3 line-clamp-2 leading-relaxed">{character.tagline}</p>
-            </button>
-          ))}
+                <p className="text-[11px] text-zinc-400 p-3 line-clamp-2 leading-relaxed">{character.tagline}</p>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

@@ -5,7 +5,6 @@ import { CharacterChat } from "@/components/CharacterChat";
 import { CharacterProfile } from "@/components/CharacterProfile";
 import { CharacterRoster } from "@/components/CharacterRoster";
 import { CHARACTERS, characterCategories, type Character } from "@/lib/characters";
-
 import { HomeView as HomeScreen } from "@/components/home-view";
 import { SiteHeader } from "@/components/site-header";
 import { containerClass } from "@/lib/cn";
@@ -15,6 +14,8 @@ import { SectionView } from "@/components/section-view";
 import { findSection, type ViewId } from "@/lib/sections";
 import { UtilitySection } from "@/components/utility-section";
 import { TributeBrowser } from "@/components/TributeBrowser";
+import { CreateGirlWizard } from "@/components/CreateGirlWizard";
+import { GoonRoom } from "@/components/GoonRoom";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
@@ -42,10 +43,10 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
   const [tag, setTag] = useState<string | null>(null);
-
   const [adult, setAdult] = useState<boolean | null>(null);
   const [user, setUser] = useState<LocalUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
   useEffect(() => {
     const main = document.getElementById("main");
     if (menuOpen) main?.setAttribute("inert", "");
@@ -60,6 +61,7 @@ export default function Home() {
     }
     setUser(getUser());
   }, []);
+
   const navigate = (next: ViewId) => {
     setMenuOpen(false);
     if (next === "girls" || next === "romance" || next === "tinder") openRoster(next === "romance");
@@ -96,9 +98,7 @@ export default function Home() {
 
   const showRoster = view === "girls" || view === "romance";
 
-  if (adult === null) {
-    return <div className="min-h-screen bg-black" />;
-  }
+  if (adult === null) return <div className="min-h-screen bg-black" />;
 
   if (!adult) {
     return (
@@ -109,14 +109,14 @@ export default function Home() {
             VelvetMotion
           </h1>
           <p className="text-sm text-zinc-400 leading-relaxed mb-6 mt-3 text-center">
-            Adult fantasy companions. Chat, nudes, tributes, and stories. Every character is fictional and 21+.
+            Adult fantasy companions. Chat, nudes, tributes, goon room. Every character is fictional and 21+.
           </p>
           <button
             onClick={() => {
               try {
                 localStorage.setItem("velvet-age", "true");
               } catch {
-                /* private mode */
+                /* */
               }
               setAdult(true);
             }}
@@ -139,7 +139,9 @@ export default function Home() {
         onUserChange={setUser}
       />
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
-        {view === "home" && <HomeScreen onNavigate={navigate} />}
+        {view === "home" && (
+          <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />
+        )}
 
         {showRoster && (
           <CharacterRoster
@@ -174,28 +176,33 @@ export default function Home() {
           />
         )}
 
-        {view === "chat" && selected && (
-          user ? (
-            <CharacterChat
-              character={selected}
-              romanceMode={romanceMode}
-              onBack={() => setView("profile")}
-            />
+        {view === "chat" && selected &&
+          (user ? (
+            <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
           ) : (
             <div className="mx-auto max-w-md rounded-3xl border border-rose-500/30 bg-ink-900 p-8 text-center">
               <p className="text-lg font-medium text-cream">Log in to chat & generate</p>
-              <p className="mt-2 text-sm text-mist">
-                Use the Log in button in the header (local username on this device).
-              </p>
-              <button
-                type="button"
-                onClick={() => setView("profile")}
-                className="mt-6 text-sm text-rose-300"
-              >
+              <p className="mt-2 text-sm text-mist">Use Log in in the header (local username on this device).</p>
+              <button type="button" onClick={() => setView("profile")} className="mt-6 text-sm text-rose-300">
                 ← Back to profile
               </button>
             </div>
-          )
+          ))}
+
+        {view === "create" && (
+          <CreateGirlWizard
+            onHome={() => setView("home")}
+            onDone={(character) => {
+              setCustomCharacter(character);
+              setSelectedId(character.id);
+              setRomanceMode(false);
+              setView("chat");
+            }}
+          />
+        )}
+
+        {view === "room" && (
+          <GoonRoom onHome={() => setView("home")} onChat={openChatById} />
         )}
 
         {view === "tribute" && (
@@ -223,7 +230,7 @@ export default function Home() {
             <JoiBrowser />
           </>
         )}
-        {["create", "suggest", "gallery", "room"].includes(view) && (
+        {["suggest", "gallery"].includes(view) && (
           <UtilitySection
             view={view}
             onHome={() => setView("home")}
@@ -250,6 +257,21 @@ export default function Home() {
           />
         )}
         {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
+        {view === "tinder" && (
+          <CharacterRoster
+            romanceMode={false}
+            query={query}
+            category={category}
+            tag={tag}
+            categories={categories}
+            tags={tags}
+            onQuery={setQuery}
+            onCategory={setCategory}
+            onTag={setTag}
+            onSelect={openProfile}
+            onBack={() => setView("home")}
+          />
+        )}
       </div>
     </div>
   );

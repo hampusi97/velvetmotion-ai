@@ -4,27 +4,27 @@ import { motion, useReducedMotion } from "framer-motion";
 import { riseContainer, riseItem } from "@/lib/motion";
 import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
+import { DailyFeed } from "./DailyFeed";
 
-export function HomeView({ onNavigate }: { onNavigate: (id: SectionId) => void }) {
+export function HomeView({
+  onNavigate,
+  onOpenGirl,
+}: {
+  onNavigate: (id: SectionId) => void;
+  onOpenGirl?: (id: string) => void;
+}) {
   const reduce = useReducedMotion();
 
   return (
-    <motion.div
-      data-motion
-      variants={riseContainer}
-      initial={reduce ? false : "hidden"}
-      animate="show"
-    >
-      <motion.section variants={riseItem} className="pb-12 pt-10 md:pb-16 md:pt-16">
-        <p className="text-sm font-medium uppercase tracking-[0.22em] text-rose-200">
-          Fictional adults · 21+
-        </p>
+    <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show">
+      <motion.section variants={riseItem} className="pb-8 pt-10 md:pb-12 md:pt-16">
+        <p className="text-sm font-medium uppercase tracking-[0.22em] text-rose-200">Fictional adults · 21+</p>
         <h1 className="mt-4 max-w-[12ch] font-display text-[clamp(3.1rem,8vw,6.25rem)] leading-[0.9] tracking-[-0.04em] text-cream">
           Velvet
           <span className="block text-rose-200">Motion</span>
         </h1>
         <p className="mt-6 max-w-xl text-lg leading-relaxed text-mist">
-          Chat, nudes, and cinematic scenes with original companions. Free AI included — no key required.
+          Chat, nudes, sex-video sequences, goon room, and a live feed. Log in once — free AI included.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <button
@@ -36,35 +36,33 @@ export function HomeView({ onNavigate }: { onNavigate: (id: SectionId) => void }
           </button>
           <button
             type="button"
-            onClick={() => onNavigate("packs")}
+            onClick={() => onNavigate("room")}
+            className="press inline-flex min-h-11 items-center justify-center rounded-full border border-pink-500/40 bg-pink-500/10 px-5 text-base font-medium text-pink-200"
+          >
+            Goon Room
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("create")}
             className="press inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 text-base font-medium text-cream hover:bg-white/10"
           >
-            Story packs
+            Create girl
           </button>
         </div>
-        <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
-          {[
-            { t: "Live chat", d: "Free LLM + character voice" },
-            { t: "Nudes", d: "Portrait to explicit" },
-            { t: "Video mode", d: "Cinematic sequences" },
-          ].map((item) => (
-            <div
-              key={item.t}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
-            >
-              <div className="text-sm font-medium text-cream">{item.t}</div>
-              <div className="mt-0.5 text-xs text-mist">{item.d}</div>
-            </div>
-          ))}
-        </div>
       </motion.section>
+
+      {onOpenGirl && (
+        <motion.div variants={riseItem}>
+          <DailyFeed onOpenGirl={onOpenGirl} />
+        </motion.div>
+      )}
 
       <section aria-labelledby="sections-heading" className="pb-4">
         <motion.div variants={riseItem} className="mb-5 md:mb-6">
           <h2 id="sections-heading" className="font-display text-3xl tracking-[-0.03em] text-cream md:text-4xl">
             Explore
           </h2>
-          <p className="mt-2 text-base text-mist">Roster, stories, JOI, and more.</p>
+          <p className="mt-2 text-base text-mist">Roster, tributes, JOI, gallery, vault.</p>
         </motion.div>
         <motion.ul
           variants={riseContainer}
