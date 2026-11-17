@@ -9,15 +9,15 @@ export type PortraitMood =
 
 const MOOD_PROMPTS: Record<PortraitMood, string> = {
   beauty:
-    "tasteful beauty portrait, soft cinematic lighting, magazine cover, sharp eyes, detailed skin",
+    "tasteful beauty portrait, soft cinematic lighting, magazine cover, sharp eyes, detailed skin, seductive expression",
   lingerie:
-    "wearing luxurious sheer lingerie, bedroom light, seductive pose, intimate atmosphere, photorealistic",
+    "wearing luxurious sheer lingerie, bedroom light, seductive pose, intimate atmosphere, photorealistic, lace detail",
   nude:
-    "fully nude, artistic erotic photography, natural skin, soft shadows, tasteful nsfw, looking at viewer",
+    "fully nude, artistic erotic photography, natural skin, soft shadows, tasteful nsfw, looking at viewer, bare breasts",
   explicit:
-    "explicit nude, sexual pose, detailed anatomy, uncensored nsfw, studio lighting, highly detailed",
+    "explicit nude, sexual pose, detailed anatomy, uncensored nsfw, studio lighting, highly detailed, aroused",
   seductive:
-    "seductive portrait, parted lips, bedroom eyes, soft rim light, intimate close-up, photorealistic",
+    "seductive portrait, parted lips, bedroom eyes, soft rim light, intimate close-up, photorealistic, slight cleavage",
 };
 
 function seedFromId(id: string, salt = 0): number {
@@ -29,12 +29,12 @@ function seedFromId(id: string, salt = 0): number {
 export function characterPortraitUrl(
   id: string,
   figure: string,
-  mood: PortraitMood | string = "beauty",
+  mood: PortraitMood | string = "seductive",
 ): string {
-  const moodKey = (mood in MOOD_PROMPTS ? mood : "beauty") as PortraitMood;
+  const moodKey = (mood in MOOD_PROMPTS ? mood : "seductive") as PortraitMood;
   const prompt = [
     "masterpiece, best quality, ultra detailed, photorealistic",
-    "beautiful adult woman 25 years old",
+    "beautiful adult woman 24 years old",
     figure,
     MOOD_PROMPTS[moodKey],
     "looking at viewer, sharp eyes, detailed skin pores, natural proportions, 8k uhd",
