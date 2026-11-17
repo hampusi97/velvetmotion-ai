@@ -1,0 +1,254 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Publicly non-PII user profile storing username, coin balance, and timestamps.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "username": {
+          "type": "string",
+          "description": "Display name chosen by the user.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "coins": {
+          "type": "number",
+          "description": "Current virtual coin balance (0 to 1,000,000)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the profile was last updated."
+        }
+      },
+      "required": ["uid", "username", "coins", "createdAt", "updatedAt"]
+    },
+    "ChatSession": {
+      "title": "ChatSession",
+      "description": "Per-character chat session metadata, intimacy level, gifts, and latest message.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "characterId": {
+          "type": "string",
+          "description": "Identifier of the companion character.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "intimacy": {
+          "type": "number",
+          "description": "Intimacy score from 0 to 100."
+        },
+        "gifts": {
+          "type": "array",
+          "description": "Bounded list of gift IDs (max 20) sent to this character."
+        },
+        "lastMessage": {
+          "type": "string",
+          "description": "Most recent message excerpt.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "characterId",
+        "intimacy",
+        "gifts",
+        "lastMessage",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedMedia": {
+      "title": "SavedMedia",
+      "description": "Generated companion portrait or sequence metadata stored for the user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "characterId": {
+          "type": "string",
+          "description": "Companion ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "characterName": {
+          "type": "string",
+          "description": "Display name of the companion.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "mediaType": {
+          "type": "string",
+          "description": "Media category.",
+          "enum": ["portrait", "lingerie", "nude", "explicit", "video"],
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "url": {
+          "type": "string",
+          "description": "External URL of the generated asset.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Generation prompt summary.",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "characterId",
+        "characterName",
+        "mediaType",
+        "url",
+        "prompt",
+        "createdAt"
+      ]
+    },
+    "CustomCompanion": {
+      "title": "CustomCompanion",
+      "description": "User-created custom AI companion metadata.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Companion display name.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "age": {
+          "type": "number",
+          "description": "Fictional adult age (21 to 99)."
+        },
+        "category": {
+          "type": "string",
+          "description": "Companion archetype category.",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "tagline": {
+          "type": "string",
+          "description": "Short persona summary.",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "personality": {
+          "type": "string",
+          "description": "Personality style.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "figure": {
+          "type": "string",
+          "description": "Visual appearance description.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kink": {
+          "type": "string",
+          "description": "Preferred fantasy theme.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Portrait URL.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "age",
+        "category",
+        "tagline",
+        "personality",
+        "figure",
+        "kink",
+        "avatar",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document keyed by Firebase Auth UID."
+    },
+    "/users/{userId}/chats/{characterId}": {
+      "schema": "ChatSession",
+      "description": "Per-character chat session state and intimacy progression."
+    },
+    "/users/{userId}/gallery/{mediaId}": {
+      "schema": "SavedMedia",
+      "description": "User gallery of generated companion media."
+    },
+    "/users/{userId}/companions/{companionId}": {
+      "schema": "CustomCompanion",
+      "description": "Custom companions created by the user."
+    }
+  }
+}

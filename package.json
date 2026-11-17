@@ -10,14 +10,17 @@
     "test": "tsx scripts/validate-content.ts"
   },
   "dependencies": {
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource-variable/outfit": "^5.3.0",
     "clsx": "^2.1.1",
+    "firebase": "^13.4.0",
     "framer-motion": "^11.11.11",
+    "lucide-react": "^1.74.0",
     "next": "15.5.29",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.5.4",
-    "@fontsource-variable/fraunces": "^5.3.0",
-    "@fontsource-variable/outfit": "^5.3.0"
+    "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
     "@types/node": "^20",

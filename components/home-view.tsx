@@ -48,6 +48,13 @@ export function HomeView({
           >
             Create girl
           </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("workspace")}
+            className="press inline-flex min-h-11 items-center justify-center rounded-full border border-rose-400/40 bg-rose-500/15 px-5 text-base font-medium text-rose-100 hover:bg-rose-500/25"
+          >
+            Google Workspace Hub
+          </button>
         </div>
       </motion.section>
 

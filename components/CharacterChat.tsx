@@ -16,6 +16,7 @@ import {
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
 import { characterPortraitUrl } from "@/lib/portraits";
+import { syncChatSessionToFirestore } from "@/lib/firebase";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -87,8 +88,17 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   }, [character.id, character.initialMessage, character.intimacy]);
 
   useEffect(() => {
-    if (messages.length > 0) saveChat(character.id, messages);
-  }, [messages, character.id]);
+    if (messages.length > 0) {
+      saveChat(character.id, messages);
+      const last = messages[messages.length - 1]?.content || character.initialMessage;
+      void syncChatSessionToFirestore({
+        characterId: character.id,
+        intimacy,
+        gifts: giftIds,
+        lastMessage: last,
+      }).catch(() => {});
+    }
+  }, [messages, character.id, character.initialMessage, intimacy, giftIds]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -119,7 +129,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       });
     }, 8000);
     return () => clearTimeout(t);
-  }, [character.id]); // only on open
+  }, [character.id, intimacy, messages.length]);
 
   const refreshCoins = () => setCoinsState(getCoins());
 
@@ -277,21 +287,33 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     const g = GIFTS.find((x) => x.id === giftId);
     if (!g) return;
     if (!spendCoins(g.cost)) {
-      alert(`Need ${g.cost} coins} coins`);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: `Need ${g.cost} coins to send ${g.name}. Top up in Gallery.` },
+      ]);
+      setGiftOpen(false);
       return;
     }
     const next = addGift(character.id, g.id);
     setGiftIds(next);
     refreshCoins();
-    setIntimacy(bumpIntimacy(character.id, 5));
+    const nextIntimacy = bumpIntimacy(character.id, 5);
+    setIntimacy(nextIntimacy);
+    const replyLine = `She notices the ${g.name.toLowerCase()}. ${g.line} “Thank you… I'll remember that.”`;
     setMessages((m) => [
       ...m,
       { role: "user", content: `(Sent gift: ${g.name})` },
       {
         role: "assistant",
-        content: `She notices the ${g.name.toLowerCase()}. ${g.line} “Thank you… I'll remember that.”`,
+        content: replyLine,
       },
     ]);
+    void syncChatSessionToFirestore({
+      characterId: character.id,
+      intimacy: nextIntimacy,
+      gifts: next,
+      lastMessage: replyLine,
+    }).catch(() => {});
     setGiftOpen(false);
   };
 

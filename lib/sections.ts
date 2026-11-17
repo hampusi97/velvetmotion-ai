@@ -9,7 +9,8 @@ export type SectionId =
   | "suggest"
   | "gallery"
   | "packs"
-  | "tribute";
+  | "tribute"
+  | "workspace";
 
 export type ViewId = "home" | SectionId;
 
@@ -22,6 +23,13 @@ export type Section = {
 };
 
 export const sections: Section[] = [
+  {
+    id: "workspace",
+    title: "Workspace",
+    kicker: "Google",
+    summary: "Google Meet, Google Chat, Gmail, Drive & Firestore sync.",
+    art: "bg-[radial-gradient(110%_85%_at_20%_10%,#f472b6_0%,transparent_48%),linear-gradient(165deg,#31102f_0%,#0f0714_75%)]",
+  },
   {
     id: "girls",
     title: "Girls",

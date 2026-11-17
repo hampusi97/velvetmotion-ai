@@ -16,6 +16,8 @@ import { UtilitySection } from "@/components/utility-section";
 import { TributeBrowser } from "@/components/TributeBrowser";
 import { CreateGirlWizard } from "@/components/CreateGirlWizard";
 import { GoonRoom } from "@/components/GoonRoom";
+import { DiscoverSwipe } from "@/components/DiscoverSwipe";
+import { WorkspaceHub } from "@/components/WorkspaceHub";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
@@ -30,7 +32,8 @@ type HomeView =
   | "suggest"
   | "gallery"
   | "packs"
-  | "tribute";
+  | "tribute"
+  | "workspace";
 
 type View = HomeView | "profile" | "chat";
 
@@ -55,7 +58,13 @@ export default function Home() {
   const toggleMenu = useCallback(() => setMenuOpen((open) => !open), []);
   useEffect(() => {
     try {
-      setAdult(localStorage.getItem("velvet-age") === "true");
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("autostart") === "1") {
+        localStorage.setItem("velvet-age", "true");
+        setAdult(true);
+      } else {
+        setAdult(localStorage.getItem("velvet-age") === "true");
+      }
     } catch {
       setAdult(false);
     }
@@ -64,7 +73,7 @@ export default function Home() {
 
   const navigate = (next: ViewId) => {
     setMenuOpen(false);
-    if (next === "girls" || next === "romance" || next === "tinder") openRoster(next === "romance");
+    if (next === "girls" || next === "romance") openRoster(next === "romance");
     else setView(next);
     window.scrollTo({ top: 0 });
   };
@@ -143,6 +152,10 @@ export default function Home() {
           <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />
         )}
 
+        {view === "workspace" && (
+          <WorkspaceHub onHome={() => setView("home")} />
+        )}
+
         {showRoster && (
           <CharacterRoster
             romanceMode={romanceMode}
@@ -182,7 +195,7 @@ export default function Home() {
           ) : (
             <div className="mx-auto max-w-md rounded-3xl border border-rose-500/30 bg-ink-900 p-8 text-center">
               <p className="text-lg font-medium text-cream">Log in to chat & generate</p>
-              <p className="mt-2 text-sm text-mist">Use Log in in the header (local username on this device).</p>
+              <p className="mt-2 text-sm text-mist">Use Log in in the header (Google Sign-In or local username).</p>
               <button type="button" onClick={() => setView("profile")} className="mt-6 text-sm text-rose-300">
                 ← Back to profile
               </button>
@@ -258,18 +271,14 @@ export default function Home() {
         )}
         {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
         {view === "tinder" && (
-          <CharacterRoster
-            romanceMode={false}
-            query={query}
-            category={category}
-            tag={tag}
-            categories={categories}
-            tags={tags}
-            onQuery={setQuery}
-            onCategory={setCategory}
-            onTag={setTag}
-            onSelect={openProfile}
-            onBack={() => setView("home")}
+          <DiscoverSwipe
+            onHome={() => setView("home")}
+            onMatch={(c) => {
+              if (c.id.startsWith("custom-")) setCustomCharacter(c);
+              setSelectedId(c.id);
+              setRomanceMode(false);
+              setView("profile");
+            }}
           />
         )}
       </div>

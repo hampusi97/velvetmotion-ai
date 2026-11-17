@@ -1,14 +1,30 @@
-/** Lightweight local login (no server). Required before chat / generate. */
+/** Local & Firebase Google Auth user state. */
+import { auth, firebaseLogout } from "@/lib/firebase";
 
 const USER_KEY = "vm-user";
 
 export type LocalUser = {
   username: string;
   joinedAt: number;
+  uid?: string;
+  email?: string | null;
+  isFirebase?: boolean;
 };
 
 export function getUser(): LocalUser | null {
   if (typeof window === "undefined") return null;
+  if (auth.currentUser) {
+    return {
+      username:
+        auth.currentUser.displayName ||
+        auth.currentUser.email?.split("@")[0] ||
+        "Google User",
+      joinedAt: Date.now(),
+      uid: auth.currentUser.uid,
+      email: auth.currentUser.email,
+      isFirebase: true,
+    };
+  }
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
@@ -40,4 +56,5 @@ export function logout() {
   } catch {
     /* */
   }
+  void firebaseLogout().catch(() => {});
 }

@@ -6,6 +6,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "VelvetMotion AI",
   description: "Your darkest fantasies. Always available. Fictional characters only.",
+  openGraph: {
+    title: "VelvetMotion AI",
+    description: "Your darkest fantasies. Always available. Fictional characters only.",
+  },
 };
 
 export const viewport: Viewport = {
@@ -21,8 +25,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh bg-ink-950 font-sans text-cream antialiased">{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning className="min-h-dvh bg-ink-950 font-sans text-cream antialiased">
+        {children}
+      </body>
     </html>
   );
 }

@@ -16,9 +16,11 @@ export function UtilitySection({
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [filter, setFilter] = useState<"all" | "image" | "video">("all");
   const [coins, setCoins] = useState(0);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     setText("");
+    setConfirmClear(false);
     try {
       const saved = JSON.parse(localStorage.getItem(`vm-${view}`) || "[]");
       setItems(Array.isArray(saved) ? saved.filter((x) => typeof x === "string") : []);
@@ -69,7 +71,7 @@ export function UtilitySection({
           <div className="text-sm text-amber-300">{coins} coins</div>
         </div>
         <p className="text-sm text-zinc-400">
-          Generated nudes, explicit shots, and cinematic sequences stay on this device.
+          Generated nudes, explicit shots, and cinematic sequences stay on this device and sync to Firestore when signed in.
         </p>
         <div className="flex flex-wrap gap-2">
           {(["all", "image", "video"] as const).map((f) => (
@@ -94,19 +96,36 @@ export function UtilitySection({
           >
             +150 demo coins
           </button>
-          {gallery.length > 0 && (
+          {gallery.length > 0 && !confirmClear && (
             <button
               type="button"
-              onClick={() => {
-                if (confirm("Clear all saved media on this device?")) {
-                  clearGallery();
-                  setGallery([]);
-                }
-              }}
+              onClick={() => setConfirmClear(true)}
               className="px-3 py-1.5 rounded-full text-sm border border-red-500/30 text-red-300"
             >
               Clear gallery
             </button>
+          )}
+          {confirmClear && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  clearGallery();
+                  setGallery([]);
+                  setConfirmClear(false);
+                }}
+                className="px-3 py-1.5 rounded-full text-sm bg-red-600 text-white"
+              >
+                Confirm clear
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmClear(false)}
+                className="px-3 py-1.5 rounded-full text-sm border border-white/15 text-cream"
+              >
+                Cancel
+              </button>
+            </div>
           )}
         </div>
         {shown.length === 0 ? (

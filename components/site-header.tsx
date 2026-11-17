@@ -6,6 +6,8 @@ import { sections, type ViewId } from "@/lib/sections";
 import { CloseIcon, Mark, MenuIcon } from "./icons";
 import { getUser, login, logout, type LocalUser } from "@/lib/auth";
 import { getCoins } from "@/lib/storage";
+import { googleSignIn, initAuth, subscribeAuthState } from "@/lib/firebase";
+import { GoogleSignInButton } from "./WorkspaceHub";
 
 export function SiteHeader({
   view,
@@ -25,13 +27,36 @@ export function SiteHeader({
   const [coins, setCoins] = useState(0);
   const [loginOpen, setLoginOpen] = useState(false);
   const [name, setName] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     setUser(getUser());
     setCoins(getCoins());
+    const unsubInit = initAuth();
+    const unsubState = subscribeAuthState((fbUser) => {
+      if (fbUser) {
+        const nextUser: LocalUser = {
+          username: fbUser.displayName || fbUser.email?.split("@")[0] || "Google User",
+          joinedAt: Date.now(),
+          uid: fbUser.uid,
+          email: fbUser.email,
+          isFirebase: true,
+        };
+        setUser(nextUser);
+        onUserChange?.(nextUser);
+      } else {
+        const local = getUser();
+        setUser(local);
+        onUserChange?.(local);
+      }
+    });
     const t = setInterval(() => setCoins(getCoins()), 2000);
-    return () => clearInterval(t);
-  }, []);
+    return () => {
+      clearInterval(t);
+      unsubInit();
+      unsubState();
+    };
+  }, [onUserChange]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -68,7 +93,29 @@ export function SiteHeader({
       setUser(u);
       setLoginOpen(false);
       setName("");
+      setAuthError(null);
       onUserChange?.(u);
+    }
+  };
+
+  const doGoogleLogin = async () => {
+    setAuthError(null);
+    try {
+      const res = await googleSignIn();
+      if (res) {
+        const nextUser: LocalUser = {
+          username: res.user.displayName || res.user.email?.split("@")[0] || "Google User",
+          joinedAt: Date.now(),
+          uid: res.user.uid,
+          email: res.user.email,
+          isFirebase: true,
+        };
+        setUser(nextUser);
+        setLoginOpen(false);
+        onUserChange?.(nextUser);
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Google Sign-In failed.");
     }
   };
 
@@ -85,6 +132,7 @@ export function SiteHeader({
           <button
             type="button"
             onClick={() => onNavigate("home")}
+            aria-label="VelvetMotion Home"
             aria-current={view === "home" ? "page" : undefined}
             className="press inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full pr-1"
           >
@@ -232,14 +280,24 @@ export function SiteHeader({
           <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-2xl">
             <h2 className="font-display text-xl text-cream">Log in</h2>
             <p className="mt-1 text-sm text-mist">
-              Local username on this device. Required to chat and generate nudes / videos.
+              Sign in with Google for Firebase & Workspace sync, or choose a local username on this device.
             </p>
+            <div className="mt-4 flex justify-center">
+              <GoogleSignInButton onClick={doGoogleLogin} />
+            </div>
+            {authError && <p className="mt-2 text-xs text-rose-300">{authError}</p>}
+            <div className="my-4 flex items-center gap-3 text-xs text-zinc-500">
+              <span className="h-px flex-1 bg-white/10" />
+              <span>or local username</span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && doLogin()}
               placeholder="Choose a name"
-              className="mt-4 w-full rounded-2xl border border-white/10 bg-ink-950 px-4 py-3 text-sm outline-none focus:border-rose-500"
+              aria-label="Local username"
+              className="w-full rounded-2xl border border-white/10 bg-ink-950 px-4 py-3 text-sm outline-none focus:border-rose-500"
               autoFocus
             />
             <button

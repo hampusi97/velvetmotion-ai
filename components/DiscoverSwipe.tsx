@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 
 function cardImage(c: Character) {
@@ -20,16 +20,24 @@ export function DiscoverSwipe({
   onHome: () => void;
   extra?: Character[];
 }) {
-  const deck = useMemo(() => {
-    const custom: Character[] = [];
+  const [customGirls, setCustomGirls] = useState<Character[]>([]);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem("velvet-custom-girls");
-      if (raw) custom.push(...JSON.parse(raw));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setCustomGirls(parsed);
+      }
     } catch {
       /* ignore */
     }
-    return [...extra, ...custom, ...CHARACTERS];
-  }, [extra]);
+  }, []);
+
+  const deck = useMemo(
+    () => [...extra, ...customGirls, ...CHARACTERS],
+    [extra, customGirls],
+  );
 
   const [idx, setIdx] = useState(0);
   const [liked, setLiked] = useState<string[]>([]);

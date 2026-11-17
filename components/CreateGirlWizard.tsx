@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Character } from "@/lib/characters";
+import { saveCustomCompanionToFirestore } from "@/lib/firebase";
 
 const STYLES = ["Realistic", "Soft glam", "Anime"] as const;
 const ETHNICITIES = ["Caucasian", "Latina", "East Asian", "Black / Afro", "South Asian", "Middle Eastern", "Mixed"] as const;
@@ -24,11 +25,20 @@ type WizardProps = {
   onHome: () => void;
 };
 
-function portraitUrl(look: string, style: string) {
+function deterministicSeed(input: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+function portraitUrl(look: string, style: string, name = "") {
   const prompt = encodeURIComponent(
     `${style === "Anime" ? "anime style" : "photorealistic"} beautiful adult woman 25 years old, ${look}, portrait, soft light, looking at viewer, masterpiece, 8k`,
   );
-  const seed = Math.floor(Math.random() * 1e9);
+  const seed = deterministicSeed(`${look}|${style}|${name}`);
   return `https://image.pollinations.ai/prompt/${prompt}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;
 }
 
@@ -62,7 +72,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
     setBusy(true);
     const id = `custom-${Date.now()}`;
     const displayName = name.trim() || "Your Girl";
-    const avatar = photoDataUrl || portraitUrl(look, style);
+    const avatar = photoDataUrl || portraitUrl(look, style, displayName);
     const character: Character = {
       id,
       name: displayName,
@@ -89,7 +99,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       kink,
       reply: `She smiles. “I'm ${displayName}. Your move.”`,
     };
-    // Persist custom girls list
+    // Persist custom girls list locally and in Firestore
     try {
       const raw = localStorage.getItem("velvet-custom-girls");
       const list = raw ? JSON.parse(raw) : [];
@@ -98,6 +108,17 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
     } catch {
       /* ignore */
     }
+    void saveCustomCompanionToFirestore({
+      id: character.id,
+      name: character.name,
+      age: character.age,
+      category: character.category,
+      tagline: character.tagline,
+      personality: character.personality,
+      figure: character.figure,
+      kink: character.kink,
+      avatar: character.avatar.startsWith("http") ? character.avatar : portraitUrl(look, style, displayName),
+    }).catch(() => {});
     setBusy(false);
     onDone(character);
   };
@@ -238,7 +259,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <div className="text-sm text-pink-300">{personality} · {relationship}</div>
             <p className="text-xs text-zinc-400 mt-2">{look}</p>
           </div>
-          <p className="text-xs text-zinc-500">She'll chat, undress on Generate, and run tributes like the rest of the cast.</p>
+          <p className="text-xs text-zinc-500">She&apos;ll chat, undress on Generate, and run tributes like the rest of the cast.</p>
         </div>
       )}
 

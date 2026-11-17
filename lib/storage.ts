@@ -1,4 +1,5 @@
-/** Client-side coins, gallery, and chat memory (localStorage sync). */
+/** Client-side coins, gallery, and chat memory (localStorage + Firestore sync). */
+import { saveMediaToFirestore, syncCoinsToFirestore } from "@/lib/firebase";
 
 export type GalleryItem = {
   id: string;
@@ -40,11 +41,13 @@ export function getCoins(): number {
 
 export function setCoins(n: number) {
   if (typeof window === "undefined") return;
+  const clamped = Math.max(0, Math.floor(n));
   try {
-    localStorage.setItem(COINS_KEY, String(Math.max(0, Math.floor(n))));
+    localStorage.setItem(COINS_KEY, String(clamped));
   } catch {
     /* private mode */
   }
+  void syncCoinsToFirestore(clamped).catch(() => {});
 }
 
 export function spendCoins(cost: number): boolean {
@@ -83,6 +86,17 @@ export function addToGallery(item: Omit<GalleryItem, "id" | "createdAt">) {
   } catch {
     /* quota */
   }
+  const validType = (["portrait", "lingerie", "nude", "explicit", "video"].includes(item.type)
+    ? item.type
+    : "portrait") as "portrait" | "lingerie" | "nude" | "explicit" | "video";
+  void saveMediaToFirestore({
+    id: full.id,
+    characterId: full.characterId,
+    characterName: full.characterName,
+    type: validType,
+    url: full.url,
+    prompt: full.prompt,
+  }).catch(() => {});
   return full;
 }
 

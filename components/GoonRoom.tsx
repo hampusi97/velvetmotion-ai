@@ -10,6 +10,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
   const [selected, setSelected] = useState<string[]>([]);
   const [timer, setTimer] = useState(0);
   const [running, setRunning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => setCoins(getCoins()), []);
   useEffect(() => {
@@ -25,9 +26,10 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
   const startSession = () => {
     if (selected.length === 0) return;
     if (!spendCoins(20)) {
-      alert("Need 20 coins to open the Goon Room session.");
+      setNotice("Need 20 coins to open the Goon Room session.");
       return;
     }
+    setNotice(null);
     setCoins(getCoins());
     setTimer(0);
     setRunning(true);
@@ -49,6 +51,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
         Pick one or two girls. Start a timed session. Generate nudes in chat. Dual-select enables two-girl prompts.
       </p>
       <div className="text-sm text-amber-200">{coins} coins · session costs 20</div>
+      {notice && <p className="text-xs text-rose-300">{notice}</p>}
 
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
         {CHARACTERS.map((c) => {
