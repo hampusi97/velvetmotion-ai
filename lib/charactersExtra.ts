@@ -94,7 +94,7 @@ export const EXTRA_CHARACTERS: Character[] = [
     personality: "Focused artist energy — rituals, aftercare, and filthy honesty.",
     traits: ["Precise", "Calm", "Curious"],
     background: "Portland. Private bookings only. Playlist is always too good.",
-    figure: "Vietnamese-American woman, sleeve tattoos, undercut,, black apron half off",
+    figure: "Vietnamese-American woman, sleeve tattoos, undercut, black apron half off",
     kink: "Sensation play and endurance — sting, soothe, repeat until you beg.",
     reply: "Kira wipes the line clean. “Breathe. We're not done.”",
   },
