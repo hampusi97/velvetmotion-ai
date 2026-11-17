@@ -10,6 +10,7 @@ interface ChatMessage {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  frames?: string[];
   mediaType?: string;
 }
 
@@ -51,7 +52,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [pose, setPose] = useState(POSES[0]);
   const [extra, setExtra] = useState("");
   const [genLoading, setGenLoading] = useState(false);
-  const [liveAi, setLiveAi] = useState<boolean | null>(null);
+  const [aiMode, setAiMode] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -66,8 +67,8 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   useEffect(() => {
     fetch("/api/chat")
       .then((r) => r.json())
-      .then((d) => setLiveAi(Boolean(d.configured)))
-      .catch(() => setLiveAi(false));
+      .then((d) => setAiMode(d.premium ? "premium" : "free"))
+      .catch(() => setAiMode("free"));
   }, []);
 
   const send = async () => {
@@ -120,15 +121,17 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         });
         const data = await res.json();
         const url = data.videoUrl || data.imageUrl;
-        if (url) {
+        const frames: string[] | undefined = Array.isArray(data.frames) ? data.frames : undefined;
+        if (url || frames?.length) {
           setMessages((m) => [
             ...m,
             {
               role: "assistant",
               content: data.fallback
-                ? "Cinematic still (set AI_VIDEO_ENDPOINT for real motion). How do you want the next angle?"
-                : "Here's the clip. Want it dirtier?",
+                ? "Cinematic sequence ready. Add AI_VIDEO_ENDPOINT for true motion MP4. Want another angle?"
+                : "Here's the scene. Want it dirtier?",
               videoUrl: url,
+              frames,
               mediaType: "video",
             },
           ]);
@@ -161,7 +164,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     } catch {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: "Generation failed. Try again in a moment." },
+        { role: "assistant", content: "Generation failed — wait a few seconds and try again (free tier rate limits)." },
       ]);
     } finally {
       setGenLoading(false);
@@ -171,12 +174,12 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   return (
     <div className="flex flex-col min-h-[80vh]">
       <p className="mb-3 text-xs text-zinc-400">
-        {liveAi === null
-          ? "Checking AI…"
-          : liveAi
-            ? "Live AI connected."
-            : "Local character replies (add XAI_API_KEY or AI_CHAT_API_KEY for live model)."}{" "}
-        Generate nudes & video from the camera button.
+        {aiMode === null
+          ? "Connecting…"
+          : aiMode === "premium"
+            ? "Premium AI key active."
+            : "Free AI chat on."}{" "}
+        Camera → nudes, explicit, sex video.
       </p>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="text-pink-400 text-sm">
@@ -226,7 +229,15 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
                 className="rounded-xl mb-2 max-h-80 w-full object-cover"
               />
             )}
-            {message.videoUrl && (
+            {message.frames && message.frames.length > 0 && (
+              <div className="mb-2 grid grid-cols-3 gap-1">
+                {message.frames.map((src, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={i} src={src} alt={`frame ${i + 1}`} className="rounded-lg aspect-[3/4] object-cover" />
+                ))}
+              </div>
+            )}
+            {message.videoUrl && !message.frames?.length && (
               <div className="mb-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -234,11 +245,11 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
                   alt="video concept"
                   className="rounded-xl max-h-80 w-full object-cover"
                 />
-                <p className="text-[11px] text-pink-300 mt-1">Film · {message.mediaType || "video"}</p>
+                <p className="text-[11px] text-pink-300 mt-1">Scene · {message.mediaType || "video"}</p>
               </div>
             )}
             <p>{message.content}</p>
-            {message.role === "assistant" && !message.imageUrl && !message.videoUrl && (
+            {message.role === "assistant" && !message.imageUrl && !message.videoUrl && !message.frames?.length && (
               <button
                 onClick={() => speak(message.content, character.voice)}
                 className="mt-2 text-[11px] text-pink-300"
@@ -330,7 +341,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               <input
                 value={extra}
                 onChange={(e) => setExtra(e.target.value)}
-                placeholder="candle light, red lingerie…"
+                placeholder="candle light, red lingerie, moaning…"
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm"
               />
             </div>
@@ -343,7 +354,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               {genLoading ? "Generating…" : `Generate ${genType}`}
             </button>
             <p className="text-[11px] text-zinc-600 text-center">
-              Images via Pollinations. Video uses AI_VIDEO_ENDPOINT if set, else cinematic still.
+              Free enhanced images via Pollinations. True motion video needs AI_VIDEO_ENDPOINT (fal / Runway).
             </p>
           </div>
         </div>
