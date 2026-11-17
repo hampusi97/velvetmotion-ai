@@ -31,11 +31,12 @@ Optional (see `.env.example`):
 ## Features (Candy-inspired, more fun)
 
 - **30+ companions** — dense roster across ethnicities, body types, ages 22–41, personalities (Dominant / Shy / Brat / Nurturing / Playful / Intense / Romantic / Bold)
+- **Experiences home** — big visual cards for Create, Discover, Roulette, Blindfold JOI, Goon Room, Tribute
 - **Discover swipe** — Tinder-style deck, drag cards, spicy peek, match modal
 - **Live portraits** — Pollinations Flux seeds per girl + mood (beauty / lingerie / nude / explicit / seductive)
 - **Chat + intimacy ladder** — free LLM, gifts, undress progression, delayed nudes, aftercare mode
 - **Generate** — portrait → lingerie → nude → explicit + dual-girl scenes + 4-frame “sex video” sequences
-- **Create your girl** — multi-step wizard (style, look, personality, relationship, kink, optional photo)
+- **Create your girl** — multi-step Candy-style wizard (style, look, eyes/chest/hair, personality, relationship, kink, optional photo seed) with live preview
 - **Retention loops** — daily claim (+coins), edging streak meter, featured pair, fantasy codes, private vault (PIN), proactive-style feed
 - **Goon / Roulette / Blindfold JOI** — timed sessions, random girl + tribute sprint, audio-only JOI that reveals with intimacy
 - **Story packs + JOI packs** — browsable content libraries
@@ -52,3 +53,4 @@ Next.js 15 · React 18 · Tailwind · Framer Motion · Pollinations · Firebase 
 - All characters are fictional adults. No real-person likenesses.
 - Image/video quality depends on Pollinations availability; seeds keep faces consistent per girl.
 - Login (local or Firebase) is required for chat and generate to keep the experience personal.
+- Free Pollinations has rate limits — wait ~30s if a generation stalls.
