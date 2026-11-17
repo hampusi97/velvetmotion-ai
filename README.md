@@ -1,23 +1,18 @@
 # VelvetMotion AI
 
-**Unified AI companion platform** — characters, chat, nudes, explicit images, and video generation.
+Professional AI girlfriend platform — chat, nudes, explicit images, cinematic sex-video sequences.
 
-All content is fantasy. Fictional adults 21+ only.
+**Fictional adults 21+ only.**
 
-## What’s included
+## Zero-config free stack
 
-| Feature | How |
-|--------|-----|
-| **8 companions** | Maren, Liora, Tess, Isolde, Briony, Nadine, Vesper, Calla |
-| **Chat** | Live via `XAI_API_KEY` or `AI_CHAT_API_KEY` + endpoint; else rich local fallback |
-| **Nude / explicit images** | `/api/generate-image` → Pollinations (free) or `AI_IMAGE_ENDPOINT` |
-| **Sex video** | `/api/generate-video` → `AI_VIDEO_ENDPOINT` or cinematic still |
-| **JOI / Story packs** | Built-in browsers |
-| **TTS** | Browser speechSynthesis per character voice |
+| Feature | Default (no keys) | Upgrade |
+|--------|-------------------|--------|
+| **Chat LLM** | Pollinations free text API | `XAI_API_KEY` or OpenAI-compatible |
+| **Nudes / explicit** | Pollinations Flux + enhance | `AI_IMAGE_ENDPOINT` (SD/Comfy) |
+| **Sex video** | Multi-frame cinematic sequence | `AI_VIDEO_ENDPOINT` (fal / Runway / Comfy) |
 
-Merged capabilities from **greger** (media UX), **velvetmotionai** (API patterns), and this repo’s character writing.
-
-## Quick start
+## Run
 
 ```bash
 git clone https://github.com/hampusi97/velvetmotion-ai.git
@@ -26,36 +21,40 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Open http://localhost:3000 → age gate → **Meet the girls** → chat → **Generate**.
 
-## Environment (optional)
-
-Create `.env.local`:
+## Optional `.env.local`
 
 ```bash
-# Live chat (pick one)
-XAI_API_KEY=xai-...
-# or
+# Better chat (optional)
+XAI_API_KEY=
 AI_CHAT_ENDPOINT=https://api.openai.com/v1
-AI_CHAT_API_KEY=sk-...
+AI_CHAT_API_KEY=
 AI_CHAT_MODEL=gpt-4o-mini
 
-# Optional custom image backend (else Pollinations)
-AI_IMAGE_ENDPOINT=
-AI_IMAGE_API_KEY=
-
-# Optional real video worker (fal / Runway / Comfy)
+# Real motion video (optional)
 AI_VIDEO_ENDPOINT=
 AI_VIDEO_API_KEY=
+
+# Custom image backend (optional)
+AI_IMAGE_ENDPOINT=
+AI_IMAGE_API_KEY=
 ```
 
-Without keys, chat uses local character replies and images still work via Pollinations.
+## Product surface
+
+- 8 original companions with voice, kink, and system prompts
+- Live free chat out of the box
+- Generate panel: portrait · lingerie · nude · explicit · sex video
+- Images appear in-thread; video mode returns a 3-frame sequence
+- JOI browser, story packs, TTS speak buttons
+- Editorial dark UI (Fraunces + Outfit)
 
 ## Deploy
 
-**Netlify / Vercel:** import this repo, build `npm run build`, set env vars in the dashboard.
+Vercel or Netlify → import repo → `npm run build` → add env vars if any.
 
-## Related
+## Honest limits
 
-- `greger` — static single-file demo of the same media flows
-- `velvetmotionai` — alternate stack with BTC/VIP experiments
+- Free Pollinations is **rate-limited** (wait ~30–45s between gens if throttled).
+- **True high-quality motion sex videos** need a paid video API (`AI_VIDEO_ENDPOINT`). Free mode delivers enhanced cinematic stills/sequences, not Hollywood MP4s.
