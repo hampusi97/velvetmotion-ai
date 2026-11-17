@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { fallbackReply, type Character } from "@/lib/characters";
 import { speak } from "@/lib/speech";
+import { getCoins, spendCoins, addToGallery, GEN_COST } from "@/lib/storage";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -53,6 +54,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [extra, setExtra] = useState("");
   const [genLoading, setGenLoading] = useState(false);
   const [aiMode, setAiMode] = useState<string | null>(null);
+  const [coins, setCoinsState] = useState(500);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -65,11 +67,14 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   }, [messages, isLoading, genLoading]);
 
   useEffect(() => {
+    setCoinsState(getCoins());
     fetch("/api/chat")
       .then((r) => r.json())
       .then((d) => setAiMode(d.premium ? "premium" : "free"))
       .catch(() => setAiMode("free"));
   }, []);
+
+  const refreshCoins = () => setCoinsState(getCoins());
 
   const send = async () => {
     const text = input.trim();
@@ -107,6 +112,20 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
   const generate = async () => {
     if (genLoading) return;
+    const cost = GEN_COST[genType] ?? 15;
+    if (!spendCoins(cost)) {
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: `Not enough coins (${cost} needed). Chat is free — earn more coins on the home screen or wait for daily top-up.`,
+        },
+      ]);
+      setGenOpen(false);
+      refreshCoins();
+      return;
+    }
+    refreshCoins();
     setGenLoading(true);
     try {
       if (genType === "video") {
@@ -123,6 +142,14 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         const url = data.videoUrl || data.imageUrl;
         const frames: string[] | undefined = Array.isArray(data.frames) ? data.frames : undefined;
         if (url || frames?.length) {
+          addToGallery({
+            characterId: character.id,
+            characterName: character.name,
+            type: "video",
+            url: url || frames![0],
+            frames,
+            prompt: data.promptUsed,
+          });
           setMessages((m) => [
             ...m,
             {
@@ -149,6 +176,13 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         });
         const data = await res.json();
         if (data.url) {
+          addToGallery({
+            characterId: character.id,
+            characterName: character.name,
+            type: genType,
+            url: data.url,
+            prompt: data.prompt,
+          });
           setMessages((m) => [
             ...m,
             {
@@ -164,12 +198,18 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     } catch {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: "Generation failed — wait a few seconds and try again (free tier rate limits)." },
+        {
+          role: "assistant",
+          content: "Generation failed — wait a few seconds and try again (free tier rate limits).",
+        },
       ]);
     } finally {
       setGenLoading(false);
+      refreshCoins();
     }
   };
+
+  const costLabel = GEN_COST[genType] ?? 15;
 
   return (
     <div className="flex flex-col min-h-[80vh]">
@@ -179,7 +219,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           : aiMode === "premium"
             ? "Premium AI key active."
             : "Free AI chat on."}{" "}
-        Camera → nudes, explicit, sex video.
+        Camera → nudes, explicit, sex video · {coins} coins
       </p>
       <div className="flex items-center gap-3 mb-4">
         <button onClick={onBack} className="text-pink-400 text-sm">
@@ -344,6 +384,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
                 placeholder="candle light, red lingerie, moaning…"
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-sm"
               />
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-zinc-400">Cost</span>
+              <span className="text-amber-300 font-medium">{costLabel} coins · you have {coins}</span>
             </div>
             <button
               type="button"
