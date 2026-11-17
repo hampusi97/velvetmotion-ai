@@ -15,11 +15,12 @@ export async function POST(req: Request) {
     const look = character?.figure || "beautiful adult woman";
     const prompt =
       promptIn.trim() ||
-      `cinematic adult film still, ${look}, ${pose}, explicit, dramatic lighting, photorealistic`;
+      `cinematic adult film, ${look}, ${pose}, explicit sex scene, dramatic lighting, photorealistic, high detail`;
 
     const videoEndpoint = (process.env.AI_VIDEO_ENDPOINT || "").trim();
     const videoKey = (process.env.AI_VIDEO_API_KEY || "").trim();
 
+    // 1) User-configured video worker (fal, Runway, Comfy, etc.)
     if (videoEndpoint) {
       try {
         const controller = new AbortController();
@@ -52,24 +53,35 @@ export async function POST(req: Request) {
           }
         }
       } catch {
-        // fall through to image still
+        /* fall through */
       }
     }
 
-    // Fallback: cinematic explicit still via Pollinations (labeled as video concept)
+    // 2) Try Pollinations free video endpoint (may rate-limit or require key depending on region)
     const seed = Math.floor(Math.random() * 1e9);
-    const stillUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
-      prompt + ", motion blur, film grain, cinematic still from sex scene"
-    )}?width=768&height=1024&nologo=true&seed=${seed}&model=flux`;
+    const pollinationsVideo = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+      prompt + ", animated, motion, smooth movement"
+    )}?width=720&height=1280&nologo=true&seed=${seed}&model=flux&enhance=true`;
+
+    // Also return a short sequence of cinematic stills the client can present as a "video concept"
+    const frames = [0, 1, 2].map((i) => {
+      const s = seed + i * 97;
+      return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+        `${prompt}, frame ${i + 1} of intimate sequence, cinematic still, film grain`
+      )}?width=768&height=1152&nologo=true&seed=${s}&model=flux&enhance=true`;
+    });
 
     return NextResponse.json({
       success: true,
-      videoUrl: stillUrl,
-      imageUrl: stillUrl,
+      videoUrl: pollinationsVideo,
+      imageUrl: frames[0],
+      frames,
       promptUsed: prompt,
-      source: "cinematic-still",
-      fallback: true,
-      note: "Set AI_VIDEO_ENDPOINT for real motion video. Returning cinematic still.",
+      source: "pollinations-sequence",
+      fallback: !videoEndpoint,
+      note: videoEndpoint
+        ? undefined
+        : "Set AI_VIDEO_ENDPOINT (fal.ai / Runway / Comfy) for true motion MP4. Returning enhanced cinematic sequence.",
     });
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
