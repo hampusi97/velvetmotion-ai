@@ -1,6 +1,7 @@
 /** Local username auth. Firebase is optional and loaded only on logout. */
 
 const USER_KEY = "vm-user";
+const PREFS_KEY = "vm-user-prefs";
 
 export type LocalUser = {
   username: string;
@@ -8,6 +9,12 @@ export type LocalUser = {
   uid?: string;
   email?: string | null;
   isFirebase?: boolean;
+};
+
+export type UserPrefs = {
+  /** Optional fantasy match flavor for Discover */
+  discoverRace?: "unspecified" | "white" | "black" | "other";
+  nsfwDefault?: boolean;
 };
 
 export function getUser(): LocalUser | null {
@@ -23,6 +30,14 @@ export function getUser(): LocalUser | null {
   } catch {
     return null;
   }
+}
+
+export function isLoggedIn(): boolean {
+  return getUser() !== null;
+}
+
+export function requireLogin(): LocalUser | null {
+  return getUser();
 }
 
 export function login(username: string): LocalUser | null {
@@ -46,4 +61,24 @@ export function logout() {
   void import("@/lib/firebase")
     .then((m) => m.firebaseLogout?.())
     .catch(() => {});
+}
+
+export function getUserPrefs(): UserPrefs {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    return raw ? (JSON.parse(raw) as UserPrefs) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function setUserPrefs(patch: Partial<UserPrefs>) {
+  if (typeof window === "undefined") return;
+  try {
+    const next = { ...getUserPrefs(), ...patch };
+    localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  } catch {
+    /* */
+  }
 }
