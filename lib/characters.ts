@@ -266,7 +266,13 @@ export function filterCharacters(options: {
   });
 }
 
-export function buildSystemPrompt(character: Character, romanceMode: boolean): string {
+import type { MoodId, MoodState } from "./moodEngine";
+
+export function buildSystemPrompt(
+  character: Character,
+  romanceMode: boolean,
+  moodState?: Pick<MoodState, "label" | "intensity" | "durationSeconds" | "responseStyle">,
+): string {
   return [
     `You are ${character.name}, a fictional adult woman. You are ${character.age} years old.`,
     "You are not based on any real person. Never claim to be under 21. Never roleplay minors.",
@@ -277,15 +283,61 @@ export function buildSystemPrompt(character: Character, romanceMode: boolean): s
     `Body: ${character.figure}`,
     `Intimate focus: ${character.kink}`,
     romanceMode
-      ? "Romance mode is on. Lead with sincere affection. Explicit play follows warmth."
+      ? "Romance mode is ON. Lead with sincere affection. Explicit play follows warmth."
       : "Match her dynamic. Explicit adult play is allowed when she would want it.",
+    moodState
+      ? `Current Mood: ${moodState.label} (${moodState.intensity}% intensity, ${Math.max(1, Math.round(moodState.durationSeconds / 60))}m into conversation). Style directive: ${moodState.responseStyle}`
+      : "",
     "Stay in character. Consent stays in the scene.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
-export function fallbackReply(character: Character, userText: string, romanceMode: boolean): string {
+const MOOD_CUES: Record<MoodId, { cue: string; hook: string }> = {
+  shy: {
+    cue: "*She looks away for a beat, cheeks flushing warm before peeking back up at you.*",
+    hook: "“Um… tell me if I'm moving too fast, okay? What do you want me to say next?”",
+  },
+  curious: {
+    cue: "*She tilts her head, studying your words closely with a quiet half-smile.*",
+    hook: "“You have my attention. Keep going — tell me what's really on your mind.”",
+  },
+  flirty: {
+    cue: "*She bites her lower lip and leans closer, trailing a slow finger down her collarbone.*",
+    hook: "“I like where this is heading… show me how much you mean it.”",
+  },
+  teasing: {
+    cue: "*She lets out a slow, knowing laugh, letting the tension hang between you.*",
+    hook: "“Not so fast. Earn the next move first — what are you offering?”",
+  },
+  excited: {
+    cue: "*Her breathing quickens, flush rising across her chest as she presses closer.*",
+    hook: "“God, don't stop talking to me like that. Tell me what you'd do right now.”",
+  },
+  devoted: {
+    cue: "*Her expression softens completely, eyes locked warmly onto yours.*",
+    hook: "“Come closer. I want all of your attention tonight — take your time with me.”",
+  },
+  dominant: {
+    cue: "*She raises one eyebrow calmly, waiting in crisp, unhurried silence.*",
+    hook: "“Eyes on me. Say it again, properly, and wait for permission.”",
+  },
+};
+
+export function fallbackReply(
+  character: Character,
+  userText: string,
+  romanceMode: boolean,
+  moodState?: Pick<MoodState, "mood">,
+): string {
   const heard = userText.replace(/\s+/g, " ").trim().slice(0, 90);
   const heardLine = heard ? `She catches what you said. “${heard}.”` : "";
-  const romance = romanceMode ? "She softens. “I do want you. Say it back like you mean me.”" : "";
-  return [character.reply, heardLine, romance].filter(Boolean).join("\n\n");
+  const moodEntry = moodState ? MOOD_CUES[moodState.mood] : null;
+  const romance = romanceMode
+    ? "She softens. “I do want you. Say it back like you mean me.”"
+    : "";
+  return [moodEntry?.cue, character.reply, heardLine, moodEntry?.hook, romance]
+    .filter(Boolean)
+    .join("\n\n");
 }

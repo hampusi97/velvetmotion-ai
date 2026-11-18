@@ -143,7 +143,7 @@ export function SiteHeader({
           </button>
           <nav aria-label="Sections" className="hidden min-w-0 flex-1 md:block">
             <ul className="flex items-center gap-1 overflow-x-auto px-1 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {sections.slice(0, 6).map((section) => {
+              {sections.slice(0, 8).map((section) => {
                 const active = view === section.id;
                 return (
                   <li key={section.id} className="shrink-0">

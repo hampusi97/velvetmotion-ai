@@ -109,3 +109,89 @@ test("Dirty Dozen payload simulator rejects all 12 adversarial payloads", () => 
     false,
   );
 });
+
+test("Character filtering and system prompt builder include persona and romance mode rules", async () => {
+  const { CHARACTERS, filterCharacters, buildSystemPrompt } = await import("./lib/characters");
+  assert.ok(CHARACTERS.length >= 12);
+
+  const dominants = filterCharacters({ category: "Dominant" });
+  assert.ok(dominants.length >= 2);
+  assert.ok(dominants.every((c) => c.category === "Dominant"));
+
+  const maren = CHARACTERS[0];
+  const promptStandard = buildSystemPrompt(maren, false);
+  const promptRomance = buildSystemPrompt(maren, true);
+  assert.ok(promptStandard.includes(maren.name));
+  assert.ok(promptRomance.includes("Romance mode is ON."));
+});
+
+test("Portrait URLs stay within Firestore 2000-char limit", async () => {
+  const { characterPortraitUrl, resolveAvatar } = await import("./lib/portraits");
+  const maxUrlLen = blueprint.entities.SavedMedia.properties.url.maxLength!;
+
+  const builtIn = characterPortraitUrl("maren", "curvy figure");
+  assert.ok(builtIn.startsWith("https://image.pollinations.ai/prompt/"));
+  assert.ok(builtIn.length <= maxUrlLen);
+
+  const customPortrait = resolveAvatar("/avatars/maren.svg", "maren", "curvy figure");
+  assert.ok(customPortrait.startsWith("https://image.pollinations.ai/prompt/"));
+  assert.ok(customPortrait.length <= maxUrlLen);
+});
+
+test("Mood Engine updates character status, response style, and avatar appearance by duration & intensity", async () => {
+  const { CHARACTERS, buildSystemPrompt, fallbackReply } = await import("./lib/characters");
+  const { computeMoodState } = await import("./lib/moodEngine");
+
+  const liora = CHARACTERS.find((c) => c.id === "liora") || CHARACTERS[1];
+  const maren = CHARACTERS[0];
+
+  const calmMood = computeMoodState({
+    character: liora,
+    messages: [{ role: "assistant", content: liora.initialMessage }],
+    durationSeconds: 0,
+    intimacy: 20,
+    romanceMode: false,
+    periodicPhase: 0,
+  });
+
+  const intenseMood = computeMoodState({
+    character: liora,
+    messages: [
+      { role: "assistant", content: liora.initialMessage },
+      { role: "user", content: "Come closer, I want to kiss your lips and touch your skin in bed!" },
+      { role: "assistant", content: "Tell me more..." },
+      { role: "user", content: "Undress slowly for me, please, I crave you tonight!" },
+    ],
+    durationSeconds: 180,
+    intimacy: 80,
+    romanceMode: false,
+    giftCount: 2,
+    periodicPhase: 1,
+  });
+
+  assert.ok(intenseMood.intensity > calmMood.intensity);
+  assert.notEqual(calmMood.statusText, intenseMood.statusText);
+  assert.notEqual(calmMood.portraitMood, intenseMood.portraitMood);
+  assert.notEqual(calmMood.avatarFilter, intenseMood.avatarFilter);
+
+  const periodicShift = computeMoodState({
+    character: maren,
+    messages: [{ role: "user", content: "I am listening closely." }],
+    durationSeconds: 20,
+    intimacy: 55,
+    romanceMode: false,
+    periodicPhase: 1,
+  });
+  assert.ok(periodicShift.statusText.length > 0);
+  assert.ok(periodicShift.responseStyle.length > 10);
+
+  const sysPrompt = buildSystemPrompt(maren, false, intenseMood);
+  assert.ok(sysPrompt.includes(`Current Mood: ${intenseMood.label}`));
+
+  const replyCalm = fallbackReply(liora, "hello", false, calmMood);
+  const replyIntense = fallbackReply(liora, "kiss me closer", false, intenseMood);
+  assert.notEqual(replyCalm, replyIntense);
+});
+
+
+

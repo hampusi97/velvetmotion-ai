@@ -23,6 +23,7 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 import blueprint from "../firebase-blueprint.json";
+import { characterPortraitUrl } from "./portraits";
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -322,12 +323,17 @@ export async function saveMediaToFirestore(params: {
   const ref = doc(db, "users", user.uid, "gallery", mediaId);
   try {
     await ensureUserProfileInFirestore(user, 500);
+    const rawUrl = params.url.trim();
+    const safeUrl =
+      rawUrl.length <= MAX_URL_LEN
+        ? rawUrl
+        : characterPortraitUrl(charId, params.characterName, params.type).slice(0, MAX_URL_LEN);
     await setDoc(ref, {
       userId: user.uid,
       characterId: charId,
       characterName: params.characterName.trim().slice(0, 80) || "Companion",
       mediaType: params.type,
-      url: params.url.trim().slice(0, MAX_URL_LEN),
+      url: safeUrl,
       prompt: (params.prompt || "").trim().slice(0, MAX_PROMPT_LEN),
       createdAt: serverTimestamp(),
     });
@@ -366,6 +372,11 @@ export async function saveCustomCompanionToFirestore(params: {
   const ref = doc(db, "users", user.uid, "companions", compId);
   try {
     await ensureUserProfileInFirestore(user, 500);
+    const rawAvatar = params.avatar.trim();
+    const safeAvatar =
+      rawAvatar.length <= 2000
+        ? rawAvatar
+        : characterPortraitUrl(compId, params.figure, params.personality).slice(0, 2000);
     await setDoc(ref, {
       userId: user.uid,
       name: params.name.trim().slice(0, 60) || "Custom Girl",
@@ -375,7 +386,7 @@ export async function saveCustomCompanionToFirestore(params: {
       personality: params.personality.trim().slice(0, 80) || "Sweet girlfriend",
       figure: params.figure.trim().slice(0, 200) || "Fictional adult",
       kink: params.kink.trim().slice(0, 200) || "Romance",
-      avatar: params.avatar.trim().slice(0, 2000),
+      avatar: safeAvatar,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -420,3 +431,57 @@ export function subscribeUserGallery(
     },
   );
 }
+
+export async function deleteCustomCompanionFromFirestore(companionId: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user || !user.emailVerified) return;
+  const cleanId = sanitizeId(companionId);
+  const path = `users/${user.uid}/companions/${cleanId}`;
+  try {
+    await deleteDoc(doc(db, "users", user.uid, "companions", cleanId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+export function subscribeUserCompanions(
+  userId: string,
+  onItems: (items: Array<{
+    id: string;
+    name: string;
+    age: number;
+    category: string;
+    tagline: string;
+    personality: string;
+    figure: string;
+    kink: string;
+    avatar: string;
+  }>) => void,
+): Unsubscribe {
+  const path = `users/${userId}/companions`;
+  const q = query(collection(db, "users", userId, "companions"), where("userId", "==", userId));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list = snapshot.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: String(data.name || "Custom Girl"),
+          age: typeof data.age === "number" ? data.age : 24,
+          category: String(data.category || "Girlfriend"),
+          tagline: String(data.tagline || "Your custom companion"),
+          personality: String(data.personality || "Sweet girlfriend"),
+          figure: String(data.figure || "Fictional adult"),
+          kink: String(data.kink || "Romance"),
+          avatar: String(data.avatar || ""),
+        };
+      });
+      onItems(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+    },
+  );
+}
+

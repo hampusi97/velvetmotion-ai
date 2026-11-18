@@ -25,6 +25,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -33,3 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tooling & drafts
+.playwright-cli/
+DRAFT_firestore.rules
+

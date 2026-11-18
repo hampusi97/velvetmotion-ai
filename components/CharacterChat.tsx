@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fallbackReply, CHARACTERS, type Character } from "@/lib/characters";
+import { computeMoodState } from "@/lib/moodEngine";
 import { speak } from "@/lib/speech";
 import {
   getCoins,
@@ -75,21 +76,74 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [coins, setCoinsState] = useState(500);
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [giftIds, setGiftIds] = useState<string[]>([]);
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [moodTick, setMoodTick] = useState(0);
+  const sessionStartRef = useRef<number>(Date.now());
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const avatarSrc =
+  const baseAvatarSrc =
     character.avatar.startsWith("http") || character.avatar.startsWith("data:")
       ? character.avatar
-      : characterPortraitUrl(character.id, character.figure);
+      : characterPortraitUrl(character.id, character.figure, "seductive");
+
+  const [displayedAvatar, setDisplayedAvatar] = useState(baseAvatarSrc);
+
+  const moodState = useMemo(
+    () =>
+      computeMoodState({
+        character,
+        messages,
+        durationSeconds,
+        intimacy,
+        romanceMode,
+        giftCount: giftIds.length,
+        periodicPhase: moodTick,
+      }),
+    [character, messages, durationSeconds, intimacy, romanceMode, giftIds.length, moodTick],
+  );
+
+  // Periodically update conversation duration & Mood Engine phase every 15 seconds
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDurationSeconds(Math.floor((Date.now() - sessionStartRef.current) / 1000));
+      setMoodTick((t) => t + 1);
+    }, 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Preload dynamic portrait appearance when moodState.portraitMood changes
+  useEffect(() => {
+    if (character.avatar.startsWith("data:")) {
+      setDisplayedAvatar(character.avatar);
+      return;
+    }
+    const targetUrl = characterPortraitUrl(character.id, character.figure, moodState.portraitMood);
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (!cancelled) setDisplayedAvatar(targetUrl);
+    };
+    probe.onerror = () => {
+      if (!cancelled) setDisplayedAvatar(baseAvatarSrc);
+    };
+    probe.src = targetUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [character.id, character.figure, character.avatar, moodState.portraitMood, baseAvatarSrc]);
 
   useEffect(() => {
     const saved = loadChat(character.id);
     if (saved.length > 0) setMessages(saved);
     else setMessages([{ role: "assistant", content: character.initialMessage }]);
     setInput("");
+    sessionStartRef.current = Date.now();
+    setDurationSeconds(0);
+    setMoodTick(0);
+    setDisplayedAvatar(baseAvatarSrc);
     setIntimacy(getIntimacy(character.id, character.intimacy));
     setGiftIds(getGiftsFor(character.id));
-  }, [character.id, character.initialMessage, character.intimacy]);
+  }, [character.id, character.initialMessage, character.intimacy, baseAvatarSrc]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -140,12 +194,24 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const send = async () => {
     const text = input.trim();
     if (!text || isLoading) return;
+    const elapsedNow = Math.floor((Date.now() - sessionStartRef.current) / 1000);
+    setDurationSeconds(elapsedNow);
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(nextMessages);
     setInput("");
     setIsLoading(true);
 
-    let reply = fallbackReply(character, text, romanceMode);
+    const activeMood = computeMoodState({
+      character,
+      messages: nextMessages,
+      durationSeconds: elapsedNow,
+      intimacy,
+      romanceMode,
+      giftCount: giftIds.length,
+      periodicPhase: moodTick,
+    });
+
+    let reply = fallbackReply(character, text, romanceMode, activeMood);
     const giftLines = giftIds
       .map((id) => GIFTS.find((g) => g.id === id)?.line)
       .filter(Boolean);
@@ -157,6 +223,9 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           messages: nextMessages.map(({ role, content }) => ({ role, content })),
           characterId: character.id,
           romanceMode,
+          intimacy,
+          durationSeconds: elapsedNow,
+          moodState: activeMood,
           gifts: giftLines,
         }),
       });
@@ -171,7 +240,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     setMessages((current) => [...current, { role: "assistant", content: reply }]);
     setIntimacy(bumpIntimacy(character.id, 2));
     setIsLoading(false);
-    speak(reply, character.voice);
+    const moodVoice = {
+      ...character.voice,
+      rate:
+        activeMood.mood === "excited"
+          ? Math.min(1.25, character.voice.rate + 0.08)
+          : activeMood.mood === "shy" || activeMood.mood === "devoted"
+            ? Math.max(0.75, character.voice.rate - 0.06)
+            : character.voice.rate,
+    };
+    speak(reply, moodVoice);
   };
 
   const runGenerate = async (type: (typeof GEN_TYPES)[number]["id"], overrideDual = dualId) => {
@@ -328,18 +406,56 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         {aiMode === "premium" ? "Premium AI." : "Free AI."} Chat synced · intimacy {intimacy}% · {coins} coins
         {giftIds.length > 0 ? ` · gifts: ${giftIds.length}` : ""}
       </p>
-      <div className="flex items-center gap-3 mb-4">
-        <button onClick={onBack} className="text-pink-400 text-sm">
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        <button onClick={onBack} className="text-pink-400 text-sm shrink-0">
           ← Profile
         </button>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={avatarSrc} alt="" className="w-9 h-9 rounded-full object-cover bg-zinc-800" />
+        <div className="relative shrink-0">
+          <div
+            aria-hidden="true"
+            className="absolute -inset-1 rounded-full blur-sm transition-all duration-700"
+            style={{ background: moodState.auraColor }}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={displayedAvatar}
+            alt={`${character.name} (${moodState.label})`}
+            onError={(e) => {
+              e.currentTarget.src = character.avatar.startsWith("/") ? character.avatar : "/avatars/maren.svg";
+            }}
+            style={{
+              filter: moodState.avatarFilter,
+              boxShadow: `0 0 22px ${moodState.auraColor}`,
+            }}
+            className={`relative w-12 h-12 rounded-full object-cover bg-zinc-800 transition-all duration-700 ${
+              moodState.mood === "excited" || moodState.mood === "flirty" ? "scale-105" : ""
+            } ${moodState.ringClass}`}
+          />
+          <span
+            aria-hidden="true"
+            className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-zinc-950 ${moodState.dotClass} animate-pulse`}
+          />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm truncate">
-            {character.name}, {character.age}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-sm truncate">
+              {character.name}, {character.age}
+            </span>
+            <span
+              data-testid="mood-status-badge"
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors duration-500 ${moodState.badgeClass}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${moodState.dotClass}`} />
+              {moodState.statusText}
+            </span>
           </div>
-          <div className="h-1.5 mt-1 rounded-full bg-zinc-800 overflow-hidden max-w-[8rem]">
-            <div className="h-full bg-gradient-to-r from-pink-600 to-fuchsia-500" style={{ width: `${intimacy}%` }} />
+          <div className="mt-1.5 flex flex-wrap items-center gap-3">
+            <div className="h-1.5 flex-1 rounded-full bg-zinc-800 overflow-hidden max-w-[9rem]" title={`Closeness ${intimacy}%`}>
+              <div className="h-full bg-gradient-to-r from-pink-600 to-fuchsia-500 transition-all duration-500" style={{ width: `${intimacy}%` }} />
+            </div>
+            <span data-testid="mood-engine-meta" className="text-[11px] text-zinc-400">
+              Style: <span className="text-zinc-200">{moodState.styleTag}</span> · Intensity {moodState.intensity}% · {Math.max(1, Math.ceil((durationSeconds + 1) / 60))}m
+            </span>
           </div>
         </div>
         <button

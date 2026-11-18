@@ -7,14 +7,16 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx scripts/validate-content.ts"
+    "test": "tsx --test firestore.rules.test.ts && tsx scripts/validate-content.ts"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/outfit": "^5.3.0",
+    "@google/genai": "^3.4.0",
     "clsx": "^2.1.1",
     "firebase": "^11.0.0",
     "framer-motion": "^11.11.11",
+    "lucide-react": "^1.74.0",
     "next": "15.5.29",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

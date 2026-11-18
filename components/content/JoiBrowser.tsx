@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import { ACCENT_CLASS } from "@/components/content/accents";
 import {
   CONTENT_DISCLAIMER,
@@ -9,6 +10,7 @@ import {
   getJoiScenario,
 } from "@/lib/content";
 import { JOI_PHASES, type JoiScenario } from "@/lib/content/types";
+import { speak, stopSpeaking } from "@/lib/speech";
 
 const PHASE_LABEL: Record<(typeof JOI_PHASES)[number], string> = {
   "warm-up": "Warm-up",
@@ -17,10 +19,18 @@ const PHASE_LABEL: Record<(typeof JOI_PHASES)[number], string> = {
   finish: "Finish",
 };
 
-export function JoiBrowser() {
-  const [scenarioId, setScenarioId] = useState<string | null>(null);
+export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: string | null }) {
+  const [scenarioId, setScenarioId] = useState<string | null>(initialScenarioId);
   const [stepIndex, setStepIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [autoVoice, setAutoVoice] = useState(false);
+
+  useEffect(() => {
+    if (initialScenarioId) {
+      setScenarioId(initialScenarioId);
+      setStepIndex(0);
+    }
+  }, [initialScenarioId]);
 
   const scenario: JoiScenario | undefined = scenarioId
     ? getJoiScenario(scenarioId)
@@ -29,7 +39,14 @@ export function JoiBrowser() {
 
   useEffect(() => {
     setRemaining(null);
-  }, [scenarioId, stepIndex]);
+    if (autoVoice && step) {
+      speak(`${step.title}. ${step.instruction}`, { pitch: 1.05, rate: 0.92 });
+    }
+  }, [scenarioId, stepIndex, autoVoice, step]);
+
+  useEffect(() => {
+    return () => stopSpeaking();
+  }, []);
 
   useEffect(() => {
     if (remaining === null || remaining <= 0) return;
@@ -83,18 +100,42 @@ export function JoiBrowser() {
   const phaseIndex = JOI_PHASES.indexOf(step.phase);
   const atStart = stepIndex === 0;
   const atEnd = stepIndex === scenario.steps.length - 1;
+  const progressPct =
+    remaining !== null && step.suggestedSeconds > 0
+      ? Math.max(0, Math.min(100, ((step.suggestedSeconds - remaining) / step.suggestedSeconds) * 100))
+      : 0;
 
   return (
     <section className="max-w-lg mx-auto">
-      <button
-        onClick={() => {
-          setScenarioId(null);
-          setStepIndex(0);
-        }}
-        className="text-sm text-pink-400 mb-3"
-      >
-        ← All JOI scenarios
-      </button>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <button
+          onClick={() => {
+            stopSpeaking();
+            setScenarioId(null);
+            setStepIndex(0);
+          }}
+          className="text-sm text-pink-400"
+        >
+          ← All JOI scenarios
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !autoVoice;
+            setAutoVoice(next);
+            if (!next) stopSpeaking();
+            else speak(`${step.title}. ${step.instruction}`, { pitch: 1.05, rate: 0.92 });
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+            autoVoice
+              ? "border-pink-500 bg-pink-500/20 text-pink-200"
+              : "border-zinc-700 bg-zinc-900 text-zinc-400"
+          }`}
+        >
+          {autoVoice ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          {autoVoice ? "Auto-Voice On" : "Auto-Voice Off"}
+        </button>
+      </div>
       <div className="flex gap-3 mb-4">
         <div
           className={`h-14 w-14 shrink-0 rounded-2xl bg-gradient-to-br ${ACCENT_CLASS[scenario.accent]}`}
@@ -119,16 +160,33 @@ export function JoiBrowser() {
           </div>
         ))}
       </div>
-      <article className="rounded-2xl bg-zinc-900 border border-zinc-800 p-4">
-        <div className="flex items-center justify-between gap-3 mb-2">
+      <article className="rounded-2xl bg-zinc-900 border border-zinc-800 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold">{step.title}</h3>
-          <span className="text-[11px] text-zinc-500">
-            {stepIndex + 1} / {scenario.steps.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => speak(`${step.title}. ${step.instruction}`, { pitch: 1.05, rate: 0.92 })}
+              className="inline-flex items-center gap-1 rounded-lg border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 text-xs text-pink-200 hover:bg-pink-500/20"
+            >
+              <Volume2 className="h-3.5 w-3.5" /> Speak Step
+            </button>
+            <span className="text-[11px] text-zinc-500">
+              {stepIndex + 1} / {scenario.steps.length}
+            </span>
+          </div>
         </div>
         <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-zinc-100">
           {step.instruction}
         </p>
+        {remaining !== null && (
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div
+              className="h-full bg-gradient-to-r from-pink-500 to-fuchsia-500 transition-all duration-500"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        )}
       </article>
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-zinc-400">
         <span>Suggested {step.suggestedSeconds}s. Skip whenever you want.</span>
@@ -140,9 +198,9 @@ export function JoiBrowser() {
             Start timer
           </button>
         ) : remaining > 0 ? (
-          <span className="text-pink-300 tabular-nums">{remaining}s</span>
+          <span className="text-pink-300 tabular-nums font-medium">{remaining}s remaining</span>
         ) : (
-          <span className="text-pink-300">Time’s up</span>
+          <span className="text-pink-300 font-medium">Time&apos;s up — ready for next step</span>
         )}
       </div>
       <div className="mt-4 flex gap-2">
