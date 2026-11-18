@@ -48,8 +48,10 @@ import {
 } from "@/lib/videoModes";
 import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
+import { saveTribute } from "@/lib/rewards";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 import { VoiceCallUI } from "@/components/VoiceCallUI";
+import { useDelayedLingerieDrop } from "@/components/ChatExtrasHooks";
 
 type ChatMessage = StoredMessage & { id?: string };
 
@@ -99,8 +101,17 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [gifts, setGifts] = useState<string[]>([]);
   const [showTributeNudge, setShowTributeNudge] = useState(false);
   const [clipStatus, setClipStatus] = useState<string | null>(null);
+  const [tributeSaved, setTributeSaved] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useDelayedLingerieDrop(character, intimacy, messages.length, (msg) => {
+    setMessages((prev) => {
+      const next = [...prev, msg];
+      saveChat(character.id, next);
+      return next;
+    });
+  });
 
   const stage = stageFromIntimacy(intimacy);
   const upcoming = nextStage(intimacy);
@@ -132,11 +143,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const persist = (next: ChatMessage[]) => {
     setMessages(next);
     saveChat(character.id, next);
-    void syncChatSessionToFirestore?.({
+    const last =
+      next.filter((m) => m.role === "assistant").at(-1)?.content ||
+      next.at(-1)?.content ||
+      character.initialMessage ||
+      "Opened chat";
+    void syncChatSessionToFirestore({
       characterId: character.id,
       intimacy,
       gifts,
-      lastMessage: next[next.length - 1]?.content || character.initialMessage,
+      lastMessage: String(last).slice(0, 2000),
     }).catch(() => {});
   };
 
@@ -164,10 +180,15 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           characterId: character.id,
+          customCharacter: character,
           messages: next.slice(-12),
           romanceMode,
           intimacy,
-          memories: [...tierMemories.slice(-10), ...(memoryBlock ? memoryBlock.split("\n").filter(Boolean).slice(0, 8) : [])],
+          gifts,
+          memories: [
+            ...tierMemories.slice(-10).map((m) => m.text),
+            ...(memoryBlock ? memoryBlock.split("\n").filter(Boolean).slice(0, 8) : []),
+          ],
           memoryBlock,
         }),
       });
@@ -295,7 +316,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     persist([
       ...messages,
       { role: "user", content: `[Gift: ${gift.name}]` },
-      { role: "assistant", content: `*${character.name} receives the ${gift.name}.* “${gift.reaction || gift.line || "Mmm…"}”` },
+      { role: "assistant", content: `*${character.name} receives the ${gift.name}.* “${gift.line || gift.reaction || "Mmm…"}”` },
     ]);
     setIntimacy(bumpIntimacy(character.id, 4));
   };
@@ -396,7 +417,26 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             // eslint-disable-next-line @next/next/no-img-element
             <img src={activeMedia.url} alt="" className="w-full max-h-64 object-cover" />
           )}
-          <button type="button" onClick={() => setActiveMedia(null)} className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-xs">Close</button>
+          <div className="absolute top-2 right-2 flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                saveTribute({
+                  characterId: character.id,
+                  characterName: character.name,
+                  url: activeMedia.url,
+                  frames: activeMedia.frames,
+                  note: activeMedia.note || activeMedia.type,
+                });
+                setTributeSaved(true);
+                setTimeout(() => setTributeSaved(false), 2000);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-pink-600/90 text-xs font-medium text-white"
+            >
+              {tributeSaved ? "Saved ✓" : "Save tribute"}
+            </button>
+            <button type="button" onClick={() => setActiveMedia(null)} className="px-2 py-1 rounded-lg bg-black/60 text-xs">Close</button>
+          </div>
         </div>
       )}
 

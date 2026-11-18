@@ -194,12 +194,48 @@ for (const c of [...HOT_CAST, ...EXTRA_CHARACTERS, ...ROLE_CHARACTERS]) {
   if (!CHARACTERS.some((x) => x.id === c.id)) CHARACTERS.push(c);
 }
 
+function loadClientCustomCharacters(): Character[] {
+  if (typeof window === "undefined") return [];
+  const out: Character[] = [];
+  for (const key of ["velvet-custom-girls", "vm-imported-cards"]) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && typeof item.id === "string" && typeof item.name === "string") {
+            out.push(item as Character);
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return out;
+}
+
+function allCharacters(): Character[] {
+  const custom = loadClientCustomCharacters();
+  if (custom.length === 0) return CHARACTERS;
+  const seen = new Set<string>();
+  const combined: Character[] = [];
+  for (const c of [...custom, ...CHARACTERS]) {
+    if (!seen.has(c.id)) {
+      seen.add(c.id);
+      combined.push(c);
+    }
+  }
+  return combined;
+}
+
 export function getCharacter(id: string): Character | undefined {
-  return CHARACTERS.find((c) => c.id === id);
+  return allCharacters().find((c) => c.id === id);
 }
 
 export function getCharactersByCategory(category: string): Character[] {
-  return CHARACTERS.filter((c) => c.category === category);
+  return allCharacters().filter((c) => c.category === category);
 }
 
 export function getFeaturedCharacters(limit = 8): Character[] {
@@ -207,14 +243,14 @@ export function getFeaturedCharacters(limit = 8): Character[] {
 }
 
 export function characterCategories(): string[] {
-  return Array.from(new Set(CHARACTERS.map((c) => c.category))).sort();
+  return Array.from(new Set(allCharacters().map((c) => c.category))).sort();
 }
 
 export function filterCharacters(opts: { query?: string; category?: string; tag?: string }): Character[] {
   const q = (opts.query || "").trim().toLowerCase();
   const cat = opts.category && opts.category !== "All" ? opts.category : null;
   const tag = opts.tag && opts.tag !== "All" ? opts.tag.toLowerCase() : null;
-  return CHARACTERS.filter((c) => {
+  return allCharacters().filter((c) => {
     if (cat && c.category !== cat) return false;
     if (tag && !(c.tags || []).some((t) => t.toLowerCase() === tag)) return false;
     if (!q) return true;
@@ -229,6 +265,22 @@ const MOOD_CUES: Record<string, { cue: string; hook: string }> = {
   calm: {
     cue: "*She settles closer, breathing steady, eyes soft.*",
     hook: "“I'm right here. Take your time.”",
+  },
+  shy: {
+    cue: "*Her cheeks flush softly as she glances up at you through her lashes.*",
+    hook: "“I'm a little shy saying it out loud… stay close with me.”",
+  },
+  curious: {
+    cue: "*She leans in closer, studying every word and expression.*",
+    hook: "“Tell me more — I want to know what you're really thinking.”",
+  },
+  flirty: {
+    cue: "*She bites her lower lip with a playful, heated smile.*",
+    hook: "“Keep talking to me like that and see how close I get.”",
+  },
+  teasing: {
+    cue: "*A wicked smirk curves her lips as she holds your gaze.*",
+    hook: "“Not so fast… convince me how badly you want it first.”",
   },
   excited: {
     cue: "*Her breathing quickens, flush rising across her chest as she presses closer.*",

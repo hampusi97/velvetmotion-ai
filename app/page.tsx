@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CharacterChat } from "@/components/CharacterChat";
 import { CharacterProfile } from "@/components/CharacterProfile";
 import { CharacterRoster } from "@/components/CharacterRoster";
-import { CHARACTERS, characterCategories, type Character } from "@/lib/characters";
+import { CHARACTERS, characterCategories, getCharacter, type Character } from "@/lib/characters";
 import { HomeView as HomeScreen } from "@/components/home-view";
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
@@ -35,7 +35,7 @@ import { LoginGate } from "@/components/LoginGate";
 import { WorkspaceHub } from "@/components/WorkspaceHub";
 import { VaultPanel } from "@/components/VaultPanel";
 import { getUser, type LocalUser } from "@/lib/auth";
-import { getCoins } from "@/lib/storage";
+import { getCoins, loadChat, saveChat } from "@/lib/storage";
 import {
   startProactiveWatcher,
   dismissProactive,
@@ -148,7 +148,7 @@ export default function Home() {
   const selected =
     customCharacter?.id === selectedId
       ? customCharacter
-      : CHARACTERS.find((character) => character.id === selectedId) ??
+      : (selectedId ? getCharacter(selectedId) : undefined) ??
         ((view === "chat" || view === "profile") ? (CHARACTERS[0] ?? null) : null);
 
   const openRoster = (romance: boolean) => {
@@ -158,11 +158,30 @@ export default function Home() {
   };
 
   const openProfile = (character: Character) => {
+    setCustomCharacter(character);
     setSelectedId(character.id);
     setView("profile");
   };
 
-  const openChatById = (id: string) => {
+  const openChatById = (id: string, scenarioPrompt?: string) => {
+    const found = getCharacter(id);
+    if (found) setCustomCharacter(found);
+    if (scenarioPrompt && scenarioPrompt.trim()) {
+      const existing = loadChat(id);
+      const base =
+        existing.length > 0
+          ? existing
+          : found
+            ? [{ role: "assistant" as const, content: found.initialMessage }]
+            : [];
+      saveChat(id, [
+        ...base,
+        {
+          role: "assistant",
+          content: `*Scenario:* ${scenarioPrompt.trim()}\n\n“We're right here inside the scene. Tell me your next move.”`,
+        },
+      ]);
+    }
     setSelectedId(id);
     setRomanceMode(false);
     setView("chat");
@@ -317,7 +336,10 @@ export default function Home() {
           {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
           {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
           {view === "scenario" && (
-            <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id) => openChatById(id)} />
+            <SpicyScenarioSimulator
+              onHome={() => setView("home")}
+              onStartChat={(id, customPrompt) => openChatById(id, customPrompt)}
+            />
           )}
           {view === "tribute" && (
             <>

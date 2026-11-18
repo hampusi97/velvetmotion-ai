@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getUser } from "@/lib/auth";
 import { postLoungeMessage, subscribeLounge } from "@/lib/firebaseLounge";
+import { encodeShareCode, loadCustomGirls } from "@/lib/shareGirls";
 
 type LobbyMsg = {
   id: string;
@@ -116,28 +117,18 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
 
   const shareGirlCode = () => {
     try {
-      const raw = localStorage.getItem("velvet-custom-girls");
-      const list = raw ? JSON.parse(raw) : [];
+      const list = loadCustomGirls();
       if (!list.length) {
         void post("I don't have a custom girl to share yet — create one first.");
         return;
       }
       const girl = list[0];
-      const code = btoa(
-        unescape(
-          encodeURIComponent(
-            JSON.stringify({
-              id: girl.id,
-              name: girl.name,
-              figure: girl.figure,
-              personality: girl.personality,
-              kink: girl.kink,
-              tagline: girl.tagline,
-            }),
-          ),
-        ),
-      ).slice(0, 48);
-      void post(`Sharing my girl “${girl.name}” — code: ${code}`, code);
+      const code = encodeShareCode(girl);
+      if (!code) {
+        void post("Couldn't build a share code.");
+        return;
+      }
+      void post(`Sharing my girl “${girl.name}” — paste code in Share & Import`, code);
     } catch {
       void post("Couldn't build a share code.");
     }

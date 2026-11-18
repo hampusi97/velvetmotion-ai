@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TRIBUTES, type TributeChallenge } from "@/lib/tributes";
 import { getCharacter } from "@/lib/characters";
 import { getEdgeStreak, recordTributeComplete } from "@/lib/streaks";
 import { addCoins } from "@/lib/storage";
+import { loadTributes, type TributeSave } from "@/lib/rewards";
 
 const intensityColor = {
   warm: "text-amber-300 border-amber-500/40 bg-amber-500/10",
@@ -16,6 +17,11 @@ export function TributeBrowser({ onStartWithGirl }: { onStartWithGirl?: (id: str
   const [active, setActive] = useState<TributeChallenge | null>(null);
   const [streak, setStreak] = useState(() => (typeof window !== "undefined" ? getEdgeStreak() : 0));
   const [toast, setToast] = useState("");
+  const [savedTributes, setSavedTributes] = useState<TributeSave[]>([]);
+
+  useEffect(() => {
+    setSavedTributes(loadTributes());
+  }, []);
 
   const complete = () => {
     const { streak: s, unlockedDual } = recordTributeComplete();
@@ -68,6 +74,24 @@ export function TributeBrowser({ onStartWithGirl }: { onStartWithGirl?: (id: str
           );
         })}
       </div>
+
+      {savedTributes.length > 0 && (
+        <div className="pt-4 space-y-3">
+          <h3 className="font-display text-xl text-cream">Saved Tributes ({savedTributes.length})</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {savedTributes.map((t) => (
+              <div key={t.id} className="rounded-2xl overflow-hidden border border-pink-500/30 bg-zinc-900/60">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={t.url} alt="" className="aspect-[3/4] w-full object-cover" />
+                <div className="p-2 text-xs">
+                  <div className="font-medium text-cream truncate">{t.characterName}</div>
+                  <div className="text-zinc-500">{new Date(t.createdAt).toLocaleDateString()}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {active && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
