@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import type { Character } from "@/lib/characters";
 import { saveCustomCompanionToFirestore } from "@/lib/firebase";
+import { characterPortraitUrl } from "@/lib/portraits";
+import { CreatePostActions } from "@/components/CreatePostActions";
 
 const STYLES = ["Realistic", "Soft glam", "Anime"] as const;
 const ETHNICITIES = [
@@ -57,8 +59,6 @@ type WizardProps = {
   onHome: () => void;
 };
 
-import { characterPortraitUrl } from "@/lib/portraits";
-
 function portraitUrl(look: string, style: string, name = "", mood = "seductive") {
   return characterPortraitUrl(name || "custom", `${style} · ${look}`, mood, `${style} · ${look}`);
 }
@@ -78,6 +78,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
   const [bio, setBio] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [created, setCreated] = useState<Character | null>(null);
 
   const look = useMemo(
     () =>
@@ -97,8 +98,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
     reader.readAsDataURL(file);
   };
 
-  const finish = () => {
-    setBusy(true);
+  const buildCharacter = (): Character => {
     const id = `custom-${Date.now()}`;
     const displayName = name.trim() || "Your Girl";
     const avatar = photoDataUrl || portraitUrl(look, style, displayName);
@@ -117,7 +117,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
                   ? "Intense"
                   : "Playful";
 
-    const character: Character = {
+    return {
       id,
       name: displayName,
       age: 24,
@@ -143,6 +143,11 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       kink,
       reply: `She smiles. “I'm ${displayName}. Your move.”`,
     };
+  };
+
+  const finish = () => {
+    setBusy(true);
+    const character = buildCharacter();
 
     try {
       const raw = localStorage.getItem("velvet-custom-girls");
@@ -162,16 +167,42 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       personality: character.personality,
       figure: character.figure,
       kink: character.kink,
-      avatar: character.avatar.startsWith("http") || character.avatar.startsWith("data:")
-        ? character.avatar
-        : portraitUrl(look, style, displayName),
+      avatar:
+        character.avatar.startsWith("http") || character.avatar.startsWith("data:")
+          ? character.avatar
+          : portraitUrl(look, style, character.name),
     }).catch(() => {});
 
     setBusy(false);
-    onDone(character);
+    setCreated(character);
   };
 
   const steps = ["Style", "Look", "Details", "Mind", "Photo", "Finish"];
+
+  // After create: one-tap heat then chat
+  if (created) {
+    return (
+      <div className="max-w-lg mx-auto pb-16 space-y-5">
+        <button type="button" onClick={onHome} className="text-pink-400 text-sm hover:text-pink-300">
+          ← Home
+        </button>
+        <h2 className="text-2xl font-extrabold text-cream">{created.name} is ready</h2>
+        <p className="text-sm text-mist">One-tap heat, then open chat / JOI.</p>
+        <div className="aspect-[3/4] max-w-[200px] rounded-2xl overflow-hidden border border-pink-500/40">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={created.avatar} alt="" className="w-full h-full object-cover" />
+        </div>
+        <CreatePostActions character={created} onChat={() => onDone(created)} />
+        <button
+          type="button"
+          onClick={() => onDone(created)}
+          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold"
+        >
+          Open chat with {created.name.split(" ")[0]}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto pb-16">
@@ -196,7 +227,6 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
         ))}
       </div>
 
-      {/* Live preview strip */}
       {step >= 1 && step < 5 && (
         <div className="mb-6 flex items-center gap-4 rounded-2xl border border-white/10 bg-zinc-900/60 p-3">
           <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
@@ -206,7 +236,9 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-cream">{name.trim() || "Your Girl"}</div>
             <div className="truncate text-xs text-pink-300/90">{look}</div>
-            <div className="mt-0.5 text-[11px] text-zinc-500">{style} · {personality}</div>
+            <div className="mt-0.5 text-[11px] text-zinc-500">
+              {style} · {personality}
+            </div>
           </div>
         </div>
       )}
@@ -230,9 +262,6 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
               </button>
             ))}
           </div>
-          <p className="text-xs text-zinc-500 pt-2">
-            Realistic gives magazine-quality nudes. Soft glam is dreamy. Anime is stylized.
-          </p>
         </div>
       )}
 
@@ -414,14 +443,12 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       {step === 4 && (
         <div className="space-y-4">
           <p className="text-sm text-mist">
-            Upload a reference photo to seed her face (your art, stock, or a selfie for couple-shot energy).
-            Stored only on this device.{" "}
+            Upload a reference photo to seed her face. Stored only on this device.{" "}
             <span className="text-zinc-500">Do not upload real people without consent.</span>
           </p>
           <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-pink-500/40 bg-pink-500/5 py-12 cursor-pointer hover:bg-pink-500/10 transition">
             <span className="text-4xl">📷</span>
             <span className="text-sm text-pink-200">{photoDataUrl ? "Replace photo" : "Upload reference photo"}</span>
-            <span className="text-xs text-zinc-500">or skip for auto-generated portrait</span>
             <input
               type="file"
               accept="image/*"
@@ -455,7 +482,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mt-1">{kink}</p>
           </div>
           <p className="text-xs text-zinc-500">
-            She will chat, undress on Generate, run tributes, and remember gifts like the rest of the cast.
+            After create you can one-tap Nudify / Sex sequence, then open chat.
           </p>
         </div>
       )}
@@ -485,7 +512,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             onClick={finish}
             className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50"
           >
-            {busy ? "Creating…" : "Create & chat"}
+            {busy ? "Creating…" : "Create girl"}
           </button>
         )}
       </div>
