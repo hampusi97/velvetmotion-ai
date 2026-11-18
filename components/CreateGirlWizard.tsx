@@ -5,6 +5,8 @@ import type { Character } from "@/lib/characters";
 import { saveCustomCompanionToFirestore } from "@/lib/firebase";
 import { characterPortraitUrl } from "@/lib/portraits";
 import { CreatePostActions } from "@/components/CreatePostActions";
+import { seedFromPhotoDataUrl } from "@/lib/media";
+import { setCharacterFaceSeed } from "@/lib/mediaSettings";
 
 const STYLES = ["Realistic", "Soft glam", "Anime"] as const;
 const ETHNICITIES = [
@@ -79,6 +81,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<Character | null>(null);
+  const [permHint, setPermHint] = useState<string | null>(null);
 
   const look = useMemo(
     () =>
@@ -93,8 +96,10 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
 
   const onFile = (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
+    setPermHint(null);
     const reader = new FileReader();
     reader.onload = () => setPhotoDataUrl(String(reader.result));
+    reader.onerror = () => setPermHint("Could not read that image. Try another photo from your gallery.");
     reader.readAsDataURL(file);
   };
 
@@ -149,6 +154,16 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
     setBusy(true);
     const character = buildCharacter();
 
+    // CharForge-style: lock face seed from reference photo for all later moods
+    if (photoDataUrl) {
+      try {
+        setCharacterFaceSeed(character.id, seedFromPhotoDataUrl(photoDataUrl));
+        localStorage.setItem(`vm-ref-photo-${character.id}`, photoDataUrl.slice(0, 500000));
+      } catch {
+        /* quota */
+      }
+    }
+
     try {
       const raw = localStorage.getItem("velvet-custom-girls");
       const list = raw ? JSON.parse(raw) : [];
@@ -179,7 +194,6 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
 
   const steps = ["Style", "Look", "Details", "Mind", "Photo", "Finish"];
 
-  // After create: one-tap heat then chat
   if (created) {
     return (
       <div className="max-w-lg mx-auto pb-16 space-y-5">
@@ -187,7 +201,9 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
           ← Home
         </button>
         <h2 className="text-2xl font-extrabold text-cream">{created.name} is ready</h2>
-        <p className="text-sm text-mist">One-tap heat, then open chat / JOI.</p>
+        <p className="text-sm text-mist">
+          Face seed locked from your photo (when uploaded). One-tap heat, then chat.
+        </p>
         <div className="aspect-[3/4] max-w-[200px] rounded-2xl overflow-hidden border border-pink-500/40">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={created.avatar} alt="" className="w-full h-full object-cover" />
@@ -271,18 +287,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mb-2">Ethnicity vibe</p>
             <div className="flex flex-wrap gap-2">
               {ETHNICITIES.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEthnicity(e)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    ethnicity === e
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {e}
-                </button>
+                <button key={e} type="button" onClick={() => setEthnicity(e)} className={`px-3 py-1.5 rounded-full text-xs border ${ethnicity === e ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{e}</button>
               ))}
             </div>
           </div>
@@ -290,18 +295,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mb-2">Body type</p>
             <div className="flex flex-wrap gap-2">
               {BODIES.map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => setBody(b)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    body === b
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {b}
-                </button>
+                <button key={b} type="button" onClick={() => setBody(b)} className={`px-3 py-1.5 rounded-full text-xs border ${body === b ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{b}</button>
               ))}
             </div>
           </div>
@@ -309,18 +303,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mb-2">Chest</p>
             <div className="flex flex-wrap gap-2">
               {CHESTS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setChest(c)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    chest === c
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {c}
-                </button>
+                <button key={c} type="button" onClick={() => setChest(c)} className={`px-3 py-1.5 rounded-full text-xs border ${chest === c ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{c}</button>
               ))}
             </div>
           </div>
@@ -333,18 +316,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mb-2">Eyes</p>
             <div className="flex flex-wrap gap-2">
               {EYES.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEyes(e)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    eyes === e
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {e}
-                </button>
+                <button key={e} type="button" onClick={() => setEyes(e)} className={`px-3 py-1.5 rounded-full text-xs border ${eyes === e ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{e}</button>
               ))}
             </div>
           </div>
@@ -352,18 +324,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mb-2">Hair</p>
             <div className="flex flex-wrap gap-2">
               {HAIR.map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  onClick={() => setHair(h)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    hair === h
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {h}
-                </button>
+                <button key={h} type="button" onClick={() => setHair(h)} className={`px-3 py-1.5 rounded-full text-xs border ${hair === h ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{h}</button>
               ))}
             </div>
           </div>
@@ -374,29 +335,13 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
         <div className="space-y-4">
           <div>
             <label className="text-xs text-zinc-500">Name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Nova"
-              className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500"
-            />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Nova" className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500" />
           </div>
           <div>
             <p className="text-xs text-zinc-500 mb-2">Personality</p>
             <div className="flex flex-wrap gap-2">
               {PERSONALITIES.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPersonality(p)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    personality === p
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {p}
-                </button>
+                <button key={p} type="button" onClick={() => setPersonality(p)} className={`px-3 py-1.5 rounded-full text-xs border ${personality === p ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{p}</button>
               ))}
             </div>
           </div>
@@ -404,38 +349,17 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <p className="text-xs text-zinc-500 mb-2">Relationship to you</p>
             <div className="flex flex-wrap gap-2">
               {RELATIONSHIPS.map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRelationship(r)}
-                  className={`px-3 py-1.5 rounded-full text-xs border transition ${
-                    relationship === r
-                      ? "border-pink-500 bg-pink-500/15 text-pink-100"
-                      : "border-white/10 text-zinc-300"
-                  }`}
-                >
-                  {r}
-                </button>
+                <button key={r} type="button" onClick={() => setRelationship(r)} className={`px-3 py-1.5 rounded-full text-xs border ${relationship === r ? "border-pink-500 bg-pink-500/15 text-pink-100" : "border-white/10 text-zinc-300"}`}>{r}</button>
               ))}
             </div>
           </div>
           <div>
             <label className="text-xs text-zinc-500">Favorite heat / kink</label>
-            <input
-              value={kink}
-              onChange={(e) => setKink(e.target.value)}
-              className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500"
-            />
+            <input value={kink} onChange={(e) => setKink(e.target.value)} className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500" />
           </div>
           <div>
             <label className="text-xs text-zinc-500">First message (optional)</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              rows={3}
-              className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm resize-none outline-none focus:border-pink-500"
-              placeholder="How she opens the chat…"
-            />
+            <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm resize-none outline-none focus:border-pink-500" placeholder="How she opens the chat…" />
           </div>
         </div>
       )}
@@ -443,26 +367,40 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       {step === 4 && (
         <div className="space-y-4">
           <p className="text-sm text-mist">
-            Upload a reference photo to seed her face. Stored only on this device.{" "}
+            Upload a reference photo to lock her face seed (CharForge-style consistency on later gens).
+            Stored only on this device.{" "}
             <span className="text-zinc-500">Do not upload real people without consent.</span>
           </p>
-          <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-pink-500/40 bg-pink-500/5 py-12 cursor-pointer hover:bg-pink-500/10 transition">
-            <span className="text-4xl">📷</span>
-            <span className="text-sm text-pink-200">{photoDataUrl ? "Replace photo" : "Upload reference photo"}</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => onFile(e.target.files?.[0] || null)}
-            />
-          </label>
+          <p className="text-xs text-zinc-500">
+            On mobile, choose <strong className="text-zinc-400">Photo Library</strong> or Camera when the system prompt asks — that is the gallery/camera permission.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-pink-500/40 bg-pink-500/5 py-10 cursor-pointer hover:bg-pink-500/10 transition">
+              <span className="text-3xl">🖼️</span>
+              <span className="text-xs text-pink-200 text-center px-2">Gallery / Photos</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onFile(e.target.files?.[0] || null)}
+              />
+            </label>
+            <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-fuchsia-500/40 bg-fuchsia-500/5 py-10 cursor-pointer hover:bg-fuchsia-500/10 transition">
+              <span className="text-3xl">📷</span>
+              <span className="text-xs text-fuchsia-200 text-center px-2">Camera</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={(e) => onFile(e.target.files?.[0] || null)}
+              />
+            </label>
+          </div>
+          {permHint && <p className="text-xs text-amber-300">{permHint}</p>}
           {photoDataUrl && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={photoDataUrl}
-              alt="Reference"
-              className="w-full max-h-72 object-contain rounded-2xl border border-white/10"
-            />
+            <img src={photoDataUrl} alt="Reference" className="w-full max-h-72 object-contain rounded-2xl border border-white/10" />
           )}
         </div>
       )}
@@ -475,43 +413,24 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
           </div>
           <div>
             <div className="text-2xl font-semibold text-cream">{name.trim() || "Your Girl"}</div>
-            <div className="text-sm text-pink-300 mt-1">
-              {personality} · {relationship}
-            </div>
+            <div className="text-sm text-pink-300 mt-1">{personality} · {relationship}</div>
             <p className="text-xs text-zinc-400 mt-2 max-w-xs mx-auto">{look}</p>
-            <p className="text-xs text-zinc-500 mt-1">{kink}</p>
           </div>
-          <p className="text-xs text-zinc-500">
-            After create you can one-tap Nudify / Sex sequence, then open chat.
-          </p>
         </div>
       )}
 
       <div className="mt-8 flex gap-2 sticky bottom-4">
         {step > 0 && (
-          <button
-            type="button"
-            onClick={() => setStep((s) => s - 1)}
-            className="px-5 py-3.5 rounded-2xl border border-white/15 text-sm font-medium hover:bg-white/5"
-          >
+          <button type="button" onClick={() => setStep((s) => s - 1)} className="px-5 py-3.5 rounded-2xl border border-white/15 text-sm font-medium hover:bg-white/5">
             Back
           </button>
         )}
         {step < 5 ? (
-          <button
-            type="button"
-            onClick={() => setStep((s) => s + 1)}
-            className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25"
-          >
+          <button type="button" onClick={() => setStep((s) => s + 1)} className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25">
             Next
           </button>
         ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={finish}
-            className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50"
-          >
+          <button type="button" disabled={busy} onClick={finish} className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50">
             {busy ? "Creating…" : "Create girl"}
           </button>
         )}
