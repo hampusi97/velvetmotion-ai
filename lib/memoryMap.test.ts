@@ -5,7 +5,7 @@ import {
   splitInnerThoughtAndReply,
   buildInnerMonologue,
   type MemoryNode,
-} from "./memoryMap.ts";
+} from "./memoryMap";
 
 describe("Mind Map Memory & Roleplay Director Engine", () => {
   it("automatically extracts user nickname and desires without duplicates", () => {

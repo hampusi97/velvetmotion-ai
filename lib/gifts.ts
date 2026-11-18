@@ -4,6 +4,7 @@ export type Gift = {
   cost: number;
   tag: string;
   line: string; // she remembers this
+  reaction?: string;
 };
 
 export const GIFTS: Gift[] = [

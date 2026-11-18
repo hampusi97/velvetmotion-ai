@@ -36,7 +36,7 @@ export function ShortsFeed({
   const frames = useMemo(() => {
     if (ep.spicy) return sexSequenceFrames(character);
     return joiSequenceFrames(character);
-  }, [character, ep.spicy, ep.id]);
+  }, [character, ep.spicy]);
 
   const nextEp = () => {
     if (epIdx + 1 < series.episodes.length) setEpIdx(epIdx + 1);

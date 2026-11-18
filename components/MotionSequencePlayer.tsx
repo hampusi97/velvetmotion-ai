@@ -9,10 +9,12 @@ export function MotionSequencePlayer({
   frames,
   fallbackSrc = "/avatars/maren.svg",
   compact = false,
+  alt,
 }: {
   frames: string[];
   fallbackSrc?: string;
   compact?: boolean;
+  alt?: string;
 }) {
   const [playing, setPlaying] = useState(true);
   const [frameIdx, setFrameIdx] = useState(0);
@@ -68,7 +70,7 @@ export function MotionSequencePlayer({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentSrc}
-            alt={`Motion frame ${frameIdx + 1}`}
+            alt={alt || `Motion frame ${frameIdx + 1}`}
             onError={(e) => {
               e.currentTarget.src = fallbackSrc;
             }}

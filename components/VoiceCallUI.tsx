@@ -13,13 +13,31 @@ type Props = {
   onClose: () => void;
 };
 
+type SpeechRecognitionResultEventLike = {
+  results: ArrayLike<ArrayLike<{ transcript?: string }>>;
+};
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((ev: SpeechRecognitionResultEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
 export function VoiceCallUI({ character, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [status, setStatus] = useState("Tap Start call");
-  const recogRef = useRef<SpeechRecognition | null>(null);
+  const recogRef = useRef<SpeechRecognitionLike | null>(null);
   const activeRef = useRef(false);
 
   useEffect(() => {
@@ -86,8 +104,13 @@ export function VoiceCallUI({ character, onClose }: Props) {
   const startListen = () => {
     const SR =
       typeof window !== "undefined"
-        ? window.SpeechRecognition ||
-          (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition })
+        ? (
+            window as unknown as {
+              SpeechRecognition?: SpeechRecognitionCtor;
+              webkitSpeechRecognition?: SpeechRecognitionCtor;
+            }
+          ).SpeechRecognition ||
+          (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor })
             .webkitSpeechRecognition
         : undefined;
     if (!SR) {
@@ -114,7 +137,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
       setListening(false);
       if (activeRef.current) setStatus("Didn't catch that — tap mic or speak again");
     };
-    recog.onresult = (ev: SpeechRecognitionEvent) => {
+    recog.onresult = (ev: SpeechRecognitionResultEventLike) => {
       const text = ev.results[0]?.[0]?.transcript?.trim();
       if (text) void replyTo(text);
     };
@@ -243,7 +266,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
 // Minimal types for browsers that expose webkit prefix
 declare global {
   interface Window {
-    SpeechRecognition?: typeof SpeechRecognition;
-    webkitSpeechRecognition?: typeof SpeechRecognition;
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
   }
 }

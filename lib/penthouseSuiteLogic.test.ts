@@ -8,7 +8,7 @@ import {
   stepPlayerMovement,
   cycleLightingPreset,
   resetSuiteSession,
-} from "./penthouseSuiteLogic.ts";
+} from "./penthouseSuiteLogic";
 
 describe("3D Penthouse Suite Pure Logic", () => {
   it("starts in title phase and transitions to playing and paused", () => {

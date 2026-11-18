@@ -7,6 +7,23 @@ import { speak } from "@/lib/speech";
 import { characterMediaUrl } from "@/lib/media";
 import { fallbackReply } from "@/lib/characters";
 
+type SpeechRecognitionResultEventLike = {
+  results: ArrayLike<ArrayLike<{ transcript?: string }>>;
+};
+
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((ev: SpeechRecognitionResultEventLike) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
 /** Browser-based voice call — Web Speech TTS + SpeechRecognition. No server required. */
 export function VoiceCall({
   character,
@@ -19,7 +36,7 @@ export function VoiceCall({
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [lastReply, setLastReply] = useState("");
-  const recogRef = useRef<SpeechRecognition | null>(null);
+  const recogRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     return () => {
@@ -50,9 +67,13 @@ export function VoiceCall({
   const toggleListen = () => {
     const SR =
       typeof window !== "undefined"
-        ? (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition })
-            .SpeechRecognition ||
-          (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
+        ? (
+            window as unknown as {
+              SpeechRecognition?: SpeechRecognitionCtor;
+              webkitSpeechRecognition?: SpeechRecognitionCtor;
+            }
+          ).SpeechRecognition ||
+          (window as unknown as { webkitSpeechRecognition?: SpeechRecognitionCtor }).webkitSpeechRecognition
         : undefined;
     if (!SR) {
       setTranscript("Speech recognition not supported in this browser. Type instead or use Chrome.");
@@ -67,7 +88,7 @@ export function VoiceCall({
     recog.continuous = false;
     recog.interimResults = false;
     recog.lang = "en-US";
-    recog.onresult = (ev: SpeechRecognitionEvent) => {
+    recog.onresult = (ev: SpeechRecognitionResultEventLike) => {
       const text = ev.results[0]?.[0]?.transcript || "";
       setTranscript(text);
       if (text) {

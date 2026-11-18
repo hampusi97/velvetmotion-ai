@@ -132,7 +132,12 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const persist = (next: ChatMessage[]) => {
     setMessages(next);
     saveChat(character.id, next);
-    void syncChatSessionToFirestore?.(character.id, next).catch(() => {});
+    void syncChatSessionToFirestore?.({
+      characterId: character.id,
+      intimacy,
+      gifts,
+      lastMessage: next[next.length - 1]?.content || character.initialMessage,
+    }).catch(() => {});
   };
 
   const send = async () => {
@@ -172,7 +177,14 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         replyText = data.reply || data.message || "";
       }
       if (!replyText) {
-        const mood = computeMoodState?.(character, text, intimacy);
+        const mood = computeMoodState?.({
+          character,
+          messages: next,
+          durationSeconds: 60,
+          intimacy,
+          romanceMode,
+          giftCount: gifts.length,
+        });
         replyText = fallbackReply(character, text, romanceMode, mood);
       }
       if (intimacy > 40 && Math.random() < 0.18 && !/tribute/i.test(replyText)) {

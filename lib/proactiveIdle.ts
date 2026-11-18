@@ -81,7 +81,7 @@ export function buildProactivePing(character: Character): ProactivePing {
   );
   const spicy =
     intimacy >= 55
-      ? ` ${Math.random() > 0.5 ? "I might be undressed already." : "Tribute me later if you miss me.”}`
+      ? ` ${Math.random() > 0.5 ? "I might be undressed already." : "Tribute me later if you miss me."}`
       : "";
   return {
     characterId: character.id,

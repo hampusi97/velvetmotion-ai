@@ -8,7 +8,9 @@ export type StoryTag =
   | "TEASE"
   | "D/S"
   | "FANTASY"
-  | "SCI-FI";
+  | "SCI-FI"
+  | "SPH"
+  | "BNWO";
 
 export type Accent =
   | "amber"

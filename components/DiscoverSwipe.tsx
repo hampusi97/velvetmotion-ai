@@ -449,7 +449,7 @@ export function DiscoverSwipe({
           <div className="relative w-full max-w-sm rounded-3xl border border-white/15 bg-zinc-950 p-6 text-center">
             <p className="text-zinc-400 text-sm uppercase tracking-widest">She passed</p>
             <h3 className="mt-3 text-xl font-bold text-cream">
-              {current.name.split(" ")[0]} isn't matching right now
+              {current.name.split(" ")[0]} isn&apos;t matching right now
             </h3>
             <button
               type="button"

@@ -231,7 +231,7 @@ export default function Home() {
         <CandySidebar active={sidebarActive} onNavigate={navigate} coins={coins} />
         <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " flex-1 py-6 min-w-0"}>
           {view === "home" && (
-            <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />
+            <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />
           )}
           {view === "shorts" && <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />}
           {view === "advanced" && <AdvancedMediaSettings onHome={() => setView("home")} />}

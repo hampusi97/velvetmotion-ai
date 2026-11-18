@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { getGallery, type GalleryItem } from "@/lib/storage";
 import {
   checkVaultPin,
@@ -18,7 +18,7 @@ export function VaultPanel({ onHome }: { onHome: () => void }) {
   const [ids, setIds] = useState<string[]>(() => getVaultIds());
   const [tab, setTab] = useState<"vault" | "pin">("vault");
 
-  const allGallery = useMemo(() => getGallery(), [ids, unlocked]);
+  const allGallery = getGallery();
   const vaultItems = allGallery.filter((g) => ids.includes(g.id));
   const unpinned = allGallery.filter((g) => !ids.includes(g.id)).slice(0, 40);
 

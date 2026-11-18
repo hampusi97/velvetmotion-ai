@@ -210,11 +210,13 @@ export function characterCategories(): string[] {
   return Array.from(new Set(CHARACTERS.map((c) => c.category))).sort();
 }
 
-export function filterCharacters(opts: { query?: string; category?: string }): Character[] {
+export function filterCharacters(opts: { query?: string; category?: string; tag?: string }): Character[] {
   const q = (opts.query || "").trim().toLowerCase();
   const cat = opts.category && opts.category !== "All" ? opts.category : null;
+  const tag = opts.tag && opts.tag !== "All" ? opts.tag.toLowerCase() : null;
   return CHARACTERS.filter((c) => {
     if (cat && c.category !== cat) return false;
+    if (tag && !(c.tags || []).some((t) => t.toLowerCase() === tag)) return false;
     if (!q) return true;
     const blob = [c.name, c.tagline, c.personality, c.kink, c.category, ...(c.tags || [])]
       .join(" ")
@@ -272,13 +274,12 @@ export function buildSystemPrompt(
     `Kink focus: ${character.kink}`,
     `Traits: ${(character.traits || []).join(", ")}`,
     `Background: ${character.background}`,
-    romanceMode ? "Tone: romantic and affectionate while still adult and sensual." : "",
+    romanceMode ? "Romance mode is ON. Tone: romantic and affectionate while still adult and sensual." : "",
     moodState?.label
-      ? `Current mood: ${moodState.label} (${moodState.intensity ?? 50}%). ${moodState.responseStyle || ""}`
+      ? `Current Mood: ${moodState.label} (${moodState.intensity ?? 50}%). ${moodState.responseStyle || ""}`
       : "",
     memoryBlock || "",
-    "Stay fully in character. Explicit adult content is allowed. Keep replies 2–4 vivid sentences.",
-    "Occasionally invite tributes, nudes, or video when intimacy is high.",
+    "Stay fully in character. Keep replies 2–4 vivid sentences.",
   ]
     .filter(Boolean)
     .join("\n");
