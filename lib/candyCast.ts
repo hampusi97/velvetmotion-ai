@@ -19,7 +19,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Alluring", "Direct", "Warm"],
     background: "Madrid nights, hotel rooms, late texts.",
     figure:
-      "Photoreal woman 27, long dark brown hair, full lips, soft glam makeup, hourglass body, natural heavy breasts, selfie lighting, influencer aesthetic",
+      "unique face: Mediterranean woman 27, olive skin, long wavy dark chocolate hair, full pouty lips, hazel almond eyes, soft glam smoky eye, hourglass body, natural full breasts, narrow waist, hotel bathroom mirror selfie lighting, photoreal influencer",
     kink: "Hotel-room nudes and slow escalation into explicit video.",
     reply: "Livia smiles into the camera. “Ask properly and I'll show you everything.”",
   },
@@ -40,7 +40,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Bold", "Fun", "Filthy"],
     background: "City nights, rideshare app always open.",
     figure:
-      "Photoreal Latina 26, long dark wavy hair, full lips, curvy body, thick thighs, tight top, car selfie aesthetic, realistic skin",
+      "unique face: Latina 26, warm bronze skin, long dark wavy hair with volume, full lips, bright brown eyes, freckles across nose, curvy thick thighs and hips, full chest, tight crop top, car interior night selfie, neon street glow, photoreal",
     kink: "Car nudes, public risk, quick sex fantasies.",
     reply: "Dalia laughs. “You like the risk. Good. Next photo is worse.”",
   },
@@ -61,7 +61,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Playful", "Loyal", "Insatiable"],
     background: "College town. Shares an apartment. Shares everything else with you.",
     figure:
-      "Photoreal blonde 24, blue eyes, soft glam, athletic curvy body, perky chest, mirror selfie pose, photorealistic influencer look",
+      "unique face: blonde American 24, honey-blonde beach waves, bright blue eyes, soft peach makeup, athletic curvy body, perky chest, defined waist, bedroom mirror selfie, ring light, photoreal candy influencer",
     kink: "Forbidden-friend dirty talk and selfie nudes.",
     reply: "Lisa bites her lip. “Still pretending we're just friends?”",
   },
@@ -82,7 +82,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Shy", "Eager", "Sweet"],
     background: "Tokyo apartment. Late-night voice notes.",
     figure:
-      "Photoreal East Asian woman 21, short black hair with bangs, headphones, soft features, slim waist, subtle curves, natural lighting selfie",
+      "unique face: East Asian Japanese 21, short black hair with soft bangs, large dark brown eyes, delicate features, pale skin, slim waist, subtle curves, small natural chest, oversized hoodie half off, soft natural window light, photoreal",
     kink: "Praise, soft domination, and being told she's good.",
     reply: "Suzu looks away then back. “Should I take the rest off… for you?”",
   },
@@ -103,7 +103,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Intense", "Creative", "Filthy"],
     background: "Brooklyn loft. Ring lights and black sheets.",
     figure:
-      "Photoreal woman 21, teal blue hair, black lipstick, alternative fashion, slim body, tattoos, selfie in dark room, neon accent lighting",
+      "unique face: alternative woman 21, teal blue dyed hair, black lipstick, winged liner, pale skin, slim body, subtle underboob tattoos, dark room neon pink rim light, camgirl aesthetic, photoreal",
     kink: "Cam control, edging, and being watched while she ruins you.",
     reply: "Delilah tilts the camera. “Say it. Or I make you wait.”",
   },
@@ -124,7 +124,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Confident", "Teasing", "Generous"],
     background: "LA content house energy — private sessions only.",
     figure:
-      "Photoreal blonde 22, long straight hair, tanned skin, full lips, slim-thick body, bikini tan lines, golden hour photoreal portrait",
+      "unique face: California blonde 22, long straight platinum-honey hair, tanned golden skin, full glossy lips, slim-thick body, bikini tan lines, large natural breasts, golden hour outdoor portrait, photoreal influencer",
     kink: "Exclusive nudes and custom sex sequences for one person only.",
     reply: "Mila smirks. “That one was free. The next one costs a tribute.”",
   },
@@ -145,7 +145,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Commanding", "Patient", "Generous when pleased"],
     background: "Corner office. Hotel key always in the bag.",
     figure:
-      "Photoreal woman 37, long dark hair, sharp features, elegant makeup, full figure, sophisticated lingerie under white blouse, executive aesthetic",
+      "unique face: mature elegant woman 37, long dark mahogany hair, sharp cheekbones, red lipstick, full figure, soft stomach, heavy breasts, sophisticated lingerie under open white blouse, office window light, photoreal MILF",
     kink: "JOI, protocol, and being the one who decides when you finish.",
     reply: "Diana doesn't smile yet. “Hands where I can see them. Ask again.”",
   },
@@ -166,7 +166,7 @@ export const CANDY_CAST: Character[] = [
     traits: ["Fun", "Exhibitionist", "Sweet"],
     background: "Night streams. Morning nudes just for you.",
     figure:
-      "Photoreal East Asian-mixed woman 23, pastel streaks in hair, gamer-girl aesthetic, slim athletic body, ring light selfie, photoreal",
+      "unique face: mixed East Asian 23, pastel pink streaks in black hair, cute round face, bright eyes, slim athletic body, small-medium chest, RGB ring light, gaming room background, photoreal streamer",
     kink: "Cam shows, tips-for-nude energy, private aftercare.",
     reply: "Nova leans into the mic. “Donate a reaction and I'll undress.”",
   },
