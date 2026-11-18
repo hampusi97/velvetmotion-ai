@@ -1,11 +1,11 @@
-/** Tribute challenges — adult fantasy only. Fictional 21+ characters. Enhanced with extreme NSFW scenarios. */
+/** Tribute challenges — adult fantasy only. Fictional 21+ characters. */
 
 export type TributeChallenge = {
   id: string;
   title: string;
   intensity: "warm" | "hot" | "extreme";
   duration: string;
-  characterId?: string; // optional lock to one girl
+  characterId?: string;
   instructions: string[];
   edgeRule: string;
   finishRule: string;
@@ -42,6 +42,51 @@ export const TRIBUTES: TributeChallenge[] = [
     edgeRule: "Minimum 3 edges before you may ask to finish.",
     finishRule: "Finish looking only at the last explicit image.",
     tags: ["nudes", "goon", "visual", "sex-video"],
+  },
+  {
+    id: "sph-measure",
+    title: "SPH Measure & Mock",
+    intensity: "hot",
+    duration: "12–18 min",
+    instructions: [
+      "Open JOI → SPH · Size Queen (or chat any girl in SPH mode).",
+      "Generate a nude of her looking unimpressed.",
+      "Stroke only while saying out loud how small you are — once per minute.",
+      "Every time you get close, stop and generate another explicit still.",
+    ],
+    edgeRule: "Four edges. No cumming during mockery lines.",
+    finishRule: "Finish only after she (or the JOI pack) grants a 'little cock' permission line.",
+    tags: ["sph", "humiliation", "joi", "nudes"],
+  },
+  {
+    id: "bnwo-night",
+    title: "BNWO Night Shift",
+    intensity: "extreme",
+    duration: "20 min",
+    instructions: [
+      "Run JOI → BNWO · BBC Only or chat a girl into BNWO roleplay.",
+      "Generate dual or explicit frames while affirming the hierarchy out loud.",
+      "Stroke only during her praise of Black men; hands off during your 'place' lines.",
+      "Safeword for the fantasy frame: say 'reality' in chat or out loud to hard-stop.",
+    ],
+    edgeRule: "Three edges tied to hierarchy affirmations.",
+    finishRule: "Cum only while repeating the pack finish phrase (BBC only / BNWO).",
+    tags: ["bnwo", "race-play", "joi", "extreme"],
+  },
+  {
+    id: "dual-girl-dump",
+    title: "Dual-Girl Cum Dump",
+    intensity: "extreme",
+    duration: "15 min",
+    instructions: [
+      "In chat, pick Dual and a second girl. Generate explicit + sex video frames.",
+      "Stroke through the 4-frame sequence twice without finishing.",
+      "Third loop: full send on frame 4 only.",
+      "Message both names when you cum.",
+    ],
+    edgeRule: "Two full sequence edges before the dump.",
+    finishRule: "Finish on the final dual explicit frame.",
+    tags: ["dual", "sex-video", "goon", "extreme"],
   },
   {
     id: "maren-protocol",
