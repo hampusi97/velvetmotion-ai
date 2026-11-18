@@ -15,6 +15,7 @@ const ITEMS: NavItem[] = [
   { id: "girls", label: "Chat", emoji: "💬" },
   { id: "gallery", label: "Collection", emoji: "🖼️" },
   { id: "create", label: "Create Character", emoji: "✨" },
+  { id: "import", label: "Import card", emoji: "🃏" },
   { id: "tinder", label: "Discover", emoji: "🔥" },
   { id: "lounge", label: "Lounge", emoji: "👋" },
   { id: "group", label: "Group chat", emoji: "👥" },
