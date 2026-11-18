@@ -8,6 +8,7 @@ import { CHARACTERS, characterCategories, type Character } from "@/lib/character
 import { HomeView as HomeScreen } from "@/components/home-view";
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { containerClass } from "@/lib/cn";
 import { JoiBrowser } from "@/components/content/JoiBrowser";
 import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
@@ -176,7 +177,7 @@ export default function Home() {
         : (view as string);
 
   return (
-    <div className="min-h-screen bg-ink-950 text-white">
+    <div className="min-h-screen bg-ink-950 text-white pb-16 lg:pb-0">
       <SiteHeader
         view={
           view === "profile" ||
@@ -350,6 +351,7 @@ export default function Home() {
           )}
         </div>
       </div>
+      <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
     </div>
   );
 }
