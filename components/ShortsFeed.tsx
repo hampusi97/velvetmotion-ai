@@ -3,83 +3,8 @@
 import { useMemo, useState } from "react";
 import { CHARACTERS } from "@/lib/characters";
 import { characterMediaUrl, joiSequenceFrames, sexSequenceFrames } from "@/lib/media";
+import { SHORTS_SERIES, SHORTS_GENRES } from "@/lib/shortsCatalog";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
-
-type ShortEp = {
-  id: string;
-  title: string;
-  series: string;
-  characterId: string;
-  spicy: boolean;
-  blurb: string;
-};
-
-const SERIES: ShortEp[] = [
-  {
-    id: "s1e1",
-    title: "House rules — Episode 1",
-    series: "House Rules",
-    characterId: "diana-m",
-    spicy: true,
-    blurb: "She writes the rules. You break them. She notices.",
-  },
-  {
-    id: "s1e2",
-    title: "After the stream",
-    series: "Private Room",
-    characterId: "nova-p",
-    spicy: true,
-    blurb: "Lights off. Cam still on — for you only.",
-  },
-  {
-    id: "s1e3",
-    title: "Passenger seat",
-    series: "Late Ride",
-    characterId: "dalia-r",
-    spicy: true,
-    blurb: "Tinted windows. Phone out. No destination.",
-  },
-  {
-    id: "s1e4",
-    title: "Best friend problem",
-    series: "Don't Tell",
-    characterId: "lisa-k",
-    spicy: true,
-    blurb: "She said it was a joke. The video wasn't.",
-  },
-  {
-    id: "s1e5",
-    title: "Headphones off",
-    series: "Quiet Girl",
-    characterId: "suzu-m",
-    spicy: false,
-    blurb: "Soft voice. Explicit ask. First nude.",
-  },
-  {
-    id: "s1e6",
-    title: "JOI countdown",
-    series: "Blindfold",
-    characterId: "scarlett",
-    spicy: true,
-    blurb: "You don't finish until she counts to one.",
-  },
-  {
-    id: "s1e7",
-    title: "Golden hour private",
-    series: "Influencer Set",
-    characterId: "mila-s",
-    spicy: true,
-    blurb: "Public post was tame. This folder isn't.",
-  },
-  {
-    id: "s1e8",
-    title: "Hotel stranger",
-    series: "Date Night",
-    characterId: "livia-n",
-    spicy: true,
-    blurb: "Key card on the table. Clothes on the floor.",
-  },
-];
 
 export function ShortsFeed({
   onHome,
@@ -88,15 +13,38 @@ export function ShortsFeed({
   onHome: () => void;
   onChat: (id: string) => void;
 }) {
-  const [active, setActive] = useState(0);
-  const ep = SERIES[active % SERIES.length];
-  const character =
-    CHARACTERS.find((c) => c.id === ep.characterId) || CHARACTERS[0];
+  const [genre, setGenre] = useState<string | "All">("All");
+  const [seriesIdx, setSeriesIdx] = useState(0);
+  const [epIdx, setEpIdx] = useState(0);
+
+  const filtered = useMemo(
+    () => (genre === "All" ? SHORTS_SERIES : SHORTS_SERIES.filter((s) => s.genre === genre)),
+    [genre],
+  );
+  const series = filtered[seriesIdx % Math.max(1, filtered.length)] || SHORTS_SERIES[0];
+  const ep = series.episodes[epIdx % series.episodes.length];
+
+  const character = useMemo(() => {
+    const hint = series.characterHint.toLowerCase();
+    const found =
+      CHARACTERS.find((c) => c.tags.some((t) => t.toLowerCase().includes(hint.split("-")[0]))) ||
+      CHARACTERS.find((c) => c.kink.toLowerCase().includes("joi") && series.genre === "JOI") ||
+      CHARACTERS[seriesIdx % CHARACTERS.length];
+    return found;
+  }, [series, seriesIdx]);
 
   const frames = useMemo(() => {
     if (ep.spicy) return sexSequenceFrames(character);
     return joiSequenceFrames(character);
   }, [character, ep.spicy, ep.id]);
+
+  const nextEp = () => {
+    if (epIdx + 1 < series.episodes.length) setEpIdx(epIdx + 1);
+    else {
+      setSeriesIdx((s) => s + 1);
+      setEpIdx(0);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-md">
@@ -105,20 +53,57 @@ export function ShortsFeed({
           ← Home
         </button>
         <h1 className="font-display text-xl text-cream">Velvet Shorts</h1>
-        <span className="text-xs text-zinc-500">{active + 1}/{SERIES.length}</span>
+        <span className="text-xs text-zinc-500">{series.genre}</span>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-2">
+        <button
+          type="button"
+          onClick={() => {
+            setGenre("All");
+            setSeriesIdx(0);
+            setEpIdx(0);
+          }}
+          className={`shrink-0 rounded-full px-3 py-1 text-xs border ${
+            genre === "All" ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/15 text-zinc-400"
+          }`}
+        >
+          All
+        </button>
+        {SHORTS_GENRES.map((g) => (
+          <button
+            key={g}
+            type="button"
+            onClick={() => {
+              setGenre(g);
+              setSeriesIdx(0);
+              setEpIdx(0);
+            }}
+            className={`shrink-0 rounded-full px-3 py-1 text-xs border ${
+              genre === g ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/15 text-zinc-400"
+            }`}
+          >
+            {g}
+          </button>
+        ))}
       </div>
 
       <div className="relative aspect-[9/16] max-h-[70vh] rounded-3xl overflow-hidden border border-pink-500/40 bg-black shadow-[0_0_50px_rgba(236,72,153,0.2)]">
         <MotionSequencePlayer frames={frames} alt={ep.title} />
         <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent">
-          {ep.spicy && (
-            <span className="inline-block rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white mb-2">
-              SPICY
-            </span>
-          )}
-          <div className="text-xs uppercase tracking-widest text-pink-300">{ep.series}</div>
+          <div className="flex gap-2 mb-2">
+            {ep.spicy && (
+              <span className="rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white">SPICY</span>
+            )}
+            {ep.free ? (
+              <span className="rounded-full bg-emerald-600/80 px-2 py-0.5 text-[10px] font-bold text-white">FREE</span>
+            ) : (
+              <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300">EP {epIdx + 1}</span>
+            )}
+          </div>
+          <div className="text-xs uppercase tracking-widest text-pink-300">{series.title}</div>
           <div className="text-lg font-semibold text-white mt-1">{ep.title}</div>
-          <p className="text-sm text-zinc-300 mt-1">{ep.blurb}</p>
+          <p className="text-sm text-zinc-300 mt-1">{series.blurb}</p>
           <div className="mt-3 flex gap-2">
             <button
               type="button"
@@ -127,11 +112,7 @@ export function ShortsFeed({
             >
               Chat with {character.name.split(" ")[0]}
             </button>
-            <button
-              type="button"
-              onClick={() => setActive((a) => a + 1)}
-              className="rounded-full border border-white/20 px-4 py-2.5 text-sm"
-            >
+            <button type="button" onClick={nextEp} className="rounded-full border border-white/20 px-4 py-2.5 text-sm">
               Next
             </button>
           </div>
@@ -139,24 +120,29 @@ export function ShortsFeed({
       </div>
 
       <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-        {SERIES.map((s, i) => {
-          const c = CHARACTERS.find((x) => x.id === s.characterId) || CHARACTERS[0];
+        {filtered.map((s, i) => {
+          const c =
+            CHARACTERS.find((x) =>
+              x.tags.some((t) => t.toLowerCase().includes(s.characterHint.split("-")[0])),
+            ) || CHARACTERS[i % CHARACTERS.length];
           return (
             <button
               key={s.id}
               type="button"
-              onClick={() => setActive(i)}
-              className={`shrink-0 w-20 rounded-xl overflow-hidden border ${
-                i === active % SERIES.length ? "border-pink-500" : "border-white/10"
+              onClick={() => {
+                setSeriesIdx(i);
+                setEpIdx(0);
+              }}
+              className={`shrink-0 w-24 rounded-xl overflow-hidden border text-left ${
+                i === seriesIdx % filtered.length ? "border-pink-500" : "border-white/10"
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={characterMediaUrl(c, "beauty")}
-                alt=""
-                className="aspect-[3/4] w-full object-cover"
-              />
-              <div className="text-[9px] p-1 truncate text-zinc-400">{s.series}</div>
+              <img src={characterMediaUrl(c, "beauty")} alt="" className="aspect-[3/4] w-full object-cover" />
+              <div className="text-[9px] p-1.5 text-zinc-300 leading-tight">
+                <div className="font-medium truncate">{s.title}</div>
+                <div className="text-zinc-500">{s.genre}</div>
+              </div>
             </button>
           );
         })}
