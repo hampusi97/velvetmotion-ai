@@ -2,7 +2,7 @@
 
 import { getFeaturedPair } from "@/lib/featured";
 import { CHARACTERS } from "@/lib/characters";
-import { resolveAvatar } from "@/lib/portraits";
+import { resolveCharacterAvatar } from "@/lib/media";
 
 export function FeaturedPair({ onOpen }: { onOpen: (id: string) => void }) {
   const pair = getFeaturedPair();
@@ -16,15 +16,17 @@ export function FeaturedPair({ onOpen }: { onOpen: (id: string) => void }) {
         <div className="flex -space-x-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={resolveAvatar(a.avatar, a.id, a.figure)}
-            alt=""
-            className="h-16 w-16 rounded-full border-2 border-pink-400 object-cover"
+            src={resolveCharacterAvatar(a)}
+            alt={a.name}
+            referrerPolicy="no-referrer"
+            className="h-16 w-16 rounded-full border-2 border-pink-400 object-cover object-top"
           />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={resolveAvatar(b.avatar, b.id, b.figure)}
-            alt=""
-            className="h-16 w-16 rounded-full border-2 border-fuchsia-400 object-cover"
+            src={resolveCharacterAvatar(b)}
+            alt={b.name}
+            referrerPolicy="no-referrer"
+            className="h-16 w-16 rounded-full border-2 border-fuchsia-400 object-cover object-top"
           />
         </div>
         <div className="min-w-0 flex-1">

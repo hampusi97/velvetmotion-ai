@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
-    "build": "next build",
-    "start": "next start",
+    "build": "NODE_ENV=production next build",
+    "start": "NODE_ENV=production next start",
     "lint": "next lint",
     "test": "tsx --test firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts && tsx scripts/validate-content.ts"
   },

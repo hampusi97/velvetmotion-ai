@@ -54,7 +54,7 @@ import {
   getIntimacy,
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
-import { characterPortraitUrl } from "@/lib/portraits";
+import { characterMediaUrl, type MediaMood } from "@/lib/media";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
@@ -169,9 +169,9 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   );
 
   const baseAvatarSrc =
-    character.avatar.startsWith("data:") || character.avatar.startsWith("/")
+    character.avatar.startsWith("data:") || character.avatar.startsWith("http")
       ? character.avatar
-      : characterPortraitUrl(character.id, character.figure, "seductive");
+      : characterMediaUrl(character, "beauty");
 
   const [displayedAvatar, setDisplayedAvatar] = useState(baseAvatarSrc);
 
@@ -276,19 +276,15 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     return () => clearInterval(id);
   }, []);
 
-  // Update dynamic portrait appearance when moodState.portraitMood changes
+  // Update portrait appearance when moodState.portraitMood changes
   useEffect(() => {
-    if (character.avatar.startsWith("data:")) {
+    if (character.avatar.startsWith("data:") || character.avatar.startsWith("http")) {
       setDisplayedAvatar(character.avatar);
       return;
     }
-    const targetUrl = characterPortraitUrl(
-      character.id,
-      character.figure,
-      moodState.portraitMood,
-    );
+    const targetUrl = characterMediaUrl(character, moodState.portraitMood as MediaMood);
     setDisplayedAvatar(targetUrl);
-  }, [character.id, character.figure, character.avatar, moodState.portraitMood]);
+  }, [character, moodState.portraitMood]);
 
   useEffect(() => {
     const saved = loadChat(character.id);

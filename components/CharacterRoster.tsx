@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { BadgeCheck, ImageIcon, Mic, Sparkles } from "lucide-react";
 import { filterCharacters, type Character } from "@/lib/characters";
-import { characterMediaUrl, resolveCharacterAvatar } from "@/lib/media";
+import { characterMediaUrl } from "@/lib/media";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -46,7 +47,7 @@ export function CharacterRoster({
           {romanceMode ? "Romance" : "AI Girlfriends"}
         </h2>
         <p className="text-zinc-400 text-sm mt-1">
-          {visible.length} companions · 21+ fictional · free chat, nudes & sex videos
+          {visible.length} companions · 21+ fictional · custom voices, memory chat &amp; galleries
         </p>
       </div>
 
@@ -107,30 +108,54 @@ export function CharacterRoster({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
           {visible.map((character, i) => {
             const src = characterMediaUrl(character, "beauty");
-            const isNew = i < 6; // first few feel "new"
+            const isNew = i < 6;
             return (
               <button
                 key={character.id}
                 onClick={() => onSelect(character)}
-                className="girl-card group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden hover:border-pink-500/50 transition"
+                className="girl-card group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden hover:border-pink-500/60 transition"
               >
                 <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <img
+                    src={src}
+                    alt={character.name}
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover object-top group-hover:scale-105 transition duration-500"
+                    loading="lazy"
+                  />
                   {isNew && (
-                    <div className="absolute top-2 left-2 rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1">
-                      ✦ NEW
+                    <div className="absolute top-2.5 left-2.5 rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1 shadow">
+                      <Sparkles className="h-2.5 w-2.5" />
+                      NEW
                     </div>
                   )}
-                  <div className="absolute top-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] text-pink-200">
-                    {character.category}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
+                    <span
+                      title="Photo gallery"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-zinc-100 backdrop-blur-sm"
+                    >
+                      <ImageIcon className="h-3 w-3" />
+                    </span>
+                    <span
+                      title={`Voice: ${character.voice.label}`}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-pink-200 backdrop-blur-sm"
+                    >
+                      <Mic className="h-3 w-3" />
+                    </span>
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/50 to-transparent">
-                    <div className="flex items-baseline justify-between gap-1">
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/65 to-transparent">
+                    <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-sm text-white truncate">{character.name}</span>
-                      <span className="text-xs text-pink-300 shrink-0">{character.age}</span>
+                      <span className="text-xs text-zinc-300 shrink-0 tabular-nums">{character.age}</span>
+                      <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-pink-400" aria-hidden="true" />
                     </div>
-                    <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{character.kink}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-pink-200/90">
+                      <span>{character.category}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="text-zinc-300 truncate">{character.voice.label}</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{character.tagline}</p>
                   </div>
                 </div>
               </button>

@@ -1,5 +1,5 @@
 import { CHARACTERS } from "@/lib/characters";
-import { resolveAvatar } from "@/lib/portraits";
+import { resolveCharacterAvatar } from "@/lib/media";
 
 /** Lightweight "she posted today" feed — living companion energy. */
 
@@ -30,8 +30,8 @@ const LINES: Record<string, string[]> = {
     "I saved a soft one for you. Open the chat when you're ready.",
   ],
   explicit: [
-    "I'm not wearing much. Generate me if you want proof.",
-    "Need you in my head and on my body. Chat open.",
+    "I'm not wearing much. Open our room if you want proof.",
+    "Need you in my head right now. Chat open.",
     "Tribute challenge unlocked for me tonight. You in?",
   ],
 };
@@ -46,7 +46,7 @@ export function buildFeed(limit = 12): FeedPost[] {
       id: `feed-${c.id}`,
       characterId: c.id,
       characterName: c.name.split(" ")[0],
-      avatar: resolveAvatar(c.avatar, c.id, c.figure),
+      avatar: resolveCharacterAvatar(c),
       text,
       mood,
       hoursAgo: (i * 2 + 1) % 14,

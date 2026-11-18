@@ -1,9 +1,7 @@
-/** Compact mood-reactive boudoir SVG portrait generator + rich media bridge.
- *  Primary path now prefers Pollinations consistent NSFW images via lib/media.ts.
- *  SVG remains as zero-dependency fallback.
+/** Compact mood-reactive boudoir SVG portrait generator.
+ *  Zero-dependency deterministic SVG portraits — never hits rate limits.
  */
 
-import { characterMediaUrl, type MediaMood } from "./media";
 import type { Character } from "./charactersTypes";
 
 export type PortraitMood =
@@ -110,24 +108,16 @@ export function characterPortraitUrl(
   return `data:image/svg+xml;utf8,${svg}`;
 }
 
-/** Prefer live Pollinations media, fall back to SVG */
+/** Zero-dependency deterministic portrait resolver */
 export function resolveAvatar(avatar: string, id: string, figure: string): string {
   if (avatar.startsWith("data:") || avatar.startsWith("http")) return avatar;
-  // Use media engine for a real portrait
-  try {
-    return characterMediaUrl(
-      { id, name: id, figure, age: 25 },
-      "beauty",
-    );
-  } catch {
-    return characterPortraitUrl(id, figure, "seductive");
-  }
+  return characterPortraitUrl(id, figure, "seductive");
 }
 
 /** Convenience: get a rich portrait directly from a Character object */
 export function characterRichPortrait(
   character: Character,
-  mood: MediaMood | PortraitMood = "beauty",
+  mood: PortraitMood | string = "beauty",
 ): string {
-  return characterMediaUrl(character, mood as MediaMood);
+  return characterPortraitUrl(character.id, character.figure || character.name, mood);
 }
