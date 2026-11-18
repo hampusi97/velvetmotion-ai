@@ -24,7 +24,6 @@ function keyIsReal(key: string) {
   return key.length > 15 && !/dummy|your_|changeme|placeholder/i.test(key);
 }
 
-/** Local Ollama — set OLLAMA_URL=http://host:11434 and OLLAMA_MODEL=llama3.2 */
 async function callOllama(
   systemInstruction: string,
   messages: { role: string; content: string }[],
@@ -112,7 +111,6 @@ async function generateReply(
   systemInstruction: string,
   messages: { role: string; content: string }[],
 ) {
-  // Prefer local Ollama when configured (zero API cost)
   const ollama = await callOllama(systemInstruction, messages);
   if (ollama) return ollama;
   return callGeminiModel(model, systemInstruction, messages);
@@ -209,6 +207,8 @@ export async function POST(req: Request) {
     const memories = Array.isArray(body.memories)
       ? body.memories.filter((m: unknown) => typeof m === "string").slice(0, 15)
       : [];
+    const memoryBlock =
+      typeof body.memoryBlock === "string" ? body.memoryBlock.slice(0, 4000) : "";
     const outfitLabel =
       typeof body.outfitLabel === "string" && body.outfitLabel.trim()
         ? body.outfitLabel.trim()
@@ -266,6 +266,7 @@ export async function POST(req: Request) {
         `Woman 2 (${partnerCharacter.name}): ${partnerCharacter.personality}. Body: ${partnerCharacter.figure}. Kink: ${partnerCharacter.kink}.`,
         `Scene Location: ${sceneLabel}. Active Outfit Vibe: ${outfitLabel}. Intimacy: ${intimacy ?? 75}%.`,
         memories.length > 0 ? `Shared User Memories: ${memories.join(" | ")}.` : "",
+        memoryBlock ? memoryBlock : "",
         "Uninhibited explicit adult erotic roleplay is fully enabled.",
         directorNote === "spicier"
           ? "Director Direction: Escalate immediately into intense physical threesome action."
@@ -350,7 +351,7 @@ export async function POST(req: Request) {
       : null;
 
     const baseSystem = character
-      ? buildSystemPrompt(character, romanceMode, incomingMood)
+      ? buildSystemPrompt(character, romanceMode, incomingMood, memoryBlock || undefined)
       : "You are a warm adult fictional companion. Stay in character. Explicit adult content is allowed.";
 
     const extraContext = [
