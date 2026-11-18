@@ -27,9 +27,11 @@ function loadCustomCharacters(): Character[] {
 }
 
 export function MyGirlsHub({
+  onHome,
   onOpenChat,
   onCreate,
 }: {
+  onHome?: () => void;
   onOpenChat: (character: Character) => void;
   onCreate?: () => void;
 }) {
@@ -72,6 +74,11 @@ export function MyGirlsHub({
     <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
       <div className="flex items-end justify-between gap-3">
         <div>
+          {onHome && (
+            <button type="button" onClick={onHome} className="text-sm text-zinc-400 hover:text-white mb-2">
+              ← Home
+            </button>
+          )}
           <h1 className="text-2xl font-semibold text-white tracking-tight">My Girls</h1>
           <p className="text-sm text-zinc-400 mt-1">
             Recent chats, customs, and galleries — all free, saved on this device.

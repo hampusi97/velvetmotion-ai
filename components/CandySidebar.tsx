@@ -12,7 +12,7 @@ type NavItem = {
 const ITEMS: NavItem[] = [
   { id: "home", label: "Home", emoji: "🏠" },
   { id: "shorts", label: "Shorts", emoji: "🎬" },
-  { id: "mygirls", label: "My Girls", emoji: "💗" },
+  { id: "my-girls", label: "My Girls", emoji: "💗" },
   { id: "girls", label: "Chat", emoji: "💬" },
   { id: "gallery", label: "Collection", emoji: "🖼️" },
   { id: "create", label: "Create Character", emoji: "✨" },
@@ -24,7 +24,7 @@ const ITEMS: NavItem[] = [
   { id: "vault", label: "Private Vault", emoji: "🔐" },
   { id: "wallet", label: "Coin Wallet & Support", emoji: "🪙", badge: "$5 ❤" },
   { id: "advanced", label: "Advanced media", emoji: "⚙️" },
-  { id: "legal", label: "Legal & Safety", emoji: "📋" },
+  { id: "safety", label: "Legal & Safety", emoji: "📋" },
 ];
 
 export function CandySidebar({
@@ -40,7 +40,11 @@ export function CandySidebar({
     <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-zinc-950/80 py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
       <nav className="flex flex-col gap-1">
         {ITEMS.map((item) => {
-          const isActive = active === item.id || (item.id === "girls" && active === "chat");
+          const isActive =
+            active === item.id ||
+            (item.id === "girls" && active === "chat") ||
+            (item.id === "safety" &&
+              (active === "terms" || active === "privacy" || active === "safety" || active === "legal"));
           return (
             <button
               key={item.id}
