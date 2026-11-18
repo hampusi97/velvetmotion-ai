@@ -1,2 +1,5 @@
-export const CONTENT_DISCLAIMER =
-  "Fictional adults only. Every scene is consensual fantasy, and you can stop whenever you want.";
+/** Shared adult-content notice — fictional 21+ only. */
+export const ADULT_DISCLAIMER =
+  "All characters are fictional adults 21+. No real-person likenesses. Explicit content is optional and gated by intimacy.";
+
+export const CONTENT_DISCLAIMER = ADULT_DISCLAIMER;

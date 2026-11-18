@@ -1,14 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import { ACCENT_CLASS } from "@/components/content/accents";
 import {
+  ALL_STORY_PACKS,
   CONTENT_DISCLAIMER,
   EXPANDED_STORY_IDS,
-  STORY_PACKS,
   getStoryPack,
 } from "@/lib/content";
 import type { StoryPack, StoryScene } from "@/lib/content/types";
+import { speak, stopSpeaking } from "@/lib/speech";
 
 function chapterTitle(pack: StoryPack, sceneId: string): string {
   return (
@@ -17,21 +19,46 @@ function chapterTitle(pack: StoryPack, sceneId: string): string {
   );
 }
 
-export function StoryPackBrowser() {
-  const [packId, setPackId] = useState<string | null>(null);
-  const [sceneId, setSceneId] = useState<string | null>(null);
+export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: string | null }) {
+  const [packId, setPackId] = useState<string | null>(initialPackId);
+  const [sceneId, setSceneId] = useState<string | null>(() => {
+    if (!initialPackId) return null;
+    return getStoryPack(initialPackId)?.scenes[0]?.id ?? null;
+  });
   const [history, setHistory] = useState<string[]>([]);
   const [tag, setTag] = useState<string>("ALL");
+  const [autoVoice, setAutoVoice] = useState(false);
+
+  useEffect(() => {
+    if (initialPackId) {
+      const next = getStoryPack(initialPackId);
+      if (next) {
+        setPackId(initialPackId);
+        setSceneId(next.scenes[0]?.id ?? null);
+        setHistory([]);
+      }
+    }
+  }, [initialPackId]);
+
+  useEffect(() => {
+    return () => stopSpeaking();
+  }, []);
 
   const tags = useMemo(
-    () => ["ALL", ...Array.from(new Set(STORY_PACKS.map((pack) => pack.tag)))],
+    () => ["ALL", ...Array.from(new Set(ALL_STORY_PACKS.map((pack) => pack.tag)))],
     [],
   );
 
-  const visible = STORY_PACKS.filter((pack) => tag === "ALL" || pack.tag === tag);
+  const visible = ALL_STORY_PACKS.filter((pack) => tag === "ALL" || pack.tag === tag);
   const pack = packId ? getStoryPack(packId) : undefined;
   const scene: StoryScene | undefined =
     pack && sceneId ? pack.scenes.find((item) => item.id === sceneId) : undefined;
+
+  useEffect(() => {
+    if (autoVoice && scene) {
+      speak(`${scene.title}. ${scene.text}`, { pitch: 1.0, rate: 0.92 });
+    }
+  }, [autoVoice, scene]);
 
   const openPack = (id: string) => {
     const next = getStoryPack(id);
@@ -113,25 +140,47 @@ export function StoryPackBrowser() {
   }
 
   const atEnd = !scene.nextSceneId && !(scene.choices && scene.choices.length > 0);
+  const currentIdx = Math.max(0, pack.scenes.findIndex((s) => s.id === scene.id));
+  const progressPct = Math.round(((currentIdx + 1) / Math.max(1, pack.scenes.length)) * 100);
 
   return (
     <section className="max-w-lg mx-auto">
-      <button
-        onClick={() => {
-          setPackId(null);
-          setSceneId(null);
-          setHistory([]);
-        }}
-        className="text-sm text-pink-400 mb-3"
-      >
-        ← All story packs
-      </button>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <button
+          onClick={() => {
+            stopSpeaking();
+            setPackId(null);
+            setSceneId(null);
+            setHistory([]);
+          }}
+          className="text-sm text-pink-400"
+        >
+          ← All story packs
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !autoVoice;
+            setAutoVoice(next);
+            if (!next) stopSpeaking();
+            else speak(`${scene.title}. ${scene.text}`, { pitch: 1.0, rate: 0.92 });
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
+            autoVoice
+              ? "border-pink-500 bg-pink-500/20 text-pink-200"
+              : "border-zinc-700 bg-zinc-900 text-zinc-400"
+          }`}
+        >
+          {autoVoice ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          {autoVoice ? "Auto-Voice On" : "Auto-Voice Off"}
+        </button>
+      </div>
       <div className="flex gap-3 mb-4">
         <div
           className={`h-16 w-16 shrink-0 rounded-2xl bg-gradient-to-br ${ACCENT_CLASS[pack.accent]}`}
           aria-hidden
         />
-        <div>
+        <div className="flex-1">
           <div className="text-[10px] font-bold bg-pink-600/20 text-pink-300 px-2 py-0.5 rounded-full inline-block">
             {pack.tag}
           </div>
@@ -141,10 +190,33 @@ export function StoryPackBrowser() {
           </p>
         </div>
       </div>
+      <div className="mb-4">
+        <div className="flex justify-between text-[11px] text-zinc-500 mb-1">
+          <span>Story Progress</span>
+          <span>
+            Scene {currentIdx + 1} of {pack.scenes.length} ({progressPct}%)
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-pink-500 to-fuchsia-500 transition-all duration-300"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
       <p className="text-sm text-zinc-300 leading-relaxed mb-4">{pack.summary}</p>
       <article className="rounded-2xl bg-zinc-900 border border-zinc-800 p-4">
-        <div className="text-[11px] uppercase tracking-wide text-pink-300/80 mb-1">
-          {chapterTitle(pack, scene.id)}
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <div className="text-[11px] uppercase tracking-wide text-pink-300/80">
+            {chapterTitle(pack, scene.id)}
+          </div>
+          <button
+            type="button"
+            onClick={() => speak(`${scene.title}. ${scene.text}`, { pitch: 1.0, rate: 0.92 })}
+            className="inline-flex items-center gap-1 rounded-lg border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 text-xs text-pink-200 hover:bg-pink-500/20"
+          >
+            <Volume2 className="h-3.5 w-3.5" /> Speak Scene
+          </button>
         </div>
         <h3 className="font-semibold mb-3">{scene.title}</h3>
         <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-zinc-100">

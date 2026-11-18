@@ -1,0 +1,4 @@
+# VelvetMotion AI Python workers use the Python 3.10+ standard library by default.
+# Optional acceleration packages for custom ComfyUI / WebSocket / Telegram webhook workers:
+httpx>=0.27.0
+websockets>=12.0

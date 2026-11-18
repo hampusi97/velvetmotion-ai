@@ -1,0 +1,14 @@
+# Ensure GitHub Linguist indexes all core project languages
+*.ts linguist-detectable=true
+*.tsx linguist-detectable=true
+*.js linguist-detectable=true
+*.py linguist-detectable=true linguist-vendored=false
+*.sh linguist-detectable=true linguist-vendored=false
+*.cmd linguist-detectable=true linguist-vendored=false
+*.vert linguist-detectable=true linguist-language=GLSL
+*.frag linguist-detectable=true linguist-language=GLSL
+*.css linguist-detectable=true
+Dockerfile linguist-detectable=true
+
+# Exclude generated lockfiles from language statistics
+package-lock.json linguist-generated=true
