@@ -1,6 +1,7 @@
 /**
  * VelvetMotion Media Engine
- * Candy-style photoreal + optional local ComfyUI/Forge base + aggressive face seeds.
+ * Candy-style photoreal + optional local ComfyUI/Forge + aggressive face seeds.
+ * All adult moods stay fully NSFW-capable.
  */
 
 import type { Character } from "./charactersTypes";
@@ -42,31 +43,32 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
+/** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "instagram influencer portrait, soft glam makeup, natural skin texture, candid selfie vibe, shallow depth of field, photorealistic, candy.ai style beauty",
+    "ultra photoreal portrait, 85mm lens, soft glam makeup, natural skin pores, candid instagram influencer selfie, shallow depth of field, catchlight in eyes, candy.ai companion aesthetic, beautiful adult woman",
   seductive:
-    "seductive mirror selfie, bedroom eyes, soft neon or golden hour, alluring expression, intimate atmosphere, photoreal",
+    "seductive bedroom mirror selfie, heavy lidded eyes, soft neon and warm lamp light, parted lips, intimate atmosphere, photoreal influencer, adult sensual",
   lingerie:
-    "sexy lingerie mirror selfie, lace bra and panties, bedroom, soft lighting, sensual pose, detailed fabric, photoreal influencer aesthetic",
+    "sexy lingerie mirror selfie, sheer lace bra and panties, bedroom, soft rim lighting, arched back, detailed fabric texture, photoreal candy-style adult, looking at viewer",
   nude:
-    "artistic nude selfie, beautiful naked body, soft natural lighting, detailed skin pores, looking at viewer, photorealistic",
+    "artistic nude selfie, fully nude beautiful adult body, soft window light, detailed skin texture and pores, tasteful yet explicit, looking at camera, photorealistic",
   explicit:
-    "explicit nude selfie, aroused, detailed anatomy, wet skin, intense eye contact, highly detailed erotic photography, photoreal",
+    "explicit nude selfie, aroused expression, detailed anatomy, glistening skin, intense eye contact, highly detailed erotic photography, uncensored photoreal adult",
   sex:
-    "explicit sex scene, passionate, detailed anatomy, realistic skin texture, intimate POV energy, erotic photography",
+    "explicit intimate sex scene, passionate motion, detailed anatomy, realistic skin, intimate POV, erotic cinematography, uncensored photoreal adult",
   aftercare:
-    "post-sex aftercare, soft lighting, intimate embrace, satisfied expression, gentle atmosphere, photoreal",
+    "post-sex aftercare portrait, soft sheets, satisfied smile, gentle embrace energy, warm morning light, photoreal intimate",
   dual:
-    "two beautiful women together, intimate dual scene, looking at viewer, detailed bodies, erotic composition, photoreal",
+    "two beautiful adult women together, intimate dual scene, looking at viewer, detailed bodies, erotic composition, photoreal",
   sph:
-    "dominant woman looking down at viewer, teasing smile, pointing, SPH vibe, lingerie, confident posture, camera looking up, photoreal",
+    "dominant woman looking down at viewer from above, teasing amused smile, pointing, SPH humiliation vibe, lingerie or nude, confident posture, low camera angle, photoreal",
   bnwo:
-    "dominant black woman in charge, powerful pose, lingerie, BNWO fantasy aesthetic, confident gaze, luxurious setting, photoreal",
+    "powerful dominant Black woman in charge, luxury room, lingerie or nude, confident gaze, BNWO fantasy aesthetic, regal posture, photoreal adult",
   joi:
-    "woman giving JOI, pointing at viewer, seductive expression, lingerie, edge of bed, instructional pose, eye contact, photoreal",
+    "woman giving JOI to viewer, pointing at camera, seductive instructional pose, lingerie on edge of bed, eye contact, explicit adult coaching vibe, photoreal",
   "joi-finish":
-    "woman encouraging climax, open mouth, intense eye contact, nude or lingerie, finish command pose, erotic photography",
+    "woman encouraging climax, open mouth, intense eye contact, nude or open lingerie, finish-now command pose, erotic photography, uncensored",
 };
 
 function buildPrompt(
@@ -74,15 +76,17 @@ function buildPrompt(
   mood: MediaMood,
   extra = "",
 ): string {
-  const figure = character.figure || "beautiful adult woman, photoreal influencer aesthetic";
+  const figure =
+    character.figure ||
+    "beautiful adult woman, photoreal influencer aesthetic, unique face, detailed body";
   return [
-    "masterpiece, best quality, ultra detailed, photorealistic, 8k",
-    `adult woman ${character.age || 24} years old`,
+    "masterpiece, best quality, ultra detailed, photorealistic, 8k uhd",
+    `adult woman ${character.age || 24} years old, 21+ only`,
     figure,
-    `${character.name} face identity, consistent face and body across shots, same person`,
+    `${character.name}, same face identity every shot, consistent face and body, unique person`,
     MOOD_PROMPTS[mood],
     extra,
-    "looking at viewer, sharp eyes, detailed skin, natural proportions, no text, no watermark, no logos",
+    "looking at viewer, sharp focused eyes, detailed iris, natural proportions, no text, no watermark, no logos, no cartoon, no anime unless style requested",
   ]
     .filter(Boolean)
     .join(", ");
@@ -97,9 +101,10 @@ function pollinationsUrl(
   const prompt = buildPrompt(character, mood, extra);
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
   const baseFace = opts?.seedOverride ?? faceSeed(character);
-  // Aggressive lock: mood offset tiny so face stays dominant
   const moodJitter =
-    settings?.aggressiveFaceLock !== false ? mediaSeed(character.id, mood, extra) % 17 : mediaSeed(character.id, mood, extra);
+    settings?.aggressiveFaceLock !== false
+      ? mediaSeed(character.id, mood, extra) % 17
+      : mediaSeed(character.id, mood, extra);
   const seed = (baseFace * 97 + moodJitter) % 100000;
   const w = opts?.width ?? 768;
   const h = opts?.height ?? 1152;
@@ -109,10 +114,9 @@ function pollinationsUrl(
     if (settings.localImageMode === "prompt-url") {
       return `${base}/${encodeURIComponent(prompt)}?seed=${seed}&width=${w}&height=${h}`;
     }
-    // forge/comfy: still return pollinations for browser-safe GET; local APIs need POST proxy
-    // Documented in Advanced UI — true Comfy needs a small local proxy.
   }
 
+  // enhance=true + flux for sharper Candy-like results
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(
     prompt,
   )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true`;
@@ -127,10 +131,6 @@ export function characterMediaUrl(
   return pollinationsUrl(character, mood, extra, opts);
 }
 
-/**
- * Resolve media URL preferring local ComfyUI / Forge (+ IP-Adapter face lock)
- * when configured in Advanced settings, with automatic fallback to Pollinations Flux.
- */
 export async function resolveBestMediaUrl(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
   mood: MediaMood = "beauty",
@@ -159,10 +159,10 @@ export function joiSequenceFrames(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
 ): string[] {
   return [
-    characterMediaUrl(character, "joi", "start instruction, clothed lingerie"),
-    characterMediaUrl(character, "joi", "stroking pace command, leaning forward"),
-    characterMediaUrl(character, "seductive", "almost there, intense eye contact"),
-    characterMediaUrl(character, "joi-finish", "finish now command"),
+    characterMediaUrl(character, "joi", "start instruction, clothed lingerie, pointing"),
+    characterMediaUrl(character, "joi", "stroking pace command, leaning forward, JOI"),
+    characterMediaUrl(character, "seductive", "almost there, intense eye contact, aroused"),
+    characterMediaUrl(character, "joi-finish", "finish now command, open mouth"),
   ];
 }
 
@@ -170,9 +170,9 @@ export function sphSequenceFrames(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
 ): string[] {
   return [
-    characterMediaUrl(character, "sph", "first look, amused"),
-    characterMediaUrl(character, "sph", "pointing down, teasing"),
-    characterMediaUrl(character, "explicit", "comparison tease, dominant"),
+    characterMediaUrl(character, "sph", "first look, amused smile"),
+    characterMediaUrl(character, "sph", "pointing down, teasing SPH"),
+    characterMediaUrl(character, "explicit", "comparison tease, dominant, nude"),
     characterMediaUrl(character, "sph", "final verdict, laughing softly"),
   ];
 }
@@ -181,10 +181,10 @@ export function bnwoSequenceFrames(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
 ): string[] {
   return [
-    characterMediaUrl(character, "bnwo", "entering room, powerful"),
-    characterMediaUrl(character, "bnwo", "standing over viewer"),
+    characterMediaUrl(character, "bnwo", "entering room, powerful walk"),
+    characterMediaUrl(character, "bnwo", "standing over viewer, dominant"),
     characterMediaUrl(character, "lingerie", "dominant lingerie, in control"),
-    characterMediaUrl(character, "bnwo", "claiming the scene"),
+    characterMediaUrl(character, "bnwo", "claiming the scene, luxury"),
   ];
 }
 
@@ -192,14 +192,18 @@ export function sexSequenceFrames(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
 ): string[] {
   return [
-    characterMediaUrl(character, "lingerie", "starting undress"),
-    characterMediaUrl(character, "nude", "aroused"),
-    characterMediaUrl(character, "explicit", "intense"),
-    characterMediaUrl(character, "sex", "climax"),
+    characterMediaUrl(character, "lingerie", "starting undress, pulling straps"),
+    characterMediaUrl(character, "nude", "aroused, fully nude"),
+    characterMediaUrl(character, "explicit", "intense, explicit anatomy"),
+    characterMediaUrl(character, "sex", "climax, passionate"),
   ];
 }
 
-export function characterGallery(character: Character): { mood: MediaMood; label: string; url: string }[] {
+export function characterGallery(character: Character): {
+  mood: MediaMood;
+  label: string;
+  url: string;
+}[] {
   const moods: { mood: MediaMood; label: string }[] = [
     { mood: "beauty", label: "Beauty" },
     { mood: "seductive", label: "Seductive" },
@@ -219,9 +223,11 @@ export function characterGallery(character: Character): { mood: MediaMood; label
   }));
 }
 
+/** Always prefer live AI portrait over static SVG placeholders */
 export function resolveCharacterAvatar(character: Character): string {
   if (character.avatar?.startsWith("http") || character.avatar?.startsWith("data:")) {
     return character.avatar;
   }
-  return characterMediaUrl(character, "beauty", character.name);
+  // /avatars/*.svg → replace with Flux beauty portrait
+  return characterMediaUrl(character, "beauty", `${character.name} beauty portrait`);
 }
