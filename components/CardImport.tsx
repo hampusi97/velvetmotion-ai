@@ -1,0 +1,113 @@
+"use client";
+
+import { useState } from "react";
+import type { Character } from "@/lib/charactersTypes";
+import {
+  loadImportedCharacters,
+  parseSillyTavernCard,
+  saveImportedCharacter,
+} from "@/lib/sillyTavernImport";
+import { parseCharacterCardFile } from "@/lib/pngCardDecode";
+
+export function CardImport({
+  onHome,
+  onOpen,
+}: {
+  onHome: () => void;
+  onOpen: (c: Character) => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
+  const [list, setList] = useState<Character[]>(() =>
+    typeof window !== "undefined" ? loadImportedCharacters() : [],
+  );
+
+  const handleFile = async (file: File) => {
+    setError(null);
+    setOk(null);
+    try {
+      const raw = await parseCharacterCardFile(file);
+      if (!raw) {
+        setError(
+          "Could not read card. Use SillyTavern PNG (chara/ccv3 chunk) or JSON export.",
+        );
+        return;
+      }
+      const character = parseSillyTavernCard(raw);
+      if (!character) {
+        setError("Parsed file but missing name/fields. Export V2 JSON from SillyTavern.");
+        return;
+      }
+      // Prefer PNG itself as avatar when image card
+      if (file.type === "image/png" || file.name.toLowerCase().endsWith(".png")) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result));
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+        character.avatar = dataUrl;
+      }
+      saveImportedCharacter(character);
+      setList(loadImportedCharacters());
+      setOk(`Imported ${character.name} — ready to chat.`);
+    } catch {
+      setError("Invalid file.");
+    }
+  };
+
+  return (
+    <div className="max-w-lg mx-auto space-y-6">
+      <button type="button" onClick={onHome} className="text-pink-400 text-sm">
+        ← Home
+      </button>
+      <div>
+        <h1 className="font-display text-2xl text-cream">Import character card</h1>
+        <p className="text-sm text-zinc-400 mt-1">
+          Drop a SillyTavern <strong className="text-zinc-300">PNG</strong> (embedded chara/ccv3) or
+          JSON / OpenChara export. Portrait is kept when you import a PNG card.
+        </p>
+      </div>
+
+      <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-pink-500/40 bg-zinc-950/60 px-6 py-10 cursor-pointer hover:border-pink-400/60">
+        <span className="text-3xl">🃏</span>
+        <span className="text-sm text-zinc-300">Click or drop .png or .json card</span>
+        <input
+          type="file"
+          accept=".json,.png,application/json,image/png"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void handleFile(f);
+          }}
+        />
+      </label>
+
+      {error && <p className="text-sm text-red-400">{error}</p>}
+      {ok && <p className="text-sm text-emerald-400">{ok}</p>}
+
+      {list.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-pink-300">Imported library</h2>
+          {list.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onOpen(c)}
+              className="w-full text-left rounded-xl border border-white/10 bg-zinc-900/80 px-4 py-3 hover:border-pink-500/40 flex gap-3 items-center"
+            >
+              {c.avatar && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.avatar} alt="" className="h-12 w-12 rounded-lg object-cover" />
+              )}
+              <div className="min-w-0">
+                <div className="font-medium text-cream">{c.name}</div>
+                <div className="text-xs text-zinc-500 truncate">{c.tagline}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,7 @@
+{
+  "name": "VelvetMotion AI",
+  "description": "Your darkest fantasies. Always available. Fictional characters only.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"],
+  "prompt": ""
+}

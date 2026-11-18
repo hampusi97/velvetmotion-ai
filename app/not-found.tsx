@@ -2,14 +2,15 @@ import Link from "next/link";
 
 export default function NotFound() {
   return (
-    <main id="content" className="gate-shell">
-      <section className="gate-card">
-        <p className="eyebrow">Missing page</p>
-        <h1 className="font-display text-4xl text-rose-50">That page isn&apos;t here</h1>
-        <Link href="/" className="button-primary mt-6 inline-flex">
-          Back to characters
-        </Link>
-      </section>
-    </main>
+    <div className="flex min-h-[70vh] flex-col items-center justify-center p-6 text-center">
+      <h2 className="font-display text-3xl font-bold text-cream">Page Not Found</h2>
+      <p className="mt-2 text-sm text-mist">The page or companion you requested could not be found.</p>
+      <Link
+        href="/"
+        className="mt-6 rounded-full bg-rose-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-500"
+      >
+        Return Home
+      </Link>
+    </div>
   );
 }

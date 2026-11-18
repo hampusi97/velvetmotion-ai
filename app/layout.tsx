@@ -1,27 +1,48 @@
-import type { Metadata } from "next";
-import { Fraunces, Outfit } from "next/font/google";
-import { Providers } from "@/components/providers";
+import type { Metadata, Viewport } from "next";
+import "@fontsource-variable/fraunces";
+import "@fontsource-variable/outfit";
 import "./globals.css";
 
-const sans = Outfit({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const display = Fraunces({ subsets: ["latin"], variable: "--font-display", display: "swap" });
-
 export const metadata: Metadata = {
-  title: {
-    default: "VelvetMotion",
-    template: "%s · VelvetMotion",
+  title: "VelvetMotion AI",
+  description: "Adult AI companions — chat, JOI, tributes. Fictional 21+ only.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "VelvetMotion",
   },
-  description: "Adults-only conversations with fictional characters aged 21 and older.",
+  openGraph: {
+    title: "VelvetMotion AI",
+    description: "Adult AI companions — chat, JOI, tributes. Fictional 21+ only.",
+  },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#db2777",
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="en">
-      <body className={`${sans.variable} ${display.variable} font-sans antialiased`}>
-        <a className="skip-link" href="#content">
-          Skip to content
-        </a>
-        <Providers>{children}</Providers>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}`,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning className="min-h-dvh bg-ink-950 font-sans text-cream antialiased">
+        {children}
       </body>
     </html>
   );
