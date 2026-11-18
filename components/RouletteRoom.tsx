@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CHARACTERS } from "@/lib/characters";
 import { TRIBUTES } from "@/lib/tributes";
 import { resolveAvatar } from "@/lib/portraits";
-import { spendCoins, getCoins } from "@/lib/storage";
+import { spendCoins, getCoins, addCoins } from "@/lib/storage";
 
 const DURATION = 8 * 60; // 8 minutes
 
@@ -20,6 +20,7 @@ export function RouletteRoom({
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [left, setLeft] = useState(0);
   const [running, setRunning] = useState(false);
+  const [spinning, setSpinning] = useState(false);
 
   useEffect(() => setCoins(getCoins()), []);
 
@@ -30,17 +31,29 @@ export function RouletteRoom({
   }, [running, left]);
 
   const spin = () => {
-    if (!spendCoins(15)) {
-      alert("Need 15 coins to spin roulette");
+    if (spinning) return;
+    if (!spendCoins(12)) {
+      alert("Need 12 coins to spin roulette");
       return;
     }
     setCoins(getCoins());
-    const g = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
-    const c = TRIBUTES[Math.floor(Math.random() * TRIBUTES.length)];
-    setGirlId(g.id);
-    setChallengeId(c.id);
-    setLeft(DURATION);
-    setRunning(true);
+    setSpinning(true);
+    // Fake spin delay for drama
+    setTimeout(() => {
+      const g = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+      const c = TRIBUTES[Math.floor(Math.random() * TRIBUTES.length)];
+      setGirlId(g.id);
+      setChallengeId(c.id);
+      setLeft(DURATION);
+      setRunning(true);
+      setSpinning(false);
+    }, 900);
+  };
+
+  const finish = () => {
+    setRunning(false);
+    addCoins(10);
+    setCoins(getCoins());
   };
 
   const girl = CHARACTERS.find((c) => c.id === girlId);
@@ -50,12 +63,12 @@ export function RouletteRoom({
 
   return (
     <div className="mx-auto max-w-lg space-y-5">
-      <button type="button" onClick={onHome} className="text-pink-400 text-sm">
+      <button type="button" onClick={onHome} className="text-pink-400 text-sm hover:text-pink-300">
         ← Home
       </button>
       <h1 className="font-display text-3xl text-cream">Roulette Room</h1>
       <p className="text-sm text-mist">
-        Random girl + random tribute. Eight-minute sprint. 15 coins to spin.
+        Random girl + random tribute. Eight-minute sprint. 12 coins to spin.
       </p>
       <div className="text-sm text-amber-200">{coins} coins</div>
 
@@ -63,9 +76,10 @@ export function RouletteRoom({
         <button
           type="button"
           onClick={spin}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold text-lg shadow-lg shadow-pink-500/30"
+          disabled={spinning}
+          className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold text-lg shadow-lg shadow-pink-500/30 disabled:opacity-60"
         >
-          Spin the wheel
+          {spinning ? "Spinning…" : "Spin the wheel"}
         </button>
       )}
 
@@ -78,9 +92,9 @@ export function RouletteRoom({
               alt=""
               className="absolute inset-0 w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
             <div className="absolute bottom-4 left-4 right-4">
-              <div className="text-2xl font-bold">{girl.name}</div>
+              <div className="text-2xl font-bold text-white">{girl.name}</div>
               <div className="text-pink-300 text-sm">{challenge.title}</div>
             </div>
             {running && (
@@ -104,10 +118,19 @@ export function RouletteRoom({
               {running && left === 0 && (
                 <button
                   type="button"
-                  onClick={() => setRunning(false)}
-                  className="px-4 py-2.5 rounded-xl border border-white/15 text-sm"
+                  onClick={finish}
+                  className="px-4 py-2.5 rounded-xl border border-white/15 text-sm hover:bg-white/5"
                 >
-                  Done
+                  Done (+10)
+                </button>
+              )}
+              {running && left > 0 && (
+                <button
+                  type="button"
+                  onClick={finish}
+                  className="px-4 py-2.5 rounded-xl border border-white/15 text-sm text-zinc-400"
+                >
+                  Bail early
                 </button>
               )}
             </div>
