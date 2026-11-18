@@ -1,7 +1,7 @@
 /**
  * VelvetMotion Media Engine
- * Studio portraits for beauty/seductive cards.
- * Pollinations Flux for lingerie / nude / explicit so every girl is unique and spicy.
+ * Every girl gets unique Pollinations Flux images driven by her figure description + id seed.
+ * No shared studio JPGs — each companion is visually distinct.
  */
 
 import type { Character } from "./charactersTypes";
@@ -17,85 +17,14 @@ export type MediaMood =
   | "aftercare"
   | "dual";
 
-const STUDIO_PORTRAITS: Record<string, string> = {
-  maren: "/portraits/maren.jpg",
-  liora: "/portraits/liora.jpg",
-  tess: "/portraits/tess.jpg",
-  isolde: "/portraits/isolde.jpg",
-  briony: "/portraits/briony.jpg",
-  nadine: "/portraits/nadine.jpg",
-  vesper: "/portraits/vesper.jpg",
-  calla: "/portraits/calla.jpg",
-  sable: "/portraits/maren.jpg",
-  rhea: "/portraits/maren.jpg",
-  juniper: "/portraits/briony.jpg",
-  dahlia: "/portraits/isolde.jpg",
-  valentina: "/portraits/briony.jpg",
-  "lana-rho": "/portraits/isolde.jpg",
-  "lena-plug": "/portraits/briony.jpg",
-  "dalia-x": "/portraits/isolde.jpg",
-  "riley-re": "/portraits/calla.jpg",
-  scarlett: "/portraits/tess.jpg",
-  maya: "/portraits/vesper.jpg",
-  bianca: "/portraits/vesper.jpg",
-  ravenna: "/portraits/isolde.jpg",
-  tessa: "/portraits/liora.jpg",
-  lola: "/portraits/tess.jpg",
-  iris: "/portraits/nadine.jpg",
-  nova: "/portraits/briony.jpg",
-  wren: "/portraits/tess.jpg",
-  jade: "/portraits/nadine.jpg",
-  luna: "/portraits/vesper.jpg",
-  kira: "/portraits/tess.jpg",
-  amber: "/portraits/tess.jpg",
-  sofia: "/portraits/calla.jpg",
-  raven: "/portraits/vesper.jpg",
-  priya: "/portraits/nadine.jpg",
-  zara: "/portraits/calla.jpg",
-  mila: "/portraits/liora.jpg",
-  sienna: "/portraits/calla.jpg",
-  yuki: "/portraits/isolde.jpg",
-  freya: "/portraits/liora.jpg",
-  camille: "/portraits/nadine.jpg",
-  aisha: "/portraits/maren.jpg",
-  elena: "/portraits/briony.jpg",
-  hannah: "/portraits/liora.jpg",
-  naya: "/portraits/nadine.jpg",
-  "goth-nyx": "/portraits/vesper.jpg",
-  "sorority-blair": "/portraits/tess.jpg",
-  "sitter-rue": "/portraits/liora.jpg",
-  "prof-elaine": "/portraits/isolde.jpg",
-  "officer-vega": "/portraits/nadine.jpg",
-  "anime-yumi": "/portraits/briony.jpg",
-  "bnwo-indigo": "/portraits/maren.jpg",
-  "cuck-opaline": "/portraits/calla.jpg",
-  "dual-tess-calla": "/portraits/tess.jpg",
-  "anime-rei": "/portraits/isolde.jpg",
-};
-
-const STUDIO_LIST = [
-  "/portraits/maren.jpg",
-  "/portraits/liora.jpg",
-  "/portraits/tess.jpg",
-  "/portraits/isolde.jpg",
-  "/portraits/briony.jpg",
-  "/portraits/nadine.jpg",
-  "/portraits/vesper.jpg",
-  "/portraits/calla.jpg",
-];
-
-function studioPortraitFor(id: string): string {
-  return STUDIO_PORTRAITS[id] || STUDIO_LIST[Math.abs(hashCode(id)) % STUDIO_LIST.length];
-}
-
 function hashCode(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return h;
 }
 
-function mediaSeed(id: string, mood: string): number {
-  return Math.abs(hashCode(id + ":" + mood)) % 100000;
+function mediaSeed(id: string, mood: string, extra = ""): number {
+  return Math.abs(hashCode(id + ":" + mood + ":" + extra)) % 100000;
 }
 
 const MOOD_PROMPTS: Record<MediaMood, string> = {
@@ -135,15 +64,15 @@ function pollinationsUrl(
   ]
     .filter(Boolean)
     .join(", ");
-  const seed = mediaSeed(character.id, moodKey);
+  const seed = mediaSeed(character.id, moodKey, extra || figure.slice(0, 40));
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(
     prompt,
   )}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;
 }
 
 /**
- * Beauty / seductive → local studio JPGs (fast, consistent cards).
- * Lingerie / nude / explicit / sex / dual → Pollinations Flux (unique nudes per girl).
+ * Always use Pollinations so every girl has a unique face and body matching her figure description.
+ * SVG fallback only when offline or for pure placeholders.
  */
 export function characterMediaUrl(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
@@ -152,11 +81,8 @@ export function characterMediaUrl(
   _opts?: { width?: number; height?: number; enhance?: boolean },
 ): string {
   void _opts;
-  const spicy = ["lingerie", "nude", "explicit", "sex", "dual", "aftercare"].includes(mood);
-  if (spicy || character.id.startsWith("custom-")) {
-    return pollinationsUrl(character, mood, extra);
-  }
-  return studioPortraitFor(character.id);
+  // Prefer unique generated images for all moods and all characters
+  return pollinationsUrl(character, mood, extra);
 }
 
 /** Full gallery set for a character — ready to drop into UI */
