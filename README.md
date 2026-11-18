@@ -28,23 +28,31 @@ Optional (see `.env.example`):
 | `AI_VIDEO_*` | Real MP4 instead of still sequences |
 | Firebase keys | Google sign-in + cloud sync |
 
-## Features
+## Features (current)
 
-- **30+ companions** — dense roster, unique personalities & kinks
-- **Experiences home** — Create, Discover, Roulette, Blindfold JOI, Goon Room, Tribute
-- **Discover swipe** — Tinder-style, Super Like, lingerie peek, match modal
-- **Create your girl** — multi-step Candy-style wizard (look, eyes, chest, personality, photo seed)
-- **Chat + intimacy ladder** — free LLM, gifts she remembers, delayed nudes, aftercare hooks
-- **One-tap Generate** — Lingerie / Nude / Explicit / Sex video buttons + dual-girl
-- **4-frame sex sequences** — cinematic stills (real MP4 when `AI_VIDEO_ENDPOINT` is set)
-- **Goon Room** — timed 1–2 girl sessions
-- **Roulette** — random girl + tribute, 8-minute sprint
-- **Blindfold JOI** — audio-only until intimacy unlocks reveal
-- **Retention** — daily claim (+100), edging streak, featured dual pair, fantasy codes, private vault
-- **Story + JOI packs**
-- **Optional Firebase** — Google sign-in + cloud sync
+- **30+ companions** — unique Pollinations portraits per girl (no shared faces)
+- **CharacterChat** — vault notes, NSFW chips (Lingerie / Nude / Explicit / Sex sequence), gifts, intimacy ladder, voice
+- **Create your girl** — multi-step wizard + photo seed
+- **Share & Import** — localStorage share codes (`lib/shareGirls.ts` + `ShareImport` UI)
+- **Blindfold JOI** — visual girl grid, Classic JOI / SPH modes, sequence reveal at intimacy ≥ 55%
+- **Goon Room** — 1–2 girl timed sessions, streak, dual-girl prompts
+- **Story packs** — romance + **BNWO / SPH / cuck** interactive packs
+- **Discover swipe**, Roulette, Tribute, JOI browser, Story browser
+- **Retention** — daily claim, edging streak, fantasy codes, private vault
 
-Everything above works on the free tier today.
+## Roadmap / ideas from research
+
+Drawn from Candy.ai, Nomi, Kindroid, MyGirlGPT, openroleplay, AIRI, HerAndHim, Aikeya, my-raze, etc.:
+
+- One-tap Nudify / Sex / JOI after Create
+- Dual-girl chat thread
+- Proactive messages (she texts first)
+- Long-term multi-tier memory (Nomi-style)
+- Live2D / VRM avatar option (AIRI / Aikeya)
+- Telegram / Discord bridge (MyGirlGPT pattern)
+- Optional WebLLM browser-side inference (zero server cost)
+- Relationship stages + affection axes
+- Scene-matched selfies that stay face-consistent
 
 ## Stack
 
