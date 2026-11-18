@@ -40,7 +40,7 @@ import {
   type StoredMessage,
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
-import { characterMediaUrl, type MediaMood } from "@/lib/media";
+import { characterMediaUrl, resolveBestMediaUrl, type MediaMood } from "@/lib/media";
 import {
   runSequenceGeneration,
   enhanceSequenceWithVideo,
@@ -240,7 +240,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     setCoinsState(getCoins());
     setBusy(true);
     try {
-      const url = characterMediaUrl(character, mood, extra);
+      const { url, note } = await resolveBestMediaUrl(character, mood, extra);
       addToGallery({ characterId: character.id, characterName: character.name, type: mood, url, prompt: `${character.name} ${mood}` });
       const mediaMsg: ChatMessage = {
         role: "assistant",
@@ -249,7 +249,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         mediaType: mood,
       };
       persist([...messages, mediaMsg]);
-      setActiveMedia({ url, type: mood });
+      setActiveMedia({ url, type: mood, note });
       setIntimacy(bumpIntimacy(character.id, 5));
       if (voiceOn) speak(`I took this just for you.`, { ...character.voice });
     } finally {

@@ -5,6 +5,7 @@
 
 import type { Character } from "./charactersTypes";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
+import { generateLocalImage } from "./comfyClient";
 
 export type MediaMood =
   | "beauty"
@@ -124,6 +125,34 @@ export function characterMediaUrl(
   opts?: { width?: number; height?: number; enhance?: boolean; seedOverride?: number },
 ): string {
   return pollinationsUrl(character, mood, extra, opts);
+}
+
+/**
+ * Resolve media URL preferring local ComfyUI / Forge (+ IP-Adapter face lock)
+ * when configured in Advanced settings, with automatic fallback to Pollinations Flux.
+ */
+export async function resolveBestMediaUrl(
+  character: Pick<Character, "id" | "name" | "figure" | "age">,
+  mood: MediaMood = "beauty",
+  extra = "",
+): Promise<{ url: string; note: string }> {
+  const fallbackUrl = characterMediaUrl(character, mood, extra);
+  const settings = typeof window !== "undefined" ? getMediaSettings() : null;
+  if (settings?.preferLocal && settings.localImageBase) {
+    const prompt = buildPrompt(character, mood, extra);
+    const seed = (faceSeed(character) * 97 + (mediaSeed(character.id, mood, extra) % 17)) % 100000;
+    const localRes = await generateLocalImage({
+      prompt,
+      seed,
+      width: 768,
+      height: 1152,
+      characterId: character.id,
+    });
+    if (localRes.ok && localRes.imageUrl) {
+      return { url: localRes.imageUrl, note: localRes.note };
+    }
+  }
+  return { url: fallbackUrl, note: "Pollinations Flux" };
 }
 
 export function joiSequenceFrames(

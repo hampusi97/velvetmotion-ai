@@ -12,6 +12,8 @@ export type LocalGenRequest = {
   width?: number;
   height?: number;
   negative?: string;
+  characterId?: string;
+  referenceImageBase64?: string;
 };
 
 export type LocalGenResult = {
@@ -90,11 +92,47 @@ export async function generateLocalImage(req: LocalGenRequest): Promise<LocalGen
   if (!s.localImageBase) {
     return { ok: false, note: "Set Advanced → Local image base (Comfy/Forge URL)" };
   }
+
+  let refPhoto = req.referenceImageBase64;
+  if (!refPhoto && s.aggressiveFaceLock && req.characterId && typeof window !== "undefined") {
+    try {
+      refPhoto = localStorage.getItem(`vm-ref-photo-${req.characterId}`) || undefined;
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // First try server-side /api/comfy proxy (avoids browser CORS and supports ComfyUI + IP-Adapter FaceID)
+  if (s.localImageMode === "comfy" || s.localImageMode === "forge") {
+    try {
+      const apiRes = await fetch("/api/comfy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          baseUrl: s.localImageBase,
+          mode: s.localImageMode,
+          prompt: req.prompt,
+          negative: req.negative || DEFAULT_NEG,
+          seed: req.seed,
+          width: req.width || 768,
+          height: req.height || 1152,
+          referenceImageBase64: refPhoto,
+        }),
+      });
+      if (apiRes.ok) {
+        const data = await apiRes.json();
+        if (data.ok && data.imageUrl) {
+          return { ok: true, imageUrl: data.imageUrl, note: data.note || "Local Comfy/Forge" };
+        }
+      }
+    } catch {
+      /* fall through to direct browser fetch or local Python proxy */
+    }
+  }
+
   if (s.localImageMode === "forge") return tryForge(s.localImageBase, req);
   if (s.localImageMode === "prompt-url") {
-    // GET-style URL already handled in media.ts; for POST use custom
     return tryCustom(s.localImageBase, req);
   }
-  // comfy: most workflows need workflow JSON — treat base as custom POST for now
   return tryCustom(s.localImageBase, req);
 }

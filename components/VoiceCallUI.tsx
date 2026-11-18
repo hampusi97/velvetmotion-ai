@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { Character } from "@/lib/charactersTypes";
 import { speak, stopSpeaking } from "@/lib/speech";
-import { characterMediaUrl } from "@/lib/media";
+import { characterMediaUrl, joiSequenceFrames } from "@/lib/media";
 import { fallbackReply } from "@/lib/characters";
 import { pushShort, memoryPromptBlock } from "@/lib/memoryTiers";
 import { bumpIntimacy, getIntimacy } from "@/lib/storage";
+import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
 type Props = {
   character: Character;
@@ -33,18 +34,58 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 export function VoiceCallUI({ character, onClose }: Props) {
   const [live, setLive] = useState(false);
+  const [videoMode, setVideoMode] = useState(false);
+  const [camActive, setCamActive] = useState(false);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [status, setStatus] = useState("Tap Start call");
   const recogRef = useRef<SpeechRecognitionLike | null>(null);
   const activeRef = useRef(false);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      for (const track of streamRef.current.getTracks()) track.stop();
+      streamRef.current = null;
+    }
+    setCamActive(false);
+  };
+
+  const toggleCamera = async () => {
+    if (camActive) {
+      stopCamera();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      setCamActive(true);
+      setVideoMode(true);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    } catch {
+      setStatus("Camera permission denied or unavailable — continuing with companion video.");
+      setVideoMode(true);
+    }
+  };
+
+  useEffect(() => {
+    if (camActive && localVideoRef.current && streamRef.current) {
+      localVideoRef.current.srcObject = streamRef.current;
+    }
+  }, [camActive, videoMode]);
 
   useEffect(() => {
     return () => {
       activeRef.current = false;
       stopSpeaking();
+      stopCamera();
       try {
+        audioRef.current?.pause();
         recogRef.current?.stop();
       } catch {
         /* */
@@ -59,26 +100,49 @@ export function VoiceCallUI({ character, onClose }: Props) {
     append(`You: ${userText}`);
     setStatus("She is thinking…");
     let reply = "";
+    let liveAudioUrl = "";
     try {
-      const res = await fetch("/api/chat", {
+      const liveRes = await fetch("/api/live-voice", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           characterId: character.id,
-          messages: [
-            { role: "user", content: userText },
-          ],
+          transcript: userText,
           romanceMode: false,
           intimacy: getIntimacy(character.id, character.intimacy),
-          memoryBlock: memoryPromptBlock(character.id),
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        reply = data.reply || "";
+      if (liveRes.ok) {
+        const liveData = await liveRes.json();
+        if (liveData.audioUrl) liveAudioUrl = liveData.audioUrl;
+        if (liveData.reply && liveData.modelUsed === "gemini-3.8-live") {
+          reply = liveData.reply;
+        }
       }
     } catch {
-      /* */
+      /* fall through to /api/chat */
+    }
+    if (!reply) {
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            characterId: character.id,
+            customCharacter: character,
+            messages: [{ role: "user", content: userText }],
+            romanceMode: false,
+            intimacy: getIntimacy(character.id, character.intimacy),
+            memoryBlock: memoryPromptBlock(character.id),
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          reply = data.reply || "";
+        }
+      } catch {
+        /* */
+      }
     }
     if (!reply) reply = fallbackReply(character, userText, false);
     // Keep voice replies short
@@ -88,6 +152,25 @@ export function VoiceCallUI({ character, onClose }: Props) {
     append(`${character.name.split(" ")[0]}: ${reply}`);
     setSpeaking(true);
     setStatus("She is speaking…");
+    if (liveAudioUrl) {
+      try {
+        const audio = new Audio(liveAudioUrl);
+        audioRef.current = audio;
+        audio.onended = () => {
+          setSpeaking(false);
+          if (activeRef.current) startListen();
+          else setStatus("Call ended");
+        };
+        audio.onerror = () => {
+          setSpeaking(false);
+          if (activeRef.current) startListen();
+        };
+        void audio.play();
+        return;
+      } catch {
+        /* fall back to Web Speech */
+      }
+    }
     speak(
       reply,
       { ...character.voice },
@@ -177,7 +260,9 @@ export function VoiceCallUI({ character, onClose }: Props) {
     setListening(false);
     setSpeaking(false);
     stopSpeaking();
+    stopCamera();
     try {
+      audioRef.current?.pause();
       recogRef.current?.stop();
     } catch {
       /* */
@@ -186,23 +271,40 @@ export function VoiceCallUI({ character, onClose }: Props) {
     onClose();
   };
 
+  const frames = joiSequenceFrames(character);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-sm rounded-3xl border border-pink-500/40 bg-gradient-to-b from-zinc-900 to-black p-6 shadow-[0_0_60px_rgba(236,72,153,0.25)]">
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="relative">
-            <div
-              className={`h-28 w-28 rounded-full overflow-hidden border-2 ${
-                speaking ? "border-pink-400 animate-pulse" : listening ? "border-emerald-400" : "border-white/20"
-              }`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={characterMediaUrl(character, "beauty")}
-                alt={character.name}
-                className="h-full w-full object-cover"
-              />
-            </div>
+          <div className="relative w-full flex justify-center">
+            {videoMode ? (
+              <div className="relative w-full aspect-[3/4] max-h-64 rounded-2xl overflow-hidden border-2 border-pink-500/50 bg-black">
+                <MotionSequencePlayer frames={frames} alt={character.name} />
+                {camActive && (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="absolute bottom-2 right-2 h-20 w-16 rounded-xl border border-white/30 object-cover bg-zinc-950"
+                  />
+                )}
+              </div>
+            ) : (
+              <div
+                className={`h-28 w-28 rounded-full overflow-hidden border-2 ${
+                  speaking ? "border-pink-400 animate-pulse" : listening ? "border-emerald-400" : "border-white/20"
+                }`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={characterMediaUrl(character, "beauty")}
+                  alt={character.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            )}
             {live && (
               <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] px-2 py-0.5 rounded-full bg-pink-600">
                 {speaking ? "Speaking" : listening ? "Listening" : "…"}
@@ -212,6 +314,27 @@ export function VoiceCallUI({ character, onClose }: Props) {
           <div>
             <div className="font-semibold text-lg text-cream">{character.name}</div>
             <div className="text-xs text-zinc-400">{status}</div>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setVideoMode((v) => !v)}
+              className={`rounded-full px-3 py-1 text-xs border ${
+                videoMode ? "border-pink-500 bg-pink-500/20 text-pink-200" : "border-white/15 text-zinc-400"
+              }`}
+            >
+              {videoMode ? "🎬 Live video ON" : "🎬 Companion video"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void toggleCamera()}
+              className={`rounded-full px-3 py-1 text-xs border ${
+                camActive ? "border-emerald-500 bg-emerald-500/20 text-emerald-200" : "border-white/15 text-zinc-400"
+              }`}
+            >
+              {camActive ? "📷 My cam ON" : "📷 My cam (PiP)"}
+            </button>
           </div>
 
           <div className="w-full max-h-28 overflow-y-auto text-left space-y-1 text-xs text-zinc-400 px-1">

@@ -42,16 +42,19 @@ def build_comfy_workflow(
     width: int,
     height: int,
     checkpoint: str = COMFY_CHECKPOINT,
+    reference_image_b64: Optional[str] = None,
+    ip_adapter_weight: float = 0.85,
 ) -> Dict[str, Any]:
-    """Construct a standard ComfyUI txt2img KSampler graph."""
-    return {
+    """Construct a ComfyUI txt2img KSampler graph with optional IP-Adapter FaceID lock."""
+    has_ref = bool(reference_image_b64 and len(reference_image_b64) > 32)
+    graph: Dict[str, Any] = {
         "3": {
             "class_type": "KSampler",
             "inputs": {
                 "cfg": 5.5,
                 "denoise": 1.0,
                 "latent_image": ["5", 0],
-                "model": ["4", 0],
+                "model": ["11" if has_ref else "4", 0],
                 "negative": ["7", 0],
                 "positive": ["6", 0],
                 "sampler_name": "euler",
@@ -85,6 +88,24 @@ def build_comfy_workflow(
             "inputs": {"filename_prefix": "VelvetMotion", "images": ["8", 0]},
         },
     }
+    if has_ref and reference_image_b64:
+        clean_b64 = reference_image_b64.split(",", 1)[-1] if "," in reference_image_b64 else reference_image_b64
+        graph["10"] = {
+            "class_type": "ETN_LoadImageBase64",
+            "inputs": {"image": clean_b64},
+        }
+        graph["11"] = {
+            "class_type": "IPAdapterUnifiedLoaderFaceID",
+            "inputs": {
+                "model": ["4", 0],
+                "preset": "FACEID PLUS V2",
+                "lora_strength": 0.65,
+                "provider": "CUDA",
+                "image": ["10", 0],
+                "weight": float(ip_adapter_weight),
+            },
+        }
+    return graph
 
 
 def forward_json(url: str, payload: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
