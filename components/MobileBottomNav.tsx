@@ -6,8 +6,8 @@ const TABS = [
   { id: "home", label: "Home", icon: "🏠" },
   { id: "shorts", label: "Shorts", icon: "🎬" },
   { id: "create", label: "Create", icon: "✨" },
+  { id: "my-girls", label: "My Girls", icon: "💗" },
   { id: "girls", label: "Chat", icon: "💬" },
-  { id: "tribute", label: "Private", icon: "🔒" },
 ] as const;
 
 export function MobileBottomNav({
@@ -20,8 +20,8 @@ export function MobileBottomNav({
   const mapped =
     active === "chat" || active === "profile"
       ? "girls"
-      : active === "gallery"
-        ? "tribute"
+      : active === "gallery" || active === "tribute"
+        ? "my-girls"
         : active;
 
   return (

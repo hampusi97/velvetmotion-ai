@@ -1,4 +1,4 @@
-/** Client-side coins, gallery, chat memory. Firebase sync is optional (never required). */
+/** Client-side coins, gallery, chat memory. Firebase sync is optional (never required). FREE forever. */
 
 export type GalleryItem = {
   id: string;
@@ -25,8 +25,8 @@ const GALLERY_KEY = "vm-gallery";
 const CHAT_PREFIX = "vm-chat-";
 const INTIMACY_PREFIX = "vm-intimacy-";
 const DAILY_KEY = "vm-daily-claim";
-const DEFAULT_COINS = 600;
-const DAILY_REWARD = 100;
+const DEFAULT_COINS = 1200;
+const DAILY_REWARD = 200;
 
 export function getCoins(): number {
   if (typeof window === "undefined") return DEFAULT_COINS;
@@ -48,7 +48,6 @@ export function setCoins(n: number) {
   } catch {
     /* private mode */
   }
-  // Optional Firebase — never blocks free mode
   void import("@/lib/firebase")
     .then((m) => m.syncCoinsToFirestore?.(clamped))
     .catch(() => {});
@@ -65,7 +64,6 @@ export function addCoins(amount: number) {
   setCoins(getCoins() + amount);
 }
 
-/** Once per calendar day — free retention loop. */
 export function canClaimDaily(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -185,11 +183,11 @@ export function bumpIntimacy(characterId: string, delta = 2) {
   return next;
 }
 
-/** Slightly more generous so free users can generate more. */
+/** Generous free-tier costs — no payments required. */
 export const GEN_COST: Record<string, number> = {
-  portrait: 6,
-  lingerie: 10,
-  nude: 14,
-  explicit: 18,
-  video: 28,
+  portrait: 4,
+  lingerie: 6,
+  nude: 8,
+  explicit: 10,
+  video: 16,
 };
