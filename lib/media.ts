@@ -1,8 +1,7 @@
 /**
  * VelvetMotion Media Engine
- * Unique Pollinations Flux images per girl via figure + id seed.
- * Face-consistent: shared face seed across moods; optional photo-derived seed.
- * SPH / BNWO / JOI sequence generators for any girl.
+ * Candy-style photoreal prompts (influencer / selfie aesthetic).
+ * Face-consistent seeds + SPH / BNWO / JOI sequences.
  */
 
 import type { Character } from "./charactersTypes";
@@ -31,12 +30,10 @@ function mediaSeed(id: string, mood: string, extra = ""): number {
   return Math.abs(hashCode(id + ":" + mood + ":" + extra)) % 100000;
 }
 
-/** Stable face seed from character — same identity across moods */
 export function faceSeed(character: Pick<Character, "id" | "figure" | "name">): number {
   return Math.abs(hashCode(character.id + "|face|" + (character.figure || "").slice(0, 80))) % 100000;
 }
 
-/** Derive seed from uploaded photo data-URL so custom girls keep face lock */
 export function seedFromPhotoDataUrl(dataUrl: string): number {
   const slice = dataUrl.slice(0, 400) + dataUrl.slice(-200);
   return Math.abs(hashCode(slice)) % 100000;
@@ -44,29 +41,29 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
 
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "professional beauty portrait, soft studio lighting, elegant makeup, looking at camera, photorealistic",
+    "instagram influencer portrait, soft glam makeup, natural skin texture, candid selfie vibe, shallow depth of field, photorealistic, candy.ai style beauty",
   seductive:
-    "seductive pose, bedroom eyes, soft neon lighting, alluring expression, intimate atmosphere",
+    "seductive mirror selfie, bedroom eyes, soft neon or golden hour, alluring expression, intimate atmosphere, photoreal",
   lingerie:
-    "wearing sexy lingerie, lace bra and panties, bedroom setting, soft lighting, sensual pose, detailed fabric",
+    "sexy lingerie mirror selfie, lace bra and panties, bedroom, soft lighting, sensual pose, detailed fabric, photoreal influencer aesthetic",
   nude:
-    "nude, beautiful naked body, soft natural lighting, artistic nude, detailed skin, looking at viewer",
+    "artistic nude selfie, beautiful naked body, soft natural lighting, detailed skin pores, looking at viewer, photorealistic",
   explicit:
-    "explicit nude, aroused, detailed anatomy, wet skin, intense eye contact, highly detailed erotic photography",
+    "explicit nude selfie, aroused, detailed anatomy, wet skin, intense eye contact, highly detailed erotic photography, photoreal",
   sex:
-    "having sex, explicit penetration, detailed anatomy, passionate expression, realistic skin texture, erotic scene",
+    "explicit sex scene, passionate, detailed anatomy, realistic skin texture, intimate POV energy, erotic photography",
   aftercare:
-    "post-sex aftercare, soft lighting, intimate embrace, satisfied expression, gentle atmosphere",
+    "post-sex aftercare, soft lighting, intimate embrace, satisfied expression, gentle atmosphere, photoreal",
   dual:
-    "two beautiful women together, intimate dual scene, looking at viewer, detailed bodies, erotic composition",
+    "two beautiful women together, intimate dual scene, looking at viewer, detailed bodies, erotic composition, photoreal",
   sph:
-    "dominant woman looking down at viewer, teasing smile, pointing, SPH humiliation vibe, lingerie, confident posture, looking at camera",
+    "dominant woman looking down at viewer, teasing smile, pointing, SPH vibe, lingerie, confident posture, camera looking up, photoreal",
   bnwo:
-    "dominant black woman in charge, powerful pose, lingerie or elegant dress, BNWO fantasy aesthetic, confident gaze at viewer, luxurious setting",
+    "dominant black woman in charge, powerful pose, lingerie, BNWO fantasy aesthetic, confident gaze, luxurious setting, photoreal",
   joi:
-    "woman giving JOI instruction, pointing at viewer, seductive expression, lingerie, sitting on edge of bed, eye contact, instructional pose",
+    "woman giving JOI, pointing at viewer, seductive expression, lingerie, edge of bed, instructional pose, eye contact, photoreal",
   "joi-finish":
-    "woman encouraging climax, open mouth, intense eye contact, nude or lingerie, finishing instruction pose, erotic photography",
+    "woman encouraging climax, open mouth, intense eye contact, nude or lingerie, finish command pose, erotic photography",
 };
 
 function pollinationsUrl(
@@ -75,15 +72,15 @@ function pollinationsUrl(
   extra = "",
   opts?: { seedOverride?: number; width?: number; height?: number },
 ): string {
-  const figure = character.figure || "beautiful adult woman";
+  const figure = character.figure || "beautiful adult woman, photoreal influencer aesthetic";
   const prompt = [
-    "masterpiece, best quality, ultra detailed, photorealistic",
-    `beautiful adult woman ${character.age || 24} years old`,
+    "masterpiece, best quality, ultra detailed, photorealistic, 8k",
+    `adult woman ${character.age || 24} years old`,
     figure,
-    `${character.name} aesthetic, same face identity, consistent face and body`,
+    `${character.name} face identity, consistent face and body across shots`,
     MOOD_PROMPTS[mood],
     extra,
-    "looking at viewer, sharp eyes, detailed skin, natural proportions, 8k uhd, no text, no watermark",
+    "looking at viewer, sharp eyes, detailed skin, natural proportions, no text, no watermark, no logos",
   ]
     .filter(Boolean)
     .join(", ");
