@@ -22,6 +22,7 @@ import { BlindfoldJoi } from "@/components/BlindfoldJoi";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
 import { DualGirlChat } from "@/components/DualGirlChat";
+import { GroupChat } from "@/components/GroupChat";
 import { ShareImport } from "@/components/ShareImport";
 import { LoginGate } from "@/components/LoginGate";
 import { getUser, type LocalUser } from "@/lib/auth";
@@ -45,6 +46,7 @@ type HomeView =
   | "tribute"
   | "workspace"
   | "dual"
+  | "group"
   | "share";
 
 type View = HomeView | "profile" | "chat";
@@ -87,7 +89,7 @@ export default function Home() {
     setAuthReady(true);
   }, []);
 
-  const navigate = (next: ViewId | "dual" | "share") => {
+  const navigate = (next: ViewId | "dual" | "share" | "group") => {
     setMenuOpen(false);
     if (next === "girls" || next === "romance") openRoster(next === "romance");
     else setView(next as View);
@@ -154,7 +156,6 @@ export default function Home() {
     );
   }
 
-  // Hard gate: must log in before any product UI
   if (!user) {
     return <LoginGate onLoggedIn={setUser} />;
   }
@@ -162,7 +163,11 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-ink-950 text-white">
       <SiteHeader
-        view={view === "profile" || view === "chat" || view === "dual" || view === "share" ? listView : (view as ViewId)}
+        view={
+          view === "profile" || view === "chat" || view === "dual" || view === "group" || view === "share"
+            ? listView
+            : (view as ViewId)
+        }
         menuOpen={menuOpen}
         onToggleMenu={toggleMenu}
         onNavigate={navigate as (v: ViewId) => void}
@@ -225,6 +230,7 @@ export default function Home() {
         )}
 
         {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
+        {view === "group" && <GroupChat onHome={() => setView("home")} />}
         {view === "share" && (
           <ShareImport
             onHome={() => setView("home")}
@@ -248,20 +254,26 @@ export default function Home() {
 
         {view === "tribute" && (
           <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
+            <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">
+              ← Home
+            </button>
             <TributeBrowser onStartWithGirl={openChatById} />
           </>
         )}
 
         {view === "packs" && (
           <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
+            <button onClick={() => setView("home")} className="mb-4 text-pink-400">
+              ← Home
+            </button>
             <StoryPackBrowser />
           </>
         )}
         {view === "joi" && (
           <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
+            <button onClick={() => setView("home")} className="mb-4 text-pink-400">
+              ← Home
+            </button>
             <JoiBrowser />
           </>
         )}
