@@ -8,6 +8,7 @@ import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
 import { DailyFeed } from "./DailyFeed";
 import { FeaturedPair } from "./FeaturedPair";
+import { ProactiveInbox } from "./ProactiveInbox";
 import { canClaimDaily, claimDaily, getCoins } from "@/lib/storage";
 import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
@@ -62,7 +63,7 @@ export function HomeView({
   onNavigate,
   onOpenGirl,
 }: {
-  onNavigate: (id: SectionId) => void;
+  onNavigate: (id: SectionId | "dual") => void;
   onOpenGirl?: (id: string) => void;
 }) {
   const reduce = useReducedMotion();
@@ -146,10 +147,22 @@ export function HomeView({
           >
             Create your girl
           </button>
+          <button
+            type="button"
+            onClick={() => onNavigate("dual" as SectionId)}
+            className="press inline-flex min-h-11 items-center justify-center rounded-full border border-fuchsia-400/40 bg-fuchsia-500/15 px-5 text-base font-medium text-fuchsia-100 hover:bg-fuchsia-500/25"
+          >
+            Dual chat
+          </button>
         </div>
       </motion.section>
 
-      {/* Featured Characters — editorial card grid inspired by modern companion galleries */}
+      {onOpenGirl && (
+        <motion.div variants={riseItem}>
+          <ProactiveInbox onOpen={onOpenGirl} />
+        </motion.div>
+      )}
+
       {onOpenGirl && (
         <motion.section variants={riseItem} className="pb-8">
           <div className="mb-3 flex items-end justify-between gap-3">
@@ -170,7 +183,6 @@ export function HomeView({
             </button>
           </div>
 
-          {/* Inline Search + Category Filter Strip */}
           <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               type="button"
@@ -281,7 +293,6 @@ export function HomeView({
         </motion.section>
       )}
 
-      {/* Private Content & Shorts teaser */}
       <motion.section variants={riseItem} className="pb-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
@@ -302,7 +313,7 @@ export function HomeView({
             className="relative overflow-hidden rounded-2xl border border-pink-500/30 bg-gradient-to-br from-pink-950/80 to-black p-6 text-left hover:border-pink-400/50 transition"
           >
             <Film className="h-7 w-7 text-fuchsia-300 mb-2" />
-            <div className="font-semibold text-lg text-white">Shorts &amp; Guided Audio</div>
+            <div className="font-semibold text-lg text-white">Shorts & Guided Audio</div>
             <p className="text-sm text-zinc-400 mt-1">Interactive voice packs + timed pacing modes</p>
             <span className="inline-block mt-4 rounded-full bg-fuchsia-600 px-4 py-1.5 text-xs font-medium text-white">
               Watch
@@ -311,7 +322,6 @@ export function HomeView({
         </div>
       </motion.section>
 
-      {/* Experiences */}
       <motion.section variants={riseItem} className="pb-8">
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
