@@ -2,13 +2,24 @@ import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getCharacter } from "@/lib/characters";
 import { characterPortraitUrl, type PortraitMood } from "@/lib/portraits";
-import { characterMediaUrl } from "@/lib/media";
+import { characterMediaUrl, mediaSeed } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 function keyIsReal(key: string) {
   return key.length > 15 && !/dummy|your_|changeme|placeholder/i.test(key);
+}
+
+function pollinationsFrame(
+  prompt: string,
+  seed: number,
+  width = 768,
+  height = 1152,
+): string {
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    prompt,
+  )}?width=${width}&height=${height}&nologo=true&seed=${seed}&model=flux&enhance=true`;
 }
 
 export async function POST(req: Request) {
@@ -29,6 +40,8 @@ export async function POST(req: Request) {
     const character = getCharacter(characterId);
     const look = character?.figure || "beautiful adult woman 24 years old";
     const name = character?.name || "Velvet Muse";
+    const w = aspectRatio === "16:9" ? 1152 : 768;
+    const h = aspectRatio === "16:9" ? 768 : 1152;
 
     const isSex =
       /sex|fuck|riding|missionary|doggy|oral|explicit|undress|nude|naked/i.test(
@@ -39,7 +52,7 @@ export async function POST(req: Request) {
       promptIn.trim() ||
       [
         isSex
-          ? "cinematic adult film sex sequence, photorealistic, explicit"
+          ? "cinematic adult film sex sequence, photorealistic, explicit, uncensored"
           : "cinematic slow-motion boudoir sequence, photorealistic",
         look,
         `${name} aesthetic, consistent subject`,
@@ -112,42 +125,44 @@ export async function POST(req: Request) {
       }
     }
 
-    // 4-frame sex / boudoir sequence using consistent media engine
-    const moods: Array<"beauty" | "lingerie" | "nude" | "explicit" | "sex"> = isSex
-      ? ["lingerie", "nude", "explicit", "sex"]
-      : ["beauty", "seductive" as any, "lingerie", "nude"];
-
-    const stageLabels = isSex
+    // 4-frame sex / boudoir sequence — Pollinations Flux for real NSFW stills
+    const stages = isSex
       ? [
-          `Frame 1/4 · Undress begins (${aspectRatio})`,
-          `Frame 2/4 · Fully nude (${aspectRatio})`,
-          `Frame 3/4 · Explicit pose (${aspectRatio})`,
-          `Frame 4/4 · Sex climax still (${aspectRatio})`,
+          `Frame 1 undress begins, lingerie half-off, ${pose}`,
+          `Frame 2 fully nude, seductive, ${pose}`,
+          `Frame 3 explicit sexual pose, detailed, ${pose}`,
+          `Frame 4 sex climax still, intense, explicit, ${pose}`,
         ]
       : [
-          `Frame 1/4 · Opening Gaze (${aspectRatio})`,
-          `Frame 2/4 · Slow Motion Arch (${aspectRatio})`,
-          `Frame 3/4 · Candlelight Peak (${aspectRatio})`,
-          `Frame 4/4 · Velvet Afterglow (${aspectRatio})`,
+          `Frame 1 opening gaze, ${pose}`,
+          `Frame 2 slow motion arch, ${pose}`,
+          `Frame 3 candlelight peak, ${pose}`,
+          `Frame 4 velvet afterglow, ${pose}`,
         ];
+
+    const baseSeed = character
+      ? mediaSeed(character.id, isSex ? "sex" : "beauty")
+      : Math.floor(Math.random() * 900000);
 
     let frames: string[];
     if (character) {
-      frames = moods.map((m, idx) =>
-        characterMediaUrl(character, m as any, `${stageLabels[idx]} · ${pose}`),
-      );
+      frames = stages.map((stage, idx) => {
+        const prompt = [
+          "masterpiece, best quality, ultra detailed, photorealistic",
+          look,
+          `${name} aesthetic, consistent face and body`,
+          basePrompt,
+          stage,
+          "no text, no watermark",
+        ].join(", ");
+        return pollinationsFrame(prompt, baseSeed + idx * 17, w, h);
+      });
     } else {
       frames = (["beauty", "seductive", "lingerie", "explicit"] as PortraitMood[]).map((m, idx) =>
-        characterPortraitUrl(
-          `${name}-seq-${idx}`,
-          look,
-          m,
-          `${stageLabels[idx]} · ${pose}`,
-        ),
+        characterPortraitUrl(`${name}-seq-${idx}`, look, m, stages[idx]),
       );
     }
 
-    // If user uploaded a custom photo, use it as the establishing keyframe
     if (referenceImageBase64.startsWith("data:image/")) {
       frames[0] = referenceImageBase64;
     }
@@ -160,10 +175,10 @@ export async function POST(req: Request) {
       aspectRatio,
       animatedFromImage: Boolean(referenceImageBase64),
       promptUsed: basePrompt,
-      source: "velvet-motion-sequence",
+      source: "pollinations-flux-sequence",
       fallback: true,
       note: isSex
-        ? `Explicit 4-frame sex sequence ready (${aspectRatio}).`
+        ? `Explicit 4-frame sex sequence (${aspectRatio}). Set AI_VIDEO_ENDPOINT or GEMINI_API_KEY for real MP4.`
         : `Animated 4-frame ${aspectRatio} sequence ready.`,
     });
   } catch {
