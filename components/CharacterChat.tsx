@@ -449,7 +449,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             disabled={busy}
             onClick={() => runLiveAction(p)}
             className="px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-100 disabled:opacity-40"
-            title={intimacy < p.minIntimacy ? `Needs ${p.minIntimacy}% intimacy` : p.label}
+            title={intimacy < p.minIntimacy ? "Needs " + p.minIntimacy + "% intimacy" : p.label}
           >
             {p.emoji} {p.label}
           </button>
