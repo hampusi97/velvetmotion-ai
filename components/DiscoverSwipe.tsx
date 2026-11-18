@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
-import { characterMediaUrl, resolveCharacterAvatar } from "@/lib/media";
+import { characterMediaUrl } from "@/lib/media";
 import { addCoins, getCoins } from "@/lib/storage";
 
 function cardImage(c: Character, level: "beauty" | "lingerie" | "nude" | "explicit" = "beauty") {
@@ -24,7 +24,32 @@ const HOOKS = [
   "Horny and online",
   "Ready to show everything",
   "Gallery full of nudes",
+  "SPH mood · size queen online",
+  "BNWO fantasy unlocked",
 ];
+
+const RACE_KEY = "vm-discover-race";
+
+type RacePref = "unspecified" | "white" | "black" | "other";
+
+function loadRace(): RacePref {
+  if (typeof window === "undefined") return "unspecified";
+  try {
+    const v = localStorage.getItem(RACE_KEY);
+    if (v === "white" || v === "black" || v === "other" || v === "unspecified") return v;
+  } catch {
+    /* */
+  }
+  return "unspecified";
+}
+
+/** Flavor match rate for BNWO-style fantasy — girls still always match on ♥ */
+function matchChance(race: RacePref): number {
+  if (race === "black") return 0.8;
+  if (race === "white") return 0.3;
+  if (race === "other") return 0.55;
+  return 1; // unspecified = always match (fun default)
+}
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -50,14 +75,17 @@ export function DiscoverSwipe({
   const [liked, setLiked] = useState<string[]>([]);
   const [passed, setPassed] = useState(0);
   const [showMatch, setShowMatch] = useState<Character | null>(null);
-  const [peekLevel, setPeekLevel] = useState<0 | 1 | 2 | 3>(0); // 0 beauty, 1 lingerie, 2 nude, 3 explicit
+  const [rejected, setRejected] = useState(false);
+  const [peekLevel, setPeekLevel] = useState<0 | 1 | 2 | 3>(0);
   const [coins, setCoins] = useState(500);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [superLiked, setSuperLiked] = useState(false);
+  const [race, setRace] = useState<RacePref>("unspecified");
 
   useEffect(() => {
     setCoins(getCoins());
+    setRace(loadRace());
     try {
       const raw = localStorage.getItem("velvet-custom-girls");
       if (raw) {
@@ -103,6 +131,7 @@ export function DiscoverSwipe({
     setPeekLevel(0);
     setDragX(0);
     setSuperLiked(false);
+    setRejected(false);
     setIdx((i) => i + 1);
   };
 
@@ -111,7 +140,24 @@ export function DiscoverSwipe({
     next();
   };
 
+  const setRacePref = (r: RacePref) => {
+    setRace(r);
+    try {
+      localStorage.setItem(RACE_KEY, r);
+    } catch {
+      /* */
+    }
+  };
+
   const like = (isSuper = false) => {
+    // Super like always matches. Normal like uses race-flavored odds (default 100%).
+    const chance = isSuper ? 1 : matchChance(race);
+    const hits = Math.random() < chance;
+    if (!hits) {
+      setRejected(true);
+      setLiked((L) => [...L, current.id]);
+      return;
+    }
     setLiked((L) => [...L, current.id]);
     const reward = isSuper ? 8 : 3;
     addCoins(reward);
@@ -160,9 +206,34 @@ export function DiscoverSwipe({
         </h2>
         <span className="text-xs text-amber-200">{coins} coins</span>
       </div>
-      <p className="text-xs text-zinc-500 mb-4">
+      <p className="text-xs text-zinc-500 mb-2">
         Swipe right / ♥ to match · left to pass · {liked.length} likes · {passed} passes
       </p>
+
+      {/* Optional race flavor for BNWO-style match odds */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {(
+          [
+            ["unspecified", "Always match"],
+            ["white", "~30% match"],
+            ["black", "~80% match"],
+            ["other", "~55% match"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setRacePref(id)}
+            className={`rounded-full px-2.5 py-1 text-[10px] border ${
+              race === id
+                ? "border-pink-500 bg-pink-500/20 text-pink-200"
+                : "border-white/10 text-zinc-500"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       <div className="relative">
         {nextCard && nextCard.id !== current.id && (
@@ -263,7 +334,7 @@ export function DiscoverSwipe({
           onClick={() => like(true)}
           className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-lg shadow-lg shadow-blue-500/30 hover:scale-105 transition"
           aria-label="Super Like"
-          title="Super Like (+8 coins)"
+          title="Super Like — always matches (+8 coins)"
         >
           ★
         </button>
@@ -277,8 +348,31 @@ export function DiscoverSwipe({
         </button>
       </div>
       <p className="text-center text-[11px] text-zinc-500 mt-4">
-        Drag · ♥ match · ★ Super · Tap 🔥 to undress (beauty → lingerie → nude → explicit)
+        Drag · ♥ match · ★ Super (always) · Tap 🔥 beauty → lingerie → nude → explicit
       </p>
+
+      {rejected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80" onClick={() => { setRejected(false); next(); }} />
+          <div className="relative w-full max-w-sm rounded-3xl border border-white/15 bg-zinc-950 p-6 text-center">
+            <p className="text-zinc-400 text-sm uppercase tracking-widest">She passed</p>
+            <h3 className="mt-3 text-xl font-bold text-cream">{current.name.split(" ")[0]} isn't matching right now</h3>
+            <p className="mt-2 text-sm text-zinc-500">
+              Flavor odds on · Super Like ★ always lands. Or set "Always match" above.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setRejected(false);
+                next();
+              }}
+              className="mt-5 w-full py-3 rounded-2xl bg-zinc-800 font-medium"
+            >
+              Keep swiping
+            </button>
+          </div>
+        </div>
+      )}
 
       {showMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
