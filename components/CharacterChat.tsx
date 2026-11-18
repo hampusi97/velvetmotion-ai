@@ -339,7 +339,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
   // She texts first when intimacy is high and chat is short
   useEffect(() => {
-    if (intimacy < 70 || messages.length > 3) return;
+    if (intimacy < 70) return;
     const t = setTimeout(() => {
       setMessages((m) => {
         if (m.length > 3) return m;
@@ -354,7 +354,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       });
     }, 8000);
     return () => clearTimeout(t);
-  }, [character.id, intimacy, messages.length]);
+  }, [character.id, intimacy]);
 
   const refreshCoins = () => setCoinsState(getCoins());
 

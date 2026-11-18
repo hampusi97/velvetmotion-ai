@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Volume2, Timer, Activity, HeartPulse } from "lucide-react";
 import { CHARACTERS } from "@/lib/characters";
 import { getIntimacy } from "@/lib/storage";
-import { characterPortraitUrl } from "@/lib/portraits";
-import { speak } from "@/lib/speech";
+import { characterMediaUrl } from "@/lib/media";
+import { speak, startVoiceCountdown, stopSpeaking } from "@/lib/speech";
+import {
+  startIntimacyAudio,
+  stopIntimacyAudio,
+  startJoiBeat,
+  stopJoiBeat,
+} from "@/lib/audioEngine";
 
 const REVEAL_AT = 55;
 
@@ -15,9 +22,9 @@ function buildScript(name: string, kink: string): string[] {
     `Don't rush. Edge when I say edge. Stop when I say stop.`,
     `Breathe with me. In… and out. You're doing so well.`,
     `Closer. Still no peeking. Earn the image.`,
-    `Almost. Hold it. Hold…`,
-    `If intimacy is high enough, I'll let you see me. Until then — only my voice.`,
-    `Good. When you're ready to finish, ask me properly in chat.`,
+    `Almost. Hold it. Hold… right on the brink.`,
+    `If intimacy is high enough, I'll let you see every inch of me. Until then — only my voice.`,
+    `Good. When you're ready to finish, start the countdown or ask me properly in chat.`,
   ];
 }
 
@@ -26,6 +33,9 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
   const [step, setStep] = useState(0);
   const [running, setRunning] = useState(false);
   const [secs, setSecs] = useState(0);
+  const [beatActive, setBeatActive] = useState(false);
+  const [ambienceActive, setAmbienceActive] = useState(false);
+  const [countdownLeft, setCountdownLeft] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const girl = CHARACTERS.find((c) => c.id === girlId) || CHARACTERS[0];
@@ -42,13 +52,52 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
     };
   }, [running]);
 
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+      stopJoiBeat();
+      stopIntimacyAudio();
+    };
+  }, []);
+
   const speakLine = () => {
-    speak(line, girl.voice);
+    speak(line, { ...girl.voice, whispery: true });
   };
 
   const next = () => {
-    setStep((s) => Math.min(script.length - 1, s + 1));
-    setTimeout(() => speak(script[Math.min(step + 1, script.length - 1)], girl.voice), 100);
+    const nextIdx = Math.min(script.length - 1, step + 1);
+    setStep(nextIdx);
+    setTimeout(() => speak(script[nextIdx], { ...girl.voice, whispery: true }), 80);
+  };
+
+  const toggleBeat = () => {
+    if (beatActive) {
+      stopJoiBeat();
+      setBeatActive(false);
+    } else {
+      startJoiBeat(105);
+      setBeatActive(true);
+    }
+  };
+
+  const toggleAmbience = () => {
+    if (ambienceActive) {
+      stopIntimacyAudio();
+      setAmbienceActive(false);
+    } else {
+      startIntimacyAudio(78);
+      setAmbienceActive(true);
+    }
+  };
+
+  const triggerCountdown = () => {
+    setCountdownLeft(10);
+    startVoiceCountdown(10, {
+      voice: girl.voice,
+      finishPhrase: `${girl.name.split(" ")[0]} whispers: Cum for me right now. Let go.`,
+      onTick: (r) => setCountdownLeft(r),
+      onComplete: () => setCountdownLeft(null),
+    });
   };
 
   return (
@@ -56,8 +105,10 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
       <button type="button" onClick={onHome} className="text-pink-400 text-sm">
         ← Home
       </button>
-      <h1 className="font-display text-3xl text-cream">Blindfold mode</h1>
-      <p className="text-sm text-mist">Audio-only JOI until intimacy ≥ {REVEAL_AT}%. Then the image unlocks.</p>
+      <h1 className="font-display text-3xl text-cream">Blindfold JOI Studio</h1>
+      <p className="text-sm text-mist">
+        Whispery voice instructions + procedural breath & stroke beats. Reaches reveal at intimacy ≥ {REVEAL_AT}%.
+      </p>
 
       <select
         value={girlId}
@@ -76,12 +127,12 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
         ))}
       </select>
 
-      <div className="relative aspect-[3/4] max-w-xs mx-auto rounded-3xl overflow-hidden border border-white/10 bg-black">
+      <div className="relative aspect-[3/4] max-w-xs mx-auto rounded-3xl overflow-hidden border border-pink-500/30 bg-black">
         {revealed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={characterPortraitUrl(girl.id, girl.figure, "lingerie")}
-            alt=""
+            src={characterMediaUrl(girl, intimacy >= 75 ? "nude" : "lingerie")}
+            alt={girl.name}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -95,23 +146,57 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4">
+      <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 space-y-3">
         <p className="text-sm leading-relaxed text-zinc-100">{line}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={speakLine} className="px-3 py-2 rounded-xl bg-pink-600 text-sm">
-            Speak
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={speakLine}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-pink-600 text-sm font-medium"
+          >
+            <Volume2 className="h-4 w-4" /> Whisper
           </button>
           <button type="button" onClick={next} className="px-3 py-2 rounded-xl border border-white/15 text-sm">
             Next line
           </button>
           <button
             type="button"
-            onClick={() => setRunning((r) => !r)}
-            className="px-3 py-2 rounded-xl border border-white/15 text-sm"
+            onClick={toggleBeat}
+            className={`inline-flex items-center gap-1 px-3 py-2 rounded-xl border text-xs ${
+              beatActive ? "border-pink-400 bg-pink-500/20 text-pink-200" : "border-white/15 text-zinc-300"
+            }`}
           >
-            {running ? "Pause timer" : "Start timer"} {running ? `${secs}s` : ""}
+            <Activity className="h-3.5 w-3.5" /> {beatActive ? "Beat ON (105)" : "Stroke Beat"}
           </button>
-          <button type="button" onClick={() => onChat(girl.id)} className="px-3 py-2 rounded-xl border border-pink-500/40 text-sm text-pink-200">
+          <button
+            type="button"
+            onClick={toggleAmbience}
+            className={`inline-flex items-center gap-1 px-3 py-2 rounded-xl border text-xs ${
+              ambienceActive ? "border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-200" : "border-white/15 text-zinc-300"
+            }`}
+          >
+            <HeartPulse className="h-3.5 w-3.5" /> {ambienceActive ? "Breath ON" : "Breath Layer"}
+          </button>
+          <button
+            type="button"
+            onClick={triggerCountdown}
+            className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-rose-600/80 text-white text-xs font-medium"
+          >
+            <Timer className="h-3.5 w-3.5" />
+            {countdownLeft !== null ? `${countdownLeft}s…` : "10s Finish"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRunning((r) => !r)}
+            className="px-3 py-2 rounded-xl border border-white/15 text-xs"
+          >
+            {running ? "Pause" : "Timer"} {running ? `${secs}s` : ""}
+          </button>
+          <button
+            type="button"
+            onClick={() => onChat(girl.id)}
+            className="px-3 py-2 rounded-xl border border-pink-500/40 text-xs text-pink-200"
+          >
             Open chat
           </button>
         </div>

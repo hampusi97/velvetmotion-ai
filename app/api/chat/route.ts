@@ -73,6 +73,59 @@ async function callGeminiModel(
   return null;
 }
 
+function parseGroupTurns(
+  raw: string,
+  primary: Character,
+  partner: Character,
+): { characterId: string; characterName: string; content: string }[] {
+  const pFirst = primary.name.split(" ")[0];
+  const bFirst = partner.name.split(" ")[0];
+  const regex = new RegExp(`\\[SPEAKER:([^\\]]+)\\]`, "gi");
+  const matches = [...raw.matchAll(regex)];
+  if (matches.length >= 2) {
+    const turns: { characterId: string; characterName: string; content: string }[] = [];
+    for (let i = 0; i < matches.length; i++) {
+      const tag = matches[i][1].trim().toLowerCase();
+      const start = (matches[i].index ?? 0) + matches[i][0].length;
+      const end = i + 1 < matches.length ? (matches[i + 1].index ?? raw.length) : raw.length;
+      const text = raw.slice(start, end).trim();
+      if (!text) continue;
+      const isPartner =
+        tag === partner.id.toLowerCase() || tag.includes(bFirst.toLowerCase());
+      turns.push({
+        characterId: isPartner ? partner.id : primary.id,
+        characterName: isPartner ? partner.name : primary.name,
+        content: text,
+      });
+    }
+    if (turns.length >= 1) return turns;
+  }
+
+  // Fallback split if Gemini didn't use [SPEAKER:] tags
+  const parts = raw
+    .split(/\n{2,}/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return [
+      { characterId: primary.id, characterName: primary.name, content: parts[0] },
+      {
+        characterId: partner.id,
+        characterName: partner.name,
+        content: parts.slice(1).join("\n\n"),
+      },
+    ];
+  }
+  return [
+    { characterId: primary.id, characterName: primary.name, content: raw.trim() },
+    {
+      characterId: partner.id,
+      characterName: partner.name,
+      content: `*${bFirst} leans in against ${pFirst}, sliding a warm hand down your chest.* “Don't forget about me — we're sharing you tonight.”`,
+    },
+  ];
+}
+
 export async function GET() {
   const gemini = (process.env.GEMINI_API_KEY || "").trim();
   const configured = keyIsReal(gemini);
@@ -97,9 +150,13 @@ export async function POST(req: Request) {
       : "gemini-4-hydrogen";
 
     const characterId = typeof body.characterId === "string" ? body.characterId : "";
+    const partnerCharacterId =
+      typeof body.partnerCharacterId === "string" ? body.partnerCharacterId : "";
     const romanceMode = Boolean(body.romanceMode);
     const customCharacter = body.customCharacter as Character | undefined;
     const character = getCharacter(characterId) || customCharacter;
+    const partnerCharacter = partnerCharacterId ? getCharacter(partnerCharacterId) : undefined;
+
     const gifts = Array.isArray(body.gifts)
       ? body.gifts.filter((g: unknown) => typeof g === "string").slice(0, 10)
       : [];
@@ -146,6 +203,102 @@ export async function POST(req: Request) {
         ? (body.moodState as MoodState)
         : computedMood;
 
+    const cleanedMessages = messages
+      .filter((m: { role?: string }) => m.role === "user" || m.role === "assistant")
+      .slice(-14)
+      .map((m: { role: string; content: string }) => ({
+        role: m.role,
+        content: String(m.content || "").slice(0, 2000),
+      }));
+
+    // —— MULTI-GIRL THREESOME / GROUP CHAT MODE ——
+    if (character && partnerCharacter) {
+      const aFirst = character.name.split(" ")[0];
+      const bFirst = partnerCharacter.name.split(" ")[0];
+      const groupSystem = [
+        `You are roleplaying a LIVE THREESOME / MULTI-GIRL GROUP SCENE with TWO consenting adult fictional women (${character.name}, age ${character.age}, and ${partnerCharacter.name}, age ${partnerCharacter.age}) together with the user.`,
+        `Woman 1 (${character.name}): ${character.personality}. Body: ${character.figure}. Kink: ${character.kink}.`,
+        `Woman 2 (${partnerCharacter.name}): ${partnerCharacter.personality}. Body: ${partnerCharacter.figure}. Kink: ${partnerCharacter.kink}.`,
+        `Scene Location: ${sceneLabel}. Active Outfit Vibe: ${outfitLabel}. Intimacy: ${intimacy ?? 75}%.`,
+        memories.length > 0 ? `Shared User Memories: ${memories.join(" | ")}.` : "",
+        "Uninhibited explicit adult erotic roleplay, kissing/touching between both women and the user, double-teaming, and explicit dirty talk are fully enabled.",
+        directorNote === "spicier"
+          ? "Director Direction: Escalate immediately into intense physical threesome action."
+          : "",
+        `FORMAT STRICTLY AS TWO TURNS:`,
+        `[SPEAKER:${character.id}]`,
+        `(2-3 vivid sentences from ${character.name}, interacting with both the user and ${bFirst})`,
+        `[SPEAKER:${partnerCharacter.id}]`,
+        `(2-3 vivid sentences reacting directly to ${aFirst} and pressing closer to the user)`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      const geminiGroup = await callGeminiModel(requestedModel, groupSystem, cleanedMessages);
+      if (geminiGroup) {
+        const turns = parseGroupTurns(geminiGroup.text, character, partnerCharacter);
+        const enriched = turns.map((t) => ({
+          ...t,
+          innerThought: showInnerThoughts
+            ? buildInnerMonologue({
+                characterName: t.characterName,
+                moodLabel: incomingMood?.label || "Excited",
+                outfitLabel,
+                sceneLabel,
+                intimacy: intimacy ?? 75,
+              })
+            : null,
+        }));
+        return NextResponse.json({
+          reply: enriched.map((t) => `${t.characterName.split(" ")[0]}: ${t.content}`).join("\n\n"),
+          groupReplies: enriched,
+          source: geminiGroup.modelUsed,
+          mood: incomingMood?.mood,
+        });
+      }
+
+      // Rich local fallback for Threesome Group Mode
+      const fallbackA = `*${aFirst} locks eyes with ${bFirst}, sliding onto your lap in the ${sceneLabel.toLowerCase()} while ${bFirst}'s hands trace down both of your bodies.* ${fallbackReply(character, userText, romanceMode, incomingMood)}`;
+      const fallbackB = `*${bFirst} bites her lip, pressing her bare skin flush against your back while kissing ${aFirst}'s neck.* “Both of us are all yours tonight. Tell us which mouth or body you want first — or make us share you.”`;
+
+      return NextResponse.json({
+        reply: `${aFirst}: ${fallbackA}\n\n${bFirst}: ${fallbackB}`,
+        groupReplies: [
+          {
+            characterId: character.id,
+            characterName: character.name,
+            content: fallbackA,
+            innerThought: showInnerThoughts
+              ? buildInnerMonologue({
+                  characterName: character.name,
+                  moodLabel: incomingMood?.label || "Excited",
+                  outfitLabel,
+                  sceneLabel,
+                  intimacy: intimacy ?? 75,
+                })
+              : null,
+          },
+          {
+            characterId: partnerCharacter.id,
+            characterName: partnerCharacter.name,
+            content: fallbackB,
+            innerThought: showInnerThoughts
+              ? buildInnerMonologue({
+                  characterName: partnerCharacter.name,
+                  moodLabel: "Flirty",
+                  outfitLabel,
+                  sceneLabel,
+                  intimacy: intimacy ?? 75,
+                })
+              : null,
+          },
+        ],
+        source: "local-group-engine",
+        mood: incomingMood?.mood,
+      });
+    }
+
+    // —— SOLO COMPANION CHAT MODE ——
     const baseLocalReply = character
       ? fallbackReply(character, userText, romanceMode, incomingMood)
       : "I'm here with you. Tell me what you're craving tonight.";
@@ -199,15 +352,6 @@ export async function POST(req: Request) {
 
     const system = `${baseSystem}\n${extraContext}`.trim();
 
-    const cleanedMessages = messages
-      .filter((m: { role?: string }) => m.role === "user" || m.role === "assistant")
-      .slice(-14)
-      .map((m: { role: string; content: string }) => ({
-        role: m.role,
-        content: String(m.content || "").slice(0, 2000),
-      }));
-
-    // 1) Server-side Gemini model call via @google/genai SDK
     const geminiResult = await callGeminiModel(requestedModel, system, cleanedMessages);
     if (geminiResult) {
       const parsed = splitInnerThoughtAndReply(geminiResult.text);
@@ -219,7 +363,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 2) Mood-reactive local character engine fallback
     return NextResponse.json({
       reply: localReply,
       innerThought: fallbackInnerThought,
