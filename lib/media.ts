@@ -1,7 +1,7 @@
 /**
  * VelvetMotion Media Engine
- * Serves crisp, zero-latency studio portraits for every companion from /public/portraits.
- * Keeps consistent per-character visual identity with zero external rate limits.
+ * Studio portraits for beauty/seductive cards.
+ * Pollinations Flux for lingerie / nude / explicit so every girl is unique and spicy.
  */
 
 import type { Character } from "./charactersTypes";
@@ -18,7 +18,6 @@ export type MediaMood =
   | "dual";
 
 const STUDIO_PORTRAITS: Record<string, string> = {
-  // Core 1-8 (Featured row)
   maren: "/portraits/maren.jpg",
   liora: "/portraits/liora.jpg",
   tess: "/portraits/tess.jpg",
@@ -27,12 +26,10 @@ const STUDIO_PORTRAITS: Record<string, string> = {
   nadine: "/portraits/nadine.jpg",
   vesper: "/portraits/vesper.jpg",
   calla: "/portraits/calla.jpg",
-  // Core 9-12
   sable: "/portraits/maren.jpg",
   rhea: "/portraits/maren.jpg",
   juniper: "/portraits/briony.jpg",
   dahlia: "/portraits/isolde.jpg",
-  // Extended cast — non-overlapping portraits within every category
   valentina: "/portraits/briony.jpg",
   "lana-rho": "/portraits/isolde.jpg",
   "lena-plug": "/portraits/briony.jpg",
@@ -77,6 +74,25 @@ const STUDIO_LIST = [
   "/portraits/calla.jpg",
 ];
 
+const MOOD_PROMPTS: Record<string, string> = {
+  beauty:
+    "tasteful beauty portrait, soft cinematic lighting, magazine cover, sharp eyes, detailed skin, seductive expression",
+  seductive:
+    "seductive portrait, parted lips, bedroom eyes, soft rim light, intimate close-up, photorealistic, slight cleavage",
+  lingerie:
+    "wearing luxurious sheer lingerie, bedroom light, seductive pose, intimate atmosphere, photorealistic, lace detail, arched back",
+  nude:
+    "fully nude, artistic erotic photography, natural skin, soft shadows, tasteful nsfw, looking at viewer, bare breasts, beautiful naked body",
+  explicit:
+    "explicit nude, sexual pose, detailed anatomy, uncensored nsfw, studio lighting, highly detailed, aroused expression",
+  sex:
+    "explicit sex scene still, intense expression, cinematic lighting, uncensored nsfw, photorealistic, adult film quality",
+  aftercare:
+    "soft afterglow portrait, satisfied expression, warm light, intimate, tender, photorealistic",
+  dual:
+    "two beautiful adult women intimate together, dual girl scene, erotic, photorealistic",
+};
+
 function toPortraitMood(mood: MediaMood | string): PortraitMood {
   if (mood === "beauty") return "beauty";
   if (mood === "lingerie") return "lingerie";
@@ -102,8 +118,33 @@ export function studioPortraitFor(id: string): string {
   return STUDIO_LIST[mediaSeed(clean, "beauty") % STUDIO_LIST.length];
 }
 
+function pollinationsUrl(
+  character: Pick<Character, "id" | "name" | "figure" | "age">,
+  mood: MediaMood | string,
+  extra = "",
+): string {
+  const moodKey = mood in MOOD_PROMPTS ? mood : "seductive";
+  const figure = character.figure || "beautiful adult woman, proportionate figure";
+  const prompt = [
+    "masterpiece, best quality, ultra detailed, photorealistic",
+    `beautiful adult woman ${character.age || 24} years old`,
+    figure,
+    `${character.name} aesthetic, consistent face and body`,
+    MOOD_PROMPTS[moodKey],
+    extra,
+    "looking at viewer, sharp eyes, detailed skin pores, natural proportions, 8k uhd, no text, no watermark",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const seed = mediaSeed(character.id, moodKey);
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(
+    prompt,
+  )}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;
+}
+
 /**
- * Return local studio photographic portrait for a companion, falling back to SVG if needed.
+ * Beauty / seductive → local studio JPGs (fast, consistent cards).
+ * Lingerie / nude / explicit / sex / dual → Pollinations Flux (unique nudes per girl).
  */
 export function characterMediaUrl(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
@@ -112,10 +153,9 @@ export function characterMediaUrl(
   _opts?: { width?: number; height?: number; enhance?: boolean },
 ): string {
   void _opts;
-  void extra;
-  if (character.id.startsWith("custom-") && !STUDIO_PORTRAITS[character.id.replace(/^custom-/, "")]) {
-    const portraitMood = toPortraitMood(mood);
-    return characterPortraitUrl(character.id, character.figure || character.name, portraitMood, character.name);
+  const spicy = ["lingerie", "nude", "explicit", "sex", "dual", "aftercare"].includes(mood);
+  if (spicy || character.id.startsWith("custom-")) {
+    return pollinationsUrl(character, mood, extra);
   }
   return studioPortraitFor(character.id);
 }
@@ -139,7 +179,6 @@ export function characterGallery(character: Character): { mood: MediaMood; label
   }));
 }
 
-/** Quick one-shot helper used by chat / generate buttons */
 export function quickNudeUrl(character: Character): string {
   return characterMediaUrl(character, "nude");
 }
@@ -152,7 +191,6 @@ export function quickLingerieUrl(character: Character): string {
   return characterMediaUrl(character, "lingerie");
 }
 
-/** Default avatar resolver */
 export function resolveCharacterAvatar(character: Character): string {
   if (character.avatar?.startsWith("http") || character.avatar?.startsWith("data:")) {
     return character.avatar;
