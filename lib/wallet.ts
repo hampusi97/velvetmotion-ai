@@ -66,11 +66,13 @@ export const DONATION_TIERS: DonationTier[] = [
   },
 ];
 
+export const PRIMARY_BTC_WALLET = "bc1qjmf9u3cmrn59q5nqmzgkvrgy7exegnfmph999k";
+
 export const CRYPTO_WALLETS: CryptoWalletAddress[] = [
   {
     symbol: "BTC",
-    network: "Bitcoin",
-    address: process.env.NEXT_PUBLIC_BTC_WALLET || "bc1qvelvetmotiondevsupport0000000000000000",
+    network: "Bitcoin (Native SegWit)",
+    address: process.env.NEXT_PUBLIC_BTC_WALLET || PRIMARY_BTC_WALLET,
   },
   {
     symbol: "ETH",
@@ -100,7 +102,7 @@ export function getDonationUrl(): string {
   }
   return (
     process.env.NEXT_PUBLIC_DONATION_URL ||
-    "https://ko-fi.com"
+    `bitcoin:${PRIMARY_BTC_WALLET}?label=VelvetMotion%20AI%20Support`
   );
 }
 

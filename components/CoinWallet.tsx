@@ -15,6 +15,7 @@ import { canClaimDaily, claimDaily, getCoins } from "@/lib/storage";
 import {
   CRYPTO_WALLETS,
   DONATION_TIERS,
+  PRIMARY_BTC_WALLET,
   claimFreeWalletRefill,
   claimSupporterBonus,
   getDonationUrl,
@@ -73,14 +74,25 @@ export function CoinWallet({
     }
   };
 
-  const handleSupportTier = (tier: DonationTier) => {
+  const handleSupportTier = async (tier: DonationTier) => {
+    try {
+      await navigator.clipboard.writeText(PRIMARY_BTC_WALLET);
+      setCopiedSymbol("BTC");
+      setTimeout(() => setCopiedSymbol(null), 2500);
+    } catch {
+      /* ignore */
+    }
     const url = getDonationUrl();
     if (typeof window !== "undefined" && url) {
-      window.open(url, "_blank", "noopener,noreferrer");
+      if (url.startsWith("bitcoin:")) {
+        window.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     }
     const { balance } = claimSupporterBonus(tier.id);
     setNotice(
-      `Thank you so much for supporting VelvetMotion ($${tier.amountUsd})! Unlocked +${tier.bonusCoins} bonus coins & VIP Supporter badge.`,
+      `Copied BTC wallet (${PRIMARY_BTC_WALLET})! Thank you for supporting VelvetMotion ($${tier.amountUsd}) — unlocked +${tier.bonusCoins.toLocaleString()} bonus coins & VIP Supporter badge.`,
     );
     refresh();
     onCoinsChanged?.(balance);
@@ -168,6 +180,46 @@ export function CoinWallet({
             {notice}
           </div>
         )}
+
+        {/* Primary Bitcoin Donation Address Banner */}
+        <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-zinc-900 to-pink-500/10 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-amber-500/25 border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-amber-200">
+                OFFICIAL BTC WALLET
+              </span>
+              <span className="text-xs text-zinc-300">
+                $5 appreciated to support development (100% optional)
+              </span>
+            </div>
+            <div className="mt-1.5 font-mono text-xs sm:text-sm text-amber-100 break-all select-all">
+              {PRIMARY_BTC_WALLET}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => void handleCopyCrypto("BTC", PRIMARY_BTC_WALLET)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-500/20 px-3.5 py-2 text-xs font-semibold text-amber-100 hover:bg-amber-500/30"
+            >
+              {copiedSymbol === "BTC" ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-300" /> Copied BTC
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" /> Copy BTC Wallet
+                </>
+              )}
+            </button>
+            <a
+              href={`bitcoin:${PRIMARY_BTC_WALLET}?label=VelvetMotion%20AI%20Support`}
+              className="inline-flex items-center gap-1 rounded-xl border border-pink-500/40 bg-pink-500/15 px-3 py-2 text-xs font-semibold text-pink-200 hover:bg-pink-500/25"
+            >
+              Open Wallet
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Optional Donation Tiers (Highlighting $5 Dev Boost) */}

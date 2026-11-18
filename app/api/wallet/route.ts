@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { CRYPTO_WALLETS, DONATION_TIERS } from "@/lib/wallet";
+import { CRYPTO_WALLETS, DONATION_TIERS, PRIMARY_BTC_WALLET } from "@/lib/wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +9,7 @@ export async function GET() {
     service: "velvetmotion-coin-wallet",
     policy: "100% free forever — donations are completely optional to help fund development and GPU servers.",
     recommendedDonationUsd: 5,
+    primaryBtcWallet: PRIMARY_BTC_WALLET,
     message:
       "A $5 donation is hugely appreciated to help develop new features and improve VelvetMotion, but never required.",
     tiers: DONATION_TIERS,

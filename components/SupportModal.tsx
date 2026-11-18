@@ -1,7 +1,13 @@
 "use client";
 
-import { Heart, Sparkles, Coins, X } from "lucide-react";
-import { claimSupporterBonus, dismissSupportPrompt, getDonationUrl } from "@/lib/wallet";
+import { useState } from "react";
+import { Heart, Sparkles, Coins, X, Copy, Check } from "lucide-react";
+import {
+  PRIMARY_BTC_WALLET,
+  claimSupporterBonus,
+  dismissSupportPrompt,
+  getDonationUrl,
+} from "@/lib/wallet";
 
 export function SupportModal({
   onClose,
@@ -12,16 +18,38 @@ export function SupportModal({
   onOpenWallet: () => void;
   onCoinsChanged?: (coins: number) => void;
 }) {
+  const [copiedBtc, setCopiedBtc] = useState(false);
+
+  const handleCopyBtc = async () => {
+    try {
+      await navigator.clipboard.writeText(PRIMARY_BTC_WALLET);
+      setCopiedBtc(true);
+      setTimeout(() => setCopiedBtc(false), 2500);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const handleSkipWithFreeCoins = () => {
     const nextBalance = dismissSupportPrompt(true);
     onCoinsChanged?.(nextBalance);
     onClose();
   };
 
-  const handleDonateFive = () => {
+  const handleDonateFive = async () => {
+    try {
+      await navigator.clipboard.writeText(PRIMARY_BTC_WALLET);
+      setCopiedBtc(true);
+    } catch {
+      /* ignore */
+    }
     const url = getDonationUrl();
     if (typeof window !== "undefined" && url) {
-      window.open(url, "_blank", "noopener,noreferrer");
+      if (url.startsWith("bitcoin:")) {
+        window.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
     }
     const { balance } = claimSupporterBonus("dev-boost-5");
     onCoinsChanged?.(balance);
@@ -61,27 +89,50 @@ export function SupportModal({
           </p>
         </div>
 
-        <div className="rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-fuchsia-500/10 p-4 space-y-1.5">
+        <div className="rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/10 via-pink-500/10 to-fuchsia-500/10 p-4 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-sm text-amber-200 flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-amber-300" /> $5 Developer Boost
+              <Sparkles className="h-4 w-4 text-amber-300" /> $5 Developer Boost (BTC Wallet)
             </span>
             <span className="rounded-full bg-amber-500/20 border border-amber-400/40 px-2.5 py-0.5 text-[11px] font-semibold text-amber-200">
               +3,500 Bonus Coins
             </span>
           </div>
-          <p className="text-xs text-zinc-300">
-            Unlocks +3,500 thank-you coins &amp; the VIP Supporter badge in your Coin Wallet.
-          </p>
+
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/60 px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-wider text-amber-300/90 font-semibold">
+                Bitcoin (BTC) Address
+              </div>
+              <div className="font-mono text-[11px] text-zinc-200 break-all">
+                {PRIMARY_BTC_WALLET}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleCopyBtc()}
+              className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-amber-400/40 bg-amber-500/20 px-2.5 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-500/30"
+            >
+              {copiedBtc ? (
+                <>
+                  <Check className="h-3.5 w-3.5 text-emerald-300" /> Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3.5 w-3.5" /> Copy
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-2 pt-1">
           <button
             type="button"
-            onClick={handleDonateFive}
+            onClick={() => void handleDonateFive()}
             className="w-full rounded-2xl bg-gradient-to-r from-pink-600 via-fuchsia-600 to-amber-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-pink-500/30 hover:opacity-95 transition"
           >
-            💝 Donate $5 to Support Development (+3,500 Coins)
+            💝 Donate $5 (Copy BTC Wallet &amp; Claim +3,500 Coins)
           </button>
 
           <button
@@ -93,7 +144,7 @@ export function SupportModal({
             }}
             className="w-full rounded-2xl border border-pink-500/35 bg-pink-500/10 py-2.5 text-xs font-medium text-pink-200 hover:bg-pink-500/20 transition"
           >
-            🪙 Open Coin Wallet (Crypto / Tiers / Free Refills)
+            🪙 Open Coin Wallet (All Tiers &amp; Free Refills)
           </button>
 
           <button

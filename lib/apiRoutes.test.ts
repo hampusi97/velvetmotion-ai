@@ -210,6 +210,7 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     const wData = await wGet.json();
     assert.equal(wData.ok, true);
     assert.equal(wData.recommendedDonationUsd, 5);
+    assert.equal(wData.primaryBtcWallet, "bc1qjmf9u3cmrn59q5nqmzgkvrgy7exegnfmph999k");
     assert.ok(Array.isArray(wData.tiers) && wData.tiers.some((t: { amountUsd: number }) => t.amountUsd === 5));
     assert.ok(Array.isArray(wData.cryptoWallets) && wData.cryptoWallets.length >= 4);
 
