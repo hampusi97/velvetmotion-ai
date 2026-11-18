@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { filterCharacters, type Character } from "@/lib/characters";
-import { resolveAvatar } from "@/lib/portraits";
+import { characterMediaUrl, resolveCharacterAvatar } from "@/lib/media";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -46,7 +46,7 @@ export function CharacterRoster({
           {romanceMode ? "Romance" : "AI Girlfriends"}
         </h2>
         <p className="text-zinc-400 text-sm mt-1">
-          {visible.length} companions · 21+ fictional · free chat & nudes
+          {visible.length} companions · 21+ fictional · free chat, nudes & sex videos
         </p>
       </div>
 
@@ -105,18 +105,24 @@ export function CharacterRoster({
         <p className="text-zinc-500 text-sm">No one matches that filter.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {visible.map((character) => {
-            const src = resolveAvatar(character.avatar, character.id, character.figure);
+          {visible.map((character, i) => {
+            const src = characterMediaUrl(character, "beauty");
+            const isNew = i < 6; // first few feel "new"
             return (
               <button
                 key={character.id}
                 onClick={() => onSelect(character)}
-                className="girl-card group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden"
+                className="girl-card group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden hover:border-pink-500/50 transition"
               >
                 <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt="" className="w-full h-full object-cover" />
-                  <div className="absolute top-2 left-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] text-pink-200">
+                  <img src={src} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  {isNew && (
+                    <div className="absolute top-2 left-2 rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1">
+                      ✦ NEW
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 rounded-full bg-black/50 px-2 py-0.5 text-[10px] text-pink-200">
                     {character.category}
                   </div>
                   <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/50 to-transparent">
@@ -124,9 +130,9 @@ export function CharacterRoster({
                       <span className="font-semibold text-sm text-white truncate">{character.name}</span>
                       <span className="text-xs text-pink-300 shrink-0">{character.age}</span>
                     </div>
+                    <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{character.kink}</p>
                   </div>
                 </div>
-                <p className="text-[11px] text-zinc-400 p-3 line-clamp-2 leading-relaxed">{character.tagline}</p>
               </button>
             );
           })}
