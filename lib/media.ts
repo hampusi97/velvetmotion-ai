@@ -61,6 +61,16 @@ const STUDIO_PORTRAITS: Record<string, string> = {
   elena: "/portraits/briony.jpg",
   hannah: "/portraits/liora.jpg",
   naya: "/portraits/nadine.jpg",
+  "goth-nyx": "/portraits/vesper.jpg",
+  "sorority-blair": "/portraits/tess.jpg",
+  "sitter-rue": "/portraits/liora.jpg",
+  "prof-elaine": "/portraits/isolde.jpg",
+  "officer-vega": "/portraits/nadine.jpg",
+  "anime-yumi": "/portraits/briony.jpg",
+  "bnwo-indigo": "/portraits/maren.jpg",
+  "cuck-opaline": "/portraits/calla.jpg",
+  "dual-tess-calla": "/portraits/tess.jpg",
+  "anime-rei": "/portraits/isolde.jpg",
 };
 
 const STUDIO_LIST = [
@@ -74,57 +84,46 @@ const STUDIO_LIST = [
   "/portraits/calla.jpg",
 ];
 
-const MOOD_PROMPTS: Record<string, string> = {
+function studioPortraitFor(id: string): string {
+  return STUDIO_PORTRAITS[id] || STUDIO_LIST[Math.abs(hashCode(id)) % STUDIO_LIST.length];
+}
+
+function hashCode(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+function mediaSeed(id: string, mood: string): number {
+  return Math.abs(hashCode(id + ":" + mood)) % 100000;
+}
+
+const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "tasteful beauty portrait, soft cinematic lighting, magazine cover, sharp eyes, detailed skin, seductive expression",
+    "professional beauty portrait, soft studio lighting, elegant makeup, looking at camera, photorealistic",
   seductive:
-    "seductive portrait, parted lips, bedroom eyes, soft rim light, intimate close-up, photorealistic, slight cleavage",
+    "seductive pose, bedroom eyes, soft neon lighting, alluring expression, intimate atmosphere",
   lingerie:
-    "wearing luxurious sheer lingerie, bedroom light, seductive pose, intimate atmosphere, photorealistic, lace detail, arched back",
+    "wearing sexy lingerie, lace bra and panties, bedroom setting, soft lighting, sensual pose, detailed fabric",
   nude:
-    "fully nude, artistic erotic photography, natural skin, soft shadows, tasteful nsfw, looking at viewer, bare breasts, beautiful naked body",
+    "nude, beautiful naked body, soft natural lighting, artistic nude, detailed skin, looking at viewer",
   explicit:
-    "explicit nude, sexual pose, detailed anatomy, uncensored nsfw, studio lighting, highly detailed, aroused expression",
+    "explicit nude, aroused, detailed genitals, wet skin, intense eye contact, highly detailed erotic photography",
   sex:
-    "explicit sex scene still, intense expression, cinematic lighting, uncensored nsfw, photorealistic, adult film quality",
+    "having sex, explicit penetration, detailed anatomy, passionate expression, realistic skin texture, erotic scene",
   aftercare:
-    "soft afterglow portrait, satisfied expression, warm light, intimate, tender, photorealistic",
+    "post-sex aftercare, soft lighting, intimate embrace, satisfied expression, gentle atmosphere",
   dual:
-    "two beautiful adult women intimate together, dual girl scene, erotic, photorealistic",
+    "two beautiful women together, intimate dual scene, looking at viewer, detailed bodies, erotic composition",
 };
-
-function toPortraitMood(mood: MediaMood | string): PortraitMood {
-  if (mood === "beauty") return "beauty";
-  if (mood === "lingerie") return "lingerie";
-  if (mood === "nude") return "nude";
-  if (mood === "explicit" || mood === "sex") return "explicit";
-  return "seductive";
-}
-
-/** Deterministic seed from character id + mood so the same girl always stays consistent */
-export function mediaSeed(characterId: string, mood: MediaMood | string = "beauty"): number {
-  let h = 2166136261;
-  const str = `${characterId}:${mood}`;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h) % 999999;
-}
-
-export function studioPortraitFor(id: string): string {
-  const clean = id.replace(/^custom-/, "").toLowerCase();
-  if (STUDIO_PORTRAITS[clean]) return STUDIO_PORTRAITS[clean];
-  return STUDIO_LIST[mediaSeed(clean, "beauty") % STUDIO_LIST.length];
-}
 
 function pollinationsUrl(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
-  mood: MediaMood | string,
+  mood: MediaMood,
   extra = "",
 ): string {
-  const moodKey = mood in MOOD_PROMPTS ? mood : "seductive";
-  const figure = character.figure || "beautiful adult woman, proportionate figure";
+  const moodKey = mood;
+  const figure = character.figure || "beautiful adult woman";
   const prompt = [
     "masterpiece, best quality, ultra detailed, photorealistic",
     `beautiful adult woman ${character.age || 24} years old`,
@@ -183,7 +182,7 @@ export function quickNudeUrl(character: Character): string {
   return characterMediaUrl(character, "nude");
 }
 
-export function quickExplicitUrl(character: Character): string {
+export function quickExplicitUrlUrl(character: Character): string {
   return characterMediaUrl(character, "explicit");
 }
 
