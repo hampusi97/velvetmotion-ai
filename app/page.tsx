@@ -21,6 +21,8 @@ import { RouletteRoom } from "@/components/RouletteRoom";
 import { BlindfoldJoi } from "@/components/BlindfoldJoi";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
+import { DualGirlChat } from "@/components/DualGirlChat";
+import { ShareImport } from "@/components/ShareImport";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
@@ -40,7 +42,9 @@ type HomeView =
   | "gallery"
   | "packs"
   | "tribute"
-  | "workspace";
+  | "workspace"
+  | "dual"
+  | "share";
 
 type View = HomeView | "profile" | "chat";
 
@@ -93,10 +97,10 @@ export default function Home() {
     }
   }, []);
 
-  const navigate = (next: ViewId) => {
+  const navigate = (next: ViewId | "dual" | "share") => {
     setMenuOpen(false);
     if (next === "girls" || next === "romance") openRoster(next === "romance");
-    else setView(next);
+    else setView(next as View);
     window.scrollTo({ top: 0 });
   };
 
@@ -163,14 +167,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-ink-950 text-white">
       <SiteHeader
-        view={view === "profile" || view === "chat" ? listView : view}
+        view={view === "profile" || view === "chat" || view === "dual" || view === "share" ? listView : (view as ViewId)}
         menuOpen={menuOpen}
         onToggleMenu={toggleMenu}
-        onNavigate={navigate}
+        onNavigate={navigate as (v: ViewId) => void}
         onUserChange={setUser}
       />
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
-        {view === "home" && <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />}
+        {view === "home" && <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />}
 
         {view === "penthouse" && (
           <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
@@ -220,6 +224,18 @@ export default function Home() {
               setCustomCharacter(character);
               setSelectedId(character.id);
               setRomanceMode(false);
+              setView("chat");
+            }}
+          />
+        )}
+
+        {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
+        {view === "share" && (
+          <ShareImport
+            onHome={() => setView("home")}
+            onImport={(girl) => {
+              setCustomCharacter(girl);
+              setSelectedId(girl.id);
               setView("chat");
             }}
           />
