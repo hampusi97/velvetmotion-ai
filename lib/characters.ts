@@ -4,6 +4,7 @@
 import type { Character, CharacterVoice } from "./charactersTypes";
 import { EXTRA_CHARACTERS } from "./charactersExtra";
 import { HOT_CAST } from "./hotCast";
+import { ROLE_CHARACTERS } from "./charactersRoles";
 
 export type { Character, CharacterVoice };
 
@@ -240,7 +241,7 @@ const CORE: Character[] = [
 ];
 
 export const CHARACTERS: Character[] = [...CORE];
-for (const c of [...HOT_CAST, ...EXTRA_CHARACTERS]) {
+for (const c of [...HOT_CAST, ...EXTRA_CHARACTERS, ...ROLE_CHARACTERS]) {
   if (!CHARACTERS.some((x) => x.id === c.id)) CHARACTERS.push(c);
 }
 
