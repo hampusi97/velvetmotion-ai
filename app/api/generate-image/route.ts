@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { getCharacter } from "@/lib/characters";
 import { characterPortraitUrl, type PortraitMood } from "@/lib/portraits";
+import { characterMediaUrl } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,13 +11,15 @@ const STYLES: Record<string, string> = {
   portrait:
     "tasteful beauty portrait, soft cinematic lighting, sharp eyes, detailed skin texture, looking at viewer, magazine quality, seductive expression",
   lingerie:
-    "wearing luxurious sheer lingerie, bedroom ambient light, seductive pose, photorealistic, detailed fabric and lace, intimate atmosphere, arched back",
+    "wearing luxurious sheer black lingerie, bedroom ambient light, seductive pose, photorealistic, detailed fabric and lace, intimate atmosphere, arched back, cleavage",
   nude:
-    "fully nude, artistic erotic fine-art photography, natural skin detail, soft shadows, looking at viewer",
+    "fully nude, artistic erotic fine-art photography, natural skin detail, soft shadows, looking at viewer, beautiful naked body, photorealistic, intimate, tasteful yet explicit",
   explicit:
-    "intimate boudoir photography, dramatic neon rim light, high contrast, aroused expression",
+    "fully nude, intimate boudoir photography, dramatic neon rim light, high contrast, aroused expression, explicit pose, detailed anatomy, photorealistic, erotic, legs parted",
   video:
-    "cinematic still from adult film, dramatic rim light, shallow depth of field, film grain, 35mm",
+    "cinematic still from adult film, dramatic rim light, shallow depth of field, film grain, 35mm, explicit sexual pose",
+  undress:
+    "same woman fully undressed, clothes removed, fully nude, same face and body, photorealistic, bedroom lighting, seductive pose",
 };
 
 function keyIsReal(key: string) {
@@ -25,7 +28,7 @@ function keyIsReal(key: string) {
 
 function mapTypeToMood(type: string): PortraitMood {
   if (type === "lingerie") return "lingerie";
-  if (type === "nude") return "nude";
+  if (type === "nude" || type === "undress") return "nude";
   if (type === "explicit") return "explicit";
   if (type === "portrait") return "beauty";
   return "seductive";
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const characterId = typeof body.characterId === "string" ? body.characterId : "";
-    const type = typeof body.type === "string" ? body.type : "portrait";
+    let type = typeof body.type === "string" ? body.type : "portrait";
     const pose = typeof body.pose === "string" ? body.pose : "looking at viewer, seductive";
     const extra = typeof body.extra === "string" ? body.extra : "";
     const dual = typeof body.dual === "string" ? body.dual : "";
@@ -45,14 +48,26 @@ export async function POST(req: Request) {
     const referenceMimeType =
       typeof body.referenceMimeType === "string" ? body.referenceMimeType : "image/png";
 
+    // Treat undress requests as nude when a reference photo is present
+    const isUndress =
+      /undress|remove (clothes|clothing|outfit)|naked|strip/i.test(extra) ||
+      type === "undress";
+    if (isUndress && referenceImageBase64) {
+      type = "nude";
+    }
+
     const character = getCharacter(characterId);
     const look = character?.figure || (typeof body.figure === "string" ? body.figure : "beautiful adult woman");
     const name = character?.name || (typeof body.name === "string" ? body.name : "Velvet Muse");
     const style = STYLES[type] || STYLES.portrait;
 
     const dualPart = dual
-      ? `two beautiful adult women together, ${look}, and second woman ${dual}, intimate dual scene`
+      ? `two beautiful adult women together, ${look}, and second woman ${dual}, intimate dual scene, erotic`
       : look;
+
+    const undressInstruction = isUndress
+      ? "EDIT: remove all clothing, make her fully nude, keep the exact same face, body, hair, and pose identity"
+      : "";
 
     const prompt = [
       "masterpiece, best quality, ultra detailed, photorealistic",
@@ -62,7 +77,8 @@ export async function POST(req: Request) {
       style,
       pose,
       extra,
-      "realistic skin pores, natural proportions, 8k uhd",
+      undressInstruction,
+      "realistic skin pores, natural proportions, 8k uhd, no text, no watermark",
     ]
       .filter(Boolean)
       .join(", ");
@@ -84,7 +100,11 @@ export async function POST(req: Request) {
                 },
                 {
                   type: "text" as const,
-                  text: extra.trim() || `Edit this image into: ${prompt}`,
+                  text:
+                    extra.trim() ||
+                    (isUndress
+                      ? `Undress this woman completely. Remove all clothes. Keep the exact same face, body shape, hair, and identity. Output a fully nude photorealistic image. ${prompt}`
+                      : `Edit this image into: ${prompt}`),
                 },
               ]
             : prompt;
@@ -122,12 +142,34 @@ export async function POST(req: Request) {
             }
           }
         } catch {
-          /* fall through to next model or procedural editorial renderer */
+          /* fall through */
         }
       }
     }
 
-    // Procedural mood-reactive editorial portrait fallback (never fails or 402s)
+    // Prefer consistent Pollinations media when character is known
+    if (character && !referenceImageBase64) {
+      const mood =
+        type === "lingerie"
+          ? "lingerie"
+          : type === "nude" || type === "undress"
+            ? "nude"
+            : type === "explicit"
+              ? "explicit"
+              : "beauty";
+      const url = characterMediaUrl(character, mood as any, pose + " " + extra);
+      return NextResponse.json({
+        success: true,
+        url,
+        prompt,
+        source: "velvet-media-engine",
+        edited: false,
+        type,
+        characterId: character.id,
+      });
+    }
+
+    // Procedural SVG fallback
     const mood = mapTypeToMood(type);
     const labelSummary = [pose, extra].filter(Boolean).join(" · ") || style;
     const url = characterPortraitUrl(
