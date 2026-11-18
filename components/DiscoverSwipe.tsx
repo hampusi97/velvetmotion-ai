@@ -2,27 +2,28 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
-import { characterPortraitUrl, resolveAvatar } from "@/lib/portraits";
+import { characterMediaUrl, resolveCharacterAvatar } from "@/lib/media";
 import { addCoins, getCoins } from "@/lib/storage";
 
-function cardImage(c: Character, spicy = false) {
-  if (!spicy && c.avatar && !c.avatar.endsWith(".svg") && (c.avatar.startsWith("http") || c.avatar.startsWith("data:"))) {
-    return c.avatar;
-  }
-  return characterPortraitUrl(c.id, c.figure, spicy ? "lingerie" : "seductive");
+function cardImage(c: Character, level: "beauty" | "lingerie" | "nude" | "explicit" = "beauty") {
+  return characterMediaUrl(c, level);
 }
 
 const HOOKS = [
   "She just liked you back",
-  "Online now · 2 min away",
+  "Online now · wants nudes",
   "Wants something explicit",
   "Matched your vibe",
   "Looking for a late session",
   "Tribute energy tonight",
-  "Feeling needy",
-  "New to the app · curious",
-  "Will send nudes if you match",
+  "Feeling needy · send pic",
+  "Will undress if you match",
   "In the mood to edge you",
+  "Private content unlocked",
+  "Wants sex video tonight",
+  "Horny and online",
+  "Ready to show everything",
+  "Gallery full of nudes",
 ];
 
 function shuffle<T>(arr: T[]): T[] {
@@ -49,7 +50,7 @@ export function DiscoverSwipe({
   const [liked, setLiked] = useState<string[]>([]);
   const [passed, setPassed] = useState(0);
   const [showMatch, setShowMatch] = useState<Character | null>(null);
-  const [spicyPeek, setSpicyPeek] = useState(false);
+  const [peekLevel, setPeekLevel] = useState<0 | 1 | 2 | 3>(0); // 0 beauty, 1 lingerie, 2 nude, 3 explicit
   const [coins, setCoins] = useState(500);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -70,7 +71,6 @@ export function DiscoverSwipe({
 
   useEffect(() => {
     const base = [...extra, ...customGirls, ...CHARACTERS];
-    // Deduplicate by id
     const seen = new Set<string>();
     const unique = base.filter((c) => {
       if (seen.has(c.id)) return false;
@@ -96,8 +96,11 @@ export function DiscoverSwipe({
     );
   }
 
+  const levels = ["beauty", "lingerie", "nude", "explicit"] as const;
+  const currentLevel = levels[peekLevel];
+
   const next = () => {
-    setSpicyPeek(false);
+    setPeekLevel(0);
     setDragX(0);
     setSuperLiked(false);
     setIdx((i) => i + 1);
@@ -121,6 +124,10 @@ export function DiscoverSwipe({
     const c = showMatch || current;
     setShowMatch(null);
     onMatch(c);
+  };
+
+  const cyclePeek = () => {
+    setPeekLevel((p) => ((p + 1) % 4) as 0 | 1 | 2 | 3);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -158,11 +165,10 @@ export function DiscoverSwipe({
       </p>
 
       <div className="relative">
-        {/* Next card preview for depth */}
         {nextCard && nextCard.id !== current.id && (
           <div className="absolute inset-0 scale-[0.94] translate-y-3 rounded-3xl overflow-hidden border border-white/5 opacity-60 pointer-events-none">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cardImage(nextCard, false)} alt="" className="w-full h-full object-cover" />
+            <img src={cardImage(nextCard, "beauty")} alt="" className="w-full h-full object-cover" />
           </div>
         )}
 
@@ -179,7 +185,7 @@ export function DiscoverSwipe({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={cardImage(current, spicyPeek)}
+            src={cardImage(current, currentLevel)}
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
             draggable={false}
@@ -202,13 +208,21 @@ export function DiscoverSwipe({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setSpicyPeek((s) => !s);
+                cyclePeek();
               }}
               className="rounded-full bg-black/55 backdrop-blur-sm px-2.5 py-1 text-fuchsia-200 hover:bg-pink-600/50 transition"
             >
-              {spicyPeek ? "Cover up" : "Peek 🔥"}
+              {peekLevel === 0 && "Peek 🔥"}
+              {peekLevel === 1 && "Lingerie"}
+              {peekLevel === 2 && "Nude 🔥"}
+              {peekLevel === 3 && "Explicit"}
             </button>
           </div>
+          {peekLevel >= 2 && (
+            <div className="absolute top-12 right-3 rounded-full bg-pink-600/90 px-2 py-0.5 text-[10px] font-bold text-white z-20">
+              NSFW
+            </div>
+          )}
           <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent">
             <div className="text-2xl font-bold text-white">
               {current.name}, {current.age}
@@ -227,7 +241,7 @@ export function DiscoverSwipe({
         </div>
       </div>
 
-      <div className="flex justify-center items-center gap-5 mt-7">
+      <div className="flex justify-center items-center gap-4 mt-7">
         <button
           type="button"
           onClick={pass}
@@ -238,11 +252,11 @@ export function DiscoverSwipe({
         </button>
         <button
           type="button"
-          onClick={() => setSpicyPeek((s) => !s)}
-          className="w-11 h-11 rounded-full bg-zinc-900 border border-fuchsia-500/40 text-base text-fuchsia-300 hover:bg-fuchsia-500/20"
-          aria-label="Peek lingerie"
+          onClick={cyclePeek}
+          className="w-12 h-12 rounded-full bg-zinc-900 border border-fuchsia-500/40 text-sm text-fuchsia-300 hover:bg-fuchsia-500/20 font-medium"
+          aria-label="Undress peek"
         >
-          🔥
+          {peekLevel === 0 ? "🔥" : peekLevel === 1 ? "👙" : peekLevel === 2 ? "nude" : "💦"}
         </button>
         <button
           type="button"
@@ -263,7 +277,7 @@ export function DiscoverSwipe({
         </button>
       </div>
       <p className="text-center text-[11px] text-zinc-500 mt-4">
-        Drag · ♥ match +3 coins · ★ Super Like +8 · Peek = lingerie frame
+        Drag · ♥ match · ★ Super · Tap 🔥 to undress (beauty → lingerie → nude → explicit)
       </p>
 
       {showMatch && (
@@ -273,10 +287,10 @@ export function DiscoverSwipe({
             <p className="text-pink-300 text-sm uppercase tracking-[0.25em] font-medium">
               {superLiked ? "Super Match ✨" : "It's a match"}
             </p>
-            <div className="mt-5 mx-auto h-32 w-32 rounded-full overflow-hidden border-2 border-pink-400 shadow-lg shadow-pink-500/30">
+            <div className="mt-5 mx-auto h-36 w-36 rounded-full overflow-hidden border-2 border-pink-400 shadow-lg shadow-pink-500/30">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={resolveAvatar(showMatch.avatar, showMatch.id, showMatch.figure)}
+                src={characterMediaUrl(showMatch, "nude")}
                 alt=""
                 className="h-full w-full object-cover"
               />
@@ -292,7 +306,7 @@ export function DiscoverSwipe({
                 onClick={openHer}
                 className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30"
               >
-                Open chat & generate
+                Open chat · nudes · sex video
               </button>
               <button
                 type="button"
