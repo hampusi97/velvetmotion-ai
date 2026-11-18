@@ -106,6 +106,15 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidLoungeMessage(data) {
+      return data.keys().hasAll(['from', 'text', 'at', 'roomId']) &&
+        data.from is string && data.from.size() >= 1 && data.from.size() <= 60 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+        data.at is int &&
+        data.roomId is string && data.roomId.size() >= 1 && data.roomId.size() <= 64 &&
+        (!('shareCode' in data) || (data.shareCode is string && data.shareCode.size() <= 4000));
+    }
+
     // Root Collection: /users/{userId}
     match /users/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
@@ -125,17 +134,13 @@ service cloud.firestore {
         incoming().uid == existing().uid &&
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time && (
-          // Action: Update Coins Balance
           incoming().diff(existing()).affectedKeys().hasOnly(['coins', 'updatedAt']) ||
-          // Action: Update Profile Username & Coins
           incoming().diff(existing()).affectedKeys().hasOnly(['username', 'coins', 'updatedAt']) ||
-          // Action: Update Username Only
           incoming().diff(existing()).affectedKeys().hasOnly(['username', 'updatedAt'])
         );
 
       allow delete: if isVerifiedUser() && isOwner(userId) && isValidId(userId);
 
-      // Subcollection: /users/{userId}/chats/{characterId}
       match /chats/{characterId} {
         allow get: if isValidId(userId) && isValidId(characterId) && isParentOwner(userId) && existing().userId == request.auth.uid;
         allow list: if isOwner(userId) && existing().userId == request.auth.uid;
@@ -157,7 +162,6 @@ service cloud.firestore {
           incoming().createdAt == existing().createdAt &&
           incoming().updatedAt == request.time &&
           (
-            // Action: Message or Intimacy Progression
             incoming().diff(existing()).affectedKeys().hasOnly(['intimacy', 'gifts', 'lastMessage', 'updatedAt']) ||
             incoming().diff(existing()).affectedKeys().hasOnly(['intimacy', 'lastMessage', 'updatedAt']) ||
             incoming().diff(existing()).affectedKeys().hasOnly(['gifts', 'intimacy', 'updatedAt'])
@@ -167,7 +171,6 @@ service cloud.firestore {
         allow delete: if isVerifiedUser() && isValidId(userId) && isValidId(characterId) && isParentOwner(userId);
       }
 
-      // Subcollection: /users/{userId}/gallery/{mediaId}
       match /gallery/{mediaId} {
         allow get: if isValidId(userId) && isValidId(mediaId) && isParentOwner(userId) && existing().userId == request.auth.uid;
         allow list: if isOwner(userId) && existing().userId == request.auth.uid;
@@ -184,7 +187,6 @@ service cloud.firestore {
         allow delete: if isVerifiedUser() && isValidId(userId) && isValidId(mediaId) && isParentOwner(userId);
       }
 
-      // Subcollection: /users/{userId}/companions/{companionId}
       match /companions/{companionId} {
         allow get: if isValidId(userId) && isValidId(companionId) && isParentOwner(userId) && existing().userId == request.auth.uid;
         allow list: if isOwner(userId) && existing().userId == request.auth.uid;
@@ -209,6 +211,17 @@ service cloud.firestore {
 
         allow delete: if isVerifiedUser() && isValidId(userId) && isValidId(companionId) && isParentOwner(userId);
       }
+    }
+
+    // Public lounge (Omegle-style) — signed-in users can read/write lobby messages
+    match /loungeRooms/{roomId}/messages/{messageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        isValidId(roomId) &&
+        isValidLoungeMessage(incoming()) &&
+        incoming().roomId == roomId &&
+        incoming().text.size() <= 1000;
+      allow update, delete: if false;
     }
   }
 }
