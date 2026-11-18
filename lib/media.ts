@@ -182,7 +182,7 @@ export function quickNudeUrl(character: Character): string {
   return characterMediaUrl(character, "nude");
 }
 
-export function quickExplicitUrlUrl(character: Character): string {
+export function quickExplicitUrl(character: Character): string {
   return characterMediaUrl(character, "explicit");
 }
 
