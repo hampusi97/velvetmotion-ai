@@ -11,34 +11,19 @@ type NavItem = {
 
 const ITEMS: NavItem[] = [
   { id: "home", label: "Home", emoji: "🏠" },
-  { id: "my-girls", label: "My Girls", emoji: "💗", badge: "FREE" },
-  { id: "wallet", label: "Coin Wallet & Support", emoji: "🪙", badge: "$5 ❤" },
   { id: "shorts", label: "Shorts", emoji: "🎬" },
-  { id: "girls", label: "Chat Roster", emoji: "💬" },
-  { id: "romance", label: "Romance Mode", emoji: "💕" },
-  { id: "tinder", label: "Discover Swipe", emoji: "🔥" },
-  { id: "penthouse", label: "3D Penthouse", emoji: "🏙️" },
-  { id: "scenario", label: "Spicy Scenarios", emoji: "🎭" },
-  { id: "blindfold", label: "Blindfold JOI", emoji: "🕶️" },
-  { id: "room", label: "Goon Room", emoji: "⏱️" },
-  { id: "roulette", label: "Roulette Sprint", emoji: "🎰" },
-  { id: "dual", label: "Dual Girl Chat", emoji: "👯‍♀️" },
-  { id: "group", label: "Group Chat", emoji: "👥" },
-  { id: "lounge", label: "User Lounge", emoji: "👋" },
-  { id: "joi", label: "Guided JOI", emoji: "🎧" },
-  { id: "packs", label: "Story Packs", emoji: "📖" },
-  { id: "bnwo", label: "Power Dynamics", emoji: "👑" },
-  { id: "tribute", label: "Tribute Hub", emoji: "🔒" },
+  { id: "mygirls", label: "My Girls", emoji: "💗" },
+  { id: "girls", label: "Chat", emoji: "💬" },
   { id: "gallery", label: "Collection", emoji: "🖼️" },
-  { id: "vault", label: "Private Vault", emoji: "🔐" },
   { id: "create", label: "Create Character", emoji: "✨" },
-  { id: "import", label: "Import Card", emoji: "🃏" },
-  { id: "share", label: "Share & Codes", emoji: "🔗" },
-  { id: "workspace", label: "Google Workspace", emoji: "☁️" },
-  { id: "advanced", label: "Advanced & Comfy", emoji: "⚙️" },
-  { id: "terms", label: "Terms", emoji: "📄" },
-  { id: "privacy", label: "Privacy", emoji: "🔏" },
-  { id: "safety", label: "Safety", emoji: "🛡️" },
+  { id: "import", label: "Import card", emoji: "🃏" },
+  { id: "tinder", label: "Discover", emoji: "🔥" },
+  { id: "lounge", label: "Lounge", emoji: "👋" },
+  { id: "group", label: "Group chat", emoji: "👥" },
+  { id: "tribute", label: "Private Content", emoji: "🔒" },
+  { id: "vault", label: "Private Vault", emoji: "🔐" },
+  { id: "advanced", label: "Advanced media", emoji: "⚙️" },
+  { id: "legal", label: "Legal & Safety", emoji: "📋" },
 ];
 
 export function CandySidebar({
@@ -51,13 +36,10 @@ export function CandySidebar({
   coins?: number;
 }) {
   return (
-    <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-white/10 bg-zinc-950/80 py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
-      <nav className="flex flex-col gap-0.5 overflow-y-auto pr-1">
+    <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-zinc-950/80 py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
+      <nav className="flex flex-col gap-1">
         {ITEMS.map((item) => {
-          const isActive =
-            active === item.id ||
-            (item.id === "girls" && active === "chat") ||
-            (item.id === "my-girls" && active === "my-girls");
+          const isActive = active === item.id || (item.id === "girls" && active === "chat");
           return (
             <button
               key={item.id}
@@ -73,7 +55,7 @@ export function CandySidebar({
               <span className="text-base w-5 text-center">{item.emoji}</span>
               <span className="font-medium">{item.label}</span>
               {item.badge && (
-                <span className="ml-auto text-[10px] rounded-full bg-emerald-600/90 px-1.5 py-0.5 text-white">
+                <span className="ml-auto text-[10px] rounded-full bg-pink-600 px-1.5 py-0.5 text-white">
                   {item.badge}
                 </span>
               )}
@@ -83,21 +65,14 @@ export function CandySidebar({
       </nav>
       <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
         {typeof coins === "number" && (
-          <button
-            type="button"
-            onClick={() => onNavigate("wallet")}
-            className="w-full text-left text-xs text-amber-200 px-3 py-1 rounded-lg hover:bg-amber-500/10 transition flex items-center justify-between"
-          >
-            <span>🪙 {coins} coins</span>
-            <span className="text-[10px] text-pink-300">Wallet / Donate $5 →</span>
-          </button>
+          <div className="text-xs text-amber-200 px-3">{coins} coins</div>
         )}
         <button
           type="button"
-          onClick={() => onNavigate("my-girls")}
+          onClick={() => onNavigate("tribute")}
           className="w-full rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 py-2.5 text-sm font-semibold text-white"
         >
-          💗 My Girls
+          💎 Premium vibes
         </button>
       </div>
     </aside>
