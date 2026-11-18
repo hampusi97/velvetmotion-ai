@@ -1,4 +1,10 @@
-/** Compact mood-reactive boudoir SVG portrait generator — zero external 402 errors, < 1100 chars for Firestore SavedMedia schema compliance. */
+/** Compact mood-reactive boudoir SVG portrait generator + rich media bridge.
+ *  Primary path now prefers Pollinations consistent NSFW images via lib/media.ts.
+ *  SVG remains as zero-dependency fallback.
+ */
+
+import { characterMediaUrl, type MediaMood } from "./media";
+import type { Character } from "./charactersTypes";
 
 export type PortraitMood =
   | "beauty"
@@ -81,6 +87,7 @@ function cleanText(str: string, max: number): string {
   return str.replace(/[^a-zA-Z0-9 ·,.-]/g, "").slice(0, max);
 }
 
+/** SVG fallback — used only when media engine is unavailable */
 export function characterPortraitUrl(
   id: string,
   figure: string,
@@ -103,8 +110,24 @@ export function characterPortraitUrl(
   return `data:image/svg+xml;utf8,${svg}`;
 }
 
-/** Prefer live portrait or SVG portrait over broken external links. */
+/** Prefer live Pollinations media, fall back to SVG */
 export function resolveAvatar(avatar: string, id: string, figure: string): string {
-  if (avatar.startsWith("data:")) return avatar;
-  return characterPortraitUrl(id, figure, "seductive");
+  if (avatar.startsWith("data:") || avatar.startsWith("http")) return avatar;
+  // Use media engine for a real portrait
+  try {
+    return characterMediaUrl(
+      { id, name: id, figure, age: 25 },
+      "beauty",
+    );
+  } catch {
+    return characterPortraitUrl(id, figure, "seductive");
+  }
+}
+
+/** Convenience: get a rich portrait directly from a Character object */
+export function characterRichPortrait(
+  character: Character,
+  mood: MediaMood | PortraitMood = "beauty",
+): string {
+  return characterMediaUrl(character, mood as MediaMood);
 }
