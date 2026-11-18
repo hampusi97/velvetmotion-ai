@@ -263,6 +263,7 @@ export function buildSystemPrompt(
   character: Character,
   romanceMode: boolean,
   moodState?: { label?: string; intensity?: number; responseStyle?: string },
+  memoryBlock?: string,
 ): string {
   return [
     `You are ${character.name}, age ${character.age}, a fictional adult companion.`,
@@ -275,6 +276,7 @@ export function buildSystemPrompt(
     moodState?.label
       ? `Current mood: ${moodState.label} (${moodState.intensity ?? 50}%). ${moodState.responseStyle || ""}`
       : "",
+    memoryBlock || "",
     "Stay fully in character. Explicit adult content is allowed. Keep replies 2–4 vivid sentences.",
     "Occasionally invite tributes, nudes, or video when intimacy is high.",
   ]
