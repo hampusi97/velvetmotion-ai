@@ -1,0 +1,73 @@
+/** Power-user media backends (localStorage). Never required for free Pollinations path. */
+
+export type MediaBackendSettings = {
+  /** e.g. http://127.0.0.1:8188 or A1111/Forge /sdapi/v1/txt2img base */
+  localImageBase: string;
+  /** Path style: comfy | forge | custom-prompt-url */
+  localImageMode: "comfy" | "forge" | "prompt-url";
+  /** Optional img2vid endpoint that accepts image URL + prompt */
+  img2vidUrl: string;
+  /** Pollinations / external API key if needed for video */
+  pollinationsKey: string;
+  /** Prefer local when set */
+  preferLocal: boolean;
+  /** Force same face seed from Create photo into every mood */
+  aggressiveFaceLock: boolean;
+};
+
+const KEY = "vm-media-backend";
+
+const DEFAULTS: MediaBackendSettings = {
+  localImageBase: "",
+  localImageMode: "prompt-url",
+  img2vidUrl: "",
+  pollinationsKey: "",
+  preferLocal: false,
+  aggressiveFaceLock: true,
+};
+
+export function getMediaSettings(): MediaBackendSettings {
+  if (typeof window === "undefined") return { ...DEFAULTS };
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return { ...DEFAULTS };
+    return { ...DEFAULTS, ...JSON.parse(raw) };
+  } catch {
+    return { ...DEFAULTS };
+  }
+}
+
+export function saveMediaSettings(partial: Partial<MediaBackendSettings>) {
+  if (typeof window === "undefined") return;
+  const next = { ...getMediaSettings(), ...partial };
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch {
+    /* */
+  }
+  return next;
+}
+
+/** Per-character face seed override from Create upload */
+const FACE_PREFIX = "vm-face-seed-";
+
+export function setCharacterFaceSeed(characterId: string, seed: number) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(FACE_PREFIX + characterId, String(seed));
+  } catch {
+    /* */
+  }
+}
+
+export function getCharacterFaceSeed(characterId: string): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = localStorage.getItem(FACE_PREFIX + characterId);
+    if (v === null) return null;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
