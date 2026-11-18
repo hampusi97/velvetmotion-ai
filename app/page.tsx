@@ -10,6 +10,8 @@ import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { AdvancedMediaSettings } from "@/components/AdvancedMediaSettings";
+import { CardImport } from "@/components/CardImport";
+import { ProactiveToast } from "@/components/ProactiveToast";
 import { containerClass } from "@/lib/cn";
 import { JoiBrowser } from "@/components/content/JoiBrowser";
 import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
@@ -32,6 +34,11 @@ import { ShortsFeed } from "@/components/ShortsFeed";
 import { LoginGate } from "@/components/LoginGate";
 import { getUser, type LocalUser } from "@/lib/auth";
 import { getCoins } from "@/lib/storage";
+import {
+  startProactiveWatcher,
+  dismissProactive,
+  type ProactivePing,
+} from "@/lib/proactiveIdle";
 
 type HomeView =
   | "home"
@@ -56,7 +63,8 @@ type HomeView =
   | "share"
   | "lounge"
   | "shorts"
-  | "advanced";
+  | "advanced"
+  | "import";
 
 type View = HomeView | "profile" | "chat";
 
@@ -74,6 +82,7 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [coins, setCoins] = useState(0);
+  const [proactive, setProactive] = useState<ProactivePing | null>(null);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -99,6 +108,24 @@ export default function Home() {
     setCoins(getCoins());
     setAuthReady(true);
   }, []);
+
+  // OpenChara-lite: she texts first after idle
+  useEffect(() => {
+    if (!authReady || !user) return;
+    return startProactiveWatcher(
+      () => {
+        if (selectedId) {
+          const c =
+            customCharacter?.id === selectedId
+              ? customCharacter
+              : CHARACTERS.find((x) => x.id === selectedId);
+          if (c) return c;
+        }
+        return CHARACTERS[Math.floor(Math.random() * Math.min(8, CHARACTERS.length))] || null;
+      },
+      (ping) => setProactive(ping),
+    );
+  }, [authReady, user, selectedId, customCharacter]);
 
   const navigate = (next: string) => {
     setMenuOpen(false);
@@ -189,7 +216,8 @@ export default function Home() {
           view === "share" ||
           view === "lounge" ||
           view === "shorts" ||
-          view === "advanced"
+          view === "advanced" ||
+          view === "import"
             ? listView
             : (view as ViewId)
         }
@@ -211,6 +239,17 @@ export default function Home() {
 
           {view === "advanced" && (
             <AdvancedMediaSettings onHome={() => setView("home")} />
+          )}
+
+          {view === "import" && (
+            <CardImport
+              onHome={() => setView("home")}
+              onOpen={(c) => {
+                setCustomCharacter(c);
+                setSelectedId(c.id);
+                setView("chat");
+              }}
+            />
           )}
 
           {view === "penthouse" && (
@@ -359,6 +398,20 @@ export default function Home() {
         </div>
       </div>
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
+      {proactive && (
+        <ProactiveToast
+          ping={proactive}
+          onOpen={() => {
+            openChatById(proactive.characterId);
+            dismissProactive(proactive.at);
+            setProactive(null);
+          }}
+          onDismiss={() => {
+            dismissProactive(proactive.at);
+            setProactive(null);
+          }}
+        />
+      )}
     </div>
   );
 }
