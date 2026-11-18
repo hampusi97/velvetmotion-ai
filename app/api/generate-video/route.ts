@@ -35,7 +35,6 @@ export async function POST(req: Request) {
     const videoEndpoint = (process.env.AI_VIDEO_ENDPOINT || "").trim();
     const videoKey = (process.env.AI_VIDEO_API_KEY || "").trim();
 
-    // 1) Real motion worker when configured
     if (videoEndpoint) {
       try {
         const controller = new AbortController();
@@ -72,7 +71,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2) Free cinematic multi-frame sequence (Pollinations Flux)
     const baseSeed = seedFromId(characterId || "default") + Math.floor(Math.random() * 50);
     const framePrompts = [
       `${base}, opening frame, establishing shot, looking at viewer`,
@@ -85,7 +83,7 @@ export async function POST(req: Request) {
       const s = baseSeed + i * 17;
       return `https://image.pollinations.ai/prompt/${encodeURIComponent(
         p
-      )}width=768&height=1152&nologo=true&seed=${s}&model=flux&enhance=true`;
+      )}?width=768&height=1152&nologo=true&seed=${s}&model=flux&enhance=true`;
     });
 
     return NextResponse.json({
