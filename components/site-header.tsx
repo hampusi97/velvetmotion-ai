@@ -8,6 +8,7 @@ import { getUser, login, logout, type LocalUser } from "@/lib/auth";
 import { getCoins } from "@/lib/storage";
 import { googleSignIn, initAuth, subscribeAuthState } from "@/lib/firebase";
 import { GoogleSignInButton } from "./WorkspaceHub";
+import { GoonStreakWidget } from "./GoonStreakWidget";
 
 export function SiteHeader({
   view,
@@ -164,6 +165,7 @@ export function SiteHeader({
             </ul>
           </nav>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+            <GoonStreakWidget />
             <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200">
               <span aria-hidden>◆</span>
               <span>{coins}</span>
@@ -219,7 +221,10 @@ export function SiteHeader({
             className="relative max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain border-b border-white/10 bg-ink-900/95 backdrop-blur-md"
           >
             <ul className="flex flex-col gap-1 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <li className="px-3 py-2 text-xs text-amber-200/90">Coins: {coins}</li>
+              <li className="px-3 py-1.5 flex items-center justify-between">
+                <span className="text-xs text-amber-200">Coins: {coins}</span>
+                <GoonStreakWidget />
+              </li>
               <li className="px-3 pb-2">
                 {user ? (
                   <button type="button" onClick={doLogout} className="text-sm text-mist">

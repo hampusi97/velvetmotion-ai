@@ -542,7 +542,7 @@ export function CharacterProfile({
             ) : (
               <div className="space-y-3">
                 <p className="text-xs text-zinc-300 leading-relaxed">
-                  Send {character.name}'s character profile and opening line to your inbox via Gmail.
+                  Send {character.name}&apos;s character profile and opening line to your inbox via Gmail.
                 </p>
                 <input
                   type="email"

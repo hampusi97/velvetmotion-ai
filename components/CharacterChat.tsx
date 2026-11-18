@@ -20,7 +20,14 @@ import {
   Check,
   Plus,
   Trash2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+import {
+  startIntimacyAudio,
+  stopIntimacyAudio,
+  updateIntimacyAudioIntensity,
+} from "@/lib/audioEngine";
 import { fallbackReply, CHARACTERS, type Character } from "@/lib/characters";
 import { computeMoodState } from "@/lib/moodEngine";
 import {
@@ -141,6 +148,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [uploadedPhotoDataUrl, setUploadedPhotoDataUrl] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
   const [musicLoading, setMusicLoading] = useState(false);
+  const [ambienceActive, setAmbienceActive] = useState(false);
 
   const [aiMode, setAiMode] = useState<string | null>(null);
   const [coins, setCoinsState] = useState(500);
@@ -180,6 +188,60 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       }),
     [character, messages, durationSeconds, intimacy, romanceMode, giftIds.length, moodTick],
   );
+
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const speakWithPulse = (text: string, voice?: Pick<Character["voice"], "pitch" | "rate">) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.pitch = voice?.pitch ?? 1;
+    utterance.rate = voice?.rate ?? 1;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const latestAssistantMsg = useMemo(() => {
+    return messages.slice().reverse().find((m) => m.role === "assistant")?.content || "";
+  }, [messages]);
+
+  const dialogueIntensity = useMemo(() => {
+    let score = moodState.intensity;
+    const lower = latestAssistantMsg.toLowerCase();
+    const hotWords = ["desire", "naked", "touch", "moan", "deep", "hard", "fast", "breath", "pleasure", "grip", "curve", "arch", "strip", "kiss", "body"];
+    hotWords.forEach((w) => {
+      if (lower.includes(w)) score += 8;
+    });
+    if (latestAssistantMsg.includes("!")) score += 5;
+    return Math.min(100, Math.max(20, score));
+  }, [latestAssistantMsg, moodState.intensity]);
+
+  const dynamicHue = useMemo(() => {
+    if (dialogueIntensity > 85) return "355"; // Deep crimson
+    if (dialogueIntensity > 70) return "330"; // Hot pink
+    if (dialogueIntensity > 50) return "285"; // Electric fuchsia
+    return "340"; // Soft rose
+  }, [dialogueIntensity]);
+
+  const pulseSpeed = isSpeaking || isLoading ? "0.75s" : dialogueIntensity > 70 ? "1.5s" : "3.5s";
+  const bgGradient = `radial-gradient(circle at 50% 25%, hsla(${dynamicHue}, 90%, 58%, ${isSpeaking || isLoading ? 0.45 : 0.25}) 0%, transparent 72%)`;
+
+  useEffect(() => {
+    if (ambienceActive) {
+      startIntimacyAudio(dialogueIntensity);
+      updateIntimacyAudioIntensity(dialogueIntensity);
+    } else {
+      stopIntimacyAudio();
+    }
+  }, [ambienceActive, dialogueIntensity]);
+
+  useEffect(() => {
+    return () => {
+      stopIntimacyAudio();
+    };
+  }, []);
 
   // Dynamic CSS Theme Engine updating root CSS variables based on character mood
   useEffect(() => {
@@ -374,7 +436,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             ? Math.max(0.75, character.voice.rate - 0.06)
             : character.voice.rate,
     };
-    speak(reply, moodVoice);
+    speakWithPulse(reply, moodVoice);
   };
 
   const send = async () => {
@@ -540,10 +602,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       if (data.audioUrl) {
         const audio = new Audio(data.audioUrl);
         void audio.play().catch(() => {
-          speak(replyText, character.voice);
+          speakWithPulse(replyText, character.voice);
         });
       } else {
-        speak(replyText, character.voice);
+        speakWithPulse(replyText, character.voice);
       }
     } catch {
       setVoiceStatus("Voice turn completed via local speech synthesizer.");
@@ -807,14 +869,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     <div className="flex flex-col min-h-[80vh] relative">
       <div
         aria-hidden="true"
-        className="fixed inset-0 pointer-events-none z-30 transition-all duration-1000"
+        className="fixed inset-0 pointer-events-none z-30 transition-all duration-700"
         style={{
-          background: `radial-gradient(circle at 50% 25%, ${moodState.auraColor} 0%, transparent 68%)`,
-          opacity: moodState.intensity > 70 ? 0.32 : 0.18,
-          animation:
-            moodState.mood === "excited" || moodState.mood === "flirty"
-              ? "pulse 2.2s ease-in-out infinite"
-              : "pulse 4.5s ease-in-out infinite",
+          background: bgGradient,
+          animation: `pulse ${pulseSpeed} ease-in-out infinite`,
         }}
       />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
@@ -1109,7 +1167,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
                 <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-white/5 pt-1.5 text-[11px]">
                   <button
                     type="button"
-                    onClick={() => speak(message.content, character.voice)}
+                    onClick={() => speakWithPulse(message.content, character.voice)}
                     className="text-pink-300 hover:text-pink-200"
                   >
                     Speak
@@ -1179,6 +1237,22 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           title="Live Voice Conversation"
         >
           <Mic className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setAmbienceActive((v) => !v)}
+          className={`shrink-0 w-11 h-11 rounded-xl border flex items-center justify-center transition ${
+            ambienceActive
+              ? "bg-pink-600 border-pink-500 text-white animate-pulse"
+              : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-pink-300"
+          }`}
+          title={
+            ambienceActive
+              ? "Intimacy Ambience: ON (reacting to intensity)"
+              : "Intimacy Ambience: OFF (click to enable heavy breathing & heartbeats)"
+          }
+        >
+          {ambienceActive ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
         <input
           value={input}
