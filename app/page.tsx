@@ -34,6 +34,8 @@ import { ShortsFeed } from "@/components/ShortsFeed";
 import { LoginGate } from "@/components/LoginGate";
 import { WorkspaceHub } from "@/components/WorkspaceHub";
 import { VaultPanel } from "@/components/VaultPanel";
+import { MyGirlsHub } from "@/components/MyGirlsHub";
+import { LegalPages } from "@/components/LegalPages";
 import { getUser, type LocalUser } from "@/lib/auth";
 import { getCoins, loadChat, saveChat } from "@/lib/storage";
 import {
@@ -68,7 +70,11 @@ type HomeView =
   | "shorts"
   | "advanced"
   | "import"
-  | "vault";
+  | "vault"
+  | "my-girls"
+  | "terms"
+  | "privacy"
+  | "safety";
 
 type View = HomeView | "profile" | "chat";
 
@@ -299,7 +305,11 @@ export default function Home() {
           view === "shorts" ||
           view === "advanced" ||
           view === "import" ||
-          view === "vault"
+          view === "vault" ||
+          view === "my-girls" ||
+          view === "terms" ||
+          view === "privacy" ||
+          view === "safety"
             ? listView
             : (view as ViewId)
         }
@@ -474,6 +484,19 @@ export default function Home() {
           )}
           {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
           {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
+          {view === "my-girls" && (
+            <MyGirlsHub
+              onHome={() => setView("home")}
+              onCreate={() => setView("create")}
+              onOpenChat={(id, customChar) => {
+                if (customChar) setCustomCharacter(customChar);
+                openChatById(id);
+              }}
+            />
+          )}
+          {(view === "terms" || view === "privacy" || view === "safety") && (
+            <LegalPages page={view} onHome={() => setView("home")} />
+          )}
           {view === "tinder" && (
             <DiscoverSwipe
               onHome={() => setView("home")}
@@ -485,6 +508,23 @@ export default function Home() {
               }}
             />
           )}
+          <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
+            <span>VelvetMotion AI · Fictional adults 21+ only</span>
+            <div className="flex flex-wrap gap-4">
+              <button type="button" onClick={() => navigate("my-girls")} className="hover:text-pink-300">
+                My Girls
+              </button>
+              <button type="button" onClick={() => navigate("terms")} className="hover:text-pink-300">
+                Terms
+              </button>
+              <button type="button" onClick={() => navigate("privacy")} className="hover:text-pink-300">
+                Privacy
+              </button>
+              <button type="button" onClick={() => navigate("safety")} className="hover:text-pink-300">
+                Safety &amp; 18+ Policy
+              </button>
+            </div>
+          </footer>
         </div>
       </div>
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />

@@ -16,6 +16,7 @@ import {
   type MemoryNode,
 } from "./memoryMap";
 import { SCENE_LIBRARY } from "./consistentPrompts";
+import { parseSceneRequest } from "./sceneRequest";
 import { characterMediaUrl, type MediaMood } from "./media";
 import { buildSequence, type SequenceKind } from "./videoModes";
 import { stageFromIntimacy, nextStage } from "./relationship";
@@ -110,14 +111,20 @@ export function executeCompanionPipeline(input: PipelineTurnInput): PipelineTurn
   stages.push("dialogue-and-monologue");
 
   // Stage 3: Face-Consistent Scene Selfie & Motion Sequence
+  const autoSceneReq = parseSceneRequest(input.userMessage);
   let sceneSelfie: PipelineTurnOutput["sceneSelfie"];
-  if (input.includeSelfie || input.sceneId) {
-    const selfieMood = (matchedScene.moodHint as MediaMood) || mood.portraitMood || "lingerie";
+  if (input.includeSelfie || input.sceneId || autoSceneReq) {
+    const selfieMood =
+      autoSceneReq?.mood ||
+      (matchedScene.moodHint as MediaMood) ||
+      mood.portraitMood ||
+      "lingerie";
+    const extraScene = autoSceneReq ? autoSceneReq.extra : matchedScene.scene;
     sceneSelfie = {
-      sceneId: matchedScene.id,
-      label: matchedScene.label,
+      sceneId: input.sceneId || (autoSceneReq ? `auto-${autoSceneReq.mood}` : matchedScene.id),
+      label: autoSceneReq ? autoSceneReq.label : matchedScene.label,
       mood: selfieMood,
-      url: characterMediaUrl(character, selfieMood, matchedScene.scene),
+      url: characterMediaUrl(character, selfieMood, extraScene),
     };
     stages.push("scene-selfie");
   }

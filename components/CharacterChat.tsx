@@ -48,6 +48,7 @@ import {
 } from "@/lib/videoModes";
 import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
 import { SCENE_LIBRARY } from "@/lib/consistentPrompts";
+import { parseSceneRequest } from "@/lib/sceneRequest";
 import { loadAdvancedConfig } from "@/lib/advancedConfig";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { saveTribute } from "@/lib/rewards";
@@ -216,8 +217,29 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       if (intimacy > 40 && Math.random() < 0.18 && !/tribute/i.test(replyText)) {
         replyText += `\n\n*She glances at the camera.* “If you want to tribute me later… I won’t look away.”`;
       }
+      const autoScene = parseSceneRequest(text);
+      let autoImageUrl: string | undefined;
+      let autoMediaType: string | undefined;
+      if (autoScene) {
+        autoImageUrl = characterMediaUrl(character, autoScene.mood, autoScene.extra);
+        autoMediaType = autoScene.mood;
+        addToGallery({
+          characterId: character.id,
+          characterName: character.name,
+          type: autoScene.mood,
+          url: autoImageUrl,
+          prompt: `${character.name} ${autoScene.label}`,
+        });
+      }
       pushShort(character.id, "assistant", replyText);
-      persist([...next, { role: "assistant", content: replyText }]);
+      persist([
+        ...next,
+        {
+          role: "assistant",
+          content: replyText,
+          ...(autoImageUrl ? { imageUrl: autoImageUrl, mediaType: autoMediaType } : {}),
+        },
+      ]);
       const newInt = bumpIntimacy(character.id, 3);
       setIntimacy(newInt);
       if (voiceOn) speak(replyText.slice(0, 280), { ...character.voice });
