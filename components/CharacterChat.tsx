@@ -1,53 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Mic,
-  MicOff,
-  PhoneCall,
-  PhoneOff,
-  Music,
-  Upload,
-  Film,
-  Sparkles,
-  Brain,
-  Shirt,
-  MapPin,
-  Camera,
-  RotateCcw,
   Flame,
-  Pencil,
-  Check,
-  Plus,
-  Trash2,
   Volume2,
   VolumeX,
   Lock,
   Unlock,
   Gift,
-  Heart,
   Image as ImageIcon,
   Video,
+  Heart,
 } from "lucide-react";
 import {
   startIntimacyAudio,
   stopIntimacyAudio,
   updateIntimacyAudioIntensity,
 } from "@/lib/audioEngine";
-import { fallbackReply, CHARACTERS, type Character } from "@/lib/characters";
+import { fallbackReply, type Character } from "@/lib/characters";
 import { computeMoodState } from "@/lib/moodEngine";
 import {
-  WARDROBE_OPTIONS,
-  SCENE_LOCATIONS,
   extractMemoriesFromMessage,
-  buildInnerMonologue,
   loadMemories,
   saveMemories,
-  loadRoleplayContext,
-  saveRoleplayContext,
-  type MemoryNode,
-  type MemoryCategory,
 } from "@/lib/memoryMap";
+import { stageFromIntimacy, nextStage } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
 import {
   getCoins,
@@ -91,8 +68,12 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [vaultNote, setVaultNote] = useState("");
   const [activeMedia, setActiveMedia] = useState<{ url: string; frames?: string[]; type: string } | null>(null);
   const [gifts, setGifts] = useState<string[]>([]);
+  const [showTributeNudge, setShowTributeNudge] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const stage = stageFromIntimacy(intimacy);
+  const upcoming = nextStage(intimacy);
 
   useEffect(() => {
     const loaded = loadChat(character.id);
@@ -108,6 +89,12 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       const note = localStorage.getItem(`vm-vault-${character.id}`);
       if (note) setVaultNote(note);
     } catch {}
+    // Show tribute nudge after a short delay if intimacy is mid-range
+    const t = setTimeout(() => {
+      const int = getIntimacy(character.id, character.intimacy);
+      if (int >= 35 && int < 80) setShowTributeNudge(true);
+    }, 8000);
+    return () => clearTimeout(t);
   }, [character.id, character.initialMessage, character.intimacy]);
 
   useEffect(() => {
@@ -135,6 +122,13 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     persist(next);
     setBusy(true);
 
+    // Multi-tier memory extract
+    try {
+      const existing = loadMemories(character.id);
+      const updated = extractMemoriesFromMessage(text, existing);
+      saveMemories(character.id, updated);
+    } catch {}
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -154,6 +148,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       if (!replyText) {
         const mood = computeMoodState?.(character, text, intimacy);
         replyText = fallbackReply(character, text, romanceMode, mood);
+      }
+      // Soft tribute encouragement in some replies
+      if (intimacy > 40 && Math.random() < 0.18 && !/tribute/i.test(replyText)) {
+        replyText += `\n\n*She glances at the camera.* “If you want to tribute me later… I won’t look away.”`;
       }
       const assistantMsg: ChatMessage = { role: "assistant", content: replyText };
       const final = [...next, assistantMsg];
@@ -209,8 +207,8 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         role: "assistant",
         content:
           mood === "sex"
-            ? `*${character.name} starts a private sequence for you…*`
-            : `*${character.name} sends you something ${mood}…*`,
+            ? `*${character.name} starts a private sequence for you…*\n\n“Finish on me when you’re ready. I want to see it.”`
+            : `*${character.name} sends you something ${mood}…*\n\n“Like what you see? Tribute me and I’ll send more.”`,
         imageUrl: url,
         frames,
         mediaType: mood,
@@ -223,7 +221,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       if (voiceOn) {
         speak(
           mood === "sex"
-            ? "Watch me. Don't look away."
+            ? "Watch me. Don't look away. Tribute me when you finish."
             : `I took this just for you. Tell me how hard you are.`,
           { ...character.voice },
         );
@@ -273,10 +271,13 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-cream truncate">{character.name}</div>
-          <div className="text-xs text-zinc-400 flex items-center gap-2">
-            <span className="text-pink-300">{intimacy}% intimacy</span>
+          <div className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-pink-300">{intimacy}% · {stage.label}</span>
             <span>·</span>
             <span>{coins} coins</span>
+            {upcoming && (
+              <span className="text-zinc-500">· next: {upcoming.label}</span>
+            )}
           </div>
         </div>
         <button
@@ -296,6 +297,23 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           {vaultOpen ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
         </button>
       </div>
+
+      {/* Tribute nudge */}
+      {showTributeNudge && (
+        <div className="mt-2 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-2 flex items-center gap-2 text-xs">
+          <Heart className="h-3.5 w-3.5 text-fuchsia-300 shrink-0" />
+          <span className="text-fuchsia-100 flex-1">
+            She wants a tribute. Generate a nude/sex sequence then finish for her — she notices.
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowTributeNudge(false)}
+            className="text-fuchsia-300/70 hover:text-white"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Vault panel */}
       {vaultOpen && (
@@ -399,6 +417,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           type="button"
           onClick={() => {
             startIntimacyAudio?.(Math.min(90, intimacy + 10));
+            setShowTributeNudge(true);
           }}
           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-white/15 text-xs text-zinc-300"
         >
