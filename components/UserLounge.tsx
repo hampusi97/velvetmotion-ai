@@ -15,24 +15,29 @@ type LobbyMsg = {
 
 const LOBBY_KEY = "vm-user-lounge";
 const MATCH_KEY = "vm-lounge-match";
-const ROOM = "public";
+const ROOMS = [
+  { id: "public", label: "Public" },
+  { id: "nsfw", label: "NSFW" },
+  { id: "share", label: "Share codes" },
+] as const;
 
-function loadLobby(): LobbyMsg[] {
+function loadLobby(room: string): LobbyMsg[] {
   try {
-    const raw = localStorage.getItem(LOBBY_KEY);
+    const raw = localStorage.getItem(`${LOBBY_KEY}-${room}`);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function saveLobby(msgs: LobbyMsg[]) {
+function saveLobby(room: string, msgs: LobbyMsg[]) {
   try {
-    localStorage.setItem(LOBBY_KEY, JSON.stringify(msgs.slice(-80)));
+    localStorage.setItem(`${LOBBY_KEY}-${room}`, JSON.stringify(msgs.slice(-80)));
   } catch {}
 }
 
 export function UserLounge({ onHome }: { onHome: () => void }) {
+  const [room, setRoom] = useState<(typeof ROOMS)[number]["id"]>("public");
   const [msgs, setMsgs] = useState<LobbyMsg[]>([]);
   const [text, setText] = useState("");
   const [partner, setPartner] = useState<string | null>(null);
@@ -41,9 +46,10 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
   const me = getUser()?.username || "Anon";
 
   useEffect(() => {
-    setMsgs(loadLobby());
+    setMsgs(loadLobby(room));
+    setFirebaseLive(false);
     let unsub = () => {};
-    void subscribeLounge(ROOM, (list) => {
+    void subscribeLounge(room, (list) => {
       if (list.length) {
         setFirebaseLive(true);
         setMsgs(
@@ -60,7 +66,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       unsub = u;
     });
     const onStorage = (e: StorageEvent) => {
-      if (e.key === LOBBY_KEY && !firebaseLive) setMsgs(loadLobby());
+      if (e.key === `${LOBBY_KEY}-${room}` && !firebaseLive) setMsgs(loadLobby(room));
       if (e.key === MATCH_KEY && e.newValue) {
         try {
           const p = JSON.parse(e.newValue);
@@ -73,7 +79,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       unsub();
       window.removeEventListener("storage", onStorage);
     };
-  }, [me, firebaseLive]);
+  }, [me, firebaseLive, room]);
 
   const post = async (body: string, shareCode?: string) => {
     const msg: LobbyMsg = {
@@ -83,10 +89,10 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       at: Date.now(),
       shareCode,
     };
-    const next = [...loadLobby(), msg];
-    saveLobby(next);
+    const next = [...loadLobby(room), msg];
+    saveLobby(room, next);
     setMsgs(next);
-    const ok = await postLoungeMessage(ROOM, {
+    const ok = await postLoungeMessage(room, {
       from: me,
       text: body,
       at: msg.at,
@@ -144,15 +150,32 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       <button type="button" onClick={onHome} className="text-pink-400 text-sm">
         ← Home
       </button>
-      <h1 className="font-display text-3xl text-cream">Lounge</h1>
+      <h1 className="font-display text-3xl text-cream neon-text">Lounge</h1>
       <p className="text-sm text-mist">
-        Omegle-style lobby · share girl codes.{" "}
+        Omegle-style lobby · share girl codes · multi-room.{" "}
         {firebaseLive ? (
-          <span className="text-emerald-400">Live (Firebase)</span>
+          <span className="text-emerald-400">● Live (Firebase)</span>
         ) : (
-          <span className="text-zinc-500">Local / same-browser demo until Firebase rules allow loungeRooms</span>
+          <span className="text-zinc-500">Local fallback — deploy firestore.rules for live rooms</span>
         )}
       </p>
+
+      <div className="flex flex-wrap gap-2">
+        {ROOMS.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            onClick={() => setRoom(r.id)}
+            className={`rounded-full px-3 py-1.5 text-xs border ${
+              room === r.id
+                ? "border-pink-500 bg-pink-500/20 text-pink-100"
+                : "border-white/15 text-zinc-300"
+            }`}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {!partner ? (
@@ -183,7 +206,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
         </button>
       </div>
 
-      <div className="h-72 overflow-y-auto rounded-2xl border border-white/10 bg-zinc-950/80 p-3 space-y-2">
+      <div className="h-72 overflow-y-auto rounded-2xl border border-pink-500/20 bg-zinc-950/80 p-3 space-y-2 glass-card">
         {msgs.length === 0 && (
           <p className="text-xs text-zinc-500 text-center pt-8">No messages yet. Find a stranger or say hi.</p>
         )}
@@ -203,7 +226,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder={partner ? `Message ${partner}…` : "Message the lounge…"}
+          placeholder={partner ? `Message ${partner}…` : `Message #${room}…`}
           className="flex-1 rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500"
         />
         <button type="button" onClick={send} className="px-4 rounded-2xl bg-pink-600 text-sm font-medium">
