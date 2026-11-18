@@ -1,10 +1,11 @@
 /**
- * Lite "live mode": when the user is idle on home/chat, she may text first.
- * Inspired by OpenChara autonomous cycles — client-only, no worker required.
+ * Lite "live mode": when the user is idle, she may text first.
+ * Uses Notification API / SW when permission granted (PWA-friendly).
  */
 
 import type { Character } from "./charactersTypes";
 import { getIntimacy } from "./storage";
+import { showProactiveNotification, ensureNotificationPermission } from "./pwaProactive";
 
 export type ProactivePing = {
   characterId: string;
@@ -15,8 +16,8 @@ export type ProactivePing = {
 
 const QUEUE_KEY = "vm-proactive-queue";
 const LAST_KEY = "vm-proactive-last";
-const IDLE_MS = 45_000; // first ping after ~45s idle
-const COOLDOWN_MS = 12 * 60_000; // min 12 min between global pings
+const IDLE_MS = 45_000;
+const COOLDOWN_MS = 12 * 60_000;
 
 const TEMPLATES = [
   (n: string) => `Hey… it's ${n}. You went quiet. Still thinking about me?`,
@@ -75,8 +76,9 @@ export function markProactiveFired() {
 
 export function buildProactivePing(character: Character): ProactivePing {
   const intimacy = getIntimacy(character.id, character.intimacy);
-  const pool = TEMPLATES;
-  const text = pool[Math.floor(Math.random() * pool.length)](character.name.split(" ")[0]);
+  const text = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)](
+    character.name.split(" ")[0],
+  );
   const spicy =
     intimacy >= 55
       ? ` ${Math.random() > 0.5 ? "I might be undressed already." : "Tribute me later if you miss me.”}`
@@ -89,7 +91,20 @@ export function buildProactivePing(character: Character): ProactivePing {
   };
 }
 
-/** Call from home: schedule idle callback. Returns cleanup. */
+function notifyPing(ping: ProactivePing) {
+  showProactiveNotification(ping.characterName, ping.text, `vm-${ping.characterId}`);
+  try {
+    navigator.serviceWorker?.controller?.postMessage({
+      type: "show-notification",
+      title: ping.characterName,
+      body: ping.text,
+      characterId: ping.characterId,
+    });
+  } catch {
+    /* */
+  }
+}
+
 export function startProactiveWatcher(
   getCharacter: () => Character | null,
   onPing: (ping: ProactivePing) => void,
@@ -97,6 +112,8 @@ export function startProactiveWatcher(
   if (typeof window === "undefined") return () => {};
   let timer: ReturnType<typeof setTimeout> | null = null;
   let idle = true;
+
+  void ensureNotificationPermission();
 
   const arm = () => {
     if (timer) clearTimeout(timer);
@@ -114,6 +131,7 @@ export function startProactiveWatcher(
       const q = [ping, ...loadProactiveQueue()].slice(0, 20);
       saveProactiveQueue(q);
       markProactiveFired();
+      notifyPing(ping);
       onPing(ping);
       arm();
     }, IDLE_MS);
