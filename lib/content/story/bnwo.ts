@@ -134,4 +134,93 @@ export const BNWO_SPH_PACKS: StoryPack[] = [
       },
     ],
   },
+  {
+    id: "sph-desk-sequel",
+    title: "Desk Sequel — Measuring Tape",
+    tag: "SPH",
+    desc: "Ava brings a tape. She measures, narrates, and decides your finish condition.",
+    summary:
+      "Ava Quinn, 26, texts you back to the office after hours. This time she has a soft measuring tape and a list of rules you already agreed to by showing up.",
+    accent: "rose",
+    character: {
+      name: "Ava Quinn",
+      age: 26,
+      role: "Office SPH sequel",
+      summary: "Curious, precise, and addicted to your reactions more than the act.",
+    },
+    chapters: [
+      { id: "return", title: "Back", sceneIds: ["return", "measure"] },
+      { id: "finish", title: "Finish Rule", sceneIds: ["rule-finish", "leave"] },
+    ],
+    scenes: [
+      {
+        id: "return",
+        title: "You Came Back",
+        nextSceneId: "measure",
+        text: "Ava is already at her desk when you close the door. She does not stand. She points at the spot in front of her.\n\n\"Good. You remembered the lock. Hands on the desk. I brought something.\" She unfolds a soft white measuring tape like it is stationery. \"Last time was visual. Tonight is data.\"",
+      },
+      {
+        id: "measure",
+        title: "Numbers",
+        nextSceneId: "rule-finish",
+        text: "She measures carefully, reading the number out loud once, then again softer, watching your face more than the tape.\n\n\"That is the number. We are not arguing with it. We are using it.\" She sets the tape aside and rests two fingers under your chin. \"You finish only after you say the number back to me without flinching. Practice.\"",
+      },
+      {
+        id: "rule-finish",
+        title: "The Condition",
+        nextSceneId: "leave",
+        text: "She works you with the same unhurried curiosity as before, stopping whenever your voice breaks on the number.\n\n\"Again. Clean.\" When you finally say it steady she smiles and lets you finish on the tissue she already prepared. \"See? Obedience looks good on you.\"",
+      },
+      {
+        id: "leave",
+        title: "Out",
+        text: "She walks you to the elevator with a hand on your lower back.\n\n\"Text me the number once when you get home. Just the number. That is your goodnight.\" The doors close on her soft, satisfied expression.",
+      },
+    ],
+  },
+  {
+    id: "bnwo-queen-weekend",
+    title: "Queen Weekend",
+    tag: "BNWO",
+    desc: "A full weekend protocol. You serve, watch, and earn soft private time only after compliance.",
+    summary:
+      "Sable, 29, designs a weekend where your phone, your eyes, and your access are all on her schedule. Guests optional. Your posture is not.",
+    accent: "violet",
+    character: {
+      name: "Sable",
+      age: 29,
+      role: "Weekend protocol queen",
+      summary: "Elegant, structured, and warm only after the rules are met.",
+    },
+    chapters: [
+      { id: "friday", title: "Friday Lock",
+ sceneIds: ["lock-in", "guest"] },
+      { id: "sunday", title: "Soft Hours", sceneIds: ["soft", "release"] },
+    ],
+    scenes: [
+      {
+        id: "lock-in",
+        title: "Friday",
+        nextSceneId: "guest",
+        text: "Sable takes your phone, sets a charging station in the hallway, and hands you a written list: posture, address, when you may speak.\n\n\"This is not punishment. This is structure. You wanted to feel owned — here is the calendar version.\" She kisses your cheek. \"Kneel when I enter a room until I wave you up.\"",
+      },
+      {
+        id: "guest",
+        title: "Saturday Guest",
+        nextSceneId: "soft",
+        text: "A guest arrives mid-afternoon. Sable does not hide you. She positions you with a drink tray and a clear view.\n\n\"He knows the rules. So do you. You serve. You watch. You do not compete.\" The afternoon stretches. She checks your posture twice with a look that is almost affectionate.",
+      },
+      {
+        id: "soft",
+        title: "Sunday Soft",
+        nextSceneId: "release",
+        text: "Sunday morning the guest is gone. Sable pulls you into bed still in her robe and lets the protocol loosen.\n\n\"You held the weekend. That buys you this.\" Soft hands, soft voice, no audience. She still decides the pace.",
+      },
+      {
+        id: "release",
+        title: "Phone Back",
+        text: "She returns your phone at the door with one condition.\n\n\"Screenshot the list and keep it. Next month we can run a shorter version or none at all. You get a vote — after you tell me what the structure did to you without performing.\"",
+      },
+    ],
+  },
 ];
