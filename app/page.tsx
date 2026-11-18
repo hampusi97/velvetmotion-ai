@@ -20,6 +20,7 @@ import { DiscoverSwipe } from "@/components/DiscoverSwipe";
 import { RouletteRoom } from "@/components/RouletteRoom";
 import { BlindfoldJoi } from "@/components/BlindfoldJoi";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
+import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
@@ -34,6 +35,7 @@ type HomeView =
   | "room"
   | "roulette"
   | "blindfold"
+  | "scenario"
   | "suggest"
   | "gallery"
   | "packs"
@@ -226,6 +228,12 @@ export default function Home() {
         {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} />}
         {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
         {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
+        {view === "scenario" && (
+          <SpicyScenarioSimulator
+            onHome={() => setView("home")}
+            onStartChat={(id) => openChatById(id)}
+          />
+        )}
 
         {view === "tribute" && (
           <>

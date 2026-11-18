@@ -1,3 +1,9 @@
+export interface KinkSettings {
+  bondageLevel: number; // 0 to 100
+  intensityFactor: number; // 1 to 10
+  preferredActs: string[];
+}
+
 export interface CharacterVoice {
   label: string;
   pitch: number;
@@ -23,4 +29,6 @@ export interface Character {
   figure: string;
   kink: string;
   reply: string;
+  kinkSettings?: KinkSettings;
 }
+

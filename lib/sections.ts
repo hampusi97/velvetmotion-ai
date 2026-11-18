@@ -9,6 +9,7 @@ export type SectionId =
   | "room"
   | "roulette"
   | "blindfold"
+  | "scenario"
   | "suggest"
   | "gallery"
   | "packs"
@@ -32,6 +33,13 @@ export const sections: Section[] = [
     kicker: "3D Suite",
     summary: "Interactive Three.js boudoir suite with lighting moods & hotspots.",
     art: "bg-[radial-gradient(120%_90%_at_18%_0%,#e879f9_0%,transparent_48%),linear-gradient(165deg,#3b0764_0%,#0f0518_75%)]",
+  },
+  {
+    id: "scenario",
+    title: "Spicy Scenarios",
+    kicker: "Engine",
+    summary: "Launch advanced custom NSFW fantasy roleplay scenarios instantly.",
+    art: "bg-[radial-gradient(120%_90%_at_18%_0%,#f43f5e_0%,transparent_48%),linear-gradient(165deg,#4c0519_0%,#0f050b_75%)]",
   },
   {
     id: "girls",

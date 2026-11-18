@@ -244,7 +244,16 @@ for (const c of EXTRA_CHARACTERS) {
 }
 
 export function getCharacter(id: string): Character | undefined {
-  return CHARACTERS.find((character) => character.id === id);
+  const found = CHARACTERS.find((character) => character.id === id);
+  if (!found) return undefined;
+  if (!found.kinkSettings) {
+    found.kinkSettings = {
+      bondageLevel: found.category === "Dominant" ? 75 : 45,
+      intensityFactor: 8,
+      preferredActs: [found.kink || "Sensual worship", "Slow burn", "Edging"],
+    };
+  }
+  return found;
 }
 
 export function characterCategories(): string[] {
@@ -273,6 +282,11 @@ export function buildSystemPrompt(
   romanceMode: boolean,
   moodState?: Pick<MoodState, "label" | "intensity" | "durationSeconds" | "responseStyle">,
 ): string {
+  const kinks = character.kinkSettings || {
+    bondageLevel: 50,
+    intensityFactor: 8,
+    preferredActs: [character.kink || "Intimate boudoir"],
+  };
   return [
     `You are ${character.name}, a fictional adult woman. You are ${character.age} years old.`,
     "You are not based on any real person. Never claim to be under 21. Never roleplay minors.",
@@ -282,9 +296,10 @@ export function buildSystemPrompt(
     `Background: ${character.background}`,
     `Body: ${character.figure}`,
     `Intimate focus: ${character.kink}`,
+    `Kink Fine-Tuning: Bondage & restraint level ${kinks.bondageLevel}%, intensity factor ${kinks.intensityFactor}/10, preferred acts: ${kinks.preferredActs.join(", ")}.`,
     romanceMode
       ? "Romance mode is ON. Lead with sincere affection. Explicit play follows warmth."
-      : "Match her dynamic. Explicit adult play is allowed when she would want it.",
+      : "Match her dynamic. Uninhibited adult play, nudes, and explicit scenes are fully allowed when she desires them.",
     moodState
       ? `Current Mood: ${moodState.label} (${moodState.intensity}% intensity, ${Math.max(1, Math.round(moodState.durationSeconds / 60))}m into conversation). Style directive: ${moodState.responseStyle}`
       : "",

@@ -35,6 +35,12 @@ export function CharacterProfile({
   const [wsNotice, setWsNotice] = useState<string | null>(null);
   const [wsModal, setWsModal] = useState<null | "drive" | "gmail">(null);
   const [gmailTo, setGmailTo] = useState("");
+  const [bondageLevel, setBondageLevel] = useState(character.kinkSettings?.bondageLevel ?? 50);
+  const [intensityFactor, setIntensityFactor] = useState(character.kinkSettings?.intensityFactor ?? 8);
+  const [preferredActs, setPreferredActs] = useState<string[]>(
+    character.kinkSettings?.preferredActs ?? [character.kink || "Sensual worship"]
+  );
+  const [newActInput, setNewActInput] = useState("");
 
   const portraitSrc =
     character.avatar.startsWith("http") || character.avatar.startsWith("data:")
@@ -293,6 +299,128 @@ export function CharacterProfile({
           <h3 className="text-pink-400 font-medium mb-1">Focus</h3>
           <p className="text-zinc-300">{character.kink}</p>
         </div>
+
+        {/* Kink & Fantasy Fine-Tuning Panel */}
+        <div className="rounded-2xl border border-pink-500/30 bg-zinc-950/80 p-4 space-y-3.5">
+          <h3 className="text-pink-300 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
+            🔥 Kink & Fantasy Fine-Tuning
+          </h3>
+          <p className="text-[11px] text-zinc-400">
+            Fine-tune restraint levels, intensity, and preferred acts to adapt her personality and NSFW prompt generator.
+          </p>
+
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-zinc-300">
+              <span>Bondage & Restraint Level</span>
+              <span className="text-pink-300 font-mono">{bondageLevel}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={bondageLevel}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setBondageLevel(val);
+                if (!character.kinkSettings) {
+                  character.kinkSettings = { bondageLevel: val, intensityFactor: 8, preferredActs: [character.kink] };
+                } else {
+                  character.kinkSettings.bondageLevel = val;
+                }
+              }}
+              className="w-full accent-pink-500 cursor-pointer"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-zinc-300">
+              <span>Intensity Factor</span>
+              <span className="text-fuchsia-300 font-mono">{intensityFactor}/10</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={intensityFactor}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setIntensityFactor(val);
+                if (!character.kinkSettings) {
+                  character.kinkSettings = { bondageLevel: 50, intensityFactor: val, preferredActs: [character.kink] };
+                } else {
+                  character.kinkSettings.intensityFactor = val;
+                }
+              }}
+              className="w-full accent-fuchsia-500 cursor-pointer"
+            />
+          </div>
+
+          <div>
+            <span className="text-xs text-zinc-400 block mb-1.5">Preferred Acts & Desires</span>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {preferredActs.map((act) => (
+                <span
+                  key={act}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-pink-500/40 bg-pink-500/15 text-pink-200"
+                >
+                  {act}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = preferredActs.filter((a) => a !== act);
+                      setPreferredActs(next);
+                      if (character.kinkSettings) character.kinkSettings.preferredActs = next;
+                    }}
+                    className="text-pink-300 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Add custom act (e.g. edging, silk ropes)…"
+                value={newActInput}
+                onChange={(e) => setNewActInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newActInput.trim()) {
+                    e.preventDefault();
+                    const next = [...preferredActs, newActInput.trim()];
+                    setPreferredActs(next);
+                    setNewActInput("");
+                    if (!character.kinkSettings) {
+                      character.kinkSettings = { bondageLevel, intensityFactor, preferredActs: next };
+                    } else {
+                      character.kinkSettings.preferredActs = next;
+                    }
+                  }
+                }}
+                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-white"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newActInput.trim()) {
+                    const next = [...preferredActs, newActInput.trim()];
+                    setPreferredActs(next);
+                    setNewActInput("");
+                    if (!character.kinkSettings) {
+                      character.kinkSettings = { bondageLevel, intensityFactor, preferredActs: next };
+                    } else {
+                      character.kinkSettings.preferredActs = next;
+                    }
+                  }
+                }}
+                className="rounded-xl bg-pink-600 px-3 py-1.5 text-xs text-white font-medium"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div>
           <h3 className="text-pink-400 font-medium mb-1">Opening line</h3>
           <p className="text-zinc-300 whitespace-pre-wrap">{character.initialMessage}</p>

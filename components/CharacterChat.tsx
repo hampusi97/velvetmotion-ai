@@ -181,6 +181,30 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     [character, messages, durationSeconds, intimacy, romanceMode, giftIds.length, moodTick],
   );
 
+  // Dynamic CSS Theme Engine updating root CSS variables based on character mood
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const MOOD_VARS: Record<string, { rose: string; candyPink: string; glow: string }> = {
+      shy: { rose: "#fb7185", candyPink: "#f43f5e", glow: "rgba(251, 113, 133, 0.4)" },
+      curious: { rose: "#38bdf8", candyPink: "#0ea5e9", glow: "rgba(56, 189, 248, 0.4)" },
+      flirty: { rose: "#f472b6", candyPink: "#ec4899", glow: "rgba(244, 114, 182, 0.5)" },
+      teasing: { rose: "#e879f9", candyPink: "#d946ef", glow: "rgba(232, 121, 249, 0.5)" },
+      excited: { rose: "#f43f5e", candyPink: "#e11d48", glow: "rgba(244, 63, 94, 0.65)" },
+      devoted: { rose: "#fbbf24", candyPink: "#f59e0b", glow: "rgba(251, 191, 36, 0.45)" },
+      dominant: { rose: "#c084fc", candyPink: "#a855f7", glow: "rgba(192, 132, 252, 0.55)" },
+    };
+    const vars = MOOD_VARS[moodState.mood] || MOOD_VARS.flirty;
+    const root = document.documentElement;
+    root.style.setProperty("--rose", vars.rose);
+    root.style.setProperty("--candy-pink", vars.candyPink);
+    root.style.setProperty("--accent-glow", vars.glow);
+    return () => {
+      root.style.removeProperty("--rose");
+      root.style.removeProperty("--candy-pink");
+      root.style.removeProperty("--accent-glow");
+    };
+  }, [moodState.mood]);
+
   // Periodically update conversation duration & Mood Engine phase every 15 seconds
   useEffect(() => {
     const id = setInterval(() => {
@@ -780,7 +804,19 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const costLabel = (GEN_COST[genType] ?? 15) + (dualId ? 15 : 0);
 
   return (
-    <div className="flex flex-col min-h-[80vh]">
+    <div className="flex flex-col min-h-[80vh] relative">
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 pointer-events-none z-30 transition-all duration-1000"
+        style={{
+          background: `radial-gradient(circle at 50% 25%, ${moodState.auraColor} 0%, transparent 68%)`,
+          opacity: moodState.intensity > 70 ? 0.32 : 0.18,
+          animation:
+            moodState.mood === "excited" || moodState.mood === "flirty"
+              ? "pulse 2.2s ease-in-out infinite"
+              : "pulse 4.5s ease-in-out infinite",
+        }}
+      />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
         <span>
           {aiMode === "premium" ? "Gemini 4 Active." : "Mood AI Active."} Chat synced · intimacy{" "}
