@@ -20,6 +20,8 @@ const STYLES: Record<string, string> = {
     "cinematic still from adult film, dramatic rim light, shallow depth of field, film grain, 35mm, explicit sexual pose",
   undress:
     "same woman fully undressed, clothes removed, fully nude, same face and body, photorealistic, bedroom lighting, seductive pose",
+  dual:
+    "two beautiful adult women together, intimate dual girl scene, erotic, photorealistic, uncensored",
 };
 
 function keyIsReal(key: string) {
@@ -29,9 +31,15 @@ function keyIsReal(key: string) {
 function mapTypeToMood(type: string): PortraitMood {
   if (type === "lingerie") return "lingerie";
   if (type === "nude" || type === "undress") return "nude";
-  if (type === "explicit") return "explicit";
+  if (type === "explicit" || type === "dual") return "explicit";
   if (type === "portrait") return "beauty";
   return "seductive";
+}
+
+function seedFromId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return (h % 800000000) + 100000;
 }
 
 export async function POST(req: Request) {
@@ -42,27 +50,28 @@ export async function POST(req: Request) {
     const pose = typeof body.pose === "string" ? body.pose : "looking at viewer, seductive";
     const extra = typeof body.extra === "string" ? body.extra : "";
     const dual = typeof body.dual === "string" ? body.dual : "";
-    const aspectRatio = body.aspectRatio === "16:9" || body.aspectRatio === "1:1" ? body.aspectRatio : "9:16";
+    const aspectRatio =
+      body.aspectRatio === "16:9" || body.aspectRatio === "1:1" ? body.aspectRatio : "9:16";
     const referenceImageBase64 =
       typeof body.referenceImageBase64 === "string" ? body.referenceImageBase64 : "";
     const referenceMimeType =
       typeof body.referenceMimeType === "string" ? body.referenceMimeType : "image/png";
 
-    // Treat undress requests as nude when a reference photo is present
     const isUndress =
-      /undress|remove (clothes|clothing|outfit)|naked|strip/i.test(extra) ||
-      type === "undress";
+      /undress|remove (clothes|clothing|outfit)|naked|strip/i.test(extra) || type === "undress";
     if (isUndress && referenceImageBase64) {
       type = "nude";
     }
+    if (dual && type === "portrait") type = "dual";
 
     const character = getCharacter(characterId);
-    const look = character?.figure || (typeof body.figure === "string" ? body.figure : "beautiful adult woman");
+    const look =
+      character?.figure || (typeof body.figure === "string" ? body.figure : "beautiful adult woman");
     const name = character?.name || (typeof body.name === "string" ? body.name : "Velvet Muse");
     const style = STYLES[type] || STYLES.portrait;
 
     const dualPart = dual
-      ? `two beautiful adult women together, ${look}, and second woman ${dual}, intimate dual scene, erotic`
+      ? `two beautiful adult women together, ${look}, and second woman ${dual}, intimate dual girl explicit scene, erotic, both looking at viewer`
       : look;
 
     const undressInstruction = isUndress
@@ -83,6 +92,7 @@ export async function POST(req: Request) {
       .filter(Boolean)
       .join(", ");
 
+    // 1) Gemini when key is real (supports reference undress)
     const apiKey = (process.env.GEMINI_API_KEY || "").trim();
     if (keyIsReal(apiKey)) {
       const ai = new GoogleGenAI({ apiKey });
@@ -147,7 +157,26 @@ export async function POST(req: Request) {
       }
     }
 
-    // Prefer consistent Pollinations media when character is known
+    // 2) Free Pollinations Flux — unique per character + type (best free nudes)
+    const spicy = ["lingerie", "nude", "undress", "explicit", "video", "dual", "sex"].includes(type);
+    if (spicy || dual) {
+      const seed = seedFromId(`${characterId || name}|${type}|${pose}`) + Math.floor(Math.random() * 30);
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
+        prompt,
+      )}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;
+      return NextResponse.json({
+        success: true,
+        url,
+        prompt,
+        source: "pollinations-flux",
+        edited: false,
+        type,
+        characterId: character?.id || characterId,
+        dual: Boolean(dual),
+      });
+    }
+
+    // 3) Known character beauty → studio / media engine
     if (character && !referenceImageBase64) {
       const mood =
         type === "lingerie"
@@ -169,7 +198,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // Procedural SVG fallback
+    // 4) SVG fallback
     const mood = mapTypeToMood(type);
     const labelSummary = [pose, extra].filter(Boolean).join(" · ") || style;
     const url = characterPortraitUrl(
