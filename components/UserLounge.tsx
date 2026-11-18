@@ -29,7 +29,6 @@ function saveLobby(msgs: LobbyMsg[]) {
   } catch {}
 }
 
-/** Lightweight peer lobby — local first; same device tab sync via storage events */
 export function UserLounge({ onHome }: { onHome: () => void }) {
   const [msgs, setMsgs] = useState<LobbyMsg[]>([]);
   const [text, setText] = useState("");
@@ -74,7 +73,6 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
 
   const findStranger = () => {
     setSearching(true);
-    // Simulated match after short delay (same-device / multi-tab demo)
     setTimeout(() => {
       const name = `Stranger_${Math.floor(1000 + Math.random() * 9000)}`;
       setPartner(name);
@@ -95,14 +93,20 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
         return;
       }
       const girl = list[0];
-      const code = btoa(unescape(encodeURIComponent(JSON.stringify({
-        id: girl.id,
-        name: girl.name,
-        figure: girl.figure,
-        personality: girl.personality,
-        kink: girl.kink,
-        tagline: girl.tagline,
-      })))).slice(0, 48);
+      const code = btoa(
+        unescape(
+          encodeURIComponent(
+            JSON.stringify({
+              id: girl.id,
+              name: girl.name,
+              figure: girl.figure,
+              personality: girl.personality,
+              kink: girl.kink,
+              tagline: girl.tagline,
+            }),
+          ),
+        ),
+      ).slice(0, 48);
       post(`Sharing my girl “${girl.name}” — code: ${code}`, code);
     } catch {
       post("Couldn't build a share code.");
@@ -140,7 +144,8 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
               Connected · {partner}
             </span>
             <button
-              type="button"fffffffffffff onClick={nextStranger}
+              type="button"
+              onClick={nextStranger}
               className="rounded-full border border-white/15 px-3 py-1.5 text-xs"
             >
               Next
@@ -179,11 +184,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
           placeholder={partner ? `Message ${partner}…` : "Message the lounge…"}
           className="flex-1 rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500"
         />
-        <button
-          type="button"
-          onClick={send}
-          className="px-4 rounded-2xl bg-pink-600 text-sm font-medium"
-        >
+        <button type="button" onClick={send} className="px-4 rounded-2xl bg-pink-600 text-sm font-medium">
           Send
         </button>
       </div>
