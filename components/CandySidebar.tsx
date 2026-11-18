@@ -22,6 +22,7 @@ const ITEMS: NavItem[] = [
   { id: "group", label: "Group chat", emoji: "👥" },
   { id: "tribute", label: "Private Content", emoji: "🔒" },
   { id: "vault", label: "Private Vault", emoji: "🔐" },
+  { id: "wallet", label: "Coin Wallet & Support", emoji: "🪙", badge: "$5 ❤" },
   { id: "advanced", label: "Advanced media", emoji: "⚙️" },
   { id: "legal", label: "Legal & Safety", emoji: "📋" },
 ];
@@ -65,14 +66,21 @@ export function CandySidebar({
       </nav>
       <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
         {typeof coins === "number" && (
-          <div className="text-xs text-amber-200 px-3">{coins} coins</div>
+          <button
+            type="button"
+            onClick={() => onNavigate("wallet")}
+            className="w-full flex items-center justify-between text-xs text-amber-200 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition"
+          >
+            <span>🪙 {coins.toLocaleString()} coins</span>
+            <span className="text-[10px] text-amber-300/80">Wallet →</span>
+          </button>
         )}
         <button
           type="button"
-          onClick={() => onNavigate("tribute")}
-          className="w-full rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 py-2.5 text-sm font-semibold text-white"
+          onClick={() => onNavigate("wallet")}
+          className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-pink-600 to-fuchsia-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-pink-500/20 hover:opacity-95 transition"
         >
-          💎 Premium vibes
+          💝 Support Dev ($5)
         </button>
       </div>
     </aside>
