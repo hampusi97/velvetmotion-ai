@@ -46,6 +46,7 @@ import {
   enhanceSequenceWithVideo,
   type SequenceKind,
 } from "@/lib/videoModes";
+import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 import { VoiceCallUI } from "@/components/VoiceCallUI";
@@ -193,7 +194,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     }
   };
 
-  const generate = async (mood: MediaMood, label: string, cost: number) => {
+  const generate = async (mood: MediaMood, label: string, cost: number, extra = "") => {
     if (busy) return;
     if (!spendCoins(cost)) {
       setMessages((m) => [...m, { role: "assistant", content: `Not enough coins for ${label}.` }]);
@@ -202,11 +203,11 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     setCoinsState(getCoins());
     setBusy(true);
     try {
-      const url = characterMediaUrl(character, mood);
+      const url = characterMediaUrl(character, mood, extra);
       addToGallery({ characterId: character.id, characterName: character.name, type: mood, url, prompt: `${character.name} ${mood}` });
       const mediaMsg: ChatMessage = {
         role: "assistant",
-        content: `*${character.name} sends you something ${mood}…*\n\n“Like what you see? Tribute me and I’ll send more.”`,
+        content: `*${character.name} — ${label}…*\n\n“Like what you see? Tribute me and I’ll send more.”`,
         imageUrl: url,
         mediaType: mood,
       };
@@ -238,21 +239,35 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       setActiveMedia({ url, frames, type: kind, note: "Frame sequence" });
       setIntimacy(bumpIntimacy(character.id, 8));
       setShowTributeNudge(true);
-      if (voiceOn) {
-        speak(kind === "joi" ? "Stroke for me." : "Watch me.", { ...character.voice });
-      }
+      if (voiceOn) speak(kind === "joi" ? "Stroke for me." : "Watch me.", { ...character.voice });
       setClipStatus("Enhancing to live clip…");
       const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
       if (enhanced.videoUrl) {
         setActiveMedia({ url, frames, videoUrl: enhanced.videoUrl, type: kind, note: enhanced.note });
         setClipStatus(enhanced.mode === "mp4" ? "Live clip attached" : enhanced.note);
         persist([...next, { role: "assistant", content: `*Clip ready.* ${enhanced.note}`, videoUrl: enhanced.videoUrl, frames, imageUrl: url, mediaType: kind }]);
-      } else {
-        setClipStatus(enhanced.note || "Sequence only");
-      }
+      } else setClipStatus(enhanced.note || "Sequence only");
     } finally {
       setBusy(false);
     }
+  };
+
+  const runLiveAction = (preset: LiveActionPreset) => {
+    if (intimacy < preset.minIntimacy) {
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: `*She smiles.* “Get closer first… need about ${preset.minIntimacy}% intimacy for that.”`,
+        },
+      ]);
+      return;
+    }
+    if (preset.kind === "photo" && preset.mood) {
+      void generate(preset.mood, preset.label, GEN_COST.lingerie, preset.sceneExtra);
+      return;
+    }
+    void generateSequence(preset.kind as SequenceKind);
   };
 
   const sendGift = (giftId: string) => {
@@ -299,10 +314,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             {upcoming && <span className="text-zinc-500">next: {upcoming.label}</span>}
           </div>
         </div>
-        <button type="button" onClick={() => setCallOpen(true)} className="p-2 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" title="Voice call">
+        <button type="button" onClick={() => setCallOpen(true)} className="p-2 rounded-xl border border-emerald-500/40 text-emerald-300" title="Voice call">
           <Phone className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => setVoiceOn((v) => !v)} className="p-2 rounded-xl border border-white/10 text-zinc-300" title="TTS">
+        <button type="button" onClick={() => setVoiceOn((v) => !v)} className="p-2 rounded-xl border border-white/10 text-zinc-300">
           {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
         <button type="button" onClick={() => setVaultOpen((v) => !v)} className="p-2 rounded-xl border border-white/10 text-zinc-300">
@@ -332,9 +347,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-pink-600/90" : "bg-zinc-900/80 border border-white/10"}`}>
               <div className="whitespace-pre-wrap">{m.content}</div>
-              {m.videoUrl && (
-                <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />
+              {m.role === "assistant" && (
+                <button
+                  type="button"
+                  className="mt-1 text-[10px] text-pink-400/80 hover:text-pink-300"
+                  onClick={() => speak(m.content.slice(0, 280), { ...character.voice })}
+                >
+                  ▶ Voice note
+                </button>
               )}
+              {m.videoUrl && <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />}
               {m.imageUrl && !m.videoUrl && (
                 <div className="mt-2 rounded-xl overflow-hidden">
                   {m.frames && m.frames.length > 1 ? (
@@ -365,6 +387,22 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           <button type="button" onClick={() => setActiveMedia(null)} className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-xs">Close</button>
         </div>
       )}
+
+      <div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Live Action</div>
+      <div className="flex flex-wrap gap-1.5 pb-2">
+        {LIVE_ACTION_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            disabled={busy}
+            onClick={() => runLiveAction(p)}
+            className="px-2.5 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-[11px] text-emerald-100 disabled:opacity-40"
+            title={intimacy < p.minIntimacy ? `Needs ${p.minIntimacy}% intimacy` : p.label}
+          >
+            {p.emoji} {p.label}
+          </button>
+        ))}
+      </div>
 
       <div className="flex flex-wrap gap-2 pb-2">
         {NSFW_CHIPS.map((chip) => (
