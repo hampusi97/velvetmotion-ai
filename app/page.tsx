@@ -9,6 +9,7 @@ import { HomeView as HomeScreen } from "@/components/home-view";
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { AdvancedMediaSettings } from "@/components/AdvancedMediaSettings";
 import { containerClass } from "@/lib/cn";
 import { JoiBrowser } from "@/components/content/JoiBrowser";
 import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
@@ -54,7 +55,8 @@ type HomeView =
   | "group"
   | "share"
   | "lounge"
-  | "shorts";
+  | "shorts"
+  | "advanced";
 
 type View = HomeView | "profile" | "chat";
 
@@ -186,7 +188,8 @@ export default function Home() {
           view === "group" ||
           view === "share" ||
           view === "lounge" ||
-          view === "shorts"
+          view === "shorts" ||
+          view === "advanced"
             ? listView
             : (view as ViewId)
         }
@@ -204,6 +207,10 @@ export default function Home() {
 
           {view === "shorts" && (
             <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />
+          )}
+
+          {view === "advanced" && (
+            <AdvancedMediaSettings onHome={() => setView("home")} />
           )}
 
           {view === "penthouse" && (
