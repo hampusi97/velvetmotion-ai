@@ -1,241 +1,247 @@
 import type { JoiScenario } from "../types";
 
-/** SPH / BNWO / race-play JOI — fictional adults only, consensual fantasy. */
+/**
+ * SPH / BNWO / hotwife fetish JOI packs.
+ * Adult consensual fantasy only. Characters are 21+.
+ */
 export const FETISH_JOI: JoiScenario[] = [
   {
     id: "sph-size-queen",
     label: "SPH · Size Queen",
-    tone: "Humiliating, teasing, precise",
+    tone: "Sweet cruelty, rating talk, guided finish",
     accent: "fuchsia",
     persona: {
-      name: "Sable Quinn",
-      age: 26,
-      summary: "A blunt size queen who measures you with her eyes and never looks impressed.",
+      name: "Seraphine Blake",
+      age: 31,
+      summary:
+        "A size-queen who mixes compliments with honest ratings and still walks you to a finish that belongs to her.",
     },
     summary:
-      "Sable talks down to your size the whole way: warm-up mockery, tighter strokes on command, edges when you get hopeful, finish only when she says your little cock can spill.",
+      "She asks what you’re working with, assumes the worst if you dodge, and turns the ranking into a JOI: slow strokes, verbal checks, edges that sting, and a finish on her word.",
     steps: [
       {
         id: "w1",
         phase: "warm-up",
-        title: "Look at It",
+        title: "Show Me",
         suggestedSeconds: 70,
         instruction:
-          "Sable laughs softly. \"Adults only. You asked for this. Grip that small cock. Loose. I want to see how little it looks when you're already trying.\"\n\n\"Stroke slow. Don't hide it. Size queens don't flinch — we catalog. Tell me the truth out loud: it's not big. Good. Keep stroking like you're hoping I'll change my mind. I won't.\"",
+          "\"Out. Slow.\" Seraphine’s voice is sweet enough to make the next line land harder. \"I want to see what I’m working with. If you won’t describe it, I’ll assume it’s on the smaller side — and I’ll still make you stroke it for me.\"\n\n\"Lube. Loose hand. Base to tip, no rushing. I like watching a boy take care of something cute. Tell me the length if you know it. Or don’t. Silence is an answer too.\"",
       },
       {
         id: "w2",
         phase: "warm-up",
-        title: "Compare",
-        suggestedSeconds: 65,
+        title: "Honest Rating",
+        suggestedSeconds: 75,
         instruction:
-          "\"Imagine the last real cock I took. Thicker. Longer. Stretching.\" Her voice is almost kind. \"Now look at yours. Same hand. Different scale. Twenty slow strokes. Every one is a reminder.\"\n\n\"If you get hard from the insult, say it. \"I'm hard from being small.\" I like honest losers. Keep the pace soft. We're not racing to a finish you haven't earned.\"",
+          "\"Hmm.\" She pretends to think. \"That’s… sweet. Not what fills me, but look how hard it still gets when I say that. Keep stroking. Thumb over the head every third pass.\"\n\n\"Good boy for not arguing. Arguing is boring. Stroking while I rate you is interesting.\"",
       },
       {
         id: "b1",
         phase: "build",
-        title: "Tighter",
-        suggestedSeconds: 55,
+        title: "Compare",
+        suggestedSeconds: 65,
         instruction:
-          "\"Tighter grip. Faster. Not because you deserve it — because I want to watch you chase something you can't give me.\" Sable clicks her tongue. \"Twist at the head. That's the only part that gets interesting.\"\n\n\"Say: my cock is cute when it's desperate. Again. Good boy. Build heat. Stay under the edge. If you tip early I'll make you start over with colder hands.\"",
+          "\"Tighter. Not a fist — a decision.\" Her voice drops. \"Imagine something thicker next to you. Faster for twenty. Then back off.\"\n\n\"You’re allowed to be embarrassed. You’re not allowed to stop unless I say edge.\"",
       },
       {
         id: "b2",
         phase: "build",
-        title: "Bigger Fantasies",
-        suggestedSeconds: 55,
+        title: "Stay Hard Through It",
+        suggestedSeconds: 60,
         instruction:
-          "\"Think about me on someone thicker. My face when I take it. The sound.\" She lets that sit. \"Stroke your little one to that movie. Full length. Don't look away from the fantasy.\"\n\n\"You're the audience, not the lead. Faster ten strokes. Stop if you're about to cum — size queens decide the ending.\"",
+          "\"I could leave you like this and go find someone who stretches me.\" She laughs softly. \"Or I could stay and watch you try to impress me with what you’ve got. You’re staying. Faster.\"\n\n\"Tell me you’re small. Out loud. Then keep stroking like you still deserve a finish.\"",
       },
       {
         id: "e1",
         phase: "edge",
-        title: "Denied",
-        suggestedSeconds: 35,
+        title: "Hands Off, Mouth Open",
+        suggestedSeconds: 40,
         instruction:
-          "\"Edge. Right there. Hands off.\" Sable's laugh is sharp. \"Look at it twitch. So eager for so little. Ten seconds. Breathe.\"\n\n\"When you touch again, slower than you want. You're not allowed to pretend you're packing. Own the small.\"",
+          "\"Stop.\" Clean cut. \"Hands on your thighs. Look at it. Still hard after all that talk? Good. Breathe. Don’t sneak a stroke.\"\n\n\"Color check. If you need out, say so. If you want the rest, say green and wait for my count.\"",
       },
       {
         id: "e2",
         phase: "edge",
-        title: "Almost",
-        suggestedSeconds: 40,
+        title: "One More Rating",
+        suggestedSeconds: 45,
         instruction:
-          "\"Build again. I want you shaking. Faster. Yes. That face.\" She drops to a whisper. \"You thought maybe this time I'd be impressed.\"\n\n\"Stop. Off. Oh, you're dripping. Good. One more hold. Then I'll let the little cock finish while I narrate how small the mess looks.\"",
+          "\"Loose hand. Build.\" She counts under her breath. \"There — closer. You’re going to edge for a size queen and you’re going to thank her. Stop.\"\n\n\"Beautiful. Last build next. You come when I say the word.\"",
       },
       {
         id: "f1",
         phase: "finish",
-        title: "Spill",
-        suggestedSeconds: 45,
+        title: "On My Word",
+        suggestedSeconds: 40,
         instruction:
-          "\"Hand on. Cum for me. Fast if you need it. Don't try to aim impressive — there isn't enough.\" Sable stays mean and warm at once. \"Come on. Empty that small cock. Now. Yes.\"\n\n\"Keep stroking through it. Show me. That's it. All that fuss for a cute little finish.\"",
+          "\"Stroke. Faster. Tighter. Show me what that little cock can do when it’s trying to impress me.\" Her voice is close. \"You’re allowed to come. Now. Come for your size queen. Keep stroking through it.\"\n\n\"That’s it. All of it. Don’t hide the mess.\"",
       },
       {
         id: "f2",
         phase: "finish",
-        title: "After",
-        suggestedSeconds: 30,
+        title: "After the Rating",
+        suggestedSeconds: 35,
         instruction:
-          "\"Soft hands. Water.\" Her voice eases. \"SPH is a game we both opted into. If it hit too sharp, stop the catalog for tonight. If it hit right, you know where to find me.\"\n\n\"You're still an adult who gets to like what you like. Clean up. I'm done mocking for now.\"",
+          "\"Easy.\" Softer now. \"You took the talk and still finished on command. That’s the session. Water. Wipe down.\"\n\n\"I’m still here for a minute if you need a softer voice. You earned that part too.\"",
       },
     ],
   },
   {
     id: "bnwo-bbc-only",
     label: "BNWO · BBC Only",
-    tone: "Race-play, worship, consensual adult fetish",
-    accent: "indigo",
+    tone: "Cool hierarchy, raceplay fantasy, guided watching",
+    accent: "violet",
     persona: {
-      name: "Naya Brooks",
-      age: 29,
-      summary: "Confident BNWO voice who rewires your priorities toward Black men and leaves you grateful for the hierarchy.",
+      name: "Zara Okonkwo",
+      age: 27,
+      summary:
+        "A BNWO fantasy lead who treats the hierarchy like a private club you asked to join — firm, theatrical, consent-checked.",
     },
     summary:
-      "Naya walks you through BNWO fantasy: acknowledge the hierarchy, stroke while she praises BBC, edge when you slip into old habits, finish only while affirming the new order.",
+      "Structured adult raceplay JOI: she sets the ranking, describes what she prefers, puts you in a watching role, and times your strokes to her narration.",
     steps: [
       {
         id: "w1",
         phase: "warm-up",
-        title: "Rules",
+        title: "State the Order",
         suggestedSeconds: 70,
         instruction:
-          "Naya speaks clear and steady. \"Fictional adults. Consensual race-play. Safeword is 'reality' — say it and we drop the frame.\"\n\n\"Hand on your cock. Slow strokes. You're not the standard anymore. Black men are. Say it once: BBC comes first. Good. Keep stroking while that sinks in.\"",
+          "\"Say the order back to me.\" Zara’s voice is level. \"Who she chooses first. Where you sit. If you can’t say it, you don’t get to stroke yet.\"\n\n\"Good. Hand on yourself — loose. You don’t get a hard pace until you sound like you mean the ranking.\"",
       },
       {
         id: "w2",
         phase: "warm-up",
-        title: "Look Up",
-        suggestedSeconds: 65,
+        title: "Watching Room",
+        suggestedSeconds: 75,
         instruction:
-          "\"Picture him. Dark skin, thick cock, easy confidence.\" Naya doesn't rush. \"Your hand is practice for a world where you watch more than you lead. Twenty slow strokes. Eyes open in your head.\"\n\n\"If jealousy hits, stroke through it. Jealousy is fuel here. If shame hits wrong, say reality. Otherwise keep going.\"",
+          "\"Imagine the door open enough to see.\" She paints the room. \"I’m not talking to you for a minute. I’m busy. Your job is the edge of the bed and a slow hand.\"\n\n\"Breathe. This only works if you stay hard while you’re not the main event.\"",
       },
       {
         id: "b1",
         phase: "build",
-        title: "Hierarchy",
-        suggestedSeconds: 55,
+        title: "What She Prefers",
+        suggestedSeconds: 65,
         instruction:
-          "\"Faster. You're training your body to get hard for the hierarchy.\" Her tone stays firm. \"Say: I yield to superior Black cock. Again while you stroke.\"\n\n\"Full length. Tighter. Think about me choosing him in front of you. Your place is witnessing and wanting. Build. Don't cum.\"",
+          "\"I’ll be explicit, because you asked for this fantasy.\" Zara describes preference with clinical heat. \"Stroke on my sentences. Pause on the periods.\"\n\n\"Faster for one paragraph. Then back to slow. Don’t you dare finish early.\"",
       },
       {
         id: "b2",
         phase: "build",
-        title: "Worship",
-        suggestedSeconds: 55,
+        title: "Permission Window",
+        suggestedSeconds: 60,
         instruction:
-          "\"Worship out loud. One sentence about his size, one about his entitlement to me.\" She listens in the fantasy. \"Good. Stroke to that. Faster tens.\"\n\n\"BNWO isn't chaos — it's order with you lower on purpose. Stay hard for that order. Edge coming.\"",
+          "\"You may stroke harder while I tell you what you’re not getting tonight.\" A thin smile in the voice. \"Stay verbal — yes, and thank you. If you go quiet I assume you need to stop the scene.\"\n\n\"Closer. Not over. I own the edge.\"",
       },
       {
         id: "e1",
         phase: "edge",
-        title: "Hold the Line",
-        suggestedSeconds: 35,
+        title: "Hands Off for the Hierarchy",
+        suggestedSeconds: 40,
         instruction:
-          "\"Edge. Hands off.\" Naya is calm. \"Breathe. Remember who gets to finish inside the story. Not you — not yet.\"\n\n\"Ten seconds. When you touch again, slower. Affirm: Black men first. Then we'll let you spill as a loyal beta.\"",
+          "\"Stop.\" Clean. \"Hands visible. You’re going to sit in the ache while I finish the thought.\"\n\n\"Green to continue. Red ends it with no argument.\"",
       },
       {
         id: "e2",
         phase: "edge",
-        title: "Almost Loyal",
-        suggestedSeconds: 40,
+        title: "Second Edge",
+        suggestedSeconds: 45,
         instruction:
-          "\"Build. I want you desperate and clear-headed. Faster.\" She counts under her breath. \"You're close because the hierarchy turns you on. Own that.\"\n\n\"Stop. Off. Perfect. Last hold. Finish only while you say you're locked into BNWO fantasy on purpose.\"",
+          "\"Loose hand. Build on my count.\" She counts eight. \"Stop.\" Silence. \"Again — build. You’re going to be shaky when I let you come.\"\n\n\"Last climb next. You come for the ranking, not against it.\"",
       },
       {
         id: "f1",
         phase: "finish",
-        title: "Spill for the Order",
-        suggestedSeconds: 45,
+        title: "Allowed",
+        suggestedSeconds: 40,
         instruction:
-          "\"Stroke. Cum while you say it: BBC only. BNWO. I know my place.\" Naya stays steady through your peak. \"Now. Empty it. Good.\"\n\n\"Keep the words going until you're done. That's the finish condition. Yes.\"",
+          "\"Stroke. Faster. You’re allowed.\" Zara doesn’t shout it. \"Come while you keep the order in your mouth. Thank me after.\"\n\n\"Good. That’s the scene.\"",
       },
       {
         id: "f2",
         phase: "finish",
-        title: "Re-entry",
+        title: "Step Out Clean",
         suggestedSeconds: 35,
         instruction:
-          "\"Scene open. You're an adult who played a race-play fantasy.\" Naya softens. \"Drink water. If anything felt like more than play, step away and talk to a real person.\"\n\n\"If it was hot and contained, you know how to run it again. Reality still works as a hard stop anytime.\"",
+          "\"Scene’s over.\" Practical warmth. \"Water. Clothes if you want them. Hierarchy talk stays in the fantasy box unless you ask to reopen it.\"\n\n\"If you run this pack again, we start with the consent line first — every time.\"",
       },
     ],
   },
   {
-    id: "cuck-phone",
+    id: "cuck-phone-joi",
     label: "Cuck Phone JOI",
-    tone: "Teasing, reporting, hotwife energy",
+    tone: "Intimate report, listening strokes, aftercare",
     accent: "rose",
     persona: {
-      name: "Calla Voss",
-      age: 28,
-      summary: "Hotwife energy — she texts you updates while you stroke at home.",
+      name: "Opal Voss",
+      age: 36,
+      summary:
+        "A hotwife who texts and calls from the other room, expects a full listen, and brings you back gently after.",
     },
     summary:
-      "Calla puts you on a timed JOI while she 'steps out.' Warm-up waiting, build on her updates, edges on her silence, finish when she says he made her cum.",
+      "Report-back JOI: she describes what’s happening (or just happened), times your hand to the story, edges you on the details, and closes with aftercare.",
     steps: [
       {
         id: "w1",
         phase: "warm-up",
-        title: "Stay Home",
+        title: "Line Open",
         suggestedSeconds: 70,
         instruction:
-          "Calla: \"I'm going out. You're staying. Hand on your cock, slow. This is not punishment — it's the arrangement you asked for.\"\n\n\"Stroke while you imagine my dress. Lube up. No rushing. I'll text when he's here.\"",
+          "\"Can you hear me?\" Opal’s voice is close to the phone. \"Door’s not fully shut. Hand on yourself — slow. You’re going to listen more than you talk.\"\n\n\"If anything about this stops working for you, say red. Otherwise stroke with my breathing.\"",
       },
       {
         id: "w2",
         phase: "warm-up",
-        title: "First Update",
-        suggestedSeconds: 60,
+        title: "First Details",
+        suggestedSeconds: 75,
         instruction:
-          "\"He's here. Kissing me like he owns the night.\" Her voice smiles. \"Twenty strokes. Count them. You're the husband who gets the play-by-play.\"\n\n\"Keep it slow. Hard is allowed. Finishing before my signal is not.\"",
+          "She gives sensory detail without rushing. \"Faster for ten. Back to slow. I want you hard while you’re only a voice on the line.\"\n\n\"Good. Stay with me.\"",
       },
       {
         id: "b1",
         phase: "build",
-        title: "Louder",
-        suggestedSeconds: 55,
+        title: "While He’s Here",
+        suggestedSeconds: 65,
         instruction:
-          "\"He's thicker than you. I'm louder than I am with you.\" Calla doesn't soften it. \"Faster strokes. Match my breathing in your head.\"\n\n\"Say: make her cum. Mean it. Build.\"",
+          "\"He’s still here.\" The report gets filthier. \"Stroke on the wet sounds. Pause when I pause. You’re not competing — you’re witnessing on purpose.\"\n\n\"Closer. Not yet.\"",
       },
       {
         id: "b2",
         phase: "build",
-        title: "Details",
-        suggestedSeconds: 55,
+        title: "After He Leaves",
+        suggestedSeconds: 60,
         instruction:
-          "\"Hands on the headboard. He's deep.\" She lets the image land. \"Full strokes. Don't you dare edge yet — wait for my silence.\"\n\n\"Ten hard strokes. Stop if you're tipping.\"",
+          "\"He’s gone.\" Her voice softens and gets meaner. \"I’m still open. You’re still stroking. Tell me how hard you are after that.\"\n\n\"Faster. I want you desperate on the leftover of someone else’s night.\"",
       },
       {
         id: "e1",
         phase: "edge",
-        title: "Silence",
-        suggestedSeconds: 35,
+        title: "Hold the Report",
+        suggestedSeconds: 40,
         instruction:
-          "\"…\" A beat. \"Hands off. That silence was me taking him. Hold.\"\n\n\"Breathe. You're doing perfect cuck protocol.\"",
+          "\"Hands off.\" Firm. \"You’re going to sit with every detail I just gave you. No bargaining.\"\n\n\"Green if you want the finish on my next story. Red if you need out.\"",
       },
       {
         id: "e2",
         phase: "edge",
-        title: "Almost",
-        suggestedSeconds: 40,
+        title: "Last Listen",
+        suggestedSeconds: 45,
         instruction:
-          "\"Touch. Slow. I'm close with him.\" Her voice frays on purpose. \"Match me. Get to the edge and freeze.\"\n\n\"Off. Good boy. When I say he made me cum, you finish.\"",
+          "\"Hand back. Slow build while I tell you the part I saved.\" She does. \"Stop.\" A beat. \"You’re going to come on the next permission.\"",
       },
       {
         id: "f1",
         phase: "finish",
-        title: "He Made Me Cum",
-        suggestedSeconds: 45,
+        title: "Permission",
+        suggestedSeconds: 40,
         instruction:
-          "\"He made me cum. Your turn — stroke and empty it.\" Calla stays in the report. \"Faster. Now. Cum knowing I got there first.\"\n\n\"Yes. All of it.\"",
+          "\"Now. Stroke. Come for me while I’m still on the line.\" Opal stays present through it. \"Keep going until it’s done.\"\n\n\"That’s it. Good.\"",
       },
       {
         id: "f2",
         phase: "finish",
-        title: "Home",
-        suggestedSeconds: 30,
+        title: "Aftercare",
+        suggestedSeconds: 40,
         instruction:
-          "\"I'm 'on my way home' in the fantasy. Soft hands. Water.\" Warm again. \"Cuck JOI ends here unless you restart. You did well staying on the line.\"",
+          "\"Scene closed.\" Warm, clear. \"Water. Something soft. I’m here for a few quiet minutes if you want a normal voice.\"\n\n\"You did well. Rest.\"",
       },
     ],
   },
