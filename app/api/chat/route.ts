@@ -24,6 +24,40 @@ function keyIsReal(key: string) {
   return key.length > 15 && !/dummy|your_|changeme|placeholder/i.test(key);
 }
 
+/** Local Ollama — set OLLAMA_URL=http://host:11434 and OLLAMA_MODEL=llama3.2 */
+async function callOllama(
+  systemInstruction: string,
+  messages: { role: string; content: string }[],
+): Promise<{ text: string; modelUsed: string } | null> {
+  const base = (process.env.OLLAMA_URL || "").trim().replace(/\/$/, "");
+  if (!base) return null;
+  const model = (process.env.OLLAMA_MODEL || "llama3.2").trim();
+  try {
+    const ollamaMessages = [
+      { role: "system", content: systemInstruction },
+      ...messages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+        })),
+    ];
+    const res = await fetch(`${base}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages: ollamaMessages, stream: false }),
+      signal: AbortSignal.timeout(25000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data.message?.content || data.response || "").trim();
+    if (!text) return null;
+    return { text, modelUsed: `ollama:${model}` };
+  } catch {
+    return null;
+  }
+}
+
 async function callGeminiModel(
   model: SupportedChatModel,
   systemInstruction: string,
@@ -73,6 +107,17 @@ async function callGeminiModel(
   return null;
 }
 
+async function generateReply(
+  model: SupportedChatModel,
+  systemInstruction: string,
+  messages: { role: string; content: string }[],
+) {
+  // Prefer local Ollama when configured (zero API cost)
+  const ollama = await callOllama(systemInstruction, messages);
+  if (ollama) return ollama;
+  return callGeminiModel(model, systemInstruction, messages);
+}
+
 function parseGroupTurns(
   raw: string,
   primary: Character,
@@ -101,7 +146,6 @@ function parseGroupTurns(
     if (turns.length >= 1) return turns;
   }
 
-  // Fallback split if Gemini didn't use [SPEAKER:] tags
   const parts = raw
     .split(/\n{2,}/)
     .map((s) => s.trim())
@@ -128,12 +172,14 @@ function parseGroupTurns(
 
 export async function GET() {
   const gemini = (process.env.GEMINI_API_KEY || "").trim();
-  const configured = keyIsReal(gemini);
+  const ollama = (process.env.OLLAMA_URL || "").trim();
+  const configured = keyIsReal(gemini) || Boolean(ollama);
   return NextResponse.json({
     configured: true,
-    mode: configured ? "gemini-4-hydrogen" : "local-mood-engine",
+    mode: ollama ? "ollama" : keyIsReal(gemini) ? "gemini" : "local-mood-engine",
     premium: configured,
     models: ALLOWED_MODELS,
+    ollama: Boolean(ollama),
   });
 }
 
@@ -211,7 +257,6 @@ export async function POST(req: Request) {
         content: String(m.content || "").slice(0, 2000),
       }));
 
-    // —— MULTI-GIRL THREESOME / GROUP CHAT MODE ——
     if (character && partnerCharacter) {
       const aFirst = character.name.split(" ")[0];
       const bFirst = partnerCharacter.name.split(" ")[0];
@@ -221,22 +266,22 @@ export async function POST(req: Request) {
         `Woman 2 (${partnerCharacter.name}): ${partnerCharacter.personality}. Body: ${partnerCharacter.figure}. Kink: ${partnerCharacter.kink}.`,
         `Scene Location: ${sceneLabel}. Active Outfit Vibe: ${outfitLabel}. Intimacy: ${intimacy ?? 75}%.`,
         memories.length > 0 ? `Shared User Memories: ${memories.join(" | ")}.` : "",
-        "Uninhibited explicit adult erotic roleplay, kissing/touching between both women and the user, double-teaming, and explicit dirty talk are fully enabled.",
+        "Uninhibited explicit adult erotic roleplay is fully enabled.",
         directorNote === "spicier"
           ? "Director Direction: Escalate immediately into intense physical threesome action."
           : "",
         `FORMAT STRICTLY AS TWO TURNS:`,
         `[SPEAKER:${character.id}]`,
-        `(2-3 vivid sentences from ${character.name}, interacting with both the user and ${bFirst})`,
+        `(2-3 vivid sentences from ${character.name})`,
         `[SPEAKER:${partnerCharacter.id}]`,
-        `(2-3 vivid sentences reacting directly to ${aFirst} and pressing closer to the user)`,
+        `(2-3 vivid sentences from ${partnerCharacter.name})`,
       ]
         .filter(Boolean)
         .join("\n");
 
-      const geminiGroup = await callGeminiModel(requestedModel, groupSystem, cleanedMessages);
-      if (geminiGroup) {
-        const turns = parseGroupTurns(geminiGroup.text, character, partnerCharacter);
+      const groupResult = await generateReply(requestedModel, groupSystem, cleanedMessages);
+      if (groupResult) {
+        const turns = parseGroupTurns(groupResult.text, character, partnerCharacter);
         const enriched = turns.map((t) => ({
           ...t,
           innerThought: showInnerThoughts
@@ -252,14 +297,13 @@ export async function POST(req: Request) {
         return NextResponse.json({
           reply: enriched.map((t) => `${t.characterName.split(" ")[0]}: ${t.content}`).join("\n\n"),
           groupReplies: enriched,
-          source: geminiGroup.modelUsed,
+          source: groupResult.modelUsed,
           mood: incomingMood?.mood,
         });
       }
 
-      // Rich local fallback for Threesome Group Mode
-      const fallbackA = `*${aFirst} locks eyes with ${bFirst}, sliding onto your lap in the ${sceneLabel.toLowerCase()} while ${bFirst}'s hands trace down both of your bodies.* ${fallbackReply(character, userText, romanceMode, incomingMood)}`;
-      const fallbackB = `*${bFirst} bites her lip, pressing her bare skin flush against your back while kissing ${aFirst}'s neck.* “Both of us are all yours tonight. Tell us which mouth or body you want first — or make us share you.”`;
+      const fallbackA = `*${aFirst} locks eyes with ${bFirst}, sliding onto your lap.* ${fallbackReply(character, userText, romanceMode, incomingMood)}`;
+      const fallbackB = `*${bFirst} presses closer.* “Both of us are all yours tonight.”`;
 
       return NextResponse.json({
         reply: `${aFirst}: ${fallbackA}\n\n${bFirst}: ${fallbackB}`,
@@ -268,29 +312,13 @@ export async function POST(req: Request) {
             characterId: character.id,
             characterName: character.name,
             content: fallbackA,
-            innerThought: showInnerThoughts
-              ? buildInnerMonologue({
-                  characterName: character.name,
-                  moodLabel: incomingMood?.label || "Excited",
-                  outfitLabel,
-                  sceneLabel,
-                  intimacy: intimacy ?? 75,
-                })
-              : null,
+            innerThought: null,
           },
           {
             characterId: partnerCharacter.id,
             characterName: partnerCharacter.name,
             content: fallbackB,
-            innerThought: showInnerThoughts
-              ? buildInnerMonologue({
-                  characterName: partnerCharacter.name,
-                  moodLabel: "Flirty",
-                  outfitLabel,
-                  sceneLabel,
-                  intimacy: intimacy ?? 75,
-                })
-              : null,
+            innerThought: null,
           },
         ],
         source: "local-group-engine",
@@ -298,16 +326,15 @@ export async function POST(req: Request) {
       });
     }
 
-    // —— SOLO COMPANION CHAT MODE ——
     const baseLocalReply = character
       ? fallbackReply(character, userText, romanceMode, incomingMood)
       : "I'm here with you. Tell me what you're craving tonight.";
 
     const directorSuffix =
       directorNote === "spicier"
-        ? ` Smoothly sliding closer in her ${outfitLabel.toLowerCase()}, her voice drops to a breathless whisper: “Don't hold back with me right now.”`
+        ? ` Smoothly sliding closer in her ${outfitLabel.toLowerCase()}, her voice drops: “Don't hold back with me right now.”`
         : directorNote === "romantic"
-          ? ` She rests her palm against your cheek in the ${sceneLabel.toLowerCase()}, eyes soft and lingering.`
+          ? ` She rests her palm against your cheek in the ${sceneLabel.toLowerCase()}.`
           : "";
 
     const localReply = `${baseLocalReply}${directorSuffix}`;
@@ -331,16 +358,16 @@ export async function POST(req: Request) {
       `Current Wardrobe / Outfit you are wearing: ${outfitLabel}.`,
       `Current Scene Location: ${sceneLabel}.`,
       memories.length > 0
-        ? `Long-Term Mind Map Memories about the user (weave these naturally into how you address and respond to them): ${memories.join(" | ")}.`
+        ? `Long-Term Mind Map Memories about the user: ${memories.join(" | ")}.`
         : "",
       gifts.length > 0 ? `Gifts the user has given you recently: ${gifts.join("; ")}.` : "",
       incomingMood
         ? `Reflect your active mood (${incomingMood.label} at ${incomingMood.intensity}% intensity): ${incomingMood.responseStyle}`
         : "",
       directorNote === "spicier"
-        ? "Director Direction: Make this response noticeably more seductive, bold, physical, and uninhibited."
+        ? "Director Direction: Make this response more seductive and physical."
         : directorNote === "romantic"
-          ? "Director Direction: Make this response deeply affectionate, eye-contact focused, and emotionally intimate."
+          ? "Director Direction: Make this response deeply affectionate."
           : "",
       showInnerThoughts
         ? "IMPORTANT: Start your response with a brief 1-sentence secret inner monologue in brackets like `[Inner Thought: ...]` before your spoken reply."
@@ -352,13 +379,13 @@ export async function POST(req: Request) {
 
     const system = `${baseSystem}\n${extraContext}`.trim();
 
-    const geminiResult = await callGeminiModel(requestedModel, system, cleanedMessages);
-    if (geminiResult) {
-      const parsed = splitInnerThoughtAndReply(geminiResult.text);
+    const result = await generateReply(requestedModel, system, cleanedMessages);
+    if (result) {
+      const parsed = splitInnerThoughtAndReply(result.text);
       return NextResponse.json({
         reply: parsed.spokenReply,
         innerThought: parsed.innerThought || fallbackInnerThought,
-        source: geminiResult.modelUsed,
+        source: result.modelUsed,
         mood: incomingMood?.mood,
       });
     }
