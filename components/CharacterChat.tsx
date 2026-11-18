@@ -39,6 +39,7 @@ import {
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
 import { characterMediaUrl, type MediaMood } from "@/lib/media";
+import { runSequenceGeneration, type SequenceKind } from "@/lib/videoModes";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
@@ -54,8 +55,21 @@ const NSFW_CHIPS = [
   { id: "lingerie", label: "Lingerie", mood: "lingerie" as MediaMood, cost: GEN_COST.lingerie },
   { id: "nude", label: "Nude", mood: "nude" as MediaMood, cost: GEN_COST.nude },
   { id: "explicit", label: "Explicit", mood: "explicit" as MediaMood, cost: GEN_COST.explicit },
-  { id: "sex", label: "Sex sequence", mood: "sex" as MediaMood, cost: GEN_COST.video },
 ];
+
+const VIDEO_CHIPS: { id: SequenceKind; label: string }[] = [
+  { id: "sex", label: "Sex video" },
+  { id: "joi", label: "JOI video" },
+  { id: "sph", label: "SPH video" },
+  { id: "bnwo", label: "BNWO video" },
+];
+
+const SEQUENCE_LINES: Record<SequenceKind, string> = {
+  sex: "*She starts a private sex sequence…*\n\n“Finish on me when you’re ready. I want to see it.”",
+  joi: "*JOI mode.*\n\n“Stroke for me. Match my pace. Don’t finish until I say.”",
+  sph: "*SPH sequence.*\n\n“Look at you… go on, keep watching. I want to see that face.”",
+  bnwo: "*BNWO sequence.*\n\n“You’re mine for this. Stay on your knees for the camera.”",
+};
 
 export function CharacterChat({ character, romanceMode, onBack }: CharacterChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -89,7 +103,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       const note = localStorage.getItem(`vm-vault-${character.id}`);
       if (note) setVaultNote(note);
     } catch {}
-    // Show tribute nudge after a short delay if intimacy is mid-range
     const t = setTimeout(() => {
       const int = getIntimacy(character.id, character.intimacy);
       if (int >= 35 && int < 80) setShowTributeNudge(true);
@@ -122,7 +135,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     persist(next);
     setBusy(true);
 
-    // Multi-tier memory extract
     try {
       const existing = loadMemories(character.id);
       const updated = extractMemoriesFromMessage(text, existing);
@@ -149,7 +161,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         const mood = computeMoodState?.(character, text, intimacy);
         replyText = fallbackReply(character, text, romanceMode, mood);
       }
-      // Soft tribute encouragement in some replies
       if (intimacy > 40 && Math.random() < 0.18 && !/tribute/i.test(replyText)) {
         replyText += `\n\n*She glances at the camera.* “If you want to tribute me later… I won’t look away.”`;
       }
@@ -184,47 +195,73 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     setBusy(true);
     try {
       const url = characterMediaUrl(character, mood);
-      const frames =
-        mood === "sex"
-          ? [
-              characterMediaUrl(character, "lingerie", "starting undress"),
-              characterMediaUrl(character, "nude", "aroused"),
-              characterMediaUrl(character, "explicit", "intense"),
-              characterMediaUrl(character, "sex", "climax"),
-            ]
-          : undefined;
-
       addToGallery({
         characterId: character.id,
         characterName: character.name,
-        type: mood === "sex" ? "video" : mood,
+        type: mood,
         url,
-        frames,
         prompt: `${character.name} ${mood}`,
       });
-
       const mediaMsg: ChatMessage = {
         role: "assistant",
-        content:
-          mood === "sex"
-            ? `*${character.name} starts a private sequence for you…*\n\n“Finish on me when you’re ready. I want to see it.”`
-            : `*${character.name} sends you something ${mood}…*\n\n“Like what you see? Tribute me and I’ll send more.”`,
+        content: `*${character.name} sends you something ${mood}…*\n\n“Like what you see? Tribute me and I’ll send more.”`,
         imageUrl: url,
-        frames,
         mediaType: mood,
       };
       const next = [...messages, mediaMsg];
       persist(next);
-      setActiveMedia({ url, frames, type: mood });
-      const newInt = bumpIntimacy(character.id, mood === "sex" ? 8 : 5);
+      setActiveMedia({ url, type: mood });
+      const newInt = bumpIntimacy(character.id, 5);
       setIntimacy(newInt);
       if (voiceOn) {
-        speak(
-          mood === "sex"
-            ? "Watch me. Don't look away. Tribute me when you finish."
-            : `I took this just for you. Tell me how hard you are.`,
-          { ...character.voice },
-        );
+        speak(`I took this just for you. Tell me how hard you are.`, { ...character.voice });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const generateSequence = (kind: SequenceKind) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = runSequenceGeneration(character, kind);
+      if (!result.ok) {
+        setMessages((m) => [
+          ...m,
+          {
+            role: "assistant",
+            content: `Not enough coins for ${kind.toUpperCase()} video (${result.cost} needed).`,
+          },
+        ]);
+        return;
+      }
+      setCoinsState(getCoins());
+      const frames = result.frames;
+      const url = frames[frames.length - 1];
+      const mediaMsg: ChatMessage = {
+        role: "assistant",
+        content: SEQUENCE_LINES[kind],
+        imageUrl: url,
+        frames,
+        mediaType: kind,
+      };
+      const next = [...messages, mediaMsg];
+      persist(next);
+      setActiveMedia({ url, frames, type: kind });
+      const newInt = bumpIntimacy(character.id, 8);
+      setIntimacy(newInt);
+      setShowTributeNudge(true);
+      if (voiceOn) {
+        const line =
+          kind === "joi"
+            ? "Stroke for me. Don't finish until I say."
+            : kind === "sph"
+              ? "Keep watching. I want to see that face."
+              : kind === "bnwo"
+                ? "You're mine for this. Stay right there."
+                : "Watch me. Tribute me when you finish.";
+        speak(line, { ...character.voice });
       }
     } finally {
       setBusy(false);
@@ -256,7 +293,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] max-w-2xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
         <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">
           ← Back
@@ -272,12 +308,12 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-cream truncate">{character.name}</div>
           <div className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="text-pink-300">{intimacy}% · {stage.label}</span>
+            <span className="text-pink-300">
+              {intimacy}% · {stage.label}
+            </span>
             <span>·</span>
             <span>{coins} coins</span>
-            {upcoming && (
-              <span className="text-zinc-500">· next: {upcoming.label}</span>
-            )}
+            {upcoming && <span className="text-zinc-500">· next: {upcoming.label}</span>}
           </div>
         </div>
         <button
@@ -298,24 +334,18 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </button>
       </div>
 
-      {/* Tribute nudge */}
       {showTributeNudge && (
         <div className="mt-2 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-2 flex items-center gap-2 text-xs">
           <Heart className="h-3.5 w-3.5 text-fuchsia-300 shrink-0" />
           <span className="text-fuchsia-100 flex-1">
-            She wants a tribute. Generate a nude/sex sequence then finish for her — she notices.
+            She wants a tribute. Run a JOI/sex sequence then finish for her — she notices.
           </span>
-          <button
-            type="button"
-            onClick={() => setShowTributeNudge(false)}
-            className="text-fuchsia-300/70 hover:text-white"
-          >
+          <button type="button" onClick={() => setShowTributeNudge(false)} className="text-fuchsia-300/70 hover:text-white">
             ✕
           </button>
         </div>
       )}
 
-      {/* Vault panel */}
       {vaultOpen && (
         <div className="mt-3 rounded-2xl border border-pink-500/30 bg-zinc-900/80 p-4 space-y-2">
           <div className="text-sm font-medium text-pink-200">Private vault — only you see this</div>
@@ -327,11 +357,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-sm resize-none outline-none focus:border-pink-500"
           />
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={saveVault}
-              className="px-3 py-1.5 rounded-xl bg-pink-600 text-sm font-medium"
-            >
+            <button type="button" onClick={saveVault} className="px-3 py-1.5 rounded-xl bg-pink-600 text-sm font-medium">
               Save
             </button>
             <button
@@ -345,13 +371,9 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </div>
       )}
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                 m.role === "user"
@@ -373,13 +395,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             </div>
           </div>
         ))}
-        {busy && (
-          <div className="text-xs text-zinc-500 animate-pulse">She is typing…</div>
-        )}
+        {busy && <div className="text-xs text-zinc-500 animate-pulse">She is typing…</div>}
         <div ref={bottomRef} />
       </div>
 
-      {/* Active media preview */}
       {activeMedia && (
         <div className="mb-2 rounded-2xl overflow-hidden border border-pink-500/40 relative">
           {activeMedia.frames && activeMedia.frames.length > 1 ? (
@@ -398,7 +417,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </div>
       )}
 
-      {/* NSFW chips */}
       <div className="flex flex-wrap gap-2 pb-2 shrink-0">
         {NSFW_CHIPS.map((chip) => (
           <button
@@ -408,9 +426,22 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             onClick={() => generate(chip.mood, chip.label, chip.cost)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs font-medium text-pink-100 hover:bg-pink-500/20 disabled:opacity-50"
           >
-            {chip.id === "sex" ? <Video className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+            <ImageIcon className="h-3.5 w-3.5" />
             {chip.label}
             <span className="text-pink-300/70">{chip.cost}</span>
+          </button>
+        ))}
+        {VIDEO_CHIPS.map((chip) => (
+          <button
+            key={chip.id}
+            type="button"
+            disabled={busy}
+            onClick={() => generateSequence(chip.id)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-fuchsia-500/50 bg-fuchsia-500/15 text-xs font-medium text-fuchsia-100 hover:bg-fuchsia-500/25 disabled:opacity-50"
+          >
+            <Video className="h-3.5 w-3.5" />
+            {chip.label}
+            <span className="text-fuchsia-300/70">{GEN_COST.video}</span>
           </button>
         ))}
         <button
@@ -425,7 +456,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </button>
       </div>
 
-      {/* Gifts row */}
       <div className="flex gap-2 overflow-x-auto pb-2 shrink-0">
         {GIFTS.slice(0, 6).map((g) => (
           <button
@@ -439,7 +469,6 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         ))}
       </div>
 
-      {/* Input */}
       <div className="flex gap-2 pt-1 shrink-0">
         <textarea
           ref={inputRef}
