@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Video,
   Heart,
+  Phone,
 } from "lucide-react";
 import {
   startIntimacyAudio,
@@ -47,6 +48,7 @@ import {
 } from "@/lib/videoModes";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
+import { VoiceCallUI } from "@/components/VoiceCallUI";
 
 type ChatMessage = StoredMessage & { id?: string };
 
@@ -83,6 +85,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [coins, setCoinsState] = useState(600);
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [callOpen, setCallOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultNote, setVaultNote] = useState("");
   const [activeMedia, setActiveMedia] = useState<{
@@ -103,11 +106,8 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
   useEffect(() => {
     const loaded = loadChat(character.id);
-    if (loaded.length > 0) {
-      setMessages(loaded);
-    } else {
-      setMessages([{ role: "assistant", content: character.initialMessage }]);
-    }
+    if (loaded.length > 0) setMessages(loaded);
+    else setMessages([{ role: "assistant", content: character.initialMessage }]);
     setIntimacy(getIntimacy(character.id, character.intimacy));
     setCoinsState(getCoins());
     setGifts(getGiftsFor(character.id));
@@ -126,11 +126,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeMedia]);
 
-  useEffect(() => {
-    return () => {
-      stopIntimacyAudio();
-    };
-  }, []);
+  useEffect(() => () => stopIntimacyAudio(), []);
 
   const persist = (next: ChatMessage[]) => {
     setMessages(next);
@@ -146,21 +142,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     const next = [...messages, userMsg];
     persist(next);
     setBusy(true);
-
-    // Haven-style tiers + existing memory map
     try {
       pushShort(character.id, "user", text);
       const existing = loadMemories(character.id);
-      const updated = extractMemoriesFromMessage(text, existing);
-      saveMemories(character.id, updated);
+      saveMemories(character.id, extractMemoriesFromMessage(text, existing));
       if (/(always remember|never forget|my name is|call me)/i.test(text)) {
         pinLong(character.id, text.slice(0, 180));
       }
     } catch {}
-
     const memoryBlock = memoryPromptBlock(character.id);
     const tierMemories = loadMemories(character.id);
-
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -170,10 +161,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           messages: next.slice(-12),
           romanceMode,
           intimacy,
-          memories: [
-            ...tierMemories.slice(-10),
-            ...(memoryBlock ? memoryBlock.split("\n").filter(Boolean).slice(0, 8) : []),
-          ],
+          memories: [...tierMemories.slice(-10), ...(memoryBlock ? memoryBlock.split("\n").filter(Boolean).slice(0, 8) : [])],
           memoryBlock,
         }),
       });
@@ -190,14 +178,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         replyText += `\n\n*She glances at the camera.* “If you want to tribute me later… I won’t look away.”`;
       }
       pushShort(character.id, "assistant", replyText);
-      const assistantMsg: ChatMessage = { role: "assistant", content: replyText };
-      const final = [...next, assistantMsg];
-      persist(final);
+      persist([...next, { role: "assistant", content: replyText }]);
       const newInt = bumpIntimacy(character.id, 3);
       setIntimacy(newInt);
-      if (voiceOn) {
-        speak(replyText.slice(0, 280), { ...character.voice });
-      }
+      if (voiceOn) speak(replyText.slice(0, 280), { ...character.voice });
       updateIntimacyAudioIntensity?.(Math.min(100, newInt));
     } catch {
       const fallback = fallbackReply(character, text, romanceMode);
@@ -212,40 +196,24 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const generate = async (mood: MediaMood, label: string, cost: number) => {
     if (busy) return;
     if (!spendCoins(cost)) {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: `Not enough coins for ${label}. Claim daily or keep chatting to earn more.`,
-        },
-      ]);
+      setMessages((m) => [...m, { role: "assistant", content: `Not enough coins for ${label}.` }]);
       return;
     }
     setCoinsState(getCoins());
     setBusy(true);
     try {
       const url = characterMediaUrl(character, mood);
-      addToGallery({
-        characterId: character.id,
-        characterName: character.name,
-        type: mood,
-        url,
-        prompt: `${character.name} ${mood}`,
-      });
+      addToGallery({ characterId: character.id, characterName: character.name, type: mood, url, prompt: `${character.name} ${mood}` });
       const mediaMsg: ChatMessage = {
         role: "assistant",
         content: `*${character.name} sends you something ${mood}…*\n\n“Like what you see? Tribute me and I’ll send more.”`,
         imageUrl: url,
         mediaType: mood,
       };
-      const next = [...messages, mediaMsg];
-      persist(next);
+      persist([...messages, mediaMsg]);
       setActiveMedia({ url, type: mood });
-      const newInt = bumpIntimacy(character.id, 5);
-      setIntimacy(newInt);
-      if (voiceOn) {
-        speak(`I took this just for you. Tell me how hard you are.`, { ...character.voice });
-      }
+      setIntimacy(bumpIntimacy(character.id, 5));
+      if (voiceOn) speak(`I took this just for you.`, { ...character.voice });
     } finally {
       setBusy(false);
     }
@@ -258,70 +226,29 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     try {
       const result = runSequenceGeneration(character, kind);
       if (!result.ok) {
-        setMessages((m) => [
-          ...m,
-          {
-            role: "assistant",
-            content: `Not enough coins for ${kind.toUpperCase()} video (${result.cost} needed).`,
-          },
-        ]);
+        setMessages((m) => [...m, { role: "assistant", content: `Not enough coins for ${kind} (${result.cost}).` }]);
         return;
       }
       setCoinsState(getCoins());
       const frames = result.frames;
       const url = frames[frames.length - 1];
-      const mediaMsg: ChatMessage = {
-        role: "assistant",
-        content: SEQUENCE_LINES[kind],
-        imageUrl: url,
-        frames,
-        mediaType: kind,
-      };
+      const mediaMsg: ChatMessage = { role: "assistant", content: SEQUENCE_LINES[kind], imageUrl: url, frames, mediaType: kind };
       const next = [...messages, mediaMsg];
       persist(next);
       setActiveMedia({ url, frames, type: kind, note: "Frame sequence" });
-      const newInt = bumpIntimacy(character.id, 8);
-      setIntimacy(newInt);
+      setIntimacy(bumpIntimacy(character.id, 8));
       setShowTributeNudge(true);
       if (voiceOn) {
-        const line =
-          kind === "joi"
-            ? "Stroke for me. Don't finish until I say."
-            : kind === "sph"
-              ? "Keep watching. I want to see that face."
-              : kind === "bnwo"
-                ? "You're mine for this. Stay right there."
-                : "Watch me. Tribute me when you finish.";
-        speak(line, { ...character.voice });
+        speak(kind === "joi" ? "Stroke for me." : "Watch me.", { ...character.voice });
       }
-
-      // Real clip when Advanced img2vid / Pollinations video is configured
       setClipStatus("Enhancing to live clip…");
       const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
       if (enhanced.videoUrl) {
-        setActiveMedia({
-          url,
-          frames,
-          videoUrl: enhanced.videoUrl,
-          type: kind,
-          note: enhanced.note,
-        });
-        setClipStatus(
-          enhanced.mode === "mp4" ? "Live clip attached" : enhanced.note,
-        );
-        persist([
-          ...next,
-          {
-            role: "assistant",
-            content: `*Clip ready.* ${enhanced.note}`,
-            videoUrl: enhanced.videoUrl,
-            frames,
-            imageUrl: url,
-            mediaType: kind,
-          },
-        ]);
+        setActiveMedia({ url, frames, videoUrl: enhanced.videoUrl, type: kind, note: enhanced.note });
+        setClipStatus(enhanced.mode === "mp4" ? "Live clip attached" : enhanced.note);
+        persist([...next, { role: "assistant", content: `*Clip ready.* ${enhanced.note}`, videoUrl: enhanced.videoUrl, frames, imageUrl: url, mediaType: kind }]);
       } else {
-        setClipStatus(enhanced.note || "Sequence only (configure Advanced → img2vid for MP4)");
+        setClipStatus(enhanced.note || "Sequence only");
       }
     } finally {
       setBusy(false);
@@ -332,16 +259,18 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     const gift = GIFTS.find((g) => g.id === giftId);
     if (!gift) return;
     if (!spendCoins(gift.cost || 12)) {
-      setMessages((m) => [...m, { role: "assistant", content: "Not enough coins for that gift." }]);
+      setMessages((m) => [...m, { role: "assistant", content: "Not enough coins." }]);
       return;
     }
     setCoinsState(getCoins());
     addGift(character.id, giftId);
     setGifts(getGiftsFor(character.id));
-    const reply = `*${character.name} receives the ${gift.name}.* “${gift.reaction || "Mmm… you know me."}`;
-    persist([...messages, { role: "user", content: `[Gift: ${gift.name}]` }, { role: "assistant", content: reply }]);
-    bumpIntimacy(character.id, 4);
-    setIntimacy(getIntimacy(character.id));
+    persist([
+      ...messages,
+      { role: "user", content: `[Gift: ${gift.name}]` },
+      { role: "assistant", content: `*${character.name} receives the ${gift.name}.* “${gift.reaction || "Mmm…"}` },
+    ]);
+    setIntimacy(bumpIntimacy(character.id, 4));
   };
 
   const saveVault = () => {
@@ -354,106 +283,60 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)] max-w-2xl mx-auto">
+      {callOpen && <VoiceCallUI character={character} onClose={() => setCallOpen(false)} />}
+
       <div className="flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
-        <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">
-          ← Back
-        </button>
+        <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Back</button>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={characterMediaUrl(character, "beauty")}
-            alt={character.name}
-            className="h-full w-full object-cover"
-          />
+          <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-cream truncate">{character.name}</div>
-          <div className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span className="text-pink-300">
-              {intimacy}% · {stage.label}
-            </span>
-            <span>·</span>
+          <div className="text-xs text-zinc-400 flex flex-wrap gap-x-2">
+            <span className="text-pink-300">{intimacy}% · {stage.label}</span>
             <span>{coins} coins</span>
-            {upcoming && <span className="text-zinc-500">· next: {upcoming.label}</span>}
+            {upcoming && <span className="text-zinc-500">next: {upcoming.label}</span>}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setVoiceOn((v) => !v)}
-          className="p-2 rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5"
-          title={voiceOn ? "Mute voice" : "Enable voice"}
-        >
+        <button type="button" onClick={() => setCallOpen(true)} className="p-2 rounded-xl border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10" title="Voice call">
+          <Phone className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={() => setVoiceOn((v) => !v)} className="p-2 rounded-xl border border-white/10 text-zinc-300" title="TTS">
           {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
-        <button
-          type="button"
-          onClick={() => setVaultOpen((v) => !v)}
-          className="p-2 rounded-xl border border-white/10 text-zinc-300 hover:bg-white/5"
-          title="Private vault"
-        >
+        <button type="button" onClick={() => setVaultOpen((v) => !v)} className="p-2 rounded-xl border border-white/10 text-zinc-300">
           {vaultOpen ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
         </button>
       </div>
 
       {showTributeNudge && (
         <div className="mt-2 rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/10 px-3 py-2 flex items-center gap-2 text-xs">
-          <Heart className="h-3.5 w-3.5 text-fuchsia-300 shrink-0" />
-          <span className="text-fuchsia-100 flex-1">
-            She wants a tribute. Run a JOI/sex sequence then finish for her — she notices.
-          </span>
-          <button type="button" onClick={() => setShowTributeNudge(false)} className="text-fuchsia-300/70 hover:text-white">
-            ✕
-          </button>
+          <Heart className="h-3.5 w-3.5 text-fuchsia-300" />
+          <span className="text-fuchsia-100 flex-1">She wants a tribute. JOI/sex then finish for her.</span>
+          <button type="button" onClick={() => setShowTributeNudge(false)}>✕</button>
         </div>
       )}
-
-      {clipStatus && (
-        <div className="mt-2 text-[11px] text-zinc-400 px-1">{clipStatus}</div>
-      )}
+      {clipStatus && <div className="mt-2 text-[11px] text-zinc-400">{clipStatus}</div>}
 
       {vaultOpen && (
         <div className="mt-3 rounded-2xl border border-pink-500/30 bg-zinc-900/80 p-4 space-y-2">
-          <div className="text-sm font-medium text-pink-200">Private vault — only you see this</div>
-          <textarea
-            value={vaultNote}
-            onChange={(e) => setVaultNote(e.target.value)}
-            rows={3}
-            placeholder="Notes, kinks she responded to, private fantasies…"
-            className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-sm resize-none outline-none focus:border-pink-500"
-          />
-          <div className="flex gap-2">
-            <button type="button" onClick={saveVault} className="px-3 py-1.5 rounded-xl bg-pink-600 text-sm font-medium">
-              Save (pins to long-term memory)
-            </button>
-            <button
-              type="button"
-              onClick={() => setVaultOpen(false)}
-              className="px-3 py-1.5 rounded-xl border border-white/15 text-sm"
-            >
-              Close
-            </button>
-          </div>
+          <div className="text-sm text-pink-200">Private vault</div>
+          <textarea value={vaultNote} onChange={(e) => setVaultNote(e.target.value)} rows={3} className="w-full rounded-xl bg-black/40 border border-white/10 px-3 py-2 text-sm" />
+          <button type="button" onClick={saveVault} className="px-3 py-1.5 rounded-xl bg-pink-600 text-sm">Save</button>
         </div>
       )}
 
       <div className="flex-1 overflow-y-auto py-4 space-y-4">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                m.role === "user"
-                  ? "bg-pink-600/90 text-white"
-                  : "bg-zinc-900/80 border border-white/10 text-zinc-100"
-              }`}
-            >
+            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-pink-600/90" : "bg-zinc-900/80 border border-white/10"}`}>
               <div className="whitespace-pre-wrap">{m.content}</div>
               {m.videoUrl && (
-                <div className="mt-2 rounded-xl overflow-hidden border border-pink-500/30">
-                  <video src={m.videoUrl} controls playsInline className="w-full max-h-80 bg-black" />
-                </div>
+                <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />
               )}
               {m.imageUrl && !m.videoUrl && (
-                <div className="mt-2 rounded-xl overflow-hidden border border-white/10">
+                <div className="mt-2 rounded-xl overflow-hidden">
                   {m.frames && m.frames.length > 1 ? (
                     <MotionSequencePlayer frames={m.frames} alt={character.name} />
                   ) : (
@@ -472,87 +355,42 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       {activeMedia && (
         <div className="mb-2 rounded-2xl overflow-hidden border border-pink-500/40 relative">
           {activeMedia.videoUrl ? (
-            <video
-              src={activeMedia.videoUrl}
-              controls
-              autoPlay
-              playsInline
-              className="w-full max-h-64 bg-black"
-            />
+            <video src={activeMedia.videoUrl} controls autoPlay playsInline className="w-full max-h-64 bg-black" />
           ) : activeMedia.frames && activeMedia.frames.length > 1 ? (
             <MotionSequencePlayer frames={activeMedia.frames} alt={character.name} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={activeMedia.url} alt="" className="w-full max-h-64 object-cover" />
           )}
-          {activeMedia.note && (
-            <div className="absolute bottom-2 left-2 right-12 text-[10px] bg-black/70 rounded px-2 py-1 text-zinc-300">
-              {activeMedia.note}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setActiveMedia(null)}
-            className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-xs"
-          >
-            Close
-          </button>
+          <button type="button" onClick={() => setActiveMedia(null)} className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-black/60 text-xs">Close</button>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 pb-2 shrink-0">
+      <div className="flex flex-wrap gap-2 pb-2">
         {NSFW_CHIPS.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            disabled={busy}
-            onClick={() => generate(chip.mood, chip.label, chip.cost)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs font-medium text-pink-100 hover:bg-pink-500/20 disabled:opacity-50"
-          >
-            <ImageIcon className="h-3.5 w-3.5" />
-            {chip.label}
-            <span className="text-pink-300/70">{chip.cost}</span>
+          <button key={chip.id} type="button" disabled={busy} onClick={() => generate(chip.mood, chip.label, chip.cost)} className="px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs text-pink-100 disabled:opacity-50">
+            <ImageIcon className="inline h-3.5 w-3.5" /> {chip.label}
           </button>
         ))}
         {VIDEO_CHIPS.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            disabled={busy}
-            onClick={() => void generateSequence(chip.id)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-fuchsia-500/50 bg-fuchsia-500/15 text-xs font-medium text-fuchsia-100 hover:bg-fuchsia-500/25 disabled:opacity-50"
-          >
-            <Video className="h-3.5 w-3.5" />
-            {chip.label}
-            <span className="text-fuchsia-300/70">{GEN_COST.video}</span>
+          <button key={chip.id} type="button" disabled={busy} onClick={() => void generateSequence(chip.id)} className="px-3 py-1.5 rounded-full border border-fuchsia-500/50 bg-fuchsia-500/15 text-xs text-fuchsia-100 disabled:opacity-50">
+            <Video className="inline h-3.5 w-3.5" /> {chip.label}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => {
-            startIntimacyAudio?.(Math.min(90, intimacy + 10));
-            setShowTributeNudge(true);
-          }}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-white/15 text-xs text-zinc-300"
-        >
-          <Flame className="h-3.5 w-3.5" /> Ambience
+        <button type="button" onClick={() => { startIntimacyAudio?.(Math.min(90, intimacy + 10)); setShowTributeNudge(true); }} className="px-3 py-1.5 rounded-full border border-white/15 text-xs text-zinc-300">
+          <Flame className="inline h-3.5 w-3.5" /> Ambience
         </button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 shrink-0">
+      <div className="flex gap-2 overflow-x-auto pb-2">
         {GIFTS.slice(0, 6).map((g) => (
-          <button
-            key={g.id}
-            type="button"
-            onClick={() => sendGift(g.id)}
-            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-white/10 text-[11px] text-zinc-300 hover:border-pink-500/40"
-          >
-            <Gift className="h-3 w-3" /> {g.name}
+          <button key={g.id} type="button" onClick={() => sendGift(g.id)} className="shrink-0 px-2.5 py-1 rounded-full border border-white/10 text-[11px] text-zinc-300">
+            <Gift className="inline h-3 w-3" /> {g.name}
           </button>
         ))}
       </div>
 
-      <div className="flex gap-2 pt-1 shrink-0">
+      <div className="flex gap-2 pt-1">
         <textarea
           ref={inputRef}
           value={input}
@@ -565,14 +403,9 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           }}
           rows={1}
           placeholder={`Message ${character.name}…`}
-          className="flex-1 rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm resize-none outline-none focus:border-pink-500 max-h-28"
+          className="flex-1 rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm resize-none outline-none focus:border-pink-500"
         />
-        <button
-          type="button"
-          disabled={busy || !input.trim()}
-          onClick={() => void send()}
-          className="px-5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold text-sm disabled:opacity-50"
-        >
+        <button type="button" disabled={busy || !input.trim()} onClick={() => void send()} className="px-5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold text-sm disabled:opacity-50">
           Send
         </button>
       </div>
