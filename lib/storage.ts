@@ -1,4 +1,4 @@
-/** Client-side coins, gallery, chat memory. Firebase sync is optional (never required). FREE forever. */
+/** Client-side coins, gallery, chat memory. Firebase sync is optional (never required). */
 
 export type GalleryItem = {
   id: string;
@@ -64,6 +64,7 @@ export function addCoins(amount: number) {
   setCoins(getCoins() + amount);
 }
 
+/** Once per calendar day — free retention loop. */
 export function canClaimDaily(): boolean {
   if (typeof window === "undefined") return false;
   try {
@@ -183,11 +184,19 @@ export function bumpIntimacy(characterId: string, delta = 2) {
   return next;
 }
 
-/** Generous free-tier costs — no payments required. */
+/** Free-forever generous costs — daily claim + high default coins keep users generating. */
 export const GEN_COST: Record<string, number> = {
   portrait: 4,
+  beauty: 4,
+  seductive: 5,
   lingerie: 6,
   nude: 8,
   explicit: 10,
-  video: 16,
+  sex: 12,
+  joi: 10,
+  sph: 10,
+  bnwo: 12,
+  video: 14,
+  aftercare: 5,
+  dual: 12,
 };

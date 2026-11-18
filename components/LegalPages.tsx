@@ -1,94 +1,109 @@
 "use client";
 
-export function LegalPages({
-  page,
-  onHome,
-}: {
-  page: "terms" | "privacy" | "safety";
-  onHome: () => void;
-}) {
-  const title =
-    page === "terms" ? "Terms of Use" : page === "privacy" ? "Privacy" : "Safety & Content";
+import { useState } from "react";
+import { cn } from "@/lib/cn";
+
+type Tab = "terms" | "privacy" | "safety";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "terms", label: "Terms" },
+  { id: "privacy", label: "Privacy" },
+  { id: "safety", label: "Safety & 18+" },
+];
+
+export function LegalPages({ onBack }: { onBack?: () => void }) {
+  const [tab, setTab] = useState<Tab>("safety");
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 pb-20 text-sm text-zinc-300 leading-relaxed">
-      <button type="button" onClick={onHome} className="text-pink-400 text-sm">
-        ← Home
-      </button>
-      <h1 className="font-display text-3xl text-cream">{title}</h1>
-      <p className="text-xs text-zinc-500">VelvetMotion AI · Free adult fantasy platform · Updated 2026</p>
+    <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">
+      <div className="flex items-center gap-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="text-sm text-zinc-400 hover:text-white"
+          >
+            ← Back
+          </button>
+        )}
+        <h1 className="text-2xl font-semibold text-white">Legal & Safety</h1>
+      </div>
 
-      {page === "terms" && (
-        <div className="space-y-3">
-          <p>
-            VelvetMotion is a free entertainment product for adults 18+. All companions are
-            <strong className="text-cream"> fictional AI characters</strong> aged 21+ in-fiction. They are not real
-            people, do not have feelings, and cannot form real relationships or keep promises.
-          </p>
-          <p>
-            You must be 18 or older to use this site. You agree not to upload or request content involving anyone under
-            18, real non-consensual deepfakes of private individuals, or illegal material.
-          </p>
-          <p>
-            The service is provided <strong className="text-cream">free of charge</strong> “as is.” Media is generated
-            by third-party or local models and may fail, be inconsistent, or be unavailable. We do not guarantee uptime
-            or output quality.
-          </p>
-          <p>
-            You retain responsibility for how you use generated content. Do not claim AI images depict real identified
-            people without rights.
-          </p>
-          <p>We may update these terms; continued use means you accept the current version.</p>
-        </div>
-      )}
+      <div className="flex gap-2 border-b border-white/10 pb-2">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-sm transition",
+              tab === t.id
+                ? "bg-pink-600/20 text-pink-200 border border-pink-500/40"
+                : "text-zinc-400 hover:text-white",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {page === "privacy" && (
-        <div className="space-y-3">
-          <p>
-            <strong className="text-cream">Local-first:</strong> chats, coins, galleries, and custom girls are stored in
-            your browser (localStorage) by default. Clearing site data deletes them.
-          </p>
-          <p>
-            Optional Firebase sync (if configured) may store account profile, chat summaries, and custom companions under
-            your auth uid. We do not sell personal data.
-          </p>
-          <p>
-            Uploaded reference photos for Create stay on your device unless you enable cloud features. Do not upload
-            photos of real people without consent.
-          </p>
-          <p>
-            Third-party image/LLM APIs (e.g. Pollinations, your own Ollama/Comfy endpoint) process prompts you send. Read
-            those providers’ policies if you use them.
-          </p>
-          <p>Contact the site operator for deletion requests related to any cloud account you created.</p>
-        </div>
-      )}
-
-      {page === "safety" && (
-        <div className="space-y-3">
-          <p>
-            <strong className="text-cream">18+ only.</strong> Age gate is required. Content is adult sexual fantasy
-            involving fictional adults only.
-          </p>
-          <p>
-            No CSAM, no real minors, no non-consensual deepfakes of private individuals. Report abuse if you see policy
-            violations.
-          </p>
-          <p>
-            AI can produce unexpected or inaccurate content. If a conversation is harmful to your wellbeing, take a break
-            and seek real-world support when needed.
-          </p>
-          <p>
-            NSFW features (JOI, SPH, BNWO, explicit media) are opt-in fantasy tools for consenting adults exploring
-            fiction — not advice or real-world instructions involving non-consenting people.
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-3 pt-4 text-xs">
-        <button type="button" onClick={onHome} className="text-pink-400">
-          Back to app
-        </button>
+      <div className="prose prose-invert prose-sm max-w-none text-zinc-300 space-y-4 leading-relaxed">
+        {tab === "safety" && (
+          <>
+            <h2 className="text-lg text-white font-semibold">18+ Fictional AI only</h2>
+            <p>
+              VelvetMotion is an adult entertainment product. All characters are fictional AI personas.
+              You must be 18 or older to use this app. By continuing you confirm you are of legal age
+              in your jurisdiction.
+            </p>
+            <p>
+              Content can be explicit, including JOI, SPH, BNWO, and other adult fantasies. Nothing here
+              depicts real people, and nothing is intended as advice, encouragement, or instruction for
+              real-world harm.
+            </p>
+            <p>
+              If you feel distressed, stop using the app and seek real-world support (e.g. local crisis
+              lines). This is fiction for consenting adults.
+            </p>
+          </>
+        )}
+        {tab === "terms" && (
+          <>
+            <h2 className="text-lg text-white font-semibold">Terms of use</h2>
+            <p>
+              VelvetMotion is provided free of charge, as-is, with no warranty. Features may change or
+              break. We do not sell access, subscriptions, or coins — generation costs are virtual and
+              local to your device where possible.
+            </p>
+            <p>
+              You agree not to use the service to create or share illegal content, including any sexual
+              content involving minors (fictional or otherwise). Violations may result in access being
+              blocked.
+            </p>
+            <p>
+              Optional cloud sync (Firebase) is available when you sign in; core chat and media still
+              work offline via localStorage.
+            </p>
+          </>
+        )}
+        {tab === "privacy" && (
+          <>
+            <h2 className="text-lg text-white font-semibold">Privacy</h2>
+            <p>
+              By default, chats, coins, gallery items, and intimacy scores stay on your device
+              (localStorage). We do not require an account for the free experience.
+            </p>
+            <p>
+              If you choose to sign in, limited data (profile, optional chat sync, lounge messages) may
+              be stored in Firebase under your UID. You can clear local data anytime from browser
+              settings or by wiping site data.
+            </p>
+            <p>
+              Image generation may call third-party image APIs (e.g. Pollinations). Do not put personal
+              real-world identifying information into prompts you want to keep private.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
