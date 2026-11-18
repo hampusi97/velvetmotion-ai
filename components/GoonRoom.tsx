@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CHARACTERS } from "@/lib/characters";
-import { characterPortraitUrl } from "@/lib/portraits";
+import { characterPortraitUrl, resolveAvatar } from "@/lib/portraits";
 import { getCoins, spendCoins, addCoins } from "@/lib/storage";
 
 export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: string) => void }) {
@@ -20,13 +20,15 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
   }, [running]);
 
   const toggle = (id: string) => {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < 2 ? [...s, id] : [s[1], id]));
+    setSelected((s) =>
+      s.includes(id) ? s.filter((x) => x !== id) : s.length < 2 ? [...s, id] : [s[1], id],
+    );
   };
 
   const startSession = () => {
     if (selected.length === 0) return;
-    if (!spendCoins(20)) {
-      setNotice("Need 20 coins to open the Goon Room session.");
+    if (!spendCoins(15)) {
+      setNotice("Need 15 coins to open the Goon Room session.");
       return;
     }
     setNotice(null);
@@ -37,58 +39,97 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
 
   const endSession = () => {
     setRunning(false);
-    addCoins(5);
+    addCoins(8);
     setCoins(getCoins());
+    setNotice("Session ended. +8 coins. Open chat to generate while the heat is high.");
   };
+
+  const mm = String(Math.floor(timer / 60)).padStart(2, "0");
+  const ss = String(timer % 60).padStart(2, "0");
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <button type="button" onClick={onHome} className="text-pink-400 text-sm">
+      <button type="button" onClick={onHome} className="text-pink-400 text-sm hover:text-pink-300">
         ← Home
       </button>
       <h1 className="font-display text-3xl text-cream">Goon Room</h1>
       <p className="text-sm text-mist">
-        Pick one or two girls. Start a timed session. Generate nudes in chat. Dual-select enables two-girl prompts.
+        Pick one or two girls. Start a timed session. Generate nudes and sex sequences in chat. Dual-select unlocks two-girl prompts.
       </p>
-      <div className="text-sm text-amber-200">{coins} coins · session costs 20</div>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-amber-200">{coins} coins</span>
+        <span className="text-zinc-500">·</span>
+        <span className="text-zinc-400">Session costs 15</span>
+        {running && (
+          <span className="ml-auto font-mono text-pink-300 text-lg">
+            {mm}:{ss}
+          </span>
+        )}
+      </div>
       {notice && <p className="text-xs text-rose-300">{notice}</p>}
 
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
         {CHARACTERS.map((c) => {
           const on = selected.includes(c.id);
-          const src = c.avatar.startsWith("http") ? c.avatar : characterPortraitUrl(c.id, c.figure);
+          const src = resolveAvatar(c.avatar, c.id, c.figure);
           return (
             <button
               key={c.id}
               type="button"
               onClick={() => toggle(c.id)}
-              className={`rounded-2xl border overflow-hidden text-left ${on ? "border-pink-500 ring-1 ring-pink-500" : "border-white/10"}`}
+              className={`rounded-2xl border overflow-hidden text-left transition ${
+                on
+                  ? "border-pink-500 ring-2 ring-pink-500/50 scale-[1.02]"
+                  : "border-white/10 hover:border-pink-500/40"
+              }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt="" className="aspect-[3/4] w-full object-cover" />
-              <div className="p-1.5 text-[11px] truncate">{c.name.split(" ")[0]}</div>
+              <div className="p-1.5 text-[11px] truncate text-center">{c.name.split(" ")[0]}</div>
             </button>
           );
         })}
       </div>
 
       {selected.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/50 p-4 space-y-3">
-          <div className="text-sm">
-            Selected: {selected.map((id) => CHARACTERS.find((c) => c.id === id)?.name.split(" ")[0]).join(" + ")}
-            {selected.length === 2 ? " · dual-girl mode" : ""}
+        <div className="rounded-2xl border border-pink-500/30 bg-gradient-to-b from-zinc-900/80 to-black p-4 space-y-3">
+          <div className="flex -space-x-3">
+            {selected.map((id) => {
+              const c = CHARACTERS.find((x) => x.id === id)!;
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={id}
+                  src={resolveAvatar(c.avatar, c.id, c.figure)}
+                  alt=""
+                  className="h-14 w-14 rounded-full border-2 border-pink-400 object-cover"
+                />
+              );
+            })}
           </div>
-          <div className="text-2xl font-mono text-pink-300">
-            {String(Math.floor(timer / 60)).padStart(2, "0")}:{String(timer % 60).padStart(2, "0")}
+          <div className="text-sm text-cream">
+            Selected:{" "}
+            {selected.map((id) => CHARACTERS.find((c) => c.id === id)?.name.split(" ")[0]).join(" + ")}
+            {selected.length === 2 ? (
+              <span className="text-pink-300"> · dual-girl mode</span>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {!running ? (
-              <button type="button" onClick={startSession} className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-medium">
+              <button
+                type="button"
+                onClick={startSession}
+                className="rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 px-5 py-2.5 text-sm font-medium shadow-lg shadow-pink-500/20"
+              >
                 Start goon session
               </button>
             ) : (
-              <button type="button" onClick={endSession} className="rounded-xl border border-white/20 px-4 py-2 text-sm">
-                End (+5 coins)
+              <button
+                type="button"
+                onClick={endSession}
+                className="rounded-xl border border-white/20 px-4 py-2.5 text-sm hover:bg-white/5"
+              >
+                End session (+8 coins)
               </button>
             )}
             {selected.map((id) => (
@@ -96,14 +137,14 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
                 key={id}
                 type="button"
                 onClick={() => onChat(id)}
-                className="rounded-xl border border-pink-500/40 px-4 py-2 text-sm text-pink-200"
+                className="rounded-xl border border-pink-500/40 px-4 py-2.5 text-sm text-pink-200 hover:bg-pink-500/10"
               >
                 Chat {CHARACTERS.find((c) => c.id === id)?.name.split(" ")[0]}
               </button>
             ))}
           </div>
           <p className="text-xs text-zinc-500">
-            Tip: In chat, use Generate → Explicit / Sex video. With two selected, dual scenes are unlocked in the generator.
+            Tip: In chat use the quick Generate buttons (Lingerie / Nude / Explicit / Sex video). With two girls selected, dual scenes are unlocked.
           </p>
         </div>
       )}
