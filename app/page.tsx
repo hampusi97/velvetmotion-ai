@@ -23,6 +23,7 @@ import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
 import { DualGirlChat } from "@/components/DualGirlChat";
 import { ShareImport } from "@/components/ShareImport";
+import { LoginGate } from "@/components/LoginGate";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
@@ -59,6 +60,7 @@ export default function Home() {
   const [tag, setTag] = useState<string | null>(null);
   const [adult, setAdult] = useState<boolean | null>(null);
   const [user, setUser] = useState<LocalUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -77,24 +79,12 @@ export default function Home() {
         setAdult(localStorage.getItem("velvet-age") === "true");
       }
       const initialView = params.get("view") as View | null;
-      if (initialView) {
-        setView(initialView);
-      }
+      if (initialView) setView(initialView);
     } catch {
       setAdult(false);
     }
-    const existing = getUser();
-    if (existing) {
-      setUser(existing);
-    } else {
-      const guest: LocalUser = { username: "VIP Guest", joinedAt: Date.now() };
-      try {
-        localStorage.setItem("vm-user", JSON.stringify(guest));
-      } catch {
-        /* ignore */
-      }
-      setUser(guest);
-    }
+    setUser(getUser());
+    setAuthReady(true);
   }, []);
 
   const navigate = (next: ViewId | "dual" | "share") => {
@@ -133,7 +123,7 @@ export default function Home() {
 
   const showRoster = view === "girls" || view === "romance";
 
-  if (adult === null) return <div className="min-h-screen bg-black" />;
+  if (adult === null || !authReady) return <div className="min-h-screen bg-black" />;
 
   if (!adult) {
     return (
@@ -162,6 +152,11 @@ export default function Home() {
         </div>
       </main>
     );
+  }
+
+  // Hard gate: must log in before any product UI
+  if (!user) {
+    return <LoginGate onLoggedIn={setUser} />;
   }
 
   return (
