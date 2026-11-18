@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getUser } from "@/lib/auth";
+import { postLoungeMessage, subscribeLounge } from "@/lib/firebaseLounge";
 
 type LobbyMsg = {
   id: string;
@@ -13,6 +14,7 @@ type LobbyMsg = {
 
 const LOBBY_KEY = "vm-user-lounge";
 const MATCH_KEY = "vm-lounge-match";
+const ROOM = "public";
 
 function loadLobby(): LobbyMsg[] {
   try {
@@ -34,12 +36,30 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
   const [text, setText] = useState("");
   const [partner, setPartner] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
+  const [firebaseLive, setFirebaseLive] = useState(false);
   const me = getUser()?.username || "Anon";
 
   useEffect(() => {
     setMsgs(loadLobby());
+    let unsub = () => {};
+    void subscribeLounge(ROOM, (list) => {
+      if (list.length) {
+        setFirebaseLive(true);
+        setMsgs(
+          list.map((m) => ({
+            id: m.id,
+            from: m.from,
+            text: m.text,
+            at: m.at,
+            shareCode: m.shareCode,
+          })),
+        );
+      }
+    }).then((u) => {
+      unsub = u;
+    });
     const onStorage = (e: StorageEvent) => {
-      if (e.key === LOBBY_KEY) setMsgs(loadLobby());
+      if (e.key === LOBBY_KEY && !firebaseLive) setMsgs(loadLobby());
       if (e.key === MATCH_KEY && e.newValue) {
         try {
           const p = JSON.parse(e.newValue);
@@ -48,10 +68,13 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       }
     };
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [me]);
+    return () => {
+      unsub();
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [me, firebaseLive]);
 
-  const post = (body: string, shareCode?: string) => {
+  const post = async (body: string, shareCode?: string) => {
     const msg: LobbyMsg = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       from: me,
@@ -62,13 +85,20 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
     const next = [...loadLobby(), msg];
     saveLobby(next);
     setMsgs(next);
+    const ok = await postLoungeMessage(ROOM, {
+      from: me,
+      text: body,
+      at: msg.at,
+      shareCode,
+    });
+    if (ok) setFirebaseLive(true);
   };
 
   const send = () => {
     const t = text.trim();
     if (!t) return;
     setText("");
-    post(t);
+    void post(t);
   };
 
   const findStranger = () => {
@@ -80,7 +110,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       try {
         localStorage.setItem(MATCH_KEY, JSON.stringify({ from: me, to: name, at: Date.now() }));
       } catch {}
-      post(`*connected with ${name}*`);
+      void post(`*connected with ${name}*`);
     }, 1200 + Math.random() * 1500);
   };
 
@@ -89,7 +119,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       const raw = localStorage.getItem("velvet-custom-girls");
       const list = raw ? JSON.parse(raw) : [];
       if (!list.length) {
-        post("I don't have a custom girl to share yet — create one first.");
+        void post("I don't have a custom girl to share yet — create one first.");
         return;
       }
       const girl = list[0];
@@ -107,9 +137,9 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
           ),
         ),
       ).slice(0, 48);
-      post(`Sharing my girl “${girl.name}” — code: ${code}`, code);
+      void post(`Sharing my girl “${girl.name}” — code: ${code}`, code);
     } catch {
-      post("Couldn't build a share code.");
+      void post("Couldn't build a share code.");
     }
   };
 
@@ -125,7 +155,12 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       </button>
       <h1 className="font-display text-3xl text-cream">Lounge</h1>
       <p className="text-sm text-mist">
-        Omegle-style lobby · chat with other users · share girl codes. Local/demo match for now.
+        Omegle-style lobby · share girl codes.{" "}
+        {firebaseLive ? (
+          <span className="text-emerald-400">Live (Firebase)</span>
+        ) : (
+          <span className="text-zinc-500">Local / same-browser demo until Firebase rules allow loungeRooms</span>
+        )}
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -143,11 +178,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
             <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-200">
               Connected · {partner}
             </span>
-            <button
-              type="button"
-              onClick={nextStranger}
-              className="rounded-full border border-white/15 px-3 py-1.5 text-xs"
-            >
+            <button type="button" onClick={nextStranger} className="rounded-full border border-white/15 px-3 py-1.5 text-xs">
               Next
             </button>
           </>
