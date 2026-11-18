@@ -24,6 +24,7 @@ import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
 import { DualGirlChat } from "@/components/DualGirlChat";
 import { GroupChat } from "@/components/GroupChat";
 import { ShareImport } from "@/components/ShareImport";
+import { UserLounge } from "@/components/UserLounge";
 import { LoginGate } from "@/components/LoginGate";
 import { getUser, type LocalUser } from "@/lib/auth";
 
@@ -47,7 +48,8 @@ type HomeView =
   | "workspace"
   | "dual"
   | "group"
-  | "share";
+  | "share"
+  | "lounge";
 
 type View = HomeView | "profile" | "chat";
 
@@ -89,7 +91,7 @@ export default function Home() {
     setAuthReady(true);
   }, []);
 
-  const navigate = (next: ViewId | "dual" | "share" | "group") => {
+  const navigate = (next: ViewId | "dual" | "share" | "group" | "lounge") => {
     setMenuOpen(false);
     if (next === "girls" || next === "romance") openRoster(next === "romance");
     else setView(next as View);
@@ -164,7 +166,12 @@ export default function Home() {
     <div className="min-h-screen bg-ink-950 text-white">
       <SiteHeader
         view={
-          view === "profile" || view === "chat" || view === "dual" || view === "group" || view === "share"
+          view === "profile" ||
+          view === "chat" ||
+          view === "dual" ||
+          view === "group" ||
+          view === "share" ||
+          view === "lounge"
             ? listView
             : (view as ViewId)
         }
@@ -174,7 +181,9 @@ export default function Home() {
         onUserChange={setUser}
       />
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
-        {view === "home" && <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />}
+        {view === "home" && (
+          <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />
+        )}
 
         {view === "penthouse" && (
           <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
@@ -231,6 +240,7 @@ export default function Home() {
 
         {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
         {view === "group" && <GroupChat onHome={() => setView("home")} />}
+        {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
         {view === "share" && (
           <ShareImport
             onHome={() => setView("home")}
