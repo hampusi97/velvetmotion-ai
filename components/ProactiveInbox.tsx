@@ -2,14 +2,34 @@
 
 import { useEffect, useState } from "react";
 import { getProactiveMessages, type ProactiveMessage } from "@/lib/proactive";
+import { loadProactiveQueue } from "@/lib/proactiveIdle";
 import { characterMediaUrl } from "@/lib/media";
-import { CHARACTERS } from "@/lib/characters";
+import { CHARACTERS, getCharacter } from "@/lib/characters";
 
-export function ProactiveInbox({ onOpen }: { onOpen: (id: string) => void }) {
+export function ProactiveInbox({
+  onOpen,
+}: {
+  onOpen: (id: string, incomingMessage?: string) => void;
+}) {
   const [msgs, setMsgs] = useState<ProactiveMessage[]>([]);
 
   useEffect(() => {
-    setMsgs(getProactiveMessages(4));
+    const queue = loadProactiveQueue().map((q) => ({
+      characterId: q.characterId,
+      characterName: q.characterName,
+      text: q.text,
+      at: q.at,
+    }));
+    const base = getProactiveMessages(4);
+    const seen = new Set<string>();
+    const combined: ProactiveMessage[] = [];
+    for (const m of [...queue, ...base]) {
+      if (!seen.has(m.characterId)) {
+        seen.add(m.characterId);
+        combined.push(m);
+      }
+    }
+    setMsgs(combined.slice(0, 6));
   }, []);
 
   if (msgs.length === 0) return null;
@@ -20,13 +40,13 @@ export function ProactiveInbox({ onOpen }: { onOpen: (id: string) => void }) {
       <p className="text-sm text-mist mb-4">Proactive messages from girls you’ve already talked to</p>
       <div className="space-y-2">
         {msgs.map((m) => {
-          const c = CHARACTERS.find((x) => x.id === m.characterId);
+          const c = getCharacter(m.characterId) || CHARACTERS.find((x) => x.id === m.characterId);
           if (!c) return null;
           return (
             <button
               key={m.characterId + m.at}
               type="button"
-              onClick={() => onOpen(m.characterId)}
+              onClick={() => onOpen(m.characterId, m.text)}
               className="w-full flex items-center gap-3 rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-950/50 to-zinc-900/80 p-3 text-left hover:border-pink-400/50 transition"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}

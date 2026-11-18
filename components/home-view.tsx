@@ -62,9 +62,11 @@ const EXPERIENCES = [
 export function HomeView({
   onNavigate,
   onOpenGirl,
+  onOpenDual,
 }: {
-  onNavigate: (id: SectionId | "dual" | "group" | "lounge") => void;
-  onOpenGirl?: (id: string) => void;
+  onNavigate: (id: SectionId | "dual" | "group" | "lounge" | "shorts" | "vault" | "import" | "share" | "advanced") => void;
+  onOpenGirl?: (id: string, incomingMessage?: string) => void;
+  onOpenDual?: (aId: string, bId: string) => void;
 }) {
   const reduce = useReducedMotion();
   const [coins, setCoins] = useState(500);
@@ -366,7 +368,7 @@ export function HomeView({
 
       {onOpenGirl && (
         <motion.div variants={riseItem}>
-          <FeaturedPair onOpen={onOpenGirl} />
+          <FeaturedPair onOpen={onOpenGirl} onOpenDual={onOpenDual} />
         </motion.div>
       )}
 
@@ -386,14 +388,35 @@ export function HomeView({
           variants={riseContainer}
           className="grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {sections
-            .filter((s) => !["workspace", "bnwo", "suggest"].includes(s.id))
-            .map((section) => (
-              <motion.li key={section.id} variants={riseItem} className="min-w-0">
-                <FeatureCard section={section} onOpen={onNavigate} />
-              </motion.li>
-            ))}
+          {sections.map((section) => (
+            <motion.li key={section.id} variants={riseItem} className="min-w-0">
+              <FeatureCard section={section} onOpen={onNavigate} />
+            </motion.li>
+          ))}
         </motion.ul>
+        <motion.div variants={riseItem} className="mt-6 flex flex-wrap gap-2">
+          {(
+            [
+              ["shorts", "🎬 Velvet Shorts"],
+              ["dual", "👯‍♀️ Dual Girl Chat"],
+              ["group", "👥 Group Chat (2-4 Girls)"],
+              ["lounge", "👋 User Lounge"],
+              ["vault", "🔐 Private PIN Vault"],
+              ["import", "🃏 Import SillyTavern Card"],
+              ["share", "🔗 Share & Import Codes"],
+              ["advanced", "⚙️ ComfyUI / Ollama / Telegram"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onNavigate(id)}
+              className="rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-zinc-200 hover:border-pink-500/50 hover:bg-pink-500/10 transition"
+            >
+              {label}
+            </button>
+          ))}
+        </motion.div>
       </section>
     </motion.div>
   );

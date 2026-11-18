@@ -4,7 +4,13 @@ import { getFeaturedPair } from "@/lib/featured";
 import { CHARACTERS } from "@/lib/characters";
 import { resolveCharacterAvatar } from "@/lib/media";
 
-export function FeaturedPair({ onOpen }: { onOpen: (id: string) => void }) {
+export function FeaturedPair({
+  onOpen,
+  onOpenDual,
+}: {
+  onOpen: (id: string) => void;
+  onOpenDual?: (aId: string, bId: string) => void;
+}) {
   const pair = getFeaturedPair();
   const a = CHARACTERS.find((c) => c.id === pair.aId);
   const b = CHARACTERS.find((c) => c.id === pair.bId);
@@ -34,18 +40,27 @@ export function FeaturedPair({ onOpen }: { onOpen: (id: string) => void }) {
           <h3 className="text-lg font-semibold text-cream">{pair.label}</h3>
           <p className="text-xs text-mist">Dual-girl gens {pair.dualDiscount}% off when you pick both in chat.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {onOpenDual && (
+            <button
+              type="button"
+              onClick={() => onOpenDual(a.id, b.id)}
+              className="rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-pink-500/25"
+            >
+              Dual Chat ({pair.aName} + {pair.bName})
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onOpen(a.id)}
-            className="rounded-full bg-pink-600 px-4 py-2 text-sm font-medium"
+            className="rounded-full border border-pink-500/40 bg-pink-500/15 px-3.5 py-2 text-sm font-medium text-pink-100"
           >
-            Chat {pair.aName}
+            {pair.aName}
           </button>
           <button
             type="button"
             onClick={() => onOpen(b.id)}
-            className="rounded-full border border-white/20 px-4 py-2 text-sm"
+            className="rounded-full border border-white/20 px-3.5 py-2 text-sm"
           >
             {pair.bName}
           </button>

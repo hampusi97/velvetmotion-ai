@@ -89,6 +89,7 @@ export default function Home() {
   const [proactive, setProactive] = useState<ProactivePing | null>(null);
   const [activePackId, setActivePackId] = useState<string | null>(null);
   const [activeJoiId, setActiveJoiId] = useState<string | null>(null);
+  const [dualPair, setDualPair] = useState<{ a: string; b: string } | null>(null);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -200,7 +201,7 @@ export default function Home() {
     setView("profile");
   };
 
-  const openChatById = (id: string, scenarioPrompt?: string) => {
+  const openChatById = (id: string, scenarioPrompt?: string, incomingAssistantNote?: string) => {
     const found = getCharacter(id);
     if (found) setCustomCharacter(found);
     if (scenarioPrompt && scenarioPrompt.trim()) {
@@ -218,10 +219,27 @@ export default function Home() {
           content: `*Scenario:* ${scenarioPrompt.trim()}\n\n“We're right here inside the scene. Tell me your next move.”`,
         },
       ]);
+    } else if (incomingAssistantNote && incomingAssistantNote.trim()) {
+      const existing = loadChat(id);
+      const note = incomingAssistantNote.trim();
+      if (!existing.some((m) => m.content === note)) {
+        const base =
+          existing.length > 0
+            ? existing
+            : found
+              ? [{ role: "assistant" as const, content: found.initialMessage }]
+              : [];
+        saveChat(id, [...base, { role: "assistant", content: note }]);
+      }
     }
     setSelectedId(id);
     setRomanceMode(false);
     setView("chat");
+  };
+
+  const openDualWithPair = (aId: string, bId: string) => {
+    setDualPair({ a: aId, b: bId });
+    setView("dual");
   };
 
   const showRoster = view === "girls" || view === "romance";
@@ -294,7 +312,11 @@ export default function Home() {
         <CandySidebar active={sidebarActive} onNavigate={navigate} coins={coins} />
         <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " flex-1 py-6 min-w-0"}>
           {view === "home" && (
-            <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />
+            <HomeScreen
+              onNavigate={navigate}
+              onOpenGirl={(id, note) => openChatById(id, undefined, note)}
+              onOpenDual={openDualWithPair}
+            />
           )}
           {view === "shorts" && <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />}
           {view === "advanced" && <AdvancedMediaSettings onHome={() => setView("home")} />}
@@ -356,7 +378,13 @@ export default function Home() {
               }}
             />
           )}
-          {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
+          {view === "dual" && (
+            <DualGirlChat
+              onHome={() => setView("home")}
+              initialGirlAId={dualPair?.a}
+              initialGirlBId={dualPair?.b}
+            />
+          )}
           {view === "group" && <GroupChat onHome={() => setView("home")} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
           {view === "share" && (
@@ -369,7 +397,13 @@ export default function Home() {
               }}
             />
           )}
-          {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "room" && (
+            <GoonRoom
+              onHome={() => setView("home")}
+              onChat={openChatById}
+              onOpenDual={openDualWithPair}
+            />
+          )}
           {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
           {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
           {view === "scenario" && (
@@ -458,7 +492,7 @@ export default function Home() {
         <ProactiveToast
           ping={proactive}
           onOpen={() => {
-            openChatById(proactive.characterId);
+            openChatById(proactive.characterId, undefined, proactive.text);
             dismissProactive(proactive.at);
             setProactive(null);
           }}

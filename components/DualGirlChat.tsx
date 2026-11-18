@@ -8,9 +8,21 @@ import { FantasyCodePanel } from "./FantasyCodePanel";
 
 type Msg = { role: "user" | "a" | "b"; content: string; name?: string };
 
-export function DualGirlChat({ onHome }: { onHome: () => void }) {
-  const [aId, setAId] = useState(CHARACTERS[0]?.id || "");
-  const [bId, setBId] = useState(CHARACTERS[1]?.id || "");
+export function DualGirlChat({
+  onHome,
+  initialGirlAId,
+  initialGirlBId,
+}: {
+  onHome: () => void;
+  initialGirlAId?: string | null;
+  initialGirlBId?: string | null;
+}) {
+  const [aId, setAId] = useState(initialGirlAId || CHARACTERS[0]?.id || "");
+  const [bId, setBId] = useState(
+    initialGirlBId && initialGirlBId !== (initialGirlAId || CHARACTERS[0]?.id)
+      ? initialGirlBId
+      : CHARACTERS[1]?.id || "",
+  );
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");

@@ -6,7 +6,15 @@ import { resolveAvatar } from "@/lib/portraits";
 import { characterMediaUrl } from "@/lib/media";
 import { getCoins, spendCoins, addCoins } from "@/lib/storage";
 
-export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: string) => void }) {
+export function GoonRoom({
+  onHome,
+  onChat,
+  onOpenDual,
+}: {
+  onHome: () => void;
+  onChat: (id: string) => void;
+  onOpenDual?: (aId: string, bId: string) => void;
+}) {
   const [coins, setCoins] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [timer, setTimer] = useState(0);
@@ -152,6 +160,16 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
                 className="rounded-xl border border-white/20 px-4 py-2.5 text-sm hover:bg-white/5"
               >
                 End session (+coins)
+              </button>
+            )}
+            {selected.length === 2 && onOpenDual && (
+              <button
+                type="button"
+                onClick={() => onOpenDual(selected[0], selected[1])}
+                className="rounded-xl bg-fuchsia-600 px-4 py-2.5 text-sm font-semibold text-white shadow"
+              >
+                Launch Dual Chat ({CHARACTERS.find((c) => c.id === selected[0])?.name.split(" ")[0]} +{" "}
+                {CHARACTERS.find((c) => c.id === selected[1])?.name.split(" ")[0]})
               </button>
             )}
             {selected.map((id) => (

@@ -9,7 +9,11 @@ const MOOD_STYLE: Record<string, string> = {
   explicit: "bg-red-500/20 text-red-200",
 };
 
-export function DailyFeed({ onOpenGirl }: { onOpenGirl: (id: string) => void }) {
+export function DailyFeed({
+  onOpenGirl,
+}: {
+  onOpenGirl: (id: string, incomingMessage?: string) => void;
+}) {
   const posts = buildFeed(12);
   return (
     <section className="mt-10 mb-8">
@@ -24,7 +28,7 @@ export function DailyFeed({ onOpenGirl }: { onOpenGirl: (id: string) => void }) 
           <li key={p.id}>
             <button
               type="button"
-              onClick={() => onOpenGirl(p.characterId)}
+              onClick={() => onOpenGirl(p.characterId, p.text)}
               className="flex w-full gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-pink-500/40 hover:bg-pink-500/5"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
