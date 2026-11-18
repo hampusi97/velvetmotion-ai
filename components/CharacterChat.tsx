@@ -24,6 +24,7 @@ import {
   loadMemories,
   saveMemories,
 } from "@/lib/memoryMap";
+import { pushShort, memoryPromptBlock, pinLong } from "@/lib/memoryTiers";
 import { stageFromIntimacy, nextStage } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
 import {
@@ -39,7 +40,11 @@ import {
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
 import { characterMediaUrl, type MediaMood } from "@/lib/media";
-import { runSequenceGeneration, type SequenceKind } from "@/lib/videoModes";
+import {
+  runSequenceGeneration,
+  enhanceSequenceWithVideo,
+  type SequenceKind,
+} from "@/lib/videoModes";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
@@ -80,9 +85,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const [voiceOn, setVoiceOn] = useState(true);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultNote, setVaultNote] = useState("");
-  const [activeMedia, setActiveMedia] = useState<{ url: string; frames?: string[]; type: string } | null>(null);
+  const [activeMedia, setActiveMedia] = useState<{
+    url: string;
+    frames?: string[];
+    videoUrl?: string | null;
+    type: string;
+    note?: string;
+  } | null>(null);
   const [gifts, setGifts] = useState<string[]>([]);
   const [showTributeNudge, setShowTributeNudge] = useState(false);
+  const [clipStatus, setClipStatus] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -135,11 +147,19 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     persist(next);
     setBusy(true);
 
+    // Haven-style tiers + existing memory map
     try {
+      pushShort(character.id, "user", text);
       const existing = loadMemories(character.id);
       const updated = extractMemoriesFromMessage(text, existing);
       saveMemories(character.id, updated);
+      if (/(always remember|never forget|my name is|call me)/i.test(text)) {
+        pinLong(character.id, text.slice(0, 180));
+      }
     } catch {}
+
+    const memoryBlock = memoryPromptBlock(character.id);
+    const tierMemories = loadMemories(character.id);
 
     try {
       const res = await fetch("/api/chat", {
@@ -150,6 +170,11 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           messages: next.slice(-12),
           romanceMode,
           intimacy,
+          memories: [
+            ...tierMemories.slice(-10),
+            ...(memoryBlock ? memoryBlock.split("\n").filter(Boolean).slice(0, 8) : []),
+          ],
+          memoryBlock,
         }),
       });
       let replyText = "";
@@ -164,6 +189,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       if (intimacy > 40 && Math.random() < 0.18 && !/tribute/i.test(replyText)) {
         replyText += `\n\n*She glances at the camera.* “If you want to tribute me later… I won’t look away.”`;
       }
+      pushShort(character.id, "assistant", replyText);
       const assistantMsg: ChatMessage = { role: "assistant", content: replyText };
       const final = [...next, assistantMsg];
       persist(final);
@@ -175,6 +201,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       updateIntimacyAudioIntensity?.(Math.min(100, newInt));
     } catch {
       const fallback = fallbackReply(character, text, romanceMode);
+      pushShort(character.id, "assistant", fallback);
       persist([...next, { role: "assistant", content: fallback }]);
     } finally {
       setBusy(false);
@@ -187,7 +214,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     if (!spendCoins(cost)) {
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: `Not enough coins for ${label}. Claim daily or keep chatting to earn more.` },
+        {
+          role: "assistant",
+          content: `Not enough coins for ${label}. Claim daily or keep chatting to earn more.`,
+        },
       ]);
       return;
     }
@@ -221,9 +251,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     }
   };
 
-  const generateSequence = (kind: SequenceKind) => {
+  const generateSequence = async (kind: SequenceKind) => {
     if (busy) return;
     setBusy(true);
+    setClipStatus(null);
     try {
       const result = runSequenceGeneration(character, kind);
       if (!result.ok) {
@@ -248,7 +279,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       };
       const next = [...messages, mediaMsg];
       persist(next);
-      setActiveMedia({ url, frames, type: kind });
+      setActiveMedia({ url, frames, type: kind, note: "Frame sequence" });
       const newInt = bumpIntimacy(character.id, 8);
       setIntimacy(newInt);
       setShowTributeNudge(true);
@@ -262,6 +293,35 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
                 ? "You're mine for this. Stay right there."
                 : "Watch me. Tribute me when you finish.";
         speak(line, { ...character.voice });
+      }
+
+      // Real clip when Advanced img2vid / Pollinations video is configured
+      setClipStatus("Enhancing to live clip…");
+      const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
+      if (enhanced.videoUrl) {
+        setActiveMedia({
+          url,
+          frames,
+          videoUrl: enhanced.videoUrl,
+          type: kind,
+          note: enhanced.note,
+        });
+        setClipStatus(
+          enhanced.mode === "mp4" ? "Live clip attached" : enhanced.note,
+        );
+        persist([
+          ...next,
+          {
+            role: "assistant",
+            content: `*Clip ready.* ${enhanced.note}`,
+            videoUrl: enhanced.videoUrl,
+            frames,
+            imageUrl: url,
+            mediaType: kind,
+          },
+        ]);
+      } else {
+        setClipStatus(enhanced.note || "Sequence only (configure Advanced → img2vid for MP4)");
       }
     } finally {
       setBusy(false);
@@ -287,6 +347,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
   const saveVault = () => {
     try {
       localStorage.setItem(`vm-vault-${character.id}`, vaultNote);
+      if (vaultNote.trim()) pinLong(character.id, `Vault: ${vaultNote.trim().slice(0, 160)}`);
     } catch {}
     setVaultOpen(false);
   };
@@ -346,6 +407,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </div>
       )}
 
+      {clipStatus && (
+        <div className="mt-2 text-[11px] text-zinc-400 px-1">{clipStatus}</div>
+      )}
+
       {vaultOpen && (
         <div className="mt-3 rounded-2xl border border-pink-500/30 bg-zinc-900/80 p-4 space-y-2">
           <div className="text-sm font-medium text-pink-200">Private vault — only you see this</div>
@@ -358,7 +423,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           />
           <div className="flex gap-2">
             <button type="button" onClick={saveVault} className="px-3 py-1.5 rounded-xl bg-pink-600 text-sm font-medium">
-              Save
+              Save (pins to long-term memory)
             </button>
             <button
               type="button"
@@ -382,7 +447,12 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               }`}
             >
               <div className="whitespace-pre-wrap">{m.content}</div>
-              {m.imageUrl && (
+              {m.videoUrl && (
+                <div className="mt-2 rounded-xl overflow-hidden border border-pink-500/30">
+                  <video src={m.videoUrl} controls playsInline className="w-full max-h-80 bg-black" />
+                </div>
+              )}
+              {m.imageUrl && !m.videoUrl && (
                 <div className="mt-2 rounded-xl overflow-hidden border border-white/10">
                   {m.frames && m.frames.length > 1 ? (
                     <MotionSequencePlayer frames={m.frames} alt={character.name} />
@@ -401,11 +471,24 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
 
       {activeMedia && (
         <div className="mb-2 rounded-2xl overflow-hidden border border-pink-500/40 relative">
-          {activeMedia.frames && activeMedia.frames.length > 1 ? (
+          {activeMedia.videoUrl ? (
+            <video
+              src={activeMedia.videoUrl}
+              controls
+              autoPlay
+              playsInline
+              className="w-full max-h-64 bg-black"
+            />
+          ) : activeMedia.frames && activeMedia.frames.length > 1 ? (
             <MotionSequencePlayer frames={activeMedia.frames} alt={character.name} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={activeMedia.url} alt="" className="w-full max-h-64 object-cover" />
+          )}
+          {activeMedia.note && (
+            <div className="absolute bottom-2 left-2 right-12 text-[10px] bg-black/70 rounded px-2 py-1 text-zinc-300">
+              {activeMedia.note}
+            </div>
           )}
           <button
             type="button"
@@ -436,7 +519,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             key={chip.id}
             type="button"
             disabled={busy}
-            onClick={() => generateSequence(chip.id)}
+            onClick={() => void generateSequence(chip.id)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-fuchsia-500/50 bg-fuchsia-500/15 text-xs font-medium text-fuchsia-100 hover:bg-fuchsia-500/25 disabled:opacity-50"
           >
             <Video className="h-3.5 w-3.5" />
