@@ -1,10 +1,10 @@
 /**
  * VelvetMotion Media Engine
- * Candy-style photoreal prompts (influencer / selfie aesthetic).
- * Face-consistent seeds + SPH / BNWO / JOI sequences.
+ * Candy-style photoreal + optional local ComfyUI/Forge base + aggressive face seeds.
  */
 
 import type { Character } from "./charactersTypes";
+import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 
 export type MediaMood =
   | "beauty"
@@ -31,6 +31,8 @@ function mediaSeed(id: string, mood: string, extra = ""): number {
 }
 
 export function faceSeed(character: Pick<Character, "id" | "figure" | "name">): number {
+  const stored = getCharacterFaceSeed(character.id);
+  if (stored != null) return stored;
   return Math.abs(hashCode(character.id + "|face|" + (character.figure || "").slice(0, 80))) % 100000;
 }
 
@@ -66,28 +68,50 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
     "woman encouraging climax, open mouth, intense eye contact, nude or lingerie, finish command pose, erotic photography",
 };
 
-function pollinationsUrl(
+function buildPrompt(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
   mood: MediaMood,
   extra = "",
-  opts?: { seedOverride?: number; width?: number; height?: number },
 ): string {
   const figure = character.figure || "beautiful adult woman, photoreal influencer aesthetic";
-  const prompt = [
+  return [
     "masterpiece, best quality, ultra detailed, photorealistic, 8k",
     `adult woman ${character.age || 24} years old`,
     figure,
-    `${character.name} face identity, consistent face and body across shots`,
+    `${character.name} face identity, consistent face and body across shots, same person`,
     MOOD_PROMPTS[mood],
     extra,
     "looking at viewer, sharp eyes, detailed skin, natural proportions, no text, no watermark, no logos",
   ]
     .filter(Boolean)
     .join(", ");
-  const base = opts?.seedOverride ?? faceSeed(character);
-  const seed = (base + mediaSeed(character.id, mood, extra)) % 100000;
+}
+
+function pollinationsUrl(
+  character: Pick<Character, "id" | "name" | "figure" | "age">,
+  mood: MediaMood,
+  extra = "",
+  opts?: { seedOverride?: number; width?: number; height?: number },
+): string {
+  const prompt = buildPrompt(character, mood, extra);
+  const settings = typeof window !== "undefined" ? getMediaSettings() : null;
+  const baseFace = opts?.seedOverride ?? faceSeed(character);
+  // Aggressive lock: mood offset tiny so face stays dominant
+  const moodJitter =
+    settings?.aggressiveFaceLock !== false ? mediaSeed(character.id, mood, extra) % 17 : mediaSeed(character.id, mood, extra);
+  const seed = (baseFace * 97 + moodJitter) % 100000;
   const w = opts?.width ?? 768;
   const h = opts?.height ?? 1152;
+
+  if (settings?.preferLocal && settings.localImageBase) {
+    const base = settings.localImageBase.replace(/\/$/, "");
+    if (settings.localImageMode === "prompt-url") {
+      return `${base}/${encodeURIComponent(prompt)}?seed=${seed}&width=${w}&height=${h}`;
+    }
+    // forge/comfy: still return pollinations for browser-safe GET; local APIs need POST proxy
+    // Documented in Advanced UI — true Comfy needs a small local proxy.
+  }
+
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(
     prompt,
   )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true`;
