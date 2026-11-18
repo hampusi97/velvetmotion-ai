@@ -4,9 +4,10 @@ import { useState } from "react";
 import type { Character } from "@/lib/charactersTypes";
 import {
   loadImportedCharacters,
-  parseCardFileText,
+  parseSillyTavernCard,
   saveImportedCharacter,
 } from "@/lib/sillyTavernImport";
+import { parseCharacterCardFile } from "@/lib/pngCardDecode";
 
 export function CardImport({
   onHome,
@@ -25,11 +26,27 @@ export function CardImport({
     setError(null);
     setOk(null);
     try {
-      const text = await file.text();
-      const character = parseCardFileText(text);
-      if (!character) {
-        setError("Could not parse this card. Use SillyTavern V1/V2 JSON or OpenChara export.");
+      const raw = await parseCharacterCardFile(file);
+      if (!raw) {
+        setError(
+          "Could not read card. Use SillyTavern PNG (chara/ccv3 chunk) or JSON export.",
+        );
         return;
+      }
+      const character = parseSillyTavernCard(raw);
+      if (!character) {
+        setError("Parsed file but missing name/fields. Export V2 JSON from SillyTavern.");
+        return;
+      }
+      // Prefer PNG itself as avatar when image card
+      if (file.type === "image/png" || file.name.toLowerCase().endsWith(".png")) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result));
+          r.onerror = reject;
+          r.readAsDataURL(file);
+        });
+        character.avatar = dataUrl;
       }
       saveImportedCharacter(character);
       setList(loadImportedCharacters());
@@ -47,17 +64,17 @@ export function CardImport({
       <div>
         <h1 className="font-display text-2xl text-cream">Import character card</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Drop a SillyTavern V1/V2 JSON card or OpenChara-style export. We map name, personality,
-          first message, and tags into a VelvetMotion girl.
+          Drop a SillyTavern <strong className="text-zinc-300">PNG</strong> (embedded chara/ccv3) or
+          JSON / OpenChara export. Portrait is kept when you import a PNG card.
         </p>
       </div>
 
       <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-pink-500/40 bg-zinc-950/60 px-6 py-10 cursor-pointer hover:border-pink-400/60">
         <span className="text-3xl">🃏</span>
-        <span className="text-sm text-zinc-300">Click or drop .json card</span>
+        <span className="text-sm text-zinc-300">Click or drop .png or .json card</span>
         <input
           type="file"
-          accept=".json,application/json"
+          accept=".json,.png,application/json,image/png"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -77,10 +94,16 @@ export function CardImport({
               key={c.id}
               type="button"
               onClick={() => onOpen(c)}
-              className="w-full text-left rounded-xl border border-white/10 bg-zinc-900/80 px-4 py-3 hover:border-pink-500/40"
+              className="w-full text-left rounded-xl border border-white/10 bg-zinc-900/80 px-4 py-3 hover:border-pink-500/40 flex gap-3 items-center"
             >
-              <div className="font-medium text-cream">{c.name}</div>
-              <div className="text-xs text-zinc-500 truncate">{c.tagline}</div>
+              {c.avatar && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.avatar} alt="" className="h-12 w-12 rounded-lg object-cover" />
+              )}
+              <div className="min-w-0">
+                <div className="font-medium text-cream">{c.name}</div>
+                <div className="text-xs text-zinc-500 truncate">{c.tagline}</div>
+              </div>
             </button>
           ))}
         </div>
