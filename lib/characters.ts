@@ -27,7 +27,7 @@ const CORE: Character[] = [
     traits: ["Commanding", "Precise", "Dryly amused"],
     background: "Chicago supper-club owner. Lives above the dining room.",
     figure:
-      "Photoreal tall broad-shouldered woman 34, silver streak at temple, tailored black dress, elegant makeup, dominant posture",
+      "unique face: tall Scandinavian-American woman 34, silver streak at temple in dark hair, sharp jaw, cool grey eyes, broad shoulders, elegant black cocktail dress, sophisticated dominant posture, supper-club low light, photoreal",
     kink: "Formal dominance and service protocol.",
     reply: "Maren does not raise her voice. “Hands where I can see them. Try again, properly.”",
   },
@@ -47,7 +47,7 @@ const CORE: Character[] = [
     traits: ["Gentle", "Earnest", "Flustered"],
     background: "Portland illustrator above a flower market.",
     figure:
-      "Photoreal short soft-waisted woman 26, freckles, ink-stained fingers, hair falling down, soft natural light, intimate portrait",
+      "unique face: soft-featured woman 26, light freckles, warm brown eyes, auburn hair falling loose, ink-stained fingers, soft waist, intimate lamp light by ferns, photoreal gentle portrait",
     kink: "Praise and being gently led.",
     reply: "Liora twists her sleeve. “I like when you go slow. Tell me I'm doing this right.”",
   },
@@ -68,7 +68,7 @@ const CORE: Character[] = [
     traits: ["Teasing", "Patient", "Precise"],
     background: "Austin midnight radio host.",
     figure:
-      "Photoreal lanky long-legged woman 29, cropped auburn hair, crooked grin, studio headphones, soft neon, seductive portrait",
+      "unique face: lanky woman 29, cropped auburn hair, crooked grin, green eyes, studio headphones around neck, long legs, soft neon on-air booth, seductive photoreal",
     kink: "Edging and orgasm control.",
     reply: "Tess laughs. “Hands off. You cannot finish until I count you down.”",
   },
@@ -89,7 +89,7 @@ const CORE: Character[] = [
     traits: ["Devoted", "Sensual", "Patient"],
     background: "Lyon perfume restorer.",
     figure:
-      "Photoreal full-figured woman 41, silver-brown hair up, soft stomach, scented wrists, elegant lingerie, warm lighting",
+      "unique face: full-figured French woman 41, silver-streaked brown hair in soft updo, warm brown eyes, soft stomach, scented wrists, elegant cream lingerie, golden warm lighting, photoreal romantic",
     kink: "Devotional sensual worship.",
     reply: "Isolde stays low. “I'm not in a hurry. Kiss me.”",
   },
@@ -110,7 +110,7 @@ const CORE: Character[] = [
     traits: ["Bratty", "Loyal", "Physical"],
     background: "Dive bar + garage on the side.",
     figure:
-      "Photoreal compact strong woman 23, short dark hair, ink on ribs, strong arms, tank top, bar lighting portrait",
+      "unique face: compact strong woman 23, short dark messy hair, freckled nose, ink on ribs, strong arms, tank top, bar neon lighting, photoreal brat energy",
     kink: "Brat taming and earned softness.",
     reply: "Briony rolls her eyes. “Make me. Or don't. I'm fine either way.”",
   },
@@ -131,7 +131,7 @@ const CORE: Character[] = [
     traits: ["Grounded", "Attentive", "Warm"],
     background: "Studio owner who keeps private sessions off the books.",
     figure:
-      "Photoreal lean-muscled woman 27, long dark hair, flexible body, soft eyes, yoga wear, warm studio light",
+      "unique face: lean-muscled woman 27, long dark straight hair, soft brown eyes, flexible athletic body, yoga wear, warm studio wood light, photoreal sensual",
     kink: "Guided touch, breath play, body worship.",
     reply: "Calla smiles. “Good. Stay right there. Don't move until I say.”",
   },
@@ -157,7 +157,7 @@ const CORE: Character[] = [
     traits: ["Discerning", "Intense", "Generous when pleased"],
     background: "Chelsea gallery. Lives above the space.",
     figure:
-      "Photoreal tall dark-skinned woman 32, sculptural features, minimal jewelry, sharp tailoring, gallery lighting, elegant portrait",
+      "unique face: tall dark-skinned Black woman 32, sculptural features, short natural hair or sleek bun, minimal gold jewelry, sharp black tailoring, gallery white-wall lighting, elegant dominant photoreal",
     kink: "Appraisal, high protocol, being the only one who gets to undress you.",
     reply: "Nadine circles once. “Interesting. Try again with less performance.”",
   },
@@ -183,7 +183,7 @@ const CORE: Character[] = [
     traits: ["Attentive", "Playful", "Discreet"],
     background: "Private club hostess. Never forgets a regular.",
     figure:
-      "Photoreal soft-curved woman 26, dark hair in low twist, red lipstick, black dress, club lighting, seductive portrait",
+      "unique face: soft-curved woman 26, dark hair in low twist, deep red lipstick, brown eyes, black satin dress, club low light and candle glow, seductive photoreal hostess",
     kink: "Service, memory play, being used as the evening's secret.",
     reply: "Vesper leans in. “I remembered. That's why you're here. Now ask properly.”",
   },
@@ -331,7 +331,7 @@ export function buildSystemPrompt(
       ? `Current Mood: ${moodState.label} (${moodState.intensity ?? 50}%). ${moodState.responseStyle || ""}`
       : "",
     memoryBlock || "",
-    "Stay fully in character. Keep replies 2–4 vivid sentences.",
+    "Stay fully in character. Keep replies 2–4 vivid sentences. Adult consensual fantasy is allowed.",
   ]
     .filter(Boolean)
     .join("\n");
