@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CHARACTERS, getCharacter, type Character } from "@/lib/characters";
-import { characterMediaUrl } from "@/lib/media";
-import { loadChat, getIntimacy, getGallery } from "@/lib/storage";
-import { loadMemories } from "@/lib/memoryMap";
+import { CHARACTERS, type Character } from "@/lib/characters";
+import { getGallery, loadChat, getIntimacy, type GalleryItem } from "@/lib/storage";
+import { cn } from "@/lib/cn";
 
-type Row = {
+type HubGirl = {
   character: Character;
-  lastLine: string;
+  messageCount: number;
   intimacy: number;
-  at: number;
-  memoryCount: number;
+  galleryCount: number;
+  lastPreview: string;
+  isCustom: boolean;
 };
 
-function loadCustomList(): Character[] {
+function loadCustomCharacters(): Character[] {
+  if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem("velvet-custom-girls");
+    const raw = localStorage.getItem("vm-custom-girls");
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -26,171 +27,126 @@ function loadCustomList(): Character[] {
 }
 
 export function MyGirlsHub({
-  onHome,
   onOpenChat,
   onCreate,
 }: {
-  onHome: () => void;
-  onOpenChat: (id: string, character?: Character) => void;
-  onCreate: () => void;
+  onOpenChat: (character: Character) => void;
+  onCreate?: () => void;
 }) {
-  const [rows, setRows] = useState<Row[]>([]);
   const [customs, setCustoms] = useState<Character[]>([]);
-  const [galleryCount, setGalleryCount] = useState(0);
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
 
   useEffect(() => {
-    const custom = loadCustomList();
-    setCustoms(custom);
-    setGalleryCount(getGallery().length);
+    setCustoms(loadCustomCharacters());
+    setGallery(getGallery());
+  }, []);
 
-    const pool = [...custom, ...CHARACTERS];
-    const seen = new Set<string>();
-    const next: Row[] = [];
+  const rows = useMemo(() => {
+    const byId = new Map<string, HubGirl>();
+    const all = [...CHARACTERS, ...customs];
 
-    for (const c of pool) {
-      if (seen.has(c.id)) continue;
-      seen.add(c.id);
-      const chat = loadChat(c.id);
-      if (chat.length === 0 && !c.id.startsWith("custom-")) continue;
-      const last = chat[chat.length - 1];
-      next.push({
+    for (const c of all) {
+      const msgs = loadChat(c.id);
+      const intimacy = getIntimacy(c.id, c.intimacy ?? 0);
+      const galleryCount = gallery.filter((g) => g.characterId === c.id).length;
+      const last = msgs.length ? msgs[msgs.length - 1] : null;
+      const hasActivity = msgs.length > 0 || galleryCount > 0 || intimacy > (c.intimacy ?? 0);
+      if (!hasActivity && !customs.some((x) => x.id === c.id)) continue;
+      byId.set(c.id, {
         character: c,
-        lastLine: last?.content?.slice(0, 90) || c.initialMessage.slice(0, 90),
-        intimacy: getIntimacy(c.id, c.intimacy),
-        at: Date.now(),
-        memoryCount: loadMemories(c.id).length,
+        messageCount: msgs.length,
+        intimacy,
+        galleryCount,
+        lastPreview: last?.content?.slice(0, 80) || c.tagline || c.initialMessage?.slice(0, 80) || "",
+        isCustom: customs.some((x) => x.id === c.id),
       });
     }
 
-    // Sort: customs + anyone with chat, by intimacy then name
-    next.sort((a, b) => b.intimacy - a.intimacy || a.character.name.localeCompare(b.character.name));
-    setRows(next.slice(0, 40));
-  }, []);
-
-  const empty = rows.length === 0 && customs.length === 0;
-
-  const featured = useMemo(() => CHARACTERS.slice(0, 6), []);
+    return Array.from(byId.values()).sort((a, b) => {
+      if (b.messageCount !== a.messageCount) return b.messageCount - a.messageCount;
+      return b.intimacy - a.intimacy;
+    });
+  }, [customs, gallery]);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-20">
-      <button type="button" onClick={onHome} className="text-pink-400 text-sm">
-        ← Home
-      </button>
-
-      <div>
-        <h1 className="font-display text-3xl text-cream neon-text">My Girls</h1>
-        <p className="text-sm text-mist mt-1">
-          Continue chats · customs · memory. 100% free forever.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-zinc-400">
-          <span className="rounded-full border border-white/10 px-2.5 py-1">{rows.length} active</span>
-          <span className="rounded-full border border-white/10 px-2.5 py-1">{customs.length} created</span>
-          <span className="rounded-full border border-white/10 px-2.5 py-1">{galleryCount} media saved</span>
+    <div className="mx-auto max-w-3xl px-4 py-6 space-y-6">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-white tracking-tight">My Girls</h1>
+          <p className="text-sm text-zinc-400 mt-1">
+            Recent chats, customs, and galleries — all free, saved on this device.
+          </p>
         </div>
+        {onCreate && (
+          <button
+            type="button"
+            onClick={onCreate}
+            className="rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white"
+          >
+            + Create
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onCreate}
-          className="rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold"
-        >
-          + Create girl (no photo needed)
-        </button>
-      </div>
-
-      {empty && (
-        <div className="rounded-2xl border border-pink-500/30 bg-zinc-900/60 p-6 glass-card text-center space-y-3">
-          <p className="text-sm text-mist">No chats yet. Pick a girl or create one.</p>
-          <div className="grid grid-cols-3 gap-2">
-            {featured.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onOpenChat(c.id)}
-                className="rounded-xl overflow-hidden border border-white/10 text-left"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={characterMediaUrl(c, "beauty")} alt="" className="aspect-[3/4] w-full object-cover" />
-                <div className="p-1 text-[10px] truncate text-center">{c.name.split(" ")[0]}</div>
-              </button>
-            ))}
-          </div>
+      {rows.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-8 text-center space-y-3">
+          <p className="text-zinc-300">No active girls yet.</p>
+          <p className="text-sm text-zinc-500">Start a chat or create a custom character — everything stays free.</p>
+          {onCreate && (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="mt-2 rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-2 text-sm text-pink-100"
+            >
+              Create your first girl
+            </button>
+          )}
         </div>
-      )}
-
-      {customs.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-pink-200 mb-2">Your creations</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {customs.map((c) => (
+      ) : (
+        <ul className="space-y-3">
+          {rows.map((row) => (
+            <li key={row.character.id}>
               <button
-                key={c.id}
                 type="button"
-                onClick={() => onOpenChat(c.id, c)}
-                className="girl-card rounded-2xl overflow-hidden border border-pink-500/30 text-left"
+                onClick={() => onOpenChat(row.character)}
+                className={cn(
+                  "w-full text-left rounded-2xl border border-white/10 bg-zinc-900/70 p-4 flex gap-4 hover:border-pink-500/40 transition",
+                )}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={c.avatar?.startsWith("http") || c.avatar?.startsWith("data:") ? c.avatar : characterMediaUrl(c, "beauty")}
-                  alt=""
-                  className="aspect-[3/4] w-full object-cover"
-                />
-                <div className="p-2">
-                  <div className="text-sm font-medium truncate">{c.name}</div>
-                  <div className="text-[10px] text-zinc-500">Custom · AI</div>
+                <div className="h-14 w-14 shrink-0 rounded-xl overflow-hidden bg-zinc-800">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={row.character.avatar || ""}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
                 </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white truncate">{row.character.name}</span>
+                    {row.isCustom && (
+                      <span className="text-[10px] uppercase tracking-wide rounded-full bg-fuchsia-600/30 text-fuchsia-200 px-2 py-0.5">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{row.lastPreview}</p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-500">
+                    <span>{row.messageCount} msgs</span>
+                    <span>·</span>
+                    <span>{row.intimacy}% intimacy</span>
+                    <span>·</span>
+                    <span>{row.galleryCount} media</span>
+                  </div>
+                </div>
+                <span className="self-center text-pink-300 text-sm font-medium shrink-0">Continue →</span>
               </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {rows.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-pink-200 mb-2">Continue</h2>
-          <ul className="space-y-2">
-            {rows.map((r) => {
-              const mems = loadMemories(r.character.id).slice(0, 3);
-              return (
-                <li key={r.character.id}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenChat(r.character.id, r.character.id.startsWith("custom-") ? r.character : undefined)}
-                    className="w-full flex gap-3 rounded-2xl border border-white/10 bg-zinc-900/50 p-3 text-left hover:border-pink-500/40 transition"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={characterMediaUrl(r.character, "beauty")}
-                      alt=""
-                      className="h-14 w-14 rounded-xl object-cover shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-cream truncate">{r.character.name}</span>
-                        <span className="text-[10px] text-pink-300 tabular-nums">{r.intimacy}%</span>
-                      </div>
-                      <p className="text-xs text-zinc-400 line-clamp-2 mt-0.5">{r.lastLine}</p>
-                      {mems.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {mems.map((m) => (
-                            <span
-                              key={m.id}
-                              className="rounded-full bg-pink-500/15 border border-pink-500/25 px-2 py-0.5 text-[10px] text-pink-100"
-                            >
-                              remembers: {m.text.slice(0, 28)}
-                              {m.text.length > 28 ? "…" : ""}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
