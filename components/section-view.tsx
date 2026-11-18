@@ -6,7 +6,7 @@ import { Flame, Sparkles, BookOpen, MessageCircleHeart } from "lucide-react";
 import { riseItem } from "@/lib/motion";
 import type { Section, ViewId } from "@/lib/sections";
 import { CHARACTERS } from "@/lib/characters";
-import { STORY_PACKS, JOI_PRESETS } from "@/lib/content";
+import { ALL_STORY_PACKS, ALL_JOI_PRESETS } from "@/lib/content";
 import { characterPortraitUrl } from "@/lib/portraits";
 import { ArrowIcon } from "./icons";
 
@@ -34,8 +34,8 @@ export function SectionView({
     return ["Dominant", "Intense", "Bold", "Brat"].includes(c.category);
   });
 
-  const featuredPacks = STORY_PACKS.slice(0, 4);
-  const featuredJoi = JOI_PRESETS.slice(0, 3);
+  const featuredPacks = ALL_STORY_PACKS.filter((p) => ["BNWO", "SPH", "CUCK"].includes(p.tag)).slice(0, 5);
+  const featuredJoi = ALL_JOI_PRESETS.slice(-4);
 
   return (
     <motion.article

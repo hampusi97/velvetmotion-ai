@@ -87,6 +87,8 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [coins, setCoins] = useState(0);
   const [proactive, setProactive] = useState<ProactivePing | null>(null);
+  const [activePackId, setActivePackId] = useState<string | null>(null);
+  const [activeJoiId, setActiveJoiId] = useState<string | null>(null);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -114,7 +116,42 @@ export default function Home() {
     setCoins(getCoins());
     setAuthReady(true);
     registerServiceWorker();
+
+    const onPopState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const nextView = (params.get("view") as View | null) || "home";
+        const nextId = params.get("id");
+        setView(nextView);
+        if (nextId) setSelectedId(nextId);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    if (!authReady || typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      if (view === "home") {
+        url.searchParams.delete("view");
+        url.searchParams.delete("id");
+      } else {
+        url.searchParams.set("view", view);
+        if ((view === "chat" || view === "profile") && selectedId) {
+          url.searchParams.set("id", selectedId);
+        } else {
+          url.searchParams.delete("id");
+        }
+      }
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      /* ignore */
+    }
+  }, [authReady, view, selectedId]);
 
   useEffect(() => {
     if (!authReady || !user) return;
@@ -350,13 +387,13 @@ export default function Home() {
           {view === "packs" && (
             <>
               <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
-              <StoryPackBrowser />
+              <StoryPackBrowser initialPackId={activePackId} />
             </>
           )}
           {view === "joi" && (
             <>
               <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
-              <JoiBrowser />
+              <JoiBrowser initialScenarioId={activeJoiId} />
             </>
           )}
           {["suggest", "gallery"].includes(view) && (
@@ -391,6 +428,14 @@ export default function Home() {
               onHome={() => setView("home")}
               onNavigate={navigate as (v: ViewId) => void}
               onOpenGirl={openChatById}
+              onOpenPack={(packId) => {
+                setActivePackId(packId);
+                setView("packs");
+              }}
+              onOpenJoi={(scenarioId) => {
+                setActiveJoiId(scenarioId);
+                setView("joi");
+              }}
             />
           )}
           {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}

@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import { ACCENT_CLASS } from "@/components/content/accents";
 import {
+  ALL_STORY_PACKS,
   CONTENT_DISCLAIMER,
   EXPANDED_STORY_IDS,
-  STORY_PACKS,
   getStoryPack,
 } from "@/lib/content";
 import type { StoryPack, StoryScene } from "@/lib/content/types";
@@ -45,11 +45,11 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
   }, []);
 
   const tags = useMemo(
-    () => ["ALL", ...Array.from(new Set(STORY_PACKS.map((pack) => pack.tag)))],
+    () => ["ALL", ...Array.from(new Set(ALL_STORY_PACKS.map((pack) => pack.tag)))],
     [],
   );
 
-  const visible = STORY_PACKS.filter((pack) => tag === "ALL" || pack.tag === tag);
+  const visible = ALL_STORY_PACKS.filter((pack) => tag === "ALL" || pack.tag === tag);
   const pack = packId ? getStoryPack(packId) : undefined;
   const scene: StoryScene | undefined =
     pack && sceneId ? pack.scenes.find((item) => item.id === sceneId) : undefined;

@@ -25,6 +25,92 @@ export type LocalGenResult = {
 const DEFAULT_NEG =
   "low quality, blurry, deformed, extra fingers, watermark, text, logo, underage, child";
 
+export interface ComfyWorkflowOptions {
+  prompt: string;
+  negativePrompt?: string;
+  seed: number;
+  width?: number;
+  height?: number;
+  checkpoint?: string;
+  referenceImageBase64?: string;
+  ipAdapterWeight?: number;
+}
+
+/**
+ * Build a ComfyUI txt2img workflow graph, optionally wiring an IP-Adapter
+ * face-lock reference node when a reference image is provided.
+ */
+export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<string, unknown> {
+  const width = opts.width || 768;
+  const height = opts.height || 1152;
+  const checkpoint = opts.checkpoint || "flux1-dev-fp8.safetensors";
+  const hasRef = Boolean(opts.referenceImageBase64 && opts.referenceImageBase64.length > 32);
+
+  const graph: Record<string, unknown> = {
+    "3": {
+      class_type: "KSampler",
+      inputs: {
+        cfg: 5.5,
+        denoise: 1.0,
+        latent_image: ["5", 0],
+        model: [hasRef ? "11" : "4", 0],
+        negative: ["7", 0],
+        positive: ["6", 0],
+        sampler_name: "euler",
+        scheduler: "normal",
+        seed: opts.seed,
+        steps: 22,
+      },
+    },
+    "4": {
+      class_type: "CheckpointLoaderSimple",
+      inputs: { ckpt_name: checkpoint },
+    },
+    "5": {
+      class_type: "EmptyLatentImage",
+      inputs: { batch_size: 1, height, width },
+    },
+    "6": {
+      class_type: "CLIPTextEncode",
+      inputs: { clip: ["4", 1], text: opts.prompt },
+    },
+    "7": {
+      class_type: "CLIPTextEncode",
+      inputs: { clip: ["4", 1], text: opts.negativePrompt || DEFAULT_NEG },
+    },
+    "8": {
+      class_type: "VAEDecode",
+      inputs: { samples: ["3", 0], vae: ["4", 2] },
+    },
+    "9": {
+      class_type: "SaveImage",
+      inputs: { filename_prefix: "VelvetMotion", images: ["8", 0] },
+    },
+  };
+
+  if (hasRef) {
+    graph["10"] = {
+      class_type: "ETN_LoadImageBase64",
+      inputs: {
+        image: opts.referenceImageBase64!.replace(/^data:[^;]+;base64,/, ""),
+      },
+    };
+    graph["11"] = {
+      class_type: "IPAdapterUnifiedLoaderFaceID",
+      inputs: {
+        model: ["4", 0],
+        preset: "FACEID PLUS V2",
+        lora_strength: 0.65,
+        provider: "CUDA",
+        image: ["10", 0],
+        weight: opts.ipAdapterWeight ?? 0.85,
+      },
+    };
+  }
+
+  return graph;
+}
+
 /** Try Forge/A1111 txt2img style API */
 async function tryForge(base: string, req: LocalGenRequest): Promise<LocalGenResult> {
   try {

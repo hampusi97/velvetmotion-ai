@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { ACCENT_CLASS } from "@/components/content/accents";
 import {
+  ALL_JOI_PRESETS,
   CONTENT_DISCLAIMER,
   EXPANDED_JOI_IDS,
-  JOI_PRESETS,
   getJoiScenario,
 } from "@/lib/content";
 import { JOI_PHASES, type JoiScenario } from "@/lib/content/types";
@@ -264,7 +264,7 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
 
         {/* Full Guided JOI Scenarios */}
         <div className="grid grid-cols-1 gap-2.5">
-          {JOI_PRESETS.map((item, idx) => {
+          {ALL_JOI_PRESETS.map((item, idx) => {
             const expanded = EXPANDED_JOI_IDS.includes(item.id);
             const char = CHARACTERS[idx % CHARACTERS.length];
             const thumb = characterMediaUrl(char, idx % 2 === 0 ? "lingerie" : "nude");

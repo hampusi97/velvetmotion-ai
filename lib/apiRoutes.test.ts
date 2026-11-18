@@ -7,7 +7,9 @@ import { POST as postVideo } from "../app/api/generate-video/route";
 import { POST as postMusic } from "../app/api/generate-music/route";
 import { POST as postLiveVoice } from "../app/api/live-voice/route";
 import { GET as getTelegram, POST as postTelegram } from "../app/api/telegram/route";
-import { GET as getComfy, buildComfyWorkflowGraph } from "../app/api/comfy/route";
+import { GET as getComfy } from "../app/api/comfy/route";
+import { buildComfyWorkflowGraph } from "./comfyClient";
+import { GET as getPipeline, POST as postPipeline } from "../app/api/pipeline/route";
 
 describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
   it("GET /api/health reports active engines and catalog counts", async () => {
@@ -165,5 +167,39 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     });
     assert.ok("10" in graphWithFaceLock);
     assert.ok("11" in graphWithFaceLock);
+  });
+
+  it("GET & POST /api/pipeline orchestrates memory, mood, dialogue, scene selfie, sequence, and relationship stages", async () => {
+    const pipeGet = await getPipeline();
+    assert.equal(pipeGet.status, 200);
+    const meta = await pipeGet.json();
+    assert.equal(meta.ok, true);
+    assert.ok(Array.isArray(meta.scenes) && meta.scenes.length >= 10);
+
+    const pipePost = await postPipeline(
+      new Request("http://localhost:3000/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: "maren",
+          userMessage: "Call me Daddy and wear sheer black lace in the shower.",
+          sceneId: "shower",
+          includeSelfie: true,
+          sequenceKind: "joi",
+          includeAftercare: true,
+        }),
+      }),
+    );
+    assert.equal(pipePost.status, 200);
+    const out = await pipePost.json();
+    assert.equal(out.ok, true);
+    assert.ok(out.stages.includes("memory-and-mood"));
+    assert.ok(out.stages.includes("dialogue-and-monologue"));
+    assert.ok(out.stages.includes("scene-selfie"));
+    assert.ok(out.stages.includes("motion-sequence"));
+    assert.ok(out.stages.includes("relationship-progression"));
+    assert.ok(out.sceneSelfie?.url.includes("image.pollinations.ai"));
+    assert.equal(out.sequence?.frames.length, 4);
+    assert.ok(typeof out.aftercare === "string" && out.aftercare.length > 5);
   });
 });

@@ -1,7 +1,9 @@
 import { CONTENT_DISCLAIMER } from "./disclaimer";
 import { ADDED_JOI } from "./joi/added";
 import { EXPANDED_JOI } from "./joi/expanded";
+import { FETISH_JOI } from "./joi/fetish";
 import { ADDED_STORY_PACKS } from "./story/added";
+import { BNWO_SPH_PACKS } from "./story/bnwo";
 import { EXPANDED_STORY_PACKS } from "./story/expanded";
 import type { JoiScenario, StoryPack } from "./types";
 
@@ -18,21 +20,31 @@ export const STORY_PACKS: StoryPack[] = [
   ...ADDED_STORY_PACKS,
 ];
 
+export const ALL_STORY_PACKS: StoryPack[] = [
+  ...STORY_PACKS,
+  ...BNWO_SPH_PACKS,
+];
+
 export const JOI_PRESETS: JoiScenario[] = [
   ...EXPANDED_JOI,
   ...ADDED_JOI,
+];
+
+export const ALL_JOI_PRESETS: JoiScenario[] = [
+  ...JOI_PRESETS,
+  ...FETISH_JOI,
 ];
 
 export const EXPANDED_STORY_IDS = EXPANDED_STORY_PACKS.map((pack) => pack.id);
 export const EXPANDED_JOI_IDS = EXPANDED_JOI.map((scenario) => scenario.id);
 
 export function getStoryPack(id: string): StoryPack | undefined {
-  return STORY_PACKS.find((pack) => pack.id === id);
+  return ALL_STORY_PACKS.find((pack) => pack.id === id);
 }
 
 export function getJoiScenario(id: string): JoiScenario | undefined {
-  return JOI_PRESETS.find((scenario) => scenario.id === id);
+  return ALL_JOI_PRESETS.find((scenario) => scenario.id === id);
 }
 
-export { CONTENT_DISCLAIMER };
+export { CONTENT_DISCLAIMER, BNWO_SPH_PACKS, FETISH_JOI };
 export type { JoiScenario, StoryPack } from "./types";

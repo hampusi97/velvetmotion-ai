@@ -47,6 +47,7 @@ import {
   type SequenceKind,
 } from "@/lib/videoModes";
 import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
+import { SCENE_LIBRARY } from "@/lib/consistentPrompts";
 import { loadAdvancedConfig } from "@/lib/advancedConfig";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { saveTribute } from "@/lib/rewards";
@@ -443,6 +444,28 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           </div>
         </div>
       )}
+
+      <div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Scene Selfies (Face-Locked)</div>
+      <div className="flex gap-1.5 overflow-x-auto pb-2">
+        {SCENE_LIBRARY.map((scene) => (
+          <button
+            key={scene.id}
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void generate(
+                (scene.moodHint as MediaMood) || "lingerie",
+                scene.label,
+                GEN_COST.lingerie,
+                scene.scene,
+              )
+            }
+            className="shrink-0 px-2.5 py-1 rounded-full border border-pink-500/30 bg-pink-500/10 text-[11px] text-pink-100 hover:bg-pink-500/20 disabled:opacity-40"
+          >
+            📸 {scene.label}
+          </button>
+        ))}
+      </div>
 
       <div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Live Action</div>
       <div className="flex flex-wrap gap-1.5 pb-2">
