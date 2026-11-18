@@ -3,9 +3,8 @@
 import { useMemo, useState } from "react";
 import type { Character } from "@/lib/characters";
 import { saveCustomCompanionToFirestore } from "@/lib/firebase";
-import { characterPortraitUrl } from "@/lib/portraits";
 import { CreatePostActions } from "@/components/CreatePostActions";
-import { seedFromPhotoDataUrl } from "@/lib/media";
+import { characterMediaUrl, faceSeed, seedFromPhotoDataUrl } from "@/lib/media";
 import { setCharacterFaceSeed } from "@/lib/mediaSettings";
 
 const STYLES = ["Realistic", "Soft glam", "Anime"] as const;
@@ -61,8 +60,18 @@ type WizardProps = {
   onHome: () => void;
 };
 
-function portraitUrl(look: string, style: string, name = "", mood = "seductive") {
-  return characterPortraitUrl(name || "custom", `${style} · ${look}`, mood, `${style} · ${look}`);
+/** Build a rich figure string for Flux / media engine. */
+function buildFigure(
+  style: string,
+  look: string,
+): string {
+  const styleHint =
+    style === "Anime"
+      ? "anime style, detailed anime face, soft shading"
+      : style === "Soft glam"
+        ? "soft glam makeup, influencer aesthetic, beauty portrait lighting"
+        : "photorealistic, instagram influencer, natural skin texture, candy.ai style";
+  return `${styleHint}, adult woman 24, ${look}, consistent face identity`;
 }
 
 export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
@@ -82,6 +91,15 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<Character | null>(null);
   const [permHint, setPermHint] = useState<string | null>(null);
+  const [genNote, setGenNote] = useState<string | null>(null);
+
+  /** Stable draft id so previews keep the same face while you tweak look */
+  const draftId = useMemo(() => {
+    const key = `${style}|${ethnicity}|${body}|${chest}|${eyes}|${hair}`;
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0;
+    return `draft-${Math.abs(h) % 1_000_000}`;
+  }, [style, ethnicity, body, chest, eyes, hair]);
 
   const look = useMemo(
     () =>
@@ -89,10 +107,20 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
     [ethnicity, body, chest, eyes, hair],
   );
 
-  const previewSrc = useMemo(
-    () => photoDataUrl || portraitUrl(look, style, name.trim() || "preview"),
-    [photoDataUrl, look, style, name],
-  );
+  const figure = useMemo(() => buildFigure(style, look), [style, look]);
+
+  /** AI preview from Pollinations (no photo required) */
+  const aiPreviewSrc = useMemo(() => {
+    const draft = {
+      id: draftId,
+      name: name.trim() || "preview",
+      figure,
+      age: 24,
+    };
+    return characterMediaUrl(draft, "beauty", `${style} portrait`);
+  }, [draftId, figure, name, style]);
+
+  const previewSrc = photoDataUrl || aiPreviewSrc;
 
   const onFile = (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
@@ -103,10 +131,13 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
     reader.readAsDataURL(file);
   };
 
-  const buildCharacter = (): Character => {
-    const id = `custom-${Date.now()}`;
+  const clearPhoto = () => {
+    setPhotoDataUrl(null);
+    setPermHint(null);
+  };
+
+  const buildCharacter = (finalId: string, avatarUrl: string): Character => {
     const displayName = name.trim() || "Your Girl";
-    const avatar = photoDataUrl || portraitUrl(look, style, displayName);
     const category =
       personality.includes("Dominant") || personality === "Queen"
         ? "Dominant"
@@ -123,17 +154,17 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
                   : "Playful";
 
     return {
-      id,
+      id: finalId,
       name: displayName,
       age: 24,
       tagline: `${relationship} · ${personality}. ${kink}.`,
       category,
-      avatar,
+      avatar: avatarUrl,
       voiceIntro: `Hey… it's ${displayName}.`,
       initialMessage:
         bio.trim() ||
         `I saw your message. I'm ${displayName} — ${personality.toLowerCase()}. Tell me what kind of night you want.`,
-      tags: [personality, relationship, style, "Custom"],
+      tags: [personality, relationship, style, "Custom", "AI-generated"],
       intimacy: 55,
       voice: {
         label: personality.includes("Dominant") ? "Low command" : "Warm",
@@ -143,25 +174,42 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       },
       personality,
       traits: [personality, relationship, style],
-      background: `Original fictional adult created by the user. ${look}.`,
-      figure: look,
+      background: `Original fictional adult created by the user. ${figure}.`,
+      figure,
       kink,
       reply: `She smiles. “I'm ${displayName}. Your move.”`,
     };
   };
 
-  const finish = () => {
+  const finish = async () => {
     setBusy(true);
-    const character = buildCharacter();
+    setGenNote(photoDataUrl ? "Locking face from your photo…" : "Generating her with AI from your look…");
 
-    // CharForge-style: lock face seed from reference photo for all later moods
-    if (photoDataUrl) {
-      try {
+    const finalId = `custom-${Date.now()}`;
+    const displayName = name.trim() || "Your Girl";
+
+    // Always produce an AI portrait so chat/gallery stay photoreal even without upload
+    const aiChar = {
+      id: finalId,
+      name: displayName,
+      figure,
+      age: 24,
+    };
+    const generatedAvatar = characterMediaUrl(aiChar, "beauty", `${style} beauty portrait`);
+    const avatarUrl = photoDataUrl || generatedAvatar;
+
+    const character = buildCharacter(finalId, avatarUrl);
+
+    // Face seed: photo wins; otherwise lock from figure so moods stay consistent
+    try {
+      if (photoDataUrl) {
         setCharacterFaceSeed(character.id, seedFromPhotoDataUrl(photoDataUrl));
         localStorage.setItem(`vm-ref-photo-${character.id}`, photoDataUrl.slice(0, 500000));
-      } catch {
-        /* quota */
+      } else {
+        setCharacterFaceSeed(character.id, faceSeed(character));
       }
+    } catch {
+      /* quota */
     }
 
     try {
@@ -182,12 +230,18 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       personality: character.personality,
       figure: character.figure,
       kink: character.kink,
-      avatar:
-        character.avatar.startsWith("http") || character.avatar.startsWith("data:")
-          ? character.avatar
-          : portraitUrl(look, style, character.name),
+      avatar: character.avatar,
     }).catch(() => {});
 
+    // Warm the image in browser cache so finish screen shows quickly
+    try {
+      const img = new Image();
+      img.src = generatedAvatar;
+    } catch {
+      /* */
+    }
+
+    setGenNote(null);
     setBusy(false);
     setCreated(character);
   };
@@ -202,9 +256,11 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
         </button>
         <h2 className="text-2xl font-extrabold text-cream">{created.name} is ready</h2>
         <p className="text-sm text-mist">
-          Face seed locked from your photo (when uploaded). One-tap heat, then chat.
+          {photoDataUrl
+            ? "Face locked from your photo. AI keeps her consistent in chat."
+            : "AI-generated from your look choices — no photo needed. Face seed locked for consistent selfies."}
         </p>
-        <div className="aspect-[3/4] max-w-[200px] rounded-2xl overflow-hidden border border-pink-500/40">
+        <div className="aspect-[3/4] max-w-[220px] rounded-2xl overflow-hidden border border-pink-500/40 shadow-lg shadow-pink-500/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={created.avatar} alt="" className="w-full h-full object-cover" />
         </div>
@@ -230,6 +286,9 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
       </h2>
       <p className="text-sm text-zinc-400 mt-1">
         Step {step + 1} of {steps.length} · {steps[step]}
+        {step < 4 && (
+          <span className="text-zinc-500"> · AI builds her look as you go</span>
+        )}
       </p>
 
       <div className="flex gap-1 mt-4 mb-6">
@@ -243,9 +302,10 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
         ))}
       </div>
 
+      {/* Live AI preview while designing */}
       {step >= 1 && step < 5 && (
-        <div className="mb-6 flex items-center gap-4 rounded-2xl border border-white/10 bg-zinc-900/60 p-3">
-          <div className="h-20 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
+        <div className="mb-6 flex items-center gap-4 rounded-2xl border border-pink-500/25 bg-zinc-900/60 p-3 glass-card">
+          <div className="h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-800 border border-white/10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={previewSrc} alt="" className="h-full w-full object-cover" />
           </div>
@@ -254,6 +314,8 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <div className="truncate text-xs text-pink-300/90">{look}</div>
             <div className="mt-0.5 text-[11px] text-zinc-500">
               {style} · {personality}
+              {!photoDataUrl && <span className="text-emerald-400/90"> · AI generating</span>}
+              {photoDataUrl && <span className="text-fuchsia-300"> · photo ref</span>}
             </div>
           </div>
         </div>
@@ -261,7 +323,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
 
       {step === 0 && (
         <div className="space-y-3">
-          <p className="text-sm text-mist">Art style</p>
+          <p className="text-sm text-mist">Art style — AI will generate her face & body to match</p>
           <div className="grid grid-cols-3 gap-2">
             {STYLES.map((s) => (
               <button
@@ -366,13 +428,13 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
 
       {step === 4 && (
         <div className="space-y-4">
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            <strong className="font-medium">Photo is optional.</strong> Skip this step and AI still generates her
+            fully from style + look. Upload only if you want a specific face locked.
+          </div>
           <p className="text-sm text-mist">
-            Upload a reference photo to lock her face seed (CharForge-style consistency on later gens).
-            Stored only on this device.{" "}
+            Optional reference photo → stronger face consistency in nudes / JOI. Stored only on this device.{" "}
             <span className="text-zinc-500">Do not upload real people without consent.</span>
-          </p>
-          <p className="text-xs text-zinc-500">
-            On mobile, choose <strong className="text-zinc-400">Photo Library</strong> or Camera when the system prompt asks — that is the gallery/camera permission.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-pink-500/40 bg-pink-500/5 py-10 cursor-pointer hover:bg-pink-500/10 transition">
@@ -399,9 +461,28 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
           </div>
           {permHint && <p className="text-xs text-amber-300">{permHint}</p>}
           {photoDataUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoDataUrl} alt="Reference" className="w-full max-h-72 object-contain rounded-2xl border border-white/10" />
+            <div className="space-y-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoDataUrl} alt="Reference" className="w-full max-h-72 object-contain rounded-2xl border border-white/10" />
+              <button type="button" onClick={clearPhoto} className="text-xs text-zinc-400 hover:text-pink-300">
+                Remove photo · use AI face instead
+              </button>
+            </div>
           )}
+          {!photoDataUrl && (
+            <div className="rounded-2xl border border-white/10 overflow-hidden">
+              <p className="text-[11px] text-zinc-500 px-3 pt-2">AI preview from your choices</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={aiPreviewSrc} alt="AI preview" className="w-full max-h-64 object-cover object-top" />
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setStep(5)}
+            className="w-full py-3 rounded-2xl border border-pink-500/40 text-sm text-pink-100 hover:bg-pink-500/10"
+          >
+            Skip photo · generate with AI →
+          </button>
         </div>
       )}
 
@@ -415,7 +496,11 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
             <div className="text-2xl font-semibold text-cream">{name.trim() || "Your Girl"}</div>
             <div className="text-sm text-pink-300 mt-1">{personality} · {relationship}</div>
             <p className="text-xs text-zinc-400 mt-2 max-w-xs mx-auto">{look}</p>
+            <p className="text-[11px] text-emerald-400/90 mt-2">
+              {photoDataUrl ? "Using your photo + AI for later moods" : "No photo — AI generates her completely"}
+            </p>
           </div>
+          {genNote && <p className="text-xs text-pink-300 animate-pulse">{genNote}</p>}
         </div>
       )}
 
@@ -427,11 +512,11 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
         )}
         {step < 5 ? (
           <button type="button" onClick={() => setStep((s) => s + 1)} className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25">
-            Next
+            {step === 4 && !photoDataUrl ? "Skip photo" : "Next"}
           </button>
         ) : (
-          <button type="button" disabled={busy} onClick={finish} className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50">
-            {busy ? "Creating…" : "Create girl"}
+          <button type="button" disabled={busy} onClick={() => void finish()} className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50">
+            {busy ? "Generating…" : photoDataUrl ? "Create girl" : "Generate with AI"}
           </button>
         )}
       </div>
