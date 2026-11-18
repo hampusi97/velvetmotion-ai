@@ -7,6 +7,7 @@ import { CharacterRoster } from "@/components/CharacterRoster";
 import { CHARACTERS, characterCategories, type Character } from "@/lib/characters";
 import { HomeView as HomeScreen } from "@/components/home-view";
 import { SiteHeader } from "@/components/site-header";
+import { CandySidebar } from "@/components/CandySidebar";
 import { containerClass } from "@/lib/cn";
 import { JoiBrowser } from "@/components/content/JoiBrowser";
 import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
@@ -25,8 +26,10 @@ import { DualGirlChat } from "@/components/DualGirlChat";
 import { GroupChat } from "@/components/GroupChat";
 import { ShareImport } from "@/components/ShareImport";
 import { UserLounge } from "@/components/UserLounge";
+import { ShortsFeed } from "@/components/ShortsFeed";
 import { LoginGate } from "@/components/LoginGate";
 import { getUser, type LocalUser } from "@/lib/auth";
+import { getCoins } from "@/lib/storage";
 
 type HomeView =
   | "home"
@@ -49,7 +52,8 @@ type HomeView =
   | "dual"
   | "group"
   | "share"
-  | "lounge";
+  | "lounge"
+  | "shorts";
 
 type View = HomeView | "profile" | "chat";
 
@@ -66,6 +70,7 @@ export default function Home() {
   const [user, setUser] = useState<LocalUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [coins, setCoins] = useState(0);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -88,10 +93,11 @@ export default function Home() {
       setAdult(false);
     }
     setUser(getUser());
+    setCoins(getCoins());
     setAuthReady(true);
   }, []);
 
-  const navigate = (next: ViewId | "dual" | "share" | "group" | "lounge") => {
+  const navigate = (next: string) => {
     setMenuOpen(false);
     if (next === "girls" || next === "romance") openRoster(next === "romance");
     else setView(next as View);
@@ -138,7 +144,7 @@ export default function Home() {
             VelvetMotion
           </h1>
           <p className="text-sm text-zinc-400 leading-relaxed mb-6 mt-3 text-center">
-            Adult fantasy companions. Chat, nudes, tributes, roulette, blindfold JOI. Fictional 21+ only.
+            Adult fantasy companions. Chat, nudes, tributes, shorts, blindfold JOI. Fictional 21+ only.
           </p>
           <button
             onClick={() => {
@@ -162,6 +168,13 @@ export default function Home() {
     return <LoginGate onLoggedIn={setUser} />;
   }
 
+  const sidebarActive =
+    view === "profile" || view === "chat"
+      ? "girls"
+      : view === "dual" || view === "group"
+        ? view
+        : (view as string);
+
   return (
     <div className="min-h-screen bg-ink-950 text-white">
       <SiteHeader
@@ -171,7 +184,8 @@ export default function Home() {
           view === "dual" ||
           view === "group" ||
           view === "share" ||
-          view === "lounge"
+          view === "lounge" ||
+          view === "shorts"
             ? listView
             : (view as ViewId)
         }
@@ -180,154 +194,161 @@ export default function Home() {
         onNavigate={navigate as (v: ViewId) => void}
         onUserChange={setUser}
       />
-      <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
-        {view === "home" && (
-          <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />
-        )}
+      <div className="flex">
+        <CandySidebar active={sidebarActive} onNavigate={navigate} coins={coins} />
+        <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " flex-1 py-6 min-w-0"}>
+          {view === "home" && (
+            <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />
+          )}
 
-        {view === "penthouse" && (
-          <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
-        )}
+          {view === "shorts" && (
+            <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />
+          )}
 
-        {showRoster && (
-          <CharacterRoster
-            romanceMode={romanceMode}
-            query={query}
-            category={category}
-            tag={tag}
-            categories={categories}
-            tags={tags}
-            onQuery={setQuery}
-            onCategory={(value) => {
-              setCategory(value);
-              setTag(null);
-            }}
-            onTag={setTag}
-            onSelect={openProfile}
-            onBack={() => setView("home")}
-          />
-        )}
+          {view === "penthouse" && (
+            <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
+          )}
 
-        {view === "profile" && selected && (
-          <CharacterProfile
-            character={selected}
-            romanceMode={romanceMode}
-            onBack={() => setView(listView)}
-            onChat={() => setView("chat")}
-            onTag={(nextTag) => {
-              setTag(nextTag);
-              setCategory("All");
-              setView(listView);
-            }}
-          />
-        )}
+          {showRoster && (
+            <CharacterRoster
+              romanceMode={romanceMode}
+              query={query}
+              category={category}
+              tag={tag}
+              categories={categories}
+              tags={tags}
+              onQuery={setQuery}
+              onCategory={(value) => {
+                setCategory(value);
+                setTag(null);
+              }}
+              onTag={setTag}
+              onSelect={openProfile}
+              onBack={() => setView("home")}
+            />
+          )}
 
-        {view === "chat" && selected && (
-          <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
-        )}
+          {view === "profile" && selected && (
+            <CharacterProfile
+              character={selected}
+              romanceMode={romanceMode}
+              onBack={() => setView(listView)}
+              onChat={() => setView("chat")}
+              onTag={(nextTag) => {
+                setTag(nextTag);
+                setCategory("All");
+                setView(listView);
+              }}
+            />
+          )}
 
-        {view === "create" && (
-          <CreateGirlWizard
-            onHome={() => setView("home")}
-            onDone={(character) => {
-              setCustomCharacter(character);
-              setSelectedId(character.id);
-              setRomanceMode(false);
-              setView("chat");
-            }}
-          />
-        )}
+          {view === "chat" && selected && (
+            <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
+          )}
 
-        {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
-        {view === "group" && <GroupChat onHome={() => setView("home")} />}
-        {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
-        {view === "share" && (
-          <ShareImport
-            onHome={() => setView("home")}
-            onImport={(girl) => {
-              setCustomCharacter(girl);
-              setSelectedId(girl.id);
-              setView("chat");
-            }}
-          />
-        )}
+          {view === "create" && (
+            <CreateGirlWizard
+              onHome={() => setView("home")}
+              onDone={(character) => {
+                setCustomCharacter(character);
+                setSelectedId(character.id);
+                setRomanceMode(false);
+                setView("chat");
+              }}
+            />
+          )}
 
-        {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} />}
-        {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
-        {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
-        {view === "scenario" && (
-          <SpicyScenarioSimulator
-            onHome={() => setView("home")}
-            onStartChat={(id) => openChatById(id)}
-          />
-        )}
+          {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
+          {view === "group" && <GroupChat onHome={() => setView("home")} />}
+          {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
+          {view === "share" && (
+            <ShareImport
+              onHome={() => setView("home")}
+              onImport={(girl) => {
+                setCustomCharacter(girl);
+                setSelectedId(girl.id);
+                setView("chat");
+              }}
+            />
+          )}
 
-        {view === "tribute" && (
-          <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">
-              ← Home
-            </button>
-            <TributeBrowser onStartWithGirl={openChatById} />
-          </>
-        )}
+          {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "scenario" && (
+            <SpicyScenarioSimulator
+              onHome={() => setView("home")}
+              onStartChat={(id) => openChatById(id)}
+            />
+          )}
 
-        {view === "packs" && (
-          <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400">
-              ← Home
-            </button>
-            <StoryPackBrowser />
-          </>
-        )}
-        {view === "joi" && (
-          <>
-            <button onClick={() => setView("home")} className="mb-4 text-pink-400">
-              ← Home
-            </button>
-            <JoiBrowser />
-          </>
-        )}
-        {["suggest", "gallery"].includes(view) && (
-          <UtilitySection
-            view={view}
-            onHome={() => setView("home")}
-            onOpenCustom={(name) => {
-              const character: Character = {
-                ...CHARACTERS[0],
-                id: `custom-${name}`,
-                name,
-                tagline: "Your fictional character",
-                initialMessage: `Hello, I'm ${name}.`,
-                personality: "Friendly",
-                traits: ["Custom"],
-                background: "An original fictional adult character.",
-                figure: "Fictional adult",
-                kink: "Not specified",
-                reply: "I'm listening.",
-                category: "Custom",
-              };
-              setCustomCharacter(character);
-              setSelectedId(character.id);
-              setRomanceMode(false);
-              setView("chat");
-            }}
-          />
-        )}
-        {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
-        {view === "workspace" && (
-          <SectionView section={findSection("workspace")} onHome={() => setView("home")} />
-        )}
-        {view === "tinder" && (
-          <DiscoverSwipe
-            onHome={() => setView("home")}
-            onMatch={(c) => {
-              if (c.id.startsWith("custom-")) setCustomCharacter(c);
-              setSelectedId(c.id);
-              setRomanceMode(false);
-              setView("profile");
-            }}
-          />
-        )}
+          {view === "tribute" && (
+            <>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">
+                ← Home
+              </button>
+              <TributeBrowser onStartWithGirl={openChatById} />
+            </>
+          )}
+
+          {view === "packs" && (
+            <>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">
+                ← Home
+              </button>
+              <StoryPackBrowser />
+            </>
+          )}
+          {view === "joi" && (
+            <>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">
+                ← Home
+              </button>
+              <JoiBrowser />
+            </>
+          )}
+          {["suggest", "gallery"].includes(view) && (
+            <UtilitySection
+              view={view}
+              onHome={() => setView("home")}
+              onOpenCustom={(name) => {
+                const character: Character = {
+                  ...CHARACTERS[0],
+                  id: `custom-${name}`,
+                  name,
+                  tagline: "Your fictional character",
+                  initialMessage: `Hello, I'm ${name}.`,
+                  personality: "Friendly",
+                  traits: ["Custom"],
+                  background: "An original fictional adult character.",
+                  figure: "Photoreal fictional adult woman, influencer aesthetic",
+                  kink: "Not specified",
+                  reply: "I'm listening.",
+                  category: "Custom",
+                };
+                setCustomCharacter(character);
+                setSelectedId(character.id);
+                setRomanceMode(false);
+                setView("chat");
+              }}
+            />
+          )}
+          {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
+          {view === "workspace" && (
+            <SectionView section={findSection("workspace")} onHome={() => setView("home")} />
+          )}
+          {view === "tinder" && (
+            <DiscoverSwipe
+              onHome={() => setView("home")}
+              onMatch={(c) => {
+                if (c.id.startsWith("custom-")) setCustomCharacter(c);
+                setSelectedId(c.id);
+                setRomanceMode(false);
+                setView("profile");
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
