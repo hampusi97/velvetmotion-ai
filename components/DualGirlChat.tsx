@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CHARACTERS, type Character, fallbackReply } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
+import { FantasyCodePanel } from "./FantasyCodePanel";
 
 type Msg = { role: "user" | "a" | "b"; content: string; name?: string };
 
@@ -95,6 +96,13 @@ export function DualGirlChat({ onHome }: { onHome: () => void }) {
         >
           Start dual chat
         </button>
+        <FantasyCodePanel
+          onLoadPair={(girlA, girlB, promptText) => {
+            setAId(girlA);
+            setBId(girlB);
+            if (promptText) setInput(promptText);
+          }}
+        />
       </div>
     );
   }

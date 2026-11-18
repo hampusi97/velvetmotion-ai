@@ -21,10 +21,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: "npm"
 
       - name: Install, Lint, Test & Build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
         run: |
-          npm install
+          npm ci
           npm run lint
           npm test
           npm run build

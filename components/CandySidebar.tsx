@@ -20,6 +20,7 @@ const ITEMS: NavItem[] = [
   { id: "lounge", label: "Lounge", emoji: "👋" },
   { id: "group", label: "Group chat", emoji: "👥" },
   { id: "tribute", label: "Private Content", emoji: "🔒" },
+  { id: "vault", label: "Private Vault", emoji: "🔐" },
   { id: "advanced", label: "Advanced media", emoji: "⚙️" },
 ];
 

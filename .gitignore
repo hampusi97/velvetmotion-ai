@@ -39,4 +39,6 @@ next-env.d.ts
 # tooling & drafts
 .playwright-cli/
 DRAFT_firestore.rules
+*.zip
+
 

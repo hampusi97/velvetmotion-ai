@@ -295,7 +295,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     persist([
       ...messages,
       { role: "user", content: `[Gift: ${gift.name}]` },
-      { role: "assistant", content: `*${character.name} receives the ${gift.name}.* “${gift.reaction || "Mmm…"}` },
+      { role: "assistant", content: `*${character.name} receives the ${gift.name}.* “${gift.reaction || gift.line || "Mmm…"}”` },
     ]);
     setIntimacy(bumpIntimacy(character.id, 4));
   };

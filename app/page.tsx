@@ -32,6 +32,8 @@ import { ShareImport } from "@/components/ShareImport";
 import { UserLounge } from "@/components/UserLounge";
 import { ShortsFeed } from "@/components/ShortsFeed";
 import { LoginGate } from "@/components/LoginGate";
+import { WorkspaceHub } from "@/components/WorkspaceHub";
+import { VaultPanel } from "@/components/VaultPanel";
 import { getUser, type LocalUser } from "@/lib/auth";
 import { getCoins } from "@/lib/storage";
 import {
@@ -65,7 +67,8 @@ type HomeView =
   | "lounge"
   | "shorts"
   | "advanced"
-  | "import";
+  | "import"
+  | "vault";
 
 type View = HomeView | "profile" | "chat";
 
@@ -102,6 +105,8 @@ export default function Home() {
       }
       const initialView = params.get("view") as View | null;
       if (initialView) setView(initialView);
+      const initialId = params.get("id");
+      if (initialId) setSelectedId(initialId);
     } catch {
       setAdult(false);
     }
@@ -143,7 +148,8 @@ export default function Home() {
   const selected =
     customCharacter?.id === selectedId
       ? customCharacter
-      : CHARACTERS.find((character) => character.id === selectedId) ?? null;
+      : CHARACTERS.find((character) => character.id === selectedId) ??
+        ((view === "chat" || view === "profile") ? (CHARACTERS[0] ?? null) : null);
 
   const openRoster = (romance: boolean) => {
     setRomanceMode(romance);
@@ -218,7 +224,8 @@ export default function Home() {
           view === "lounge" ||
           view === "shorts" ||
           view === "advanced" ||
-          view === "import"
+          view === "import" ||
+          view === "vault"
             ? listView
             : (view as ViewId)
         }
@@ -356,10 +363,16 @@ export default function Home() {
               }}
             />
           )}
-          {view === "bnwo" && <SectionView section={findSection(view)} onHome={() => setView("home")} />}
-          {view === "workspace" && (
-            <SectionView section={findSection("workspace")} onHome={() => setView("home")} />
+          {view === "bnwo" && (
+            <SectionView
+              section={findSection(view)}
+              onHome={() => setView("home")}
+              onNavigate={navigate as (v: ViewId) => void}
+              onOpenGirl={openChatById}
+            />
           )}
+          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
+          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
           {view === "tinder" && (
             <DiscoverSwipe
               onHome={() => setView("home")}

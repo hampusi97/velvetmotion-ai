@@ -24,9 +24,6 @@ self.addEventListener("fetch", (event) => {
 /* Proactive: page can postMessage { type: 'show-notification', title, body, characterId } */
 self.addEventListener("message", (event) => {
   const data = event.data || {};
-  if (data.type === "show-notification" && self.Registration) {
-    /* handled via showNotification below */
-  }
   if (data.type === "show-notification") {
     self.registration.showNotification(data.title || "She texted you",
       {
@@ -34,7 +31,7 @@ self.addEventListener("message", (event) => {
         icon: "/icon-192.png",
         badge: "/icon-192.png",
         data: { characterId: data.characterId || "" },
-        tag: data.characterId || "proactive",
+        tag: data.characterId ? `vm-${data.characterId}` : "vm-proactive",
       }
     );
   }
