@@ -166,10 +166,15 @@ export function SiteHeader({
           </nav>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <GoonStreakWidget />
-            <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200">
-              <span aria-hidden>◆</span>
+            <button
+              type="button"
+              onClick={() => onNavigate("wallet" as ViewId)}
+              title="Open Coin Wallet & Support ($5 optional)"
+              className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200 hover:bg-amber-500/20 transition"
+            >
+              <span aria-hidden>🪙</span>
               <span>{coins}</span>
-            </div>
+            </button>
             {user ? (
               <button
                 type="button"

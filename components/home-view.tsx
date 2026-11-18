@@ -64,7 +64,20 @@ export function HomeView({
   onOpenGirl,
   onOpenDual,
 }: {
-  onNavigate: (id: SectionId | "dual" | "group" | "lounge" | "shorts" | "vault" | "import" | "share" | "advanced") => void;
+  onNavigate: (
+    id:
+      | SectionId
+      | "dual"
+      | "group"
+      | "lounge"
+      | "shorts"
+      | "vault"
+      | "import"
+      | "share"
+      | "advanced"
+      | "wallet"
+      | "my-girls",
+  ) => void;
   onOpenGirl?: (id: string, incomingMessage?: string) => void;
   onOpenDual?: (aId: string, bId: string) => void;
 }) {
@@ -159,9 +172,13 @@ export function HomeView({
 
       {/* Coins / streak bar */}
       <motion.div variants={riseItem} className="mb-6 flex flex-wrap items-center gap-3 text-sm">
-        <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-200 tabular-nums">
-          {coins} coins
-        </span>
+        <button
+          type="button"
+          onClick={() => onNavigate("wallet")}
+          className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-200 tabular-nums hover:bg-amber-500/20 transition"
+        >
+          🪙 {coins} coins · Wallet
+        </button>
         <span className="text-pink-300 tabular-nums">Streak {streak}d</span>
         {canClaim && (
           <button
@@ -173,6 +190,13 @@ export function HomeView({
           </button>
         )}
         {claimMsg && <span className="text-xs text-emerald-300">{claimMsg}</span>}
+        <button
+          type="button"
+          onClick={() => onNavigate("wallet")}
+          className="rounded-full border border-pink-500/40 bg-pink-500/10 px-3 py-1 text-xs text-pink-200 hover:bg-pink-500/20"
+        >
+          💝 Support Dev ($5 optional)
+        </button>
         <button
           type="button"
           onClick={() => onNavigate("lounge" as SectionId)}

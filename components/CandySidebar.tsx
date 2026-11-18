@@ -12,6 +12,7 @@ type NavItem = {
 const ITEMS: NavItem[] = [
   { id: "home", label: "Home", emoji: "🏠" },
   { id: "my-girls", label: "My Girls", emoji: "💗", badge: "FREE" },
+  { id: "wallet", label: "Coin Wallet & Support", emoji: "🪙", badge: "$5 ❤" },
   { id: "shorts", label: "Shorts", emoji: "🎬" },
   { id: "girls", label: "Chat Roster", emoji: "💬" },
   { id: "romance", label: "Romance Mode", emoji: "💕" },
@@ -82,7 +83,14 @@ export function CandySidebar({
       </nav>
       <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
         {typeof coins === "number" && (
-          <div className="text-xs text-amber-200 px-3">{coins} coins · free daily claim</div>
+          <button
+            type="button"
+            onClick={() => onNavigate("wallet")}
+            className="w-full text-left text-xs text-amber-200 px-3 py-1 rounded-lg hover:bg-amber-500/10 transition flex items-center justify-between"
+          >
+            <span>🪙 {coins} coins</span>
+            <span className="text-[10px] text-pink-300">Wallet / Donate $5 →</span>
+          </button>
         )}
         <button
           type="button"

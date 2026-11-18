@@ -10,6 +10,7 @@ import { GET as getTelegram, POST as postTelegram } from "../app/api/telegram/ro
 import { GET as getComfy } from "../app/api/comfy/route";
 import { buildComfyWorkflowGraph } from "./comfyClient";
 import { GET as getPipeline, POST as postPipeline } from "../app/api/pipeline/route";
+import { GET as getWallet, POST as postWallet } from "../app/api/wallet/route";
 
 describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
   it("GET /api/health reports active engines and catalog counts", async () => {
@@ -201,5 +202,27 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     assert.ok(out.sceneSelfie?.url.includes("image.pollinations.ai"));
     assert.equal(out.sequence?.frames.length, 4);
     assert.ok(typeof out.aftercare === "string" && out.aftercare.length > 5);
+  });
+
+  it("GET & POST /api/wallet returns $5 Developer Boost tier, crypto wallets, and free refills", async () => {
+    const wGet = await getWallet();
+    assert.equal(wGet.status, 200);
+    const wData = await wGet.json();
+    assert.equal(wData.ok, true);
+    assert.equal(wData.recommendedDonationUsd, 5);
+    assert.ok(Array.isArray(wData.tiers) && wData.tiers.some((t: { amountUsd: number }) => t.amountUsd === 5));
+    assert.ok(Array.isArray(wData.cryptoWallets) && wData.cryptoWallets.length >= 4);
+
+    const wPost = await postWallet(
+      new Request("http://localhost:3000/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "supporter-bonus", tierId: "dev-boost-5" }),
+      }),
+    );
+    assert.equal(wPost.status, 200);
+    const pData = await wPost.json();
+    assert.equal(pData.ok, true);
+    assert.equal(pData.grantedCoins, 3500);
   });
 });

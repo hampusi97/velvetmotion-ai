@@ -36,6 +36,9 @@ import { WorkspaceHub } from "@/components/WorkspaceHub";
 import { VaultPanel } from "@/components/VaultPanel";
 import { MyGirlsHub } from "@/components/MyGirlsHub";
 import { LegalPages } from "@/components/LegalPages";
+import { CoinWallet } from "@/components/CoinWallet";
+import { SupportModal } from "@/components/SupportModal";
+import { shouldShowSupportPromptOnLogin } from "@/lib/wallet";
 import { getUser, type LocalUser } from "@/lib/auth";
 import { getCoins, loadChat, saveChat } from "@/lib/storage";
 import {
@@ -72,6 +75,7 @@ type HomeView =
   | "import"
   | "vault"
   | "my-girls"
+  | "wallet"
   | "terms"
   | "privacy"
   | "safety";
@@ -96,6 +100,7 @@ export default function Home() {
   const [activePackId, setActivePackId] = useState<string | null>(null);
   const [activeJoiId, setActiveJoiId] = useState<string | null>(null);
   const [dualPair, setDualPair] = useState<{ a: string; b: string } | null>(null);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -119,10 +124,14 @@ export default function Home() {
     } catch {
       setAdult(false);
     }
-    setUser(getUser());
+    const existingUser = getUser();
+    setUser(existingUser);
     setCoins(getCoins());
     setAuthReady(true);
     registerServiceWorker();
+    if (existingUser && shouldShowSupportPromptOnLogin()) {
+      setSupportModalOpen(true);
+    }
 
     const onPopState = () => {
       try {
@@ -282,7 +291,16 @@ export default function Home() {
   }
 
   if (!user) {
-    return <LoginGate onLoggedIn={setUser} />;
+    return (
+      <LoginGate
+        onLoggedIn={(u) => {
+          setUser(u);
+          if (shouldShowSupportPromptOnLogin()) {
+            setSupportModalOpen(true);
+          }
+        }}
+      />
+    );
   }
 
   const sidebarActive =
@@ -307,6 +325,7 @@ export default function Home() {
           view === "import" ||
           view === "vault" ||
           view === "my-girls" ||
+          view === "wallet" ||
           view === "terms" ||
           view === "privacy" ||
           view === "safety"
@@ -484,6 +503,13 @@ export default function Home() {
           )}
           {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
           {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
+          {view === "wallet" && (
+            <CoinWallet
+              onHome={() => setView("home")}
+              onPreviewLoginModal={() => setSupportModalOpen(true)}
+              onCoinsChanged={setCoins}
+            />
+          )}
           {view === "my-girls" && (
             <MyGirlsHub
               onHome={() => setView("home")}
@@ -509,8 +535,11 @@ export default function Home() {
             />
           )}
           <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
-            <span>VelvetMotion AI · Fictional adults 21+ only</span>
+            <span>VelvetMotion AI · Fictional adults 21+ only · 100% Free</span>
             <div className="flex flex-wrap gap-4">
+              <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
+                🪙 Coin Wallet ($5 Support)
+              </button>
               <button type="button" onClick={() => navigate("my-girls")} className="hover:text-pink-300">
                 My Girls
               </button>
@@ -528,6 +557,13 @@ export default function Home() {
         </div>
       </div>
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
+      {supportModalOpen && (
+        <SupportModal
+          onClose={() => setSupportModalOpen(false)}
+          onOpenWallet={() => setView("wallet")}
+          onCoinsChanged={setCoins}
+        />
+      )}
       {proactive && (
         <ProactiveToast
           ping={proactive}
