@@ -1,5 +1,6 @@
 export type SectionId =
   | "girls"
+  | "penthouse"
   | "create"
   | "romance"
   | "bnwo"
@@ -25,6 +26,13 @@ export type Section = {
 };
 
 export const sections: Section[] = [
+  {
+    id: "penthouse",
+    title: "3D Penthouse",
+    kicker: "3D Suite",
+    summary: "Interactive Three.js boudoir suite with lighting moods & hotspots.",
+    art: "bg-[radial-gradient(120%_90%_at_18%_0%,#e879f9_0%,transparent_48%),linear-gradient(165deg,#3b0764_0%,#0f0518_75%)]",
+  },
   {
     id: "girls",
     title: "Girls",

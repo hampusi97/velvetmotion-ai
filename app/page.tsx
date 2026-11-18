@@ -19,11 +19,13 @@ import { GoonRoom } from "@/components/GoonRoom";
 import { DiscoverSwipe } from "@/components/DiscoverSwipe";
 import { RouletteRoom } from "@/components/RouletteRoom";
 import { BlindfoldJoi } from "@/components/BlindfoldJoi";
+import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { getUser, type LocalUser } from "@/lib/auth";
 
 type HomeView =
   | "home"
   | "girls"
+  | "penthouse"
   | "create"
   | "romance"
   | "bnwo"
@@ -68,10 +70,25 @@ export default function Home() {
       } else {
         setAdult(localStorage.getItem("velvet-age") === "true");
       }
+      const initialView = params.get("view") as View | null;
+      if (initialView) {
+        setView(initialView);
+      }
     } catch {
       setAdult(false);
     }
-    setUser(getUser());
+    const existing = getUser();
+    if (existing) {
+      setUser(existing);
+    } else {
+      const guest: LocalUser = { username: "VIP Guest", joinedAt: Date.now() };
+      try {
+        localStorage.setItem("vm-user", JSON.stringify(guest));
+      } catch {
+        /* ignore */
+      }
+      setUser(guest);
+    }
   }, []);
 
   const navigate = (next: ViewId) => {
@@ -153,6 +170,10 @@ export default function Home() {
       <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " py-6"}>
         {view === "home" && <HomeScreen onNavigate={navigate} onOpenGirl={openChatById} />}
 
+        {view === "penthouse" && (
+          <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
+        )}
+
         {showRoster && (
           <CharacterRoster
             romanceMode={romanceMode}
@@ -186,18 +207,9 @@ export default function Home() {
           />
         )}
 
-        {view === "chat" && selected &&
-          (user ? (
-            <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
-          ) : (
-            <div className="mx-auto max-w-md rounded-3xl border border-rose-500/30 bg-ink-900 p-8 text-center">
-              <p className="text-lg font-medium text-cream">Log in to chat & generate</p>
-              <p className="mt-2 text-sm text-mist">Use Log in in the header (local username or Google).</p>
-              <button type="button" onClick={() => setView("profile")} className="mt-6 text-sm text-rose-300">
-                ← Back to profile
-              </button>
-            </div>
-          ))}
+        {view === "chat" && selected && (
+          <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
+        )}
 
         {view === "create" && (
           <CreateGirlWizard

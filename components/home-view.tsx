@@ -12,6 +12,13 @@ import { getEdgeStreak } from "@/lib/streaks";
 
 const EXPERIENCES = [
   {
+    id: "penthouse" as SectionId,
+    title: "3D Penthouse Suite",
+    subtitle: "Interactive 3D boudoir · hotspots & Lyria music",
+    gradient: "from-fuchsia-600/90 to-rose-700/90",
+    emoji: "🥂",
+  },
+  {
     id: "create" as SectionId,
     title: "Create Your Girl",
     subtitle: "Build her look, personality, and heat",
@@ -45,13 +52,6 @@ const EXPERIENCES = [
     subtitle: "Timed sessions · one or two girls",
     gradient: "from-rose-800/90 to-pink-900/90",
     emoji: "💋",
-  },
-  {
-    id: "tribute" as SectionId,
-    title: "Tribute Challenges",
-    subtitle: "Edge streaks unlock dual gens",
-    gradient: "from-violet-600/90 to-fuchsia-800/90",
-    emoji: "💎",
   },
 ];
 
@@ -92,7 +92,7 @@ export function HomeView({
           <span className="block text-rose-200">Motion</span>
         </h1>
         <p className="mt-5 max-w-xl text-base sm:text-lg leading-relaxed text-mist">
-          Chat, nudes, sex sequences, Discover swipe, roulette sprints, blindfold JOI. Free AI — log in to play.
+          Interactive 3D Penthouse Suite, Gemini 4 & Live Voice chat, Nano Banana 2.1 image editing, Omni Flash video animation, and Lyria 3 music.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-amber-200">
@@ -120,6 +120,13 @@ export function HomeView({
           </button>
           <button
             type="button"
+            onClick={() => onNavigate("penthouse")}
+            className="press inline-flex min-h-11 items-center justify-center rounded-full border border-fuchsia-400/50 bg-fuchsia-500/20 px-5 text-base font-medium text-fuchsia-100 hover:bg-fuchsia-500/30"
+          >
+            3D Penthouse Suite
+          </button>
+          <button
+            type="button"
             onClick={() => onNavigate("create")}
             className="press inline-flex min-h-11 items-center justify-center rounded-full border border-pink-500/50 bg-pink-500/15 px-5 text-base font-medium text-pink-100 hover:bg-pink-500/25"
           >
@@ -127,10 +134,10 @@ export function HomeView({
           </button>
           <button
             type="button"
-            onClick={() => onNavigate("tinder")}
+            onClick={() => onNavigate("gallery")}
             className="press inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 text-base font-medium text-cream hover:bg-white/10"
           >
-            Discover
+            Studio & Gallery
           </button>
         </div>
       </motion.section>

@@ -57,22 +57,10 @@ type WizardProps = {
   onHome: () => void;
 };
 
-function deterministicSeed(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
+import { characterPortraitUrl } from "@/lib/portraits";
 
 function portraitUrl(look: string, style: string, name = "", mood = "seductive") {
-  const stylePrefix = style === "Anime" ? "anime style, detailed eyes," : "photorealistic, ultra detailed skin,";
-  const prompt = encodeURIComponent(
-    `${stylePrefix} beautiful adult woman 24 years old, ${look}, ${mood} portrait, soft cinematic lighting, looking at viewer, masterpiece, 8k uhd`,
-  );
-  const seed = deterministicSeed(`${look}|${style}|${name}|${mood}`);
-  return `https://image.pollinations.ai/prompt/${prompt}?width=768&height=1152&nologo=true&seed=${seed}&model=flux&enhance=true`;
+  return characterPortraitUrl(name || "custom", `${style} · ${look}`, mood, `${style} · ${look}`);
 }
 
 export function CreateGirlWizard({ onDone, onHome }: WizardProps) {

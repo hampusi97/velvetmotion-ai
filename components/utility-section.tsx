@@ -1,6 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Lock, Unlock, ShieldAlert, Trash2, Sparkles, Upload, Film, Image as ImageIcon } from "lucide-react";
+import {
+  Lock,
+  Unlock,
+  ShieldAlert,
+  Trash2,
+  Sparkles,
+  Upload,
+  Film,
+  Image as ImageIcon,
+  Music,
+} from "lucide-react";
 import {
   getGallery,
   clearGallery,
@@ -30,7 +40,7 @@ const STUDIO_TYPES = [
   { id: "lingerie", label: "Lingerie", cost: 12 },
   { id: "nude", label: "Nude", cost: 15 },
   { id: "explicit", label: "Explicit", cost: 20 },
-  { id: "video", label: "4-Frame Video", cost: 30 },
+  { id: "video", label: "Omni Flash Video", cost: 30 },
 ] as const;
 
 const STUDIO_POSES = [
@@ -59,16 +69,29 @@ export function UtilitySection({
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Studio Generator & Custom Import state
+  // Studio Generator, Photo Animation, Image Edit & Lyria Music state
   const [studioCharId, setStudioCharId] = useState(CHARACTERS[0].id);
   const [studioDualId, setStudioDualId] = useState("");
   const [studioType, setStudioType] = useState<(typeof STUDIO_TYPES)[number]["id"]>("lingerie");
   const [studioPose, setStudioPose] = useState(STUDIO_POSES[0]);
   const [studioExtra, setStudioExtra] = useState("");
+  const [videoAspectRatio, setVideoAspectRatio] = useState<"9:16" | "16:9">("9:16");
+  const [referencePhotoDataUrl, setReferencePhotoDataUrl] = useState<string | null>(null);
   const [studioBusy, setStudioBusy] = useState(false);
   const [studioNotice, setStudioNotice] = useState<string | null>(null);
   const [importUrl, setImportUrl] = useState("");
   const [importOpen, setImportOpen] = useState(false);
+
+  // Lyria 3 Music Studio state
+  const [lyriaModel, setLyriaModel] = useState<"lyria-3-clip-preview" | "lyria-3-pro-preview">(
+    "lyria-3-clip-preview",
+  );
+  const [lyriaPrompt, setLyriaPrompt] = useState(
+    "Midnight velvet R&B slow jam with warm Rhodes chords and sensual bass",
+  );
+  const [lyriaBusy, setLyriaBusy] = useState(false);
+  const [lyriaAudioUrl, setLyriaAudioUrl] = useState<string | null>(null);
+  const [lyriaCaption, setLyriaCaption] = useState<string | null>(null);
 
   // PIN Vault state
   const [pinConfigured, setPinConfigured] = useState(false);
@@ -134,6 +157,15 @@ export function UtilitySection({
     };
   }, [view]);
 
+  const handleReferencePhotoSelect = (file: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setReferencePhotoDataUrl(String(reader.result || ""));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleStudioGenerate = async () => {
     if (studioBusy) return;
     const char = CHARACTERS.find((c) => c.id === studioCharId) || CHARACTERS[0];
@@ -158,6 +190,8 @@ export function UtilitySection({
           body: JSON.stringify({
             characterId: char.id,
             pose: studioPose,
+            aspectRatio: videoAspectRatio,
+            referenceImageBase64: referencePhotoDataUrl || undefined,
             prompt: `${studioPose}${studioExtra ? `, ${studioExtra}` : ""}${dualExtra}`,
           }),
         });
@@ -167,14 +201,20 @@ export function UtilitySection({
         if (url) {
           addToGallery({
             characterId: char.id,
-            characterName: dual ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}` : char.name,
+            characterName: dual
+              ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}`
+              : char.name,
             type: "video",
             url,
             frames,
             prompt: data.promptUsed || studioPose,
           });
           setGallery(getGallery());
-          setStudioNotice(`Generated 4-frame video sequence for ${char.name}.`);
+          setStudioNotice(
+            referencePhotoDataUrl
+              ? `Animated your uploaded photo into a ${videoAspectRatio} video sequence for ${char.name}.`
+              : `Generated ${videoAspectRatio} video sequence for ${char.name}.`,
+          );
         }
       } else {
         const res = await fetch("/api/generate-image", {
@@ -187,19 +227,26 @@ export function UtilitySection({
             type: studioType,
             pose: studioPose,
             extra: `${studioExtra}${dualExtra}`,
+            referenceImageBase64: referencePhotoDataUrl || undefined,
           }),
         });
         const data = await res.json();
         if (data.url) {
           addToGallery({
             characterId: char.id,
-            characterName: dual ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}` : char.name,
+            characterName: dual
+              ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}`
+              : char.name,
             type: studioType,
             url: data.url,
             prompt: data.prompt || studioPose,
           });
           setGallery(getGallery());
-          setStudioNotice(`Saved new ${studioType} scene of ${char.name} to Gallery.`);
+          setStudioNotice(
+            referencePhotoDataUrl
+              ? `Edited reference image with Nano Banana 2.1 for ${char.name} and saved to Gallery.`
+              : `Saved new ${studioType} scene of ${char.name} to Gallery.`,
+          );
         }
       }
     } catch {
@@ -207,6 +254,31 @@ export function UtilitySection({
     } finally {
       setStudioBusy(false);
       setCoins(getCoins());
+    }
+  };
+
+  const handleGenerateLyriaMusic = async () => {
+    if (lyriaBusy) return;
+    setLyriaBusy(true);
+    try {
+      const res = await fetch("/api/generate-music", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: lyriaModel,
+          prompt: lyriaPrompt,
+          referenceImageBase64: referencePhotoDataUrl || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (data.audioUrl) {
+        setLyriaAudioUrl(data.audioUrl);
+        setLyriaCaption(data.lyrics || `Generated with ${lyriaModel}`);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setLyriaBusy(false);
     }
   };
 
@@ -350,7 +422,7 @@ export function UtilitySection({
           <div className="text-sm font-medium text-amber-300">{coins} coins</div>
         </div>
 
-        {/* Direct Picture & 4-Frame Video Studio Generator */}
+        {/* Direct Picture, Photo Edit, & Omni Flash Video Studio Generator */}
         <div className="rounded-3xl border border-pink-500/30 bg-zinc-950/90 p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -358,7 +430,7 @@ export function UtilitySection({
                 <Sparkles className="h-3.5 w-3.5" /> Instant Media Lab
               </div>
               <h2 className="text-lg font-semibold text-white mt-0.5">
-                Generate Pictures & 4-Frame Motion Videos
+                Nano Banana 2.1 Image Creation/Editing & Omni Flash Video Animation
               </h2>
             </div>
             <button
@@ -424,7 +496,9 @@ export function UtilitySection({
               </select>
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-zinc-400">Duo Partner (Optional)</label>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-400">
+                Duo Partner (Optional)
+              </label>
               <select
                 aria-label="Select optional second companion"
                 value={studioDualId}
@@ -440,7 +514,9 @@ export function UtilitySection({
               </select>
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-wider text-zinc-400">Pose & Camera</label>
+              <label className="text-[11px] uppercase tracking-wider text-zinc-400">
+                Pose & Camera
+              </label>
               <select
                 aria-label="Select studio pose"
                 value={studioPose}
@@ -456,29 +532,80 @@ export function UtilitySection({
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {STUDIO_TYPES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setStudioType(t.id)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
-                  studioType === t.id
-                    ? "border-pink-500 bg-pink-500/20 text-pink-200"
-                    : "border-white/10 bg-zinc-900 text-zinc-400 hover:border-pink-500/40"
-                }`}
-              >
-                {t.id === "video" && <Film className="h-3.5 w-3.5 text-fuchsia-400" />}
-                {t.label} · {t.cost}c
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {STUDIO_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setStudioType(t.id)}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
+                    studioType === t.id
+                      ? "border-pink-500 bg-pink-500/20 text-pink-200"
+                      : "border-white/10 bg-zinc-900 text-zinc-400 hover:border-pink-500/40"
+                  }`}
+                >
+                  {t.id === "video" && <Film className="h-3.5 w-3.5 text-fuchsia-400" />}
+                  {t.label} · {t.cost}c
+                </button>
+              ))}
+            </div>
+
+            {studioType === "video" && (
+              <div className="flex items-center gap-1.5">
+                {(["9:16", "16:9"] as const).map((ratio) => (
+                  <button
+                    key={ratio}
+                    type="button"
+                    onClick={() => setVideoAspectRatio(ratio)}
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-medium ${
+                      videoAspectRatio === ratio
+                        ? "border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-200"
+                        : "border-zinc-800 text-zinc-400"
+                    }`}
+                  >
+                    {ratio === "9:16" ? "9:16 Portrait" : "16:9 Landscape"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Reference Photo Upload for Image Editing or Photo-to-Video Animation */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-900/50 px-3.5 py-2.5">
+            <span className="text-xs text-zinc-300">
+              {studioType === "video"
+                ? "Upload a photo to animate into a video (or leave blank for text-to-video):"
+                : "Upload a reference photo to edit with Nano Banana 2.1 (optional):"}
+            </span>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 rounded-xl border border-pink-500/40 bg-pink-500/15 px-3 py-1.5 text-xs font-medium text-pink-200 cursor-pointer hover:bg-pink-500/25">
+                <Upload className="h-3.5 w-3.5" />
+                {referencePhotoDataUrl ? "Photo Attached ✓" : "Attach Photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleReferencePhotoSelect(e.target.files?.[0] || null)}
+                />
+              </label>
+              {referencePhotoDataUrl && (
+                <button
+                  type="button"
+                  onClick={() => setReferencePhotoDataUrl(null)}
+                  className="text-xs text-rose-400"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <input
               type="text"
               aria-label="Custom lighting or scene details"
-              placeholder="Optional details: red darkroom light, silk stockings, arched back…"
+              placeholder="Prompt / Edit instruction: red darkroom light, silk stockings, slow motion arch…"
               value={studioExtra}
               onChange={(e) => setStudioExtra(e.target.value)}
               className="flex-1 min-w-[220px] rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-pink-500"
@@ -491,7 +618,13 @@ export function UtilitySection({
             >
               {studioBusy
                 ? "Rendering…"
-                : `Generate ${studioType === "video" ? "4-Frame Video" : "Picture"} (${activeTypeCost}c)`}
+                : studioType === "video"
+                  ? referencePhotoDataUrl
+                    ? `Animate Photo (${videoAspectRatio}) · ${activeTypeCost}c`
+                    : `Generate ${videoAspectRatio} Video (${activeTypeCost}c)`
+                  : referencePhotoDataUrl
+                    ? `Edit Photo (${activeTypeCost}c)`
+                    : `Generate Picture (${activeTypeCost}c)`}
             </button>
           </div>
 
@@ -499,6 +632,64 @@ export function UtilitySection({
             <p className="text-xs text-pink-300 bg-pink-500/10 border border-pink-500/30 rounded-xl px-3 py-2">
               {studioNotice}
             </p>
+          )}
+        </div>
+
+        {/* Lyria 3 Soundtrack Studio */}
+        <div className="rounded-3xl border border-fuchsia-500/30 bg-zinc-950/90 p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Music className="h-4 w-4 text-fuchsia-400" />
+              <h2 className="text-base font-semibold text-white">
+                Lyria 3 Lounge & Bedroom Soundtrack Generator
+              </h2>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(
+                [
+                  { id: "lyria-3-clip-preview", label: "Lyria Clip (30s)" },
+                  { id: "lyria-3-pro-preview", label: "Lyria Pro (Full Track)" },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setLyriaModel(m.id)}
+                  className={`rounded-xl border px-3 py-1 text-xs font-medium ${
+                    lyriaModel === m.id
+                      ? "border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-200"
+                      : "border-zinc-800 text-zinc-400"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="text"
+              value={lyriaPrompt}
+              onChange={(e) => setLyriaPrompt(e.target.value)}
+              placeholder="Describe the music mood: slow synth-wave, candlelit R&B, breathy lounge…"
+              className="flex-1 min-w-[220px] rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-xs text-white"
+            />
+            <button
+              type="button"
+              disabled={lyriaBusy}
+              onClick={() => void handleGenerateLyriaMusic()}
+              className="rounded-xl bg-fuchsia-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {lyriaBusy ? "Composing…" : "Generate Music"}
+            </button>
+          </div>
+
+          {lyriaAudioUrl && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-4 py-2.5 text-xs text-fuchsia-200">
+              <span className="truncate max-w-md">{lyriaCaption}</span>
+              <audio src={lyriaAudioUrl} controls autoPlay className="h-8 w-60" />
+            </div>
           )}
         </div>
 
@@ -517,7 +708,12 @@ export function UtilitySection({
                   : "border-zinc-700 text-zinc-300"
               }`}
             >
-              {f === "vault" && (vaultUnlocked ? <Unlock className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />)}
+              {f === "vault" &&
+                (vaultUnlocked ? (
+                  <Unlock className="h-3.5 w-3.5" />
+                ) : (
+                  <Lock className="h-3.5 w-3.5" />
+                ))}
               {f === "all"
                 ? "All"
                 : f === "image"
@@ -616,7 +812,8 @@ export function UtilitySection({
                 <div className="flex items-center gap-2">
                   <Unlock className="h-4 w-4 text-emerald-400" />
                   <span>
-                    {pinStatus || "Private Vault unlocked. Items here are hidden from All, Pictures, and Videos tabs."}
+                    {pinStatus ||
+                      "Private Vault unlocked. Items here are hidden from All, Pictures, and Videos tabs."}
                   </span>
                 </div>
                 <button
@@ -638,7 +835,7 @@ export function UtilitySection({
                 <p className="text-sm">
                   {filter === "vault"
                     ? "Your Private Vault is empty. Click 'Vault' on any gallery item to hide it here."
-                    : "No media in this tab yet. Use the Instant Media Lab above to generate a picture or 4-frame video!"}
+                    : "No media in this tab yet. Use the Instant Media Lab above to generate a picture or video!"}
                 </p>
               </div>
             ) : (
@@ -652,6 +849,14 @@ export function UtilitySection({
                     >
                       {item.frames && item.frames.length > 1 ? (
                         <MotionSequencePlayer frames={item.frames} compact />
+                      ) : item.url.startsWith("data:video/") ? (
+                        <video
+                          src={item.url}
+                          controls
+                          loop
+                          playsInline
+                          className="w-full aspect-[3/4] object-cover"
+                        />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -666,7 +871,8 @@ export function UtilitySection({
                       <figcaption className="p-2.5 text-[11px] text-zinc-400 space-y-2 mt-auto">
                         <div className="flex items-center justify-between gap-1">
                           <span className="truncate">
-                            <span className="text-pink-300">{item.characterName}</span> · {item.type}
+                            <span className="text-pink-300">{item.characterName}</span> ·{" "}
+                            {item.type}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-white/5">
@@ -750,7 +956,10 @@ export function UtilitySection({
               onChange={(e) => setText(e.target.value)}
               className="min-w-0 flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3"
             />
-            <button disabled={!text.trim()} className="rounded-xl bg-pink-600 px-4 disabled:opacity-40">
+            <button
+              disabled={!text.trim()}
+              className="rounded-xl bg-pink-600 px-4 disabled:opacity-40"
+            >
               {view === "create" ? "Create" : "Send"}
             </button>
           </form>

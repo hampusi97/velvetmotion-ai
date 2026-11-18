@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import blueprint from "./firebase-blueprint.json";
 
+const blueprint = JSON.parse(fs.readFileSync("./firebase-blueprint.json", "utf8"));
 const rulesText = fs.readFileSync("./firestore.rules", "utf8");
 
 test("Firestore rules include Global Safety Net and Eight Pillars primitives", () => {
@@ -130,11 +130,11 @@ test("Portrait URLs stay within Firestore 2000-char limit", async () => {
   const maxUrlLen = blueprint.entities.SavedMedia.properties.url.maxLength!;
 
   const builtIn = characterPortraitUrl("maren", "curvy figure");
-  assert.ok(builtIn.startsWith("https://image.pollinations.ai/prompt/"));
+  assert.ok(builtIn.startsWith("data:image/svg+xml;utf8,"));
   assert.ok(builtIn.length <= maxUrlLen);
 
   const customPortrait = resolveAvatar("/avatars/maren.svg", "maren", "curvy figure");
-  assert.ok(customPortrait.startsWith("https://image.pollinations.ai/prompt/"));
+  assert.ok(customPortrait.startsWith("data:image/svg+xml;utf8,"));
   assert.ok(customPortrait.length <= maxUrlLen);
 });
 
