@@ -40,5 +40,8 @@ next-env.d.ts
 .playwright-cli/
 DRAFT_firestore.rules
 *.zip
+__pycache__/
+*.py[cod]
+
 
 
