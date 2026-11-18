@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { CHARACTERS } from "@/lib/characters";
-import { characterPortraitUrl, resolveAvatar } from "@/lib/portraits";
+import { resolveAvatar } from "@/lib/portraits";
+import { characterMediaUrl } from "@/lib/media";
 import { getCoins, spendCoins, addCoins } from "@/lib/storage";
 
 export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: string) => void }) {
@@ -11,8 +12,16 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
   const [timer, setTimer] = useState(0);
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [streak, setStreak] = useState(0);
 
-  useEffect(() => setCoins(getCoins()), []);
+  useEffect(() => {
+    setCoins(getCoins());
+    try {
+      const s = localStorage.getItem("vm-goon-streak");
+      if (s) setStreak(parseInt(s, 10) || 0);
+    } catch {}
+  }, []);
+
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setTimer((t) => t + 1), 1000);
@@ -39,9 +48,16 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
 
   const endSession = () => {
     setRunning(false);
-    addCoins(8);
+    const mins = Math.floor(timer / 60);
+    const bonus = mins >= 8 ? 12 : 8;
+    addCoins(bonus);
     setCoins(getCoins());
-    setNotice("Session ended. +8 coins. Open chat to generate while the heat is high.");
+    const nextStreak = streak + 1;
+    setStreak(nextStreak);
+    try {
+      localStorage.setItem("vm-goon-streak", String(nextStreak));
+    } catch {}
+    setNotice(`Session ended. +${bonus} coins. Streak ${nextStreak}. Open chat to generate while the heat is high.`);
   };
 
   const mm = String(Math.floor(timer / 60)).padStart(2, "0");
@@ -60,6 +76,12 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
         <span className="text-amber-200">{coins} coins</span>
         <span className="text-zinc-500">·</span>
         <span className="text-zinc-400">Session costs 15</span>
+        {streak > 0 && (
+          <>
+            <span className="text-zinc-500">·</span>
+            <span className="text-pink-300">Streak {streak}</span>
+          </>
+        )}
         {running && (
           <span className="ml-auto font-mono text-pink-300 text-lg">
             {mm}:{ss}
@@ -71,7 +93,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
         {CHARACTERS.map((c) => {
           const on = selected.includes(c.id);
-          const src = resolveAvatar(c.avatar, c.id, c.figure);
+          const src = characterMediaUrl(c, "beauty");
           return (
             <button
               key={c.id}
@@ -79,7 +101,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
               onClick={() => toggle(c.id)}
               className={`rounded-2xl border overflow-hidden text-left transition ${
                 on
-                  ? "border-pink-500 ring-2 ring-pink-500/50 scale-[1.02]"
+                  ? "border-pink-500 ring-2 ring-pink-500/50 scale-[1.02] shadow-lg shadow-pink-500/20"
                   : "border-white/10 hover:border-pink-500/40"
               }`}
             >
@@ -92,7 +114,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
       </div>
 
       {selected.length > 0 && (
-        <div className="rounded-2xl border border-pink-500/30 bg-gradient-to-b from-zinc-900/80 to-black p-4 space-y-3">
+        <div className="rounded-2xl border border-pink-500/30 bg-gradient-to-b from-zinc-900/80 to-black p-4 space-y-3 shadow-[0_0_40px_rgba(236,72,153,0.15)]">
           <div className="flex -space-x-3">
             {selected.map((id) => {
               const c = CHARACTERS.find((x) => x.id === id)!;
@@ -100,7 +122,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={id}
-                  src={resolveAvatar(c.avatar, c.id, c.figure)}
+                  src={characterMediaUrl(c, "beauty")}
                   alt=""
                   className="h-14 w-14 rounded-full border-2 border-pink-400 object-cover"
                 />
@@ -111,7 +133,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
             Selected:{" "}
             {selected.map((id) => CHARACTERS.find((c) => c.id === id)?.name.split(" ")[0]).join(" + ")}
             {selected.length === 2 ? (
-              <span className="text-pink-300"> · dual-girl mode</span>
+              <span className="text-pink-300"> · dual-girl mode unlocked</span>
             ) : null}
           </div>
           <div className="flex flex-wrap gap-2">
@@ -129,7 +151,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
                 onClick={endSession}
                 className="rounded-xl border border-white/20 px-4 py-2.5 text-sm hover:bg-white/5"
               >
-                End session (+8 coins)
+                End session (+coins)
               </button>
             )}
             {selected.map((id) => (
@@ -144,7 +166,7 @@ export function GoonRoom({ onHome, onChat }: { onHome: () => void; onChat: (id: 
             ))}
           </div>
           <p className="text-xs text-zinc-500">
-            Tip: In chat use the quick Generate buttons (Lingerie / Nude / Explicit / Sex video). With two girls selected, dual scenes are unlocked.
+            Tip: In chat use Lingerie / Nude / Explicit / Sex sequence. With two girls selected, dual scenes are unlocked. Sessions ≥ 8 min earn bonus coins.
           </p>
         </div>
       )}
