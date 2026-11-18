@@ -39,6 +39,7 @@ import {
   dismissProactive,
   type ProactivePing,
 } from "@/lib/proactiveIdle";
+import { registerServiceWorker } from "@/lib/pwaProactive";
 
 type HomeView =
   | "home"
@@ -107,9 +108,9 @@ export default function Home() {
     setUser(getUser());
     setCoins(getCoins());
     setAuthReady(true);
+    registerServiceWorker();
   }, []);
 
-  // OpenChara-lite: she texts first after idle
   useEffect(() => {
     if (!authReady || !user) return;
     return startProactiveWatcher(
@@ -232,15 +233,8 @@ export default function Home() {
           {view === "home" && (
             <HomeScreen onNavigate={navigate as (id: ViewId) => void} onOpenGirl={openChatById} />
           )}
-
-          {view === "shorts" && (
-            <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />
-          )}
-
-          {view === "advanced" && (
-            <AdvancedMediaSettings onHome={() => setView("home")} />
-          )}
-
+          {view === "shorts" && <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "advanced" && <AdvancedMediaSettings onHome={() => setView("home")} />}
           {view === "import" && (
             <CardImport
               onHome={() => setView("home")}
@@ -251,11 +245,9 @@ export default function Home() {
               }}
             />
           )}
-
           {view === "penthouse" && (
             <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
           )}
-
           {showRoster && (
             <CharacterRoster
               romanceMode={romanceMode}
@@ -274,7 +266,6 @@ export default function Home() {
               onBack={() => setView("home")}
             />
           )}
-
           {view === "profile" && selected && (
             <CharacterProfile
               character={selected}
@@ -288,11 +279,9 @@ export default function Home() {
               }}
             />
           )}
-
           {view === "chat" && selected && (
             <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
           )}
-
           {view === "create" && (
             <CreateGirlWizard
               onHome={() => setView("home")}
@@ -304,7 +293,6 @@ export default function Home() {
               }}
             />
           )}
-
           {view === "dual" && <DualGirlChat onHome={() => setView("home")} />}
           {view === "group" && <GroupChat onHome={() => setView("home")} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
@@ -318,39 +306,27 @@ export default function Home() {
               }}
             />
           )}
-
           {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} />}
           {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
           {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
           {view === "scenario" && (
-            <SpicyScenarioSimulator
-              onHome={() => setView("home")}
-              onStartChat={(id) => openChatById(id)}
-            />
+            <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id) => openChatById(id)} />
           )}
-
           {view === "tribute" && (
             <>
-              <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">
-                ← Home
-              </button>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
               <TributeBrowser onStartWithGirl={openChatById} />
             </>
           )}
-
           {view === "packs" && (
             <>
-              <button onClick={() => setView("home")} className="mb-4 text-pink-400">
-                ← Home
-              </button>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
               <StoryPackBrowser />
             </>
           )}
           {view === "joi" && (
             <>
-              <button onClick={() => setView("home")} className="mb-4 text-pink-400">
-                ← Home
-              </button>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
               <JoiBrowser />
             </>
           )}
