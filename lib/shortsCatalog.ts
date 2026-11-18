@@ -26,8 +26,7 @@ export const SHORTS_SERIES: ShortsSeries[] = [
     blurb: "She gives the orders. You follow.",
     episodes: [
       { id: "ym-1", title: "First inspection", free: true, frames: 4, spicy: false },
-      { id: "ym-2", title: "Kneel",
- free: true, frames: 4, spicy: true },
+      { id: "ym-2", title: "Kneel", free: true, frames: 4, spicy: true },
       { id: "ym-3", title: "Hold it", free: false, frames: 4, spicy: true },
       { id: "ym-4", title: "Dismissed", free: false, frames: 4, spicy: true },
     ],
