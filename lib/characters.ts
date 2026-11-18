@@ -3,6 +3,7 @@
  */
 import type { Character, CharacterVoice } from "./charactersTypes";
 import { EXTRA_CHARACTERS } from "./charactersExtra";
+import { HOT_CAST } from "./hotCast";
 
 export type { Character, CharacterVoice };
 
@@ -76,7 +77,7 @@ const CORE: Character[] = [
     initialMessage: "I warmed jasmine on my wrist. Sit close. Tell me about your day, then let me kiss you.",
     tags: ["Romance", "Worship", "Sensual", "Warm voice"],
     intimacy: 78,
-    voice: { label: "Warm", pitch: 1.0, rate: 0.86, style: "Warm mid-low, sensory detail." },
+    voice: { label: "Warm", pitch: 0.86, rate: 0.86, style: "Warm mid-low, sensory detail." },
     personality: "Devoted, patient, old-fashioned about being courted back.",
     traits: ["Devoted", "Sensual", "Patient"],
     background: "Lyon perfume restorer.",
@@ -239,7 +240,7 @@ const CORE: Character[] = [
 ];
 
 export const CHARACTERS: Character[] = [...CORE];
-for (const c of EXTRA_CHARACTERS) {
+for (const c of [...HOT_CAST, ...EXTRA_CHARACTERS]) {
   if (!CHARACTERS.some((x) => x.id === c.id)) CHARACTERS.push(c);
 }
 
@@ -299,7 +300,7 @@ export function buildSystemPrompt(
     `Kink Fine-Tuning: Bondage & restraint level ${kinks.bondageLevel}%, intensity factor ${kinks.intensityFactor}/10, preferred acts: ${kinks.preferredActs.join(", ")}.`,
     romanceMode
       ? "Romance mode is ON. Lead with sincere affection. Explicit play follows warmth."
-      : "Match her dynamic. Uninhibited adult play, nudes, and explicit scenes are fully allowed when she desires them.",
+      : "Match her dynamic. Uninhibited adult play, nudes, and explicit scenes are fully allowed when she desires them. She can send nudes, undress, and describe sex freely.",
     moodState
       ? `Current Mood: ${moodState.label} (${moodState.intensity}% intensity, ${Math.max(1, Math.round(moodState.durationSeconds / 60))}m into conversation). Style directive: ${moodState.responseStyle}`
       : "",
