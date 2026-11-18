@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CHARACTERS, type Character, fallbackReply } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
+import { speak } from "@/lib/speech";
 import { FantasyCodePanel } from "./FantasyCodePanel";
 
 type Msg = { role: "user" | "a" | "b"; content: string; name?: string };
@@ -35,23 +36,67 @@ export function DualGirlChat({ onHome }: { onHome: () => void }) {
     ]);
   };
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
     if (!text || !a || !b || busy) return;
     setInput("");
     setBusy(true);
     const next: Msg[] = [...messages, { role: "user", content: text }];
-    // Staggered dual replies using fallback (API dual can be wired later)
-    const replyA = fallbackReply(a, text, false);
-    const replyB = fallbackReply(b, `${text} (responding as the second girl in a dual scene with ${a.name})`, false);
-    setTimeout(() => {
+    setMessages(next);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: a.id,
+          partnerCharacterId: b.id,
+          messages: next.slice(-10).map((m) => ({
+            role: m.role === "user" ? "user" : "assistant",
+            content: m.content,
+          })),
+          intimacy: 75,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.groupReplies) && data.groupReplies.length >= 2) {
+          const turnA = data.groupReplies[0];
+          const turnB = data.groupReplies[1];
+          setMessages([
+            ...next,
+            { role: "a", name: turnA.characterName || a.name, content: turnA.content },
+            { role: "b", name: turnB.characterName || b.name, content: turnB.content },
+          ]);
+          return;
+        }
+      }
+      const replyA = fallbackReply(a, text, false);
+      const replyB = fallbackReply(
+        b,
+        `${text} (responding as the second girl in a dual scene with ${a.name})`,
+        false,
+      );
       setMessages([
         ...next,
         { role: "a", name: a.name, content: replyA },
         { role: "b", name: b.name, content: replyB },
       ]);
+    } catch {
+      const replyA = fallbackReply(a, text, false);
+      const replyB = fallbackReply(
+        b,
+        `${text} (responding as the second girl in a dual scene with ${a.name})`,
+        false,
+      );
+      setMessages([
+        ...next,
+        { role: "a", name: a.name, content: replyA },
+        { role: "b", name: b.name, content: replyB },
+      ]);
+    } finally {
       setBusy(false);
-    }, 600);
+    }
   };
 
   if (!started) {
@@ -140,7 +185,19 @@ export function DualGirlChat({ onHome }: { onHome: () => void }) {
               }`}
             >
               {m.name && <div className="text-[10px] text-pink-300 mb-0.5">{m.name}</div>}
-              {m.content}
+              <div>{m.content}</div>
+              {m.role !== "user" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const girl = m.role === "a" ? a : b;
+                    if (girl) speak(m.content.slice(0, 260), { ...girl.voice });
+                  }}
+                  className="mt-1 text-[10px] text-pink-400/80 hover:text-pink-300"
+                >
+                  ▶ Voice note
+                </button>
+              )}
             </div>
           </div>
         ))}

@@ -12,18 +12,25 @@ import {
   TELEGRAM_WORKER_ENV,
   type TelegramBridgeConfig,
 } from "@/lib/telegramBridge";
+import {
+  loadAdvancedConfig,
+  saveAdvancedConfig,
+  type AdvancedConfig,
+} from "@/lib/advancedConfig";
 
 export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
   const [s, setS] = useState<MediaBackendSettings | null>(null);
   const [tg, setTg] = useState<TelegramBridgeConfig | null>(null);
+  const [adv, setAdv] = useState<AdvancedConfig | null>(null);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setS(getMediaSettings());
     setTg(getTelegramConfig());
+    setAdv(loadAdvancedConfig());
   }, []);
 
-  if (!s || !tg) return null;
+  if (!s || !tg || !adv) return null;
 
   const update = (partial: Partial<MediaBackendSettings>) => {
     setS((prev) => (prev ? { ...prev, ...partial } : prev));
@@ -33,6 +40,7 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
   const onSave = () => {
     saveMediaSettings(s);
     saveTelegramConfig(tg);
+    saveAdvancedConfig(adv);
     setSaved(true);
   };
 
@@ -109,10 +117,43 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-pink-300">Local LLM (Ollama) & Webhooks</h2>
+        <p className="text-xs text-zinc-500">
+          Connect chat to a local Ollama server (`ollama serve`) or run `python3 workers/local_media_proxy.py --port 8787`.
+        </p>
+        <input
+          className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
+          placeholder="http://localhost:11434"
+          value={adv.ollamaUrl}
+          onChange={(e) => {
+            setAdv({ ...adv, ollamaUrl: e.target.value.trim() });
+            setSaved(false);
+          }}
+        />
+        <input
+          className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
+          placeholder="llama3.2"
+          value={adv.ollamaModel}
+          onChange={(e) => {
+            setAdv({ ...adv, ollamaModel: e.target.value.trim() });
+            setSaved(false);
+          }}
+        />
+        <input
+          className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
+          placeholder="Discord webhook URL (optional)"
+          value={adv.discordWebhook}
+          onChange={(e) => {
+            setAdv({ ...adv, discordWebhook: e.target.value.trim() });
+            setSaved(false);
+          }}
+        />
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-pink-300">Telegram bridge (MyGirlGPT-style)</h2>
         <p className="text-xs text-zinc-500">
-          Config only in-browser. Run a small worker with BOT_TOKEN that POSTs to /api/chat. Never
-          commit real tokens.
+          Config only in-browser. Run `BOT_TOKEN=... python3 workers/telegram_bridge.py` to bridge Telegram directly to `/api/chat` and `/api/generate-image`. Never commit real tokens.
         </p>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input

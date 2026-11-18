@@ -1,0 +1,44 @@
+services:
+  velvetmotion-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AI_IMAGE_ENDPOINT=${AI_IMAGE_ENDPOINT:-}
+      - AI_VIDEO_ENDPOINT=${AI_VIDEO_ENDPOINT:-}
+    restart: unless-stopped
+
+  local-media-proxy:
+    image: python:3.12-alpine
+    working_dir: /workspace
+    volumes:
+      - ./workers:/workspace/workers:ro
+    command: ["python3", "workers/local_media_proxy.py", "--host", "0.0.0.0", "--port", "8787"]
+    ports:
+      - "8787:8787"
+    environment:
+      - COMFY_URL=${COMFY_URL:-http://host.docker.internal:8188}
+      - FORGE_URL=${FORGE_URL:-http://host.docker.internal:7860}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+    restart: unless-stopped
+
+  telegram-bridge:
+    image: python:3.12-alpine
+    profiles: ["telegram"]
+    working_dir: /workspace
+    volumes:
+      - ./workers:/workspace/workers:ro
+    command: ["python3", "workers/telegram_bridge.py"]
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN:-}
+      - VELVET_BASE_URL=http://velvetmotion-web:3000
+      - DEFAULT_CHARACTER_ID=${DEFAULT_CHARACTER_ID:-maren}
+    depends_on:
+      - velvetmotion-web
+    restart: unless-stopped

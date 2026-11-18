@@ -47,6 +47,7 @@ import {
   type SequenceKind,
 } from "@/lib/videoModes";
 import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
+import { loadAdvancedConfig } from "@/lib/advancedConfig";
 import { syncChatSessionToFirestore } from "@/lib/firebase";
 import { saveTribute } from "@/lib/rewards";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
@@ -174,6 +175,7 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     } catch {}
     const memoryBlock = memoryPromptBlock(character.id);
     const tierMemories = loadMemories(character.id);
+    const advConfig = loadAdvancedConfig();
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -185,6 +187,8 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
           romanceMode,
           intimacy,
           gifts,
+          ollamaUrl: advConfig.ollamaUrl,
+          ollamaModel: advConfig.ollamaModel,
           memories: [
             ...tierMemories.slice(-10).map((m) => m.text),
             ...(memoryBlock ? memoryBlock.split("\n").filter(Boolean).slice(0, 8) : []),

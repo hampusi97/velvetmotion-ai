@@ -27,10 +27,12 @@ function keyIsReal(key: string) {
 async function callOllama(
   systemInstruction: string,
   messages: { role: string; content: string }[],
+  overrideUrl?: string,
+  overrideModel?: string,
 ): Promise<{ text: string; modelUsed: string } | null> {
-  const base = (process.env.OLLAMA_URL || "").trim().replace(/\/$/, "");
+  const base = (overrideUrl || process.env.OLLAMA_URL || "").trim().replace(/\/$/, "");
   if (!base) return null;
-  const model = (process.env.OLLAMA_MODEL || "llama3.2").trim();
+  const model = (overrideModel || process.env.OLLAMA_MODEL || "llama3.2").trim();
   try {
     const ollamaMessages = [
       { role: "system", content: systemInstruction },
@@ -110,8 +112,10 @@ async function generateReply(
   model: SupportedChatModel,
   systemInstruction: string,
   messages: { role: string; content: string }[],
+  ollamaUrl?: string,
+  ollamaModel?: string,
 ) {
-  const ollama = await callOllama(systemInstruction, messages);
+  const ollama = await callOllama(systemInstruction, messages, ollamaUrl, ollamaModel);
   if (ollama) return ollama;
   return callGeminiModel(model, systemInstruction, messages);
 }
@@ -219,6 +223,8 @@ export async function POST(req: Request) {
         : "Penthouse Canopy Bed";
     const showInnerThoughts = Boolean(body.showInnerThoughts);
     const directorNote = typeof body.directorNote === "string" ? body.directorNote.trim() : "";
+    const ollamaUrl = typeof body.ollamaUrl === "string" ? body.ollamaUrl.trim() : undefined;
+    const ollamaModel = typeof body.ollamaModel === "string" ? body.ollamaModel.trim() : undefined;
 
     const intimacy =
       typeof body.intimacy === "number" ? Math.min(100, Math.max(0, body.intimacy)) : undefined;
@@ -280,7 +286,13 @@ export async function POST(req: Request) {
         .filter(Boolean)
         .join("\n");
 
-      const groupResult = await generateReply(requestedModel, groupSystem, cleanedMessages);
+      const groupResult = await generateReply(
+        requestedModel,
+        groupSystem,
+        cleanedMessages,
+        ollamaUrl,
+        ollamaModel,
+      );
       if (groupResult) {
         const turns = parseGroupTurns(groupResult.text, character, partnerCharacter);
         const enriched = turns.map((t) => ({
@@ -380,7 +392,13 @@ export async function POST(req: Request) {
 
     const system = `${baseSystem}\n${extraContext}`.trim();
 
-    const result = await generateReply(requestedModel, system, cleanedMessages);
+    const result = await generateReply(
+      requestedModel,
+      system,
+      cleanedMessages,
+      ollamaUrl,
+      ollamaModel,
+    );
     if (result) {
       const parsed = splitInnerThoughtAndReply(result.text);
       return NextResponse.json({
