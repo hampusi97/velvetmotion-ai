@@ -245,4 +245,136 @@ export const FETISH_JOI: JoiScenario[] = [
       },
     ],
   },
+,
+{
+    id: "bnwo-edge-only",
+    label: "BNWO Edge Only",
+    tone: "Dominant, patient, race-aware fantasy",
+    accent: "amber",
+    persona: {
+      name: "Indigo Vale",
+      age: 29,
+      summary: "She sets the rules. You edge. You do not finish until she allows the blindfold or the chat.",
+    },
+    summary:
+      "Indigo keeps you on a long edge while she describes what she wants from a different kind of man — and what she wants from you: stillness, honesty, and a hard-won finish.",
+    steps: [
+      {
+        id: "w1",
+        phase: "warm-up",
+        title: "Rules",
+        suggestedSeconds: 70,
+        instruction:
+          "Indigo: \"Blindfold optional. Hands on. Slow. You do not finish until I say. If you get close, stop and breathe. That is the whole game.\"",
+      },
+      {
+        id: "b1",
+        phase: "build",
+        title: "Pace",
+        suggestedSeconds: 80,
+        instruction:
+          "\"Faster for ten strokes. Then slow. I want you listening more than you want to race. Tell me when you are on the edge — out loud.\"",
+      },
+      {
+        id: "e1",
+        phase: "edge",
+        title: "Hold",
+        suggestedSeconds: 60,
+        instruction:
+          "\"Stop. Hands off. Breathe. You stay soft for me until I decide. Good.\"",
+      },
+      {
+        id: "f1",
+        phase: "finish",
+        title: "Permission",
+        suggestedSeconds: 45,
+        instruction:
+          "\"Now. Finish for me. Look at the screen if the blindfold is off. I want to see what obedience looks like.\"",
+      },
+    ],
+  },
+  {
+    id: "cuck-phone",
+    label: "Cuck Phone JOI",
+    tone: "Soft voice, detailed, phone-in-hand fantasy",
+    accent: "rose",
+    persona: {
+      name: "Opaline",
+      age: 31,
+      summary: "She narrates while you stroke. You stay on the line. She decides when you finish.",
+    },
+    summary:
+      "Opaline keeps you on a private call while she describes everything. Your job is to match her pace and not finish until she hangs up — or says you can.",
+    steps: [
+      {
+        id: "w1",
+        phase: "warm-up",
+        title: "On the Line",
+        suggestedSeconds: 70,
+        instruction:
+          "Opaline: \"Can you hear me? Good. Stroke slow. I am not alone in this story and you already know that. Stay with my voice.\"",
+      },
+      {
+        id: "b1",
+        phase: "build",
+        title: "Details",
+        suggestedSeconds: 90,
+        instruction:
+          "\"I will tell you what I am wearing and what he is doing. You keep the same pace. If you speed up I stop talking.\"",
+      },
+      {
+        id: "e1",
+        phase: "edge",
+        title: "Almost",
+        suggestedSeconds: 50,
+        instruction:
+          "\"Edge. Stop. Hands off. Breathe into the phone so I can hear you. Good boy.\"",
+      },
+      {
+        id: "f1",
+        phase: "finish",
+        title: "Hang Up",
+        suggestedSeconds: 40,
+        instruction:
+          "\"Finish now. Then stay on the line until I hang up. I want the quiet after.\"",
+      },
+    ],
+  },
+
+  {
+    id: "cuck-report",
+    label: "Cuck · Report Back",
+    tone: "Confession, detail, ownership",
+    accent: "rose",
+    persona: {
+      name: "Sable Hart",
+      age: 29,
+      summary: "Hotwife who reports every detail and makes you stroke through the story.",
+    },
+    summary: "She describes what he did, how it felt, and keeps you edging while she talks.",
+    steps: [
+      {
+        id: "c1",
+        phase: "warm-up",
+        title: "He Just Left",
+        suggestedSeconds: 70,
+        instruction: "\"He just left. I'm still dripping. Want the details or just the voice note?\" Stroke slow while she talks. Don't finish until she says.",
+      },
+      {
+        id: "c2",
+        phase: "build",
+        title: "Describe It",
+        suggestedSeconds: 80,
+        instruction: "\"He was bigger. Deeper. I moaned his name. Keep stroking. Tell me how that makes you feel.\" Edge when she pauses.",
+      },
+      {
+        id: "c3",
+        phase: "peak",
+        title: "Permission",
+        suggestedSeconds: 60,
+        instruction: "\"You can finish. But only while I tell you how he filled me. Say thank you when you do.\"",
+      },
+    ],
+  },
+
 ];
