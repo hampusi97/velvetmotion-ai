@@ -56,7 +56,7 @@ export function CharacterRoster({
       ) : (
         <div className="grid grid-rows-2 grid-flow-col auto-cols-[31%] sm:auto-cols-[22%] md:auto-cols-[18%] lg:auto-cols-[15%] gap-2 overflow-x-auto snap-x snap-mandatory pb-2">
           {visible.map((character, i) => (
-            <button key={character.id} onClick={() => onSelect(character)} className="girl-card group relative aspect-[3/4.6] w-full snap-start overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left">
+            <button key={character.id} onClick={() => onSelect(character)} className="girl-card candy-card group relative aspect-[3/4.6] w-full snap-start overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left">
               <img
                 src={staticPortraitUrl(character.id)}
                 alt={character.name}
@@ -66,7 +66,7 @@ export function CharacterRoster({
               />
               {i < 4 && <span className="absolute top-0 left-0 inline-flex items-center gap-0.5 rounded-tl-2xl rounded-br-xl bg-gradient-to-r from-pink-500 to-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">✦ NEW</span>}
               <span className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 backdrop-blur flex items-center justify-center text-[10px] text-white">▶</span>
-              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
+              <div className="absolute inset-x-0 bottom-0 p-2 candy-scrim">
                 <div className="flex items-center gap-1">
                   <span className="truncate text-[13px] font-semibold text-white">{character.name.split(" ")[0]}</span>
                   <span className="text-[11px] text-zinc-400">{character.age}</span>
