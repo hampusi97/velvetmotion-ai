@@ -57,6 +57,59 @@ export async function POST(req: Request) {
       });
     }
 
+    if (action === "verify-btc") {
+      const txid = typeof body.txid === "string" ? body.txid.trim().toLowerCase() : "";
+      if (!/^[0-9a-f]{64}$/.test(txid)) {
+        return NextResponse.json(
+          { ok: false, error: "Invalid Bitcoin TXID (must be a 64-character hexadecimal transaction hash)." },
+          { status: 400 },
+        );
+      }
+      try {
+        const res = await fetch(`https://mempool.space/api/tx/${txid}`, {
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) {
+          return NextResponse.json(
+            { ok: false, error: `Transaction not found on mempool.space yet (HTTP ${res.status}).` },
+            { status: 404 },
+          );
+        }
+        const tx = (await res.json()) as {
+          status?: { confirmed?: boolean };
+          vout?: Array<{ scriptpubkey_address?: string; value?: number }>;
+        };
+        const sats = (tx.vout || [])
+          .filter((o) => o.scriptpubkey_address === PRIMARY_BTC_WALLET)
+          .reduce((sum, o) => sum + (Number(o.value) || 0), 0);
+        if (sats <= 0) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `Transaction found, but no output paid ${PRIMARY_BTC_WALLET}.`,
+            },
+            { status: 400 },
+          );
+        }
+        return NextResponse.json({
+          ok: true,
+          action: "verify-btc",
+          verified: true,
+          confirmed: Boolean(tx.status?.confirmed),
+          txid,
+          satsReceived: sats,
+          btcReceived: Number((sats / 1e8).toFixed(8)),
+          grantedCoins: sats >= 15000 ? 12000 : 3500,
+          note: `On-chain Bitcoin donation verified (${sats.toLocaleString()} sats → ${PRIMARY_BTC_WALLET})!`,
+        });
+      } catch {
+        return NextResponse.json(
+          { ok: false, error: "Could not reach mempool.space right now. Try again in a moment." },
+          { status: 502 },
+        );
+      }
+    }
+
     const username =
       sanitizeUserText(typeof body.username === "string" ? body.username : "", 32) ||
       "VelvetSupporter";

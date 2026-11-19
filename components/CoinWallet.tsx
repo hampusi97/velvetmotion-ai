@@ -56,6 +56,38 @@ export function CoinWallet({
   const [notice, setNotice] = useState<string | null>(null);
   const [donateUrl, setDonateUrlState] = useState("");
   const [editingUrl, setEditingUrl] = useState(false);
+  const [btcTxid, setBtcTxid] = useState("");
+  const [verifyingTx, setVerifyingTx] = useState(false);
+
+  const handleVerifyBtcTx = async () => {
+    const clean = btcTxid.trim();
+    if (!clean || verifyingTx) return;
+    setVerifyingTx(true);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify-btc", txid: clean }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.verified) {
+        setNotice(data.error || "Could not verify Bitcoin transaction.");
+      } else {
+        const tierId = data.satsReceived >= 15000 ? "gpu-patron-15" : "dev-boost-5";
+        const { balance, leaderboard: nextBoard } = claimSupporterBonus(tierId);
+        const rank = nextBoard.find((e) => e.isCurrentUser)?.rank ?? 1;
+        setNotice(`✓ ${data.note} You are Rank #${rank} on the Top Donators Leaderboard!`);
+        setBtcTxid("");
+        refresh();
+        onCoinsChanged?.(balance);
+      }
+    } catch {
+      setNotice("Network error verifying transaction.");
+    } finally {
+      setVerifyingTx(false);
+    }
+  };
 
   const refresh = () => {
     const c = getCoins();
@@ -288,6 +320,22 @@ export function CoinWallet({
             >
               Open Wallet
             </a>
+          </div>
+          <div className="w-full pt-2 border-t border-white/10 flex flex-wrap gap-2">
+            <input
+              value={btcTxid}
+              onChange={(e) => setBtcTxid(e.target.value)}
+              placeholder="Optional: Paste 64-char BTC TXID for live on-chain verification via Mempool.space"
+              className="flex-1 min-w-[200px] rounded-xl border border-white/15 bg-black/70 px-3 py-1.5 font-mono text-[11px] text-zinc-200 outline-none focus:border-amber-400"
+            />
+            <button
+              type="button"
+              disabled={verifyingTx || btcTxid.trim().length < 16}
+              onClick={() => void handleVerifyBtcTx()}
+              className="shrink-0 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-40"
+            >
+              {verifyingTx ? "Verifying…" : "Verify On-Chain ✓"}
+            </button>
           </div>
         </div>
       </div>

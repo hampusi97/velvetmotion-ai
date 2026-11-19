@@ -1,8 +1,12 @@
-# Ensure GitHub Linguist indexes all core project languages
+# Ensure GitHub Linguist indexes all core project languages across Web, Mobile (Android/Apple), Workers, Shaders & Infra
 *.ts linguist-detectable=true
 *.tsx linguist-detectable=true
 *.js linguist-detectable=true
+*.mjs linguist-detectable=true
 *.py linguist-detectable=true linguist-vendored=false
+*.kt linguist-detectable=true linguist-vendored=false
+*.kts linguist-detectable=true linguist-vendored=false
+*.swift linguist-detectable=true linguist-vendored=false
 *.sh linguist-detectable=true linguist-vendored=false
 *.cmd linguist-detectable=true linguist-vendored=false
 *.vert linguist-detectable=true linguist-language=GLSL

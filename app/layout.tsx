@@ -4,9 +4,15 @@ import "@fontsource-variable/outfit";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VelvetMotion AI",
-  description: "Adult AI companions — chat, JOI, tributes. Fictional 21+ only.",
+  metadataBase: new URL("https://velvetmotion-ai.vercel.app"),
+  title: "VelvetMotion AI — Adult AI Companions, 3D JOI Stage & Live Voice",
+  description:
+    "100% free adult AI companions — chat, 3D Penthouse & JOI stage, tributes, live lounge, and Android/iOS apps. Fictional adults 21+ only.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-512.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -14,7 +20,16 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "VelvetMotion AI",
-    description: "Adult AI companions — chat, JOI, tributes. Fictional 21+ only.",
+    description:
+      "Adult AI companions — chat, 3D JOI stage, tributes, live lounge & Android/iOS apps. Fictional 21+ only.",
+    url: "https://velvetmotion-ai.vercel.app",
+    siteName: "VelvetMotion AI",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "VelvetMotion AI",
+    description: "Adult AI companions — chat, 3D JOI stage, tributes & live lounge. 21+ only.",
   },
 };
 

@@ -241,6 +241,15 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     assert.equal(pData.grantedCoins, 3500);
     assert.equal(pData.userRank.username, "LeaderboardChamp");
     assert.ok(typeof pData.userRank.rank === "number" && pData.userRank.rank >= 1);
+
+    const badTxRes = await postWallet(
+      new Request("http://localhost:3000/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.88" },
+        body: JSON.stringify({ action: "verify-btc", txid: "not-a-valid-hex-txid" }),
+      }),
+    );
+    assert.equal(badTxRes.status, 400);
   });
 
   it("GET & POST /api/lounge handles production multi-room lounge reads and writes", async () => {
