@@ -69,9 +69,9 @@ export interface StoryPack {
   scenes: StoryScene[];
 }
 
-export type JoiPhase = "warm-up" | "build" | "edge" | "finish";
+export type JoiPhase = "warm-up" | "build" | "edge" | "peak" | "finish";
 
-export const JOI_PHASES: JoiPhase[] = ["warm-up", "build", "edge", "finish"];
+export const JOI_PHASES: JoiPhase[] = ["warm-up", "build", "edge", "peak", "finish"];
 
 export interface JoiPersona {
   name: string;
