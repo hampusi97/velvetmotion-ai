@@ -676,6 +676,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
           {memoryFacts.map((f, i) => (
             <div key={i} className="flex gap-2 items-center">
               <input value={f} onChange={(e) => { const next = [...memoryFacts]; next[i] = e.target.value; setMemoryFacts(next); try { localStorage.setItem("velvetmotion_memory_" + character.id, JSON.stringify(next)); } catch {} }} className="flex-1 rounded-lg bg-zinc-800 border border-white/10 px-2 py-1 text-xs" />
+              <button type="button" onClick={() => { try { pinLong(character.id, f); } catch {} }} className="text-xs text-amber-300" title="Pin">📌</button>
               <button type="button" onClick={() => { const next = memoryFacts.filter((_, j) => j !== i); setMemoryFacts(next); try { localStorage.setItem("velvetmotion_memory_" + character.id, JSON.stringify(next)); } catch {} }} className="text-xs text-red-400">✕</button>
             </div>
           ))}
