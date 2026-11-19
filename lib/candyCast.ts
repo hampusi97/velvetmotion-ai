@@ -4,7 +4,7 @@ import type { Character } from "./charactersTypes";
 export const CANDY_CAST: Character[] = [
   {
     id: "nova-g",
-    name: "Nova "Byte" Park",
+    name: "Nova Byte Park",
     age: 22,
     tagline: "Blue hair, headset on, controller in her lap until you text.",
     category: "Playful",
