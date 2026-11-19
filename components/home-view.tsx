@@ -114,7 +114,7 @@ export function HomeView({
   const categories = useMemo(() => ["All", ...characterCategories()], []);
   const featured = useMemo(() => {
     const list = filterCharacters({ query: homeQuery, category: homeCategory });
-    return list.slice(0, 12);
+    return list.slice(0, 24);
   }, [homeQuery, homeCategory]);
 
   const hero = CHARACTERS[heroIdx % CHARACTERS.length];
@@ -327,7 +327,7 @@ export function HomeView({
             </div>
           )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
             {featured.map((c, i) => (
               <button
                 key={c.id}
