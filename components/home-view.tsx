@@ -22,7 +22,7 @@ const EXPERIENCES = [
   { id: "tinder" as SectionId, title: "DISCOVER", subtitle: "Swipe · match · undress", neon: "from-fuchsia-400 to-pink-400", face: "calla" },
   { id: "joi" as SectionId, title: "PRIVATE", subtitle: "JOI · galleries · tributes", neon: "from-pink-300 to-rose-400", face: "nadine" },
   { id: "blindfold" as SectionId, title: "BLINDFOLD", subtitle: "Audio first · reveal later", neon: "from-zinc-200 to-pink-300", face: "liora" },
-  { id: "penthouse" as SectionId, title: "3D SUITE", subtitle: "Hotspots · lighting", neon: "from-fuchsia-300 to-violet-400", face: "isolde" },
+  // { id: "penthouse" as SectionId, title: "3D SUITE", subtitle: "Hotspots · lighting", neon: "from-fuchsia-300 to-violet-400", face: "isolde" }, // hidden until stable
   { id: "room" as SectionId, title: "GOON ROOM", subtitle: "Timed · dual", neon: "from-rose-400 to-pink-500", face: "tess" },
 ];
 

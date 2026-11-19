@@ -195,7 +195,7 @@ export function SiteHeader({
               VelvetMotion
             </span>
           </button>
-          <nav aria-label="Sections" className="hidden min-w-0 flex-1 md:block">
+          <nav aria-label="Sections" className="hidden min-w-0 flex-1 md:block overflow-x-auto">
             <ul className="flex items-center gap-1 overflow-x-auto px-1 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {sections.slice(0, 8).map((section) => {
                 const active = view === section.id;

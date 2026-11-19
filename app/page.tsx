@@ -59,6 +59,7 @@ type HomeView =
 type View = HomeView | "profile" | "chat";
 
 export default function Home() {
+  const ENABLE_3D_SUITE = false;
   const [view, setView] = useState<View>("home");
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -292,7 +293,7 @@ export default function Home() {
               }}
             />
           )}
-          {view === "penthouse" && (
+          {ENABLE_3D_SUITE && view === "penthouse" && (
             <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
           )}
           {showRoster && (
