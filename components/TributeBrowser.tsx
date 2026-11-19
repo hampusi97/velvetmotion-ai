@@ -59,7 +59,7 @@ export function TributeBrowser({ onStartWithGirl }: { onStartWithGirl?: (id: str
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold text-cream">{t.title}</span>
                 <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${intensityColor[t.intensity]}`}>
-                  {t.intensity}
+                  {t.intensity} · {t.duration}
                 </span>
               </div>
               <p className="text-xs text-mist mt-2">{t.duration}{girl ? ` · ${girl.name}` : " · any girl"}</p>
