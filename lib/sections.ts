@@ -9,6 +9,7 @@ export type SectionId =
   | "room"
   | "roulette"
   | "blindfold"
+  | "joi3d"
   | "scenario"
   | "suggest"
   | "gallery"
@@ -77,6 +78,13 @@ export const sections: Section[] = [
     art: "bg-[radial-gradient(50%_50%_at_50%_40%,#52525b_0%,transparent_60%),linear-gradient(180deg,#18181b,#0a0a0a)]",
   },
   {
+    id: "joi3d",
+    title: "3D JOI Stage",
+    kicker: "3D",
+    summary: "Talking 3D stage — library girl or upload photo. Breath, sway, JOI scripts.",
+    art: "bg-[radial-gradient(80%_70%_at_40%_20%,#ec4899_0%,transparent_50%),linear-gradient(165deg,#3b0764_0%,#0a0608_75%)]",
+  },
+  {
     id: "joi",
     title: "JOI",
     kicker: "JOI",
@@ -97,52 +105,8 @@ export const sections: Section[] = [
     summary: "Build an original fictional character.",
     art: "bg-[radial-gradient(90%_80%_at_88%_12%,#f0d2b8_0%,transparent_42%),linear-gradient(200deg,#3a2438,#120c12)]",
   },
-  {
-    id: "romance",
-    title: "Romance",
-    kicker: "Romance",
-    summary: "Slower affection-first mode.",
-    art: "bg-[radial-gradient(80%_90%_at_50%_100%,#e7a0b8_0%,transparent_48%),linear-gradient(180deg,#2c1624,#10080e)]",
-  },
-  {
-    id: "gallery",
-    title: "Gallery",
-    kicker: "Media",
-    summary: "Your generated nudes and scenes.",
-    art: "bg-[radial-gradient(42%_42%_at_28%_28%,#f4b4cb_0%,transparent_52%),radial-gradient(46%_46%_at_74%_72%,#6e3048_0%,transparent_48%),linear-gradient(180deg,#1a1016,#0c090c)]",
-  },
-  {
-    id: "packs",
-    title: "Stories",
-    kicker: "Packs",
-    summary: "Story packs and longer scenes.",
-    art: "bg-[radial-gradient(90%_80%_at_0%_0%,#f0c2a0_0%,transparent_42%),linear-gradient(150deg,#3d2030,#11090e)]",
-  },
-  {
-    id: "workspace",
-    title: "Workspace",
-    kicker: "Google",
-    summary: "Google Meet, Chat, Gmail, Drive sync.",
-    art: "bg-[radial-gradient(110%_85%_at_20%_10%,#f472b6_0%,transparent_48%),linear-gradient(165deg,#31102f_0%,#0f0714_75%)]",
-  },
-  {
-    id: "bnwo",
-    title: "BNWO",
-    kicker: "BNWO",
-    summary: "BNWO section.",
-    art: "bg-[radial-gradient(70%_70%_at_8%_88%,#c45c7a_0%,transparent_50%),linear-gradient(145deg,#1b1020,#0c0a10)]",
-  },
-  {
-    id: "suggest",
-    title: "Suggest",
-    kicker: "Ideas",
-    summary: "Suggest a feature.",
-    art: "bg-[radial-gradient(76%_64%_at_74%_0%,#e6c7a2_0%,transparent_44%),linear-gradient(160deg,#2a1c22,#100c10)]",
-  },
 ];
 
-export function findSection(id: SectionId): Section {
-  const section = sections.find((item) => item.id === id);
-  if (!section) throw new Error(`Unknown section: ${id}`);
-  return section;
+export function findSection(id: string): Section | undefined {
+  return sections.find((s) => s.id === id);
 }
