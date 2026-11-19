@@ -122,7 +122,6 @@ jobs:
 
   mirror-public-release:
     needs: [prepare, publish-tauri]
-    if: (vars.PUBLIC_RELEASES_REPO != '' || secrets.PUBLIC_RELEASES_REPO != '') && secrets.PUBLIC_RELEASES_TOKEN != ''
     runs-on: ubuntu-latest
     steps:
       - name: Mirror release assets & latest.json to public repo
@@ -133,6 +132,10 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
           R2_BUCKET_URL: ${{ vars.R2_BUCKET_URL || secrets.R2_BUCKET_URL }}
         run: |
+          if [ -z "$TARGET_REPO" ] || [ -z "$MIRROR_TOKEN" ]; then
+            echo "Public mirror skipped (PUBLIC_RELEASES_REPO / PUBLIC_RELEASES_TOKEN not configured)."
+            exit 0
+          fi
           mkdir -p mirror-assets
           gh release download "$TAG" -R "${{ github.repository }}" -D mirror-assets
           if [ -n "$R2_BUCKET_URL" ] && [ -f mirror-assets/latest.json ]; then
