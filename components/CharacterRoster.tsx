@@ -107,7 +107,7 @@ export function CharacterRoster({
       {visible.length === 0 ? (
         <p className="text-zinc-500 text-sm">No one matches that filter.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {visible.map((character, i) => {
             const src = characterMediaUrl(character, "beauty");
             const isNew = i < 6;
