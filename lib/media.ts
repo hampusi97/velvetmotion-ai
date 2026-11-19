@@ -1,6 +1,6 @@
 /**
  * VelvetMotion Media Engine
- * Chloe-quality portraits via photography prompts + face locks.
+ * AAA Candy.ai-level portraits via photography prompts + face locks.
  */
 
 import type { Character } from "./charactersTypes";
@@ -33,23 +33,23 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
 }
 
 const MOOD_PROMPTS: Record<MediaMood, string> = {
-  beauty: "Shot on Sony A7IV, 85mm f/1.4, soft window light from the left. Realistic skin with visible pores and natural freckles. Individual hair strands, soft catchlights in eyes. Natural makeup, soft smile, looking at camera. Kodak Portra warmth, shallow depth of field, sharp focus on eyes, photoreal influencer quality.",
-  seductive: "Intimate close-up, 50mm f/1.8, warm bedside lamp mixed with soft rim light. Heavy-lidded eyes, parted lips, slight head tilt. Soft shadows, realistic skin sheen, photoreal adult, high detail.",
-  lingerie: "Mirror selfie, sheer lace, soft window light. Lace slightly off one shoulder, looking over shoulder. Realistic skin pores, soft bokeh, candid influencer aesthetic, photoreal.",
-  nude: "Fully nude, soft morning window light from the side. Natural skin texture with pores, soft shadows defining form, looking at camera. Unretouched, photoreal adult.",
-  explicit: "Explicit nude, intense eye contact, flushed cheeks. Detailed natural anatomy, glistening skin with pores. Soft directional light, high detail, uncensored photoreal adult.",
-  sex: "Explicit intimate scene, sweaty skin with realistic texture. Moaning expression, detailed anatomy. Cinematic practical lighting, uncensored photoreal.",
-  aftercare: "Post-intimacy, soft morning light through curtains. Soft smile, messy hair, warm skin tones, realistic pores. Intimate, tender, photoreal.",
-  dual: "Two adult women together, soft shared lighting, both looking at viewer. Natural skin on both, warm bedroom atmosphere, photoreal.",
-  sph: "Dominant woman looking down from above, low angle. Amused smile, pointing. Natural skin texture, soft overhead light, sharp eyes, photoreal.",
-  bnwo: "Dominant Black woman, confident gaze, natural skin sheen, gold jewelry. Warm directional light, photoreal adult.",
-  joi: "Woman giving JOI, pointing at camera, intense eye contact. Seductive pose, lingerie. Soft bedroom light, realistic skin, sharp face, photoreal.",
-  "joi-finish": "Close-up, open mouth, intense eye contact. Nude or open lingerie. Soft flash, wet lips, realistic skin texture, photoreal.",
+  beauty: "Shot on Sony A7R V, 85mm f/1.2 GM, soft north window light, subtle fill. Realistic skin with visible pores, fine peach fuzz, natural freckles or subtle imperfections. Individual hair strands with flyaways, soft catchlights, natural makeup, gentle closed-mouth smile, looking at camera. Kodak Portra 400 warmth, shallow DOF, razor sharp eyes, photoreal influencer editorial quality, no plastic, no oversmoothing.",
+  seductive: "Intimate close-up, 50mm f/1.4, warm bedside lamp + soft rim. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores, photoreal adult, high detail, cinematic.",
+  lingerie: "Mirror selfie, sheer lace lingerie slightly off shoulder, soft window light from side. Looking over shoulder, natural skin texture, soft bokeh background, candid influencer aesthetic, photoreal, authentic body.",
+  nude: "Fully nude, soft morning window light from the side, natural skin texture with pores and subtle stretch marks or freckles if fitting. Soft shadows defining form, looking at camera with soft expression. Unretouched photoreal adult, editorial nude.",
+  explicit: "Explicit nude, intense eye contact, flushed cheeks, slightly parted lips. Detailed natural anatomy, glistening skin with visible pores and fine texture. Soft directional key light, high detail, uncensored photoreal adult.",
+  sex: "Explicit intimate scene, sweaty realistic skin texture with pores, moaning or pleasure expression, detailed anatomy. Cinematic practical lighting, uncensored photoreal, natural proportions.",
+  aftercare: "Post-intimacy, soft morning light through sheer curtains. Soft smile, messy hair, warm skin tones, realistic pores and glow. Intimate, tender, photoreal, gentle.",
+  dual: "Two adult women together, soft shared warm lighting, both looking at viewer. Natural skin texture on both, warm bedroom atmosphere, photoreal, intimate.",
+  sph: "Dominant woman looking down from above, low angle. Amused or commanding smile, pointing or gesturing. Natural skin texture, soft overhead light, sharp eyes, photoreal.",
+  bnwo: "Dominant Black woman, confident direct gaze, natural skin sheen with pores, gold jewelry. Warm directional light, photoreal adult, powerful presence.",
+  joi: "Woman giving JOI, pointing at camera, intense eye contact. Seductive pose in lingerie or nude. Soft bedroom light, realistic skin, sharp face, photoreal.",
+  "joi-finish": "Close-up face and upper body, open mouth, intense eye contact. Nude or open lingerie. Soft flash or warm light, wet lips, realistic skin texture, photoreal.",
 };
 
 function buildPrompt(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood, extra = ""): string {
-  const figure = character.figure || "beautiful adult woman with unique distinctive face, natural features";
-  return [figure, `adult woman ${character.age || 24} years old, 21+`, `${character.name}, same face every shot, consistent identity lock, unique facial features`, MOOD_PROMPTS[mood], extra, "looking at viewer, sharp focused eyes, natural proportions, high detail skin texture, photoreal, no plastic skin"].filter(Boolean).join(". ");
+  const figure = character.figure || "beautiful adult woman with unique distinctive face, natural features, photoreal";
+  return [figure, `adult woman ${character.age || 24} years old, 21+`, `${character.name}, same face every shot, consistent identity lock, unique facial features, distinctive look`, MOOD_PROMPTS[mood], extra, "looking at viewer, sharp focused eyes, natural proportions, high detail skin texture with pores, photoreal, no plastic skin, no AI artifacts"].filter(Boolean).join(". ");
 }
 
 function pollinationsUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood, extra = "", opts?: { seedOverride?: number }): string {
@@ -113,7 +113,7 @@ export function resolveCharacterAvatar(character: Character): string {
 
 export function freeformImageUrl(prompt: string, character?: Pick<Character, "id" | "figure" | "name">, seedExtra = ""): string {
   const base = character ? `${character.figure || character.name}, same face, ` : "";
-  const full = `${base}${prompt}. Shot on 85mm, soft window light, realistic skin pores, sharp eyes, photoreal.`;
+  const full = `${base}${prompt}. Shot on 85mm, soft window light, realistic skin pores, sharp eyes, photoreal, no artifacts.`;
   const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=1024&height=1536&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
 }
