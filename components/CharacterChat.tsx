@@ -109,6 +109,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
   const [speakingId, setSpeakingId] = useState<number | null>(null);
+  const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [edgeLocked, setEdgeLocked] = useState(false);
   const [freeformPrompt, setFreeformPrompt] = useState("");
   const [freeformVideo, setFreeformVideo] = useState("");
@@ -160,7 +161,17 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
 
   useEffect(() => {
     const loaded = loadChat(character.id);
-    if (loaded.length > 0) setMessages(loaded);
+    const lastKey = `vm-last-visit-${character.id}`;
+    let greeting: ChatMessage | null = null;
+    try {
+      const last = localStorage.getItem(lastKey);
+      const now = Date.now();
+      if (last && now - Number(last) > 6 * 60 * 60 * 1000 && loaded.length > 0) {
+        greeting = { role: "assistant", content: `*She opens the chat first.*\n\n“Hey… missed you. Been thinking about last time. Want me to send something?”` };
+      }
+      localStorage.setItem(lastKey, String(now));
+    } catch {}
+    if (loaded.length > 0) setMessages(greeting ? [...loaded, greeting] : loaded);
     else setMessages([{ role: "assistant", content: character.initialMessage }]);
     setIntimacy(getIntimacy(character.id, character.intimacy));
     setCoinsState(getCoins());
@@ -647,12 +658,28 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
                   </div>
                 ) : null}
                 {m.imageUrl && !m.videoUrl && (
-                  <div className="mt-2 rounded-xl overflow-hidden">
+                  <div className="mt-2 rounded-xl overflow-hidden relative">
                     {m.frames && m.frames.length > 1 ? (
                       <MotionSequencePlayer frames={m.frames} alt={character.name} />
                     ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.imageUrl} alt="" className="w-full max-h-80 object-cover" />
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={m.imageUrl}
+                          alt=""
+                          onError={(e) => { (e.target as HTMLImageElement).src = "/portraits/chloe.jpg"; }}
+                          className={`w-full max-h-80 object-cover transition ${revealed.has(i) ? "" : "blur-xl scale-105"}`}
+                        />
+                        {!revealed.has(i) && (
+                          <button
+                            type="button"
+                            onClick={() => setRevealed((s) => new Set(s).add(i))}
+                            className="absolute inset-0 flex items-center justify-center bg-black/40 text-sm font-semibold text-white"
+                          >
+                            Tap to reveal
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
