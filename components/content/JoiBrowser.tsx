@@ -39,6 +39,7 @@ const PHASE_LABEL: Record<(typeof JOI_PHASES)[number], string> = {
   "warm-up": "Warm-up",
   build: "Build",
   edge: "Edge",
+  peak: "Peak",
   finish: "Finish",
 };
 
