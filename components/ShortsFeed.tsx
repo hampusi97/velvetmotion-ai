@@ -6,6 +6,8 @@ import { characterMediaUrl, joiSequenceFrames, sexSequenceFrames } from "@/lib/m
 import { SHORTS_SERIES, SHORTS_GENRES } from "@/lib/shortsCatalog";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
+const kenburns = `@keyframes kenburns { 0% { transform: scale(1) translate(0,0); } 50% { transform: scale(1.12) translate(-2%,-1%); } 100% { transform: scale(1) translate(0,0); } } .animate-kenburns { animation: kenburns 12s ease-in-out infinite; }`;
+
 export function ShortsFeed({
   onHome,
   onChat,
@@ -16,6 +18,8 @@ export function ShortsFeed({
   const [genre, setGenre] = useState<string | "All">("All");
   const [seriesIdx, setSeriesIdx] = useState(0);
   const [epIdx, setEpIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [pace, setPace] = useState(1);
 
   const filtered = useMemo(
     () => (genre === "All" ? SHORTS_SERIES : SHORTS_SERIES.filter((s) => s.genre === genre)),
@@ -47,7 +51,7 @@ export function ShortsFeed({
   };
 
   return (
-    <div className="mx-auto max-w-md pt-16">
+    <div className="mx-auto max-w-md pt-16"><style>{kenburns}</style>
       <div className="flex items-center justify-between mb-3">
         <button type="button" onClick={onHome} className="text-pink-400 text-sm">
           ← Home
@@ -88,9 +92,22 @@ export function ShortsFeed({
         ))}
       </div>
 
-      <div className="relative aspect-[9/16] max-h-[70vh] rounded-3xl overflow-hidden border border-pink-500/40 bg-black shadow-[0_0_50px_rgba(236,72,153,0.2)]">
-        <MotionSequencePlayer frames={frames} alt={ep.title} />
-        <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent">
+      <div className="relative aspect-[9/16] max-h-[70vh] rounded-3xl overflow-hidden border border-pink-500/40 bg-zinc-950 shadow-[0_0_50px_rgba(236,72,153,0.2)]">
+        {/* Ken Burns fallback so the stage is never black */}
+        <img
+          src={characterMediaUrl(character, "beauty")}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover animate-kenburns"
+          onError={(e) => { (e.target as HTMLImageElement).src = "/portraits/chloe.jpg"; }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+        {/* Right-side TikTok-style rail */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
+          <button type="button" onClick={() => setPaused(p => !p)} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur text-white text-xs">{paused ? "▶" : "⏸"}</button>
+          <button type="button" onClick={() => setPace(p => p === 0.75 ? 1 : p === 1 ? 1.5 : 0.75)} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur text-white text-[10px]">{pace}x</button>
+          <button type="button" onClick={nextEp} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur text-white text-xs">⏭</button>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent z-10">
           <div className="flex gap-2 mb-2">
             {ep.spicy && (
               <span className="rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white">SPICY</span>

@@ -389,7 +389,7 @@ export function DiscoverSwipe({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={cardImage(current, currentLevel)}
+            src={cardImage(current, "beauty")} onError={(e) => { (e.target as HTMLImageElement).src = "/portraits/chloe.jpg"; }}
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
             draggable={false}
