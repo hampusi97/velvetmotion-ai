@@ -38,6 +38,7 @@ import { VaultPanel } from "@/components/VaultPanel";
 import { MyGirlsHub } from "@/components/MyGirlsHub";
 import { LegalPages } from "@/components/LegalPages";
 import { CoinWallet } from "@/components/CoinWallet";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { SupportModal } from "@/components/SupportModal";
 import { shouldShowSupportPromptOnLogin } from "@/lib/wallet";
 import { getUser, type LocalUser } from "@/lib/auth";
@@ -459,6 +460,7 @@ export default function Home() {
         </div>
       </div>
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
+      <InstallPrompt />
       {supportModalOpen && (
         <SupportModal
           onClose={() => {
