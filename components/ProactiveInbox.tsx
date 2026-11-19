@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { getProactiveMessages, type ProactiveMessage } from "@/lib/proactive";
 import { loadProactiveQueue } from "@/lib/proactiveIdle";
-import { characterMediaUrl } from "@/lib/media";
 import { CHARACTERS, getCharacter } from "@/lib/characters";
-import { safePortraitUrl, onPortraitError } from "@/lib/portraitFallback";
+import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
 
 export function ProactiveInbox({
   onOpen,
@@ -43,7 +42,6 @@ export function ProactiveInbox({
         {msgs.map((m) => {
           const c = getCharacter(m.characterId) || CHARACTERS.find((x) => x.id === m.characterId);
           if (!c) return null;
-          const src = safePortraitUrl(c.id, characterMediaUrl(c, "beauty"));
           return (
             <button
               key={m.characterId + m.at}
@@ -53,9 +51,9 @@ export function ProactiveInbox({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={src}
+                src={staticPortraitUrl(c.id)}
                 alt=""
-                onError={(e) => onPortraitError(e, c.id)}
+                onError={onPortraitError}
                 className="h-12 w-12 rounded-full object-cover border border-pink-400/40"
               />
               <div className="min-w-0 flex-1">
