@@ -113,6 +113,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [joiPlaying, setJoiPlaying] = useState(false);
   const [byokOpen, setByokOpen] = useState(false);
+  const [showScenes, setShowScenes] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const [byokUrl, setByokUrl] = useState("");
   const [joiPace, setJoiPace] = useState(1);
   const [joiStep, setJoiStep] = useState(0);
@@ -567,7 +569,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
     <div className="flex flex-col h-[calc(100vh-5rem)] max-w-2xl mx-auto">
       {callOpen && <VoiceCallUI character={character} onClose={() => setCallOpen(false)} />}
 
-      <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex flex-wrap items-center gap-2 pb-3 border-b border-white/10 shrink-0 px-1">
+      <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex flex-wrap items-center gap-1.5 py-2 border-b border-white/10 shrink-0 px-1">
         <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Back</button>
         <button type="button" onClick={() => { persist([{ role: "assistant", content: character.initialMessage }]); setMessages([{ role: "assistant", content: character.initialMessage }]); }} className="text-xs text-zinc-400 border border-white/15 rounded-full px-2 py-0.5 hover:text-pink-300">Reset chat</button>
         <button type="button" onClick={() => { try { const raw = localStorage.getItem("velvetmotion_memory_" + character.id); setMemoryFacts(raw ? JSON.parse(raw) : []); } catch {} setMemoryOpen(true); }} className="text-xs text-fuchsia-300 border border-fuchsia-500/30 rounded-full px-2 py-0.5">Memory</button>
@@ -816,8 +818,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         </div>
       )}
 
-      <div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Scene Selfies (Face-Locked)</div>
-      <div className="flex gap-1.5 overflow-x-auto pb-2">
+      <button type="button" onClick={() => setShowScenes(v => !v)} className="text-[10px] uppercase tracking-wide text-zinc-400 px-1 pb-1 hover:text-pink-300">{showScenes ? "▼" : "▶"} Scene Selfies</button>
+      {showScenes && <div className="flex gap-1.5 overflow-x-auto pb-2">
         {SCENE_LIBRARY.map((scene) => (
           <button
             key={scene.id}
@@ -836,7 +838,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
             📸 {scene.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       
       <div className="mb-2 rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/5 p-3">
@@ -859,8 +861,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
           <button type="button" onClick={() => { setJoiStep((s) => s + 1); if (voiceOn) speak(["Slow", "Faster", "Hold", "Almost", "Finish"][joiStep % 5], { ...character.voice }); }} className="text-xs text-pink-300 border border-pink-500/30 rounded-full px-2 py-1">Next cue</button>
         </div>
       </div>
-<div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Live Action</div>
-      <div className="flex flex-wrap gap-1.5 pb-2">
+<button type="button" onClick={() => setShowActions(v => !v)} className="text-[10px] uppercase tracking-wide text-zinc-400 px-1 pb-1 hover:text-emerald-300">{showActions ? "▼" : "▶"} Live Action</button>
+      {showActions && <div className="flex flex-wrap gap-1.5 pb-2">
         {LIVE_ACTION_PRESETS.map((p) => (
           <button
             key={p.id}
@@ -873,7 +875,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
             {p.emoji} {p.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       <div className="flex flex-wrap gap-2 pb-2">
         {NSFW_CHIPS.map((chip) => (

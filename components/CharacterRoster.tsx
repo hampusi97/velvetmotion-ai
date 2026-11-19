@@ -34,7 +34,10 @@ export function CharacterRoster({
         <p className="text-zinc-400 text-sm mt-1">{visible.length} companions · 21+ fictional · custom voices, memory chat & galleries</p>
       </div>
 
-      <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search companions…" className="w-full mb-3 px-4 py-3 rounded-2xl bg-zinc-900/80 border border-white/10 text-sm outline-none focus:border-pink-500" />
+      <div className="relative mb-3">
+        <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search companions…" className="w-full px-4 py-3 pr-10 rounded-2xl bg-zinc-900/80 border border-white/10 text-sm outline-none focus:border-pink-500" />
+        {query && <button type="button" onClick={() => onQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white text-lg">×</button>}
+      </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2 mb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {categories.map((item) => (

@@ -43,6 +43,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
 
   useEffect(() => {
     setCoins(getCoins());
+    const coinTimer = setInterval(() => setCoins(getCoins()), 1500);
     setCanClaim(canClaimDaily());
     setStreak(getEdgeStreak());
   }, []);

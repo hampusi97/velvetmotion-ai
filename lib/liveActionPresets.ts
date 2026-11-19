@@ -38,7 +38,7 @@ export const LIVE_ACTION_PRESETS: LiveActionPreset[] = [
   {
     id: "lingerie-tease",
     label: "Lingerie tease",
-    emoji: "lingerie",
+    emoji: "👗",
     kind: "photo",
     mood: "lingerie",
     sceneExtra: "slow lingerie tease, looking at viewer",
