@@ -2,17 +2,16 @@
 
 import { BadgeCheck, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/characters";
-import { characterMediaUrl, type MediaMood } from "@/lib/media";
+import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
 
 export function CandyGirlCard({
   character,
   onSelect,
-  mood = "beauty",
   isNew = false,
 }: {
   character: Character;
   onSelect: (character: Character) => void;
-  mood?: MediaMood;
+  mood?: string;
   isNew?: boolean;
 }) {
   return (
@@ -23,9 +22,10 @@ export function CandyGirlCard({
       className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left transition-all duration-300 hover:-translate-y-1.5 hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/20"
     >
       <img
-        src={characterMediaUrl(character, mood)}
+        src={staticPortraitUrl(character.id)}
         alt={character.name}
         loading="lazy"
+        onError={onPortraitError}
         className="absolute inset-0 h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.08] group-hover:brightness-105"
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent opacity-85 group-hover:opacity-95 transition duration-300" />
