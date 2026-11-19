@@ -15,7 +15,9 @@ import { ProactiveToast } from "@/components/ProactiveToast";
 import { containerClass } from "@/lib/cn";
 import { JoiBrowser } from "@/components/content/JoiBrowser";
 import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
+import { SectionView } from "@/components/section-view";
 import { findSection, type ViewId } from "@/lib/sections";
+import { UtilitySection } from "@/components/utility-section";
 import { TributeBrowser } from "@/components/TributeBrowser";
 import { CreateGirlWizard } from "@/components/CreateGirlWizard";
 import { GoonRoom } from "@/components/GoonRoom";
@@ -37,6 +39,8 @@ import { MyGirlsHub } from "@/components/MyGirlsHub";
 import { LegalPages } from "@/components/LegalPages";
 import { CoinWallet } from "@/components/CoinWallet";
 import { SupportModal } from "@/components/SupportModal";
+import { InstallAppModal } from "@/components/InstallAppModal";
+import { SuggestionsHub } from "@/components/SuggestionsHub";
 import { shouldShowSupportPromptOnLogin } from "@/lib/wallet";
 import { getUser, type LocalUser } from "@/lib/auth";
 import { getCoins, loadChat, saveChat } from "@/lib/storage";
@@ -48,11 +52,38 @@ import {
 import { registerServiceWorker } from "@/lib/pwaProactive";
 
 type HomeView =
-  | "home" | "girls" | "penthouse" | "create" | "romance" | "bnwo" | "tinder"
-  | "joi" | "joi3d" | "room" | "roulette" | "blindfold" | "scenario" | "suggest"
-  | "gallery" | "packs" | "tribute" | "workspace" | "dual" | "group" | "share"
-  | "lounge" | "shorts" | "advanced" | "import" | "vault" | "my-girls" | "wallet"
-  | "terms" | "privacy" | "safety";
+  | "home"
+  | "girls"
+  | "penthouse"
+  | "create"
+  | "romance"
+  | "bnwo"
+  | "tinder"
+  | "joi"
+  | "joi3d"
+  | "room"
+  | "roulette"
+  | "blindfold"
+  | "scenario"
+  | "suggest"
+  | "gallery"
+  | "packs"
+  | "tribute"
+  | "workspace"
+  | "dual"
+  | "group"
+  | "share"
+  | "lounge"
+  | "shorts"
+  | "advanced"
+  | "import"
+  | "vault"
+  | "my-girls"
+  | "wallet"
+  | "roadmap"
+  | "terms"
+  | "privacy"
+  | "safety";
 
 type View = HomeView | "profile" | "chat";
 
@@ -71,10 +102,11 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [coins, setCoins] = useState(0);
   const [proactive, setProactive] = useState<ProactivePing | null>(null);
+  const [activePackId, setActivePackId] = useState<string | null>(null);
+  const [activeJoiId, setActiveJoiId] = useState<string | null>(null);
   const [dualPair, setDualPair] = useState<{ a: string; b: string } | null>(null);
-  const [stageGirlId, setStageGirlId] = useState<string | null>(null);
-  const [stageFromMatch, setStageFromMatch] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [installAppOpen, setInstallAppOpen] = useState(false);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -82,7 +114,6 @@ export default function Home() {
     else main?.removeAttribute("inert");
   }, [menuOpen]);
   const toggleMenu = useCallback(() => setMenuOpen((open) => !open), []);
-
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -104,8 +135,45 @@ export default function Home() {
     setCoins(getCoins());
     setAuthReady(true);
     registerServiceWorker();
-    if (existingUser && shouldShowSupportPromptOnLogin()) setSupportModalOpen(true);
+    if (existingUser && shouldShowSupportPromptOnLogin()) {
+      setSupportModalOpen(true);
+    }
+
+    const onPopState = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const nextView = (params.get("view") as View | null) || "home";
+        const nextId = params.get("id");
+        setView(nextView);
+        if (nextId) setSelectedId(nextId);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    if (!authReady || typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      if (view === "home") {
+        url.searchParams.delete("view");
+        url.searchParams.delete("id");
+      } else {
+        url.searchParams.set("view", view);
+        if ((view === "chat" || view === "profile") && selectedId) {
+          url.searchParams.set("id", selectedId);
+        } else {
+          url.searchParams.delete("id");
+        }
+      }
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      /* ignore */
+    }
+  }, [authReady, view, selectedId]);
 
   useEffect(() => {
     if (!authReady || !user) return;
@@ -124,8 +192,66 @@ export default function Home() {
     );
   }, [authReady, user, selectedId, customCharacter]);
 
+  useEffect(() => {
+    if (!authReady || !user?.isFirebase || !user?.uid) return;
+    let unsubGallery = () => {};
+    let unsubCompanions = () => {};
+    void import("@/lib/firebase")
+      .then((fb) => {
+        unsubGallery = fb.subscribeUserGallery(user.uid!, (cloudItems) => {
+          if (!cloudItems.length) return;
+          try {
+            const raw = localStorage.getItem("vm-gallery");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const item of [...cloudItems, ...(Array.isArray(local) ? local : [])]) {
+              if (item && typeof item.id === "string" && !map.has(item.id)) {
+                map.set(item.id, item);
+              }
+            }
+            localStorage.setItem("vm-gallery", JSON.stringify(Array.from(map.values()).slice(0, 200)));
+          } catch {
+            /* ignore */
+          }
+        });
+        unsubCompanions = fb.subscribeUserCompanions(user.uid!, (cloudGirls) => {
+          if (!cloudGirls.length) return;
+          try {
+            const raw = localStorage.getItem("vm-custom-girls");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const g of Array.isArray(local) ? local : []) {
+              if (g && typeof g.id === "string") map.set(g.id, g);
+            }
+            for (const cg of cloudGirls) {
+              if (!map.has(cg.id)) {
+                map.set(cg.id, {
+                  ...CHARACTERS[0],
+                  ...cg,
+                  traits: ["Custom", cg.personality],
+                  initialMessage: `Hey baby… I'm ${cg.name}. ${cg.tagline}`,
+                });
+              }
+            }
+            localStorage.setItem("vm-custom-girls", JSON.stringify(Array.from(map.values())));
+          } catch {
+            /* ignore */
+          }
+        });
+      })
+      .catch(() => {});
+    return () => {
+      unsubGallery();
+      unsubCompanions();
+    };
+  }, [authReady, user?.isFirebase, user?.uid]);
+
   const navigate = (next: string) => {
     setMenuOpen(false);
+    if (next === "install-app") {
+      setInstallAppOpen(true);
+      return;
+    }
     if (next === "girls" || next === "romance") openRoster(next === "romance");
     else setView(next as View);
     window.scrollTo({ top: 0 });
@@ -169,7 +295,7 @@ export default function Home() {
         ...base,
         {
           role: "assistant",
-          content: `*Scenario:* ${scenarioPrompt.trim()}\n\n\"We're right here inside the scene. Tell me your next move.\"`,
+          content: `*Scenario:* ${scenarioPrompt.trim()}\n\n“We're right here inside the scene. Tell me your next move.”`,
         },
       ]);
     } else if (incomingAssistantNote && incomingAssistantNote.trim()) {
@@ -208,16 +334,15 @@ export default function Home() {
             VelvetMotion
           </h1>
           <p className="text-sm text-zinc-400 leading-relaxed mb-6 mt-3 text-center">
-            Match → chat → 3D. Private uncensored companions. Fictional adults 21+ only.
+            Adult fantasy companions. Chat, nudes, tributes, shorts, blindfold JOI. Fictional 21+ only.
           </p>
-          <div className="flex gap-3 justify-center text-xs text-zinc-500 mb-4">
-            <button type="button" className="underline hover:text-pink-300" onClick={() => setView("terms")}>Terms</button>
-            <button type="button" className="underline hover:text-pink-300" onClick={() => setView("privacy")}>Privacy</button>
-            <button type="button" className="underline hover:text-pink-300" onClick={() => setView("safety")}>18+ Policy</button>
-          </div>
           <button
             onClick={() => {
-              try { localStorage.setItem("velvet-age", "true"); } catch { /* */ }
+              try {
+                localStorage.setItem("velvet-age", "true");
+              } catch {
+                /* */
+              }
               setAdult(true);
             }}
             className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30"
@@ -229,16 +354,14 @@ export default function Home() {
     );
   }
 
-  if ((view === "terms" || view === "privacy" || view === "safety") && !user) {
-    return <LegalPages page={view} onHome={() => setView("home")} />;
-  }
-
   if (!user) {
     return (
       <LoginGate
         onLoggedIn={(u) => {
           setUser(u);
-          if (shouldShowSupportPromptOnLogin()) setSupportModalOpen(true);
+          if (shouldShowSupportPromptOnLogin()) {
+            setSupportModalOpen(true);
+          }
         }}
       />
     );
@@ -255,7 +378,23 @@ export default function Home() {
     <div className="min-h-screen bg-ink-950 text-white pb-16 lg:pb-0">
       <SiteHeader
         view={
-          view === "profile" || view === "chat" || view === "joi3d" || view === "vault"
+          view === "profile" ||
+          view === "chat" ||
+          view === "dual" ||
+          view === "group" ||
+          view === "share" ||
+          view === "lounge" ||
+          view === "shorts" ||
+          view === "advanced" ||
+          view === "import" ||
+          view === "vault" ||
+          view === "my-girls" ||
+          view === "wallet" ||
+          view === "roadmap" ||
+          view === "joi3d" ||
+          view === "terms" ||
+          view === "privacy" ||
+          view === "safety"
             ? listView
             : (view as ViewId)
         }
@@ -332,17 +471,14 @@ export default function Home() {
                 setRomanceMode(false);
                 setView("chat");
               }}
-              onOpen3D={(character) => {
-                setCustomCharacter(character);
-                setSelectedId(character.id);
-                setStageGirlId(character.id);
-                setStageFromMatch(false);
-                setView("joi3d");
-              }}
             />
           )}
           {view === "dual" && (
-            <DualGirlChat onHome={() => setView("home")} initialGirlAId={dualPair?.a} initialGirlBId={dualPair?.b} />
+            <DualGirlChat
+              onHome={() => setView("home")}
+              initialGirlAId={dualPair?.a}
+              initialGirlBId={dualPair?.b}
+            />
           )}
           {view === "group" && <GroupChat onHome={() => setView("home")} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
@@ -357,21 +493,14 @@ export default function Home() {
             />
           )}
           {view === "room" && (
-            <GoonRoom onHome={() => setView("home")} onChat={openChatById} onOpenDual={openDualWithPair} />
+            <GoonRoom
+              onHome={() => setView("home")}
+              onChat={openChatById}
+              onOpenDual={openDualWithPair}
+            />
           )}
           {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
           {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
-          {view === "joi3d" && (
-            <Joi3DStage
-              onHome={() => {
-                setStageFromMatch(false);
-                setView("home");
-              }}
-              onChat={openChatById}
-              initialGirlId={stageGirlId}
-              fromMatch={stageFromMatch}
-            />
-          )}
           {view === "scenario" && (
             <SpicyScenarioSimulator
               onHome={() => setView("home")}
@@ -386,44 +515,87 @@ export default function Home() {
           )}
           {view === "packs" && (
             <>
-              <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
-              <StoryPackBrowser onStartWithGirl={openChatById} />
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
+              <StoryPackBrowser initialPackId={activePackId} />
             </>
           )}
           {view === "joi" && (
             <>
-              <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
-              <JoiBrowser onStartWithGirl={openChatById} />
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
+              <JoiBrowser initialScenarioId={activeJoiId} />
             </>
           )}
-          {view === "gallery" && (
-            <WorkspaceHub onHome={() => setView("home")} />
+          {view === "joi3d" && (
+            <Joi3DStage onHome={() => setView("home")} onChat={openChatById} initialGirlId={selectedId} />
           )}
-          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
-          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
-          {view === "my-girls" && (
-            <MyGirlsHub
+          {["suggest", "gallery"].includes(view) && (
+            <UtilitySection
+              view={view}
               onHome={() => setView("home")}
-              onChat={openChatById}
-              onOpen3D={(id) => {
-                setStageGirlId(id);
-                setStageFromMatch(false);
-                setView("joi3d");
+              onOpenCustom={(name) => {
+                const character: Character = {
+                  ...CHARACTERS[0],
+                  id: `custom-${name}`,
+                  name,
+                  tagline: "Your fictional character",
+                  initialMessage: `Hello, I'm ${name}.`,
+                  personality: "Friendly",
+                  traits: ["Custom"],
+                  background: "An original fictional adult character.",
+                  figure: "Photoreal fictional adult woman, influencer aesthetic",
+                  kink: "Not specified",
+                  reply: "I'm listening.",
+                  category: "Custom",
+                };
+                setCustomCharacter(character);
+                setSelectedId(character.id);
+                setRomanceMode(false);
+                setView("chat");
               }}
             />
           )}
-          {view === "wallet" && <CoinWallet onHome={() => setView("home")} onCoinsChanged={setCoins} />}
+          {view === "bnwo" && (
+            <SectionView
+              section={findSection(view)}
+              onHome={() => setView("home")}
+              onNavigate={navigate as (v: ViewId) => void}
+              onOpenGirl={openChatById}
+              onOpenPack={(packId) => {
+                setActivePackId(packId);
+                setView("packs");
+              }}
+              onOpenJoi={(scenarioId) => {
+                setActiveJoiId(scenarioId);
+                setView("joi");
+              }}
+            />
+          )}
+          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
+          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
+          {view === "wallet" && (
+            <CoinWallet
+              onHome={() => setView("home")}
+              onPreviewLoginModal={() => setSupportModalOpen(true)}
+              onCoinsChanged={setCoins}
+            />
+          )}
+          {view === "roadmap" && <SuggestionsHub onHome={() => setView("home")} />}
+          {view === "my-girls" && (
+            <MyGirlsHub
+              onHome={() => setView("home")}
+              onCreate={() => setView("create")}
+              onOpenChat={(character) => {
+                if (character.id.startsWith("custom-")) setCustomCharacter(character);
+                openChatById(character.id);
+              }}
+            />
+          )}
           {(view === "terms" || view === "privacy" || view === "safety") && (
             <LegalPages page={view} onHome={() => setView("home")} />
           )}
           {view === "tinder" && (
             <DiscoverSwipe
               onHome={() => setView("home")}
-              onMeet3D={(c) => {
-                setStageGirlId(c.id);
-                setStageFromMatch(true);
-                setView("joi3d");
-              }}
               onMatch={(c) => {
                 if (c.id.startsWith("custom-")) setCustomCharacter(c);
                 setSelectedId(c.id);
@@ -433,14 +605,29 @@ export default function Home() {
             />
           )}
           <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
-            <span>VelvetMotion AI · Match → chat → 3D · Fictional adults 21+ only · Free</span>
+            <span>VelvetMotion AI · Fictional adults 21+ only · 100% Free</span>
             <div className="flex flex-wrap gap-4">
-              <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
-                Coin Wallet
+              <button type="button" onClick={() => setInstallAppOpen(true)} className="text-emerald-300 hover:text-emerald-200 font-medium">
+                📱 Android &amp; Apple App
               </button>
-              <button type="button" onClick={() => navigate("terms")} className="hover:text-pink-300">Terms</button>
-              <button type="button" onClick={() => navigate("privacy")} className="hover:text-pink-300">Privacy</button>
-              <button type="button" onClick={() => navigate("safety")} className="hover:text-pink-300">Safety &amp; 18+</button>
+              <button type="button" onClick={() => navigate("roadmap")} className="text-pink-300 hover:text-pink-200 font-medium">
+                💡 Roadmap &amp; Ideas
+              </button>
+              <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
+                🪙 Coin Wallet ($5 Support)
+              </button>
+              <button type="button" onClick={() => navigate("my-girls")} className="hover:text-pink-300">
+                My Girls
+              </button>
+              <button type="button" onClick={() => navigate("terms")} className="hover:text-pink-300">
+                Terms
+              </button>
+              <button type="button" onClick={() => navigate("privacy")} className="hover:text-pink-300">
+                Privacy
+              </button>
+              <button type="button" onClick={() => navigate("safety")} className="hover:text-pink-300">
+                Safety &amp; 18+ Policy
+              </button>
             </div>
           </footer>
         </div>
@@ -453,6 +640,7 @@ export default function Home() {
           onCoinsChanged={setCoins}
         />
       )}
+      {installAppOpen && <InstallAppModal onClose={() => setInstallAppOpen(false)} />}
       {proactive && (
         <ProactiveToast
           ping={proactive}
