@@ -34,11 +34,11 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
-const PHOTO_BASE = "Shot on Sony A7R V, 85mm f/1.4 GM lens, soft natural window light, subtle fill. Realistic skin with visible pores, fine peach fuzz, natural freckles or subtle imperfections. Individual hair strands with flyaways, soft catchlights in eyes. Kodak Portra 400 warmth, shallow depth of field, razor sharp eyes, photoreal editorial quality, no plastic skin, no oversmoothing, no AI artifacts.";
+const PHOTO_BASE = "Tight close-up portrait, shot on Sony A7R V, 85mm f/1.4 GM lens, soft natural window light from the left, subtle fill. Realistic skin with visible pores, fine peach fuzz, natural freckles or subtle imperfections, no plastic skin, no oversmoothing. Individual hair strands with flyaways, soft catchlights in eyes. Kodak Portra 400 warmth, shallow depth of field, razor sharp eyes, photoreal editorial quality, looking directly at camera, gentle natural smile, high detail skin texture.";
 
 const MOOD_PROMPTS: Record<MediaMood, string> = {
-  beauty: PHOTO_BASE + " Natural makeup, gentle closed-mouth smile, looking at camera. Soft ambient light, influencer editorial portrait.",
-  seductive: PHOTO_BASE + " Intimate close-up, 50mm f/1.4, warm bedside lamp + soft rim light. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores.",
+  beauty: PHOTO_BASE + " Natural makeup, soft ambient indoor light, influencer editorial close-up, intimate and warm.",
+  seductive: PHOTO_BASE + " Intimate close-up, warm bedside lamp + soft rim light. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores.",
   lingerie: PHOTO_BASE + " Mirror selfie, sheer lace lingerie slightly off shoulder, soft side window light. Looking over shoulder, natural skin texture, soft bokeh background, candid influencer aesthetic, authentic body.",
   nude: PHOTO_BASE + " Fully nude, soft morning window light from the side. Natural skin texture with pores and subtle stretch marks or freckles if fitting. Soft shadows defining form, looking at camera with soft expression. Unretouched photoreal adult, editorial nude.",
   explicit: PHOTO_BASE + " Explicit nude, intense eye contact, flushed cheeks, slightly parted lips. Detailed natural anatomy, glistening skin with visible pores and fine texture. Soft directional key light, high detail, uncensored photoreal adult.",
@@ -66,12 +66,13 @@ function pollinationsUrl(character: Pick<Character, "id" | "name" | "figure" | "
     const base = settings.localImageBase.replace(/\/$/, "");
     if (settings.localImageMode === "prompt-url") return `${base}/${encodeURIComponent(prompt)}?seed=${seed}`;
   }
-  return `${CF_IMAGE_WORKER}?prompt=${encodeURIComponent(prompt.slice(0, 1800))}&seed=${seed}`;
+  return `${CF_IMAGE_WORKER}?prompt=${encodeURIComponent(prompt.slice(0, 1800))}&seed=${seed}&steps=8`;
 }
 
 const STATIC_PORTRAITS = new Set(["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper","livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p","valentina","lana-rho","lena-plug","dalia-x","riley-re"]);
 
 export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood = "beauty", extra = "", opts?: { seedOverride?: number }): string {
+  // Prefer static high-quality portraits for beauty when available; fall back to Flux for everything else
   if (mood === "beauty" && STATIC_PORTRAITS.has(character.id)) return `/portraits/${character.id}.jpg`;
   return pollinationsUrl(character, mood, extra, opts);
 }
