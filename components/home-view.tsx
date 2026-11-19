@@ -136,10 +136,20 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
             ))}
           </div>
           {searchOpen && <input type="search" value={homeQuery} onChange={(e) => setHomeQuery(e.target.value)} placeholder="Search…" className="mb-4 w-full rounded-xl border border-white/15 bg-zinc-900/90 px-4 py-2 text-sm outline-none focus:border-pink-500" autoFocus />}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
             {featured.map((c, i) => (
               <CandyGirlCard key={c.id} character={c} onSelect={() => onOpenGirl(c.id)} isNew={i < 4} />
             ))}
+            <button type="button" onClick={() => onNavigate("shorts")} className="relative aspect-[2/3] rounded-2xl border-2 border-fuchsia-500/60 bg-gradient-to-br from-fuchsia-900/40 to-pink-900/40 p-4 text-left flex flex-col justify-end">
+              <div className="text-xs font-bold uppercase tracking-widest text-fuchsia-300">SHORTS</div>
+              <div className="text-lg font-black text-white mt-1">Watch</div>
+              <p className="text-[10px] text-zinc-300 mt-1">Looping previews</p>
+            </button>
+            <button type="button" onClick={() => onNavigate("vault")} className="relative aspect-[2/3] rounded-2xl border-2 border-pink-500/60 bg-gradient-to-br from-pink-900/40 to-rose-900/40 p-4 text-left flex flex-col justify-end">
+              <div className="text-xs font-bold uppercase tracking-widest text-pink-300">PRIVATE</div>
+              <div className="text-lg font-black text-white mt-1">Unlock</div>
+              <p className="text-[10px] text-zinc-300 mt-1">Vault & nudes</p>
+            </button>
           </div>
         </motion.section>
       )}

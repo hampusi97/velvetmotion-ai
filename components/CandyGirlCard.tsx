@@ -19,7 +19,7 @@ export function CandyGirlCard({
       type="button"
       onClick={() => onSelect(character)}
       aria-label={`Open ${character.name}`}
-      className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left transition-all duration-300 hover:-translate-y-1.5 hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/20"
+      className="girl-card group relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left transition-all duration-300 hover:-translate-y-1.5 hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/20"
     >
       <img
         src={staticPortraitUrl(character.id)}
@@ -34,9 +34,13 @@ export function CandyGirlCard({
           <Sparkles className="h-2.5 w-2.5" /> NEW
         </span>
       )}
-      <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-        <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Online
-      </span>
+      <div className="absolute right-2.5 top-2.5 flex flex-col gap-1 items-end">
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Online
+        </span>
+        <span className="rounded-full bg-black/50 backdrop-blur-sm p-1 text-white/80" title="Video">▶</span>
+        <span className="rounded-full bg-black/50 backdrop-blur-sm p-1 text-pink-300" title="Private">🔒</span>
+      </div>
       <div className="absolute inset-x-0 bottom-0 p-3.5 bg-gradient-to-t from-black via-black/70 to-transparent">
         <div className="flex items-center gap-1.5">
           <span className="truncate text-sm font-semibold text-white tracking-tight">{character.name}</span>

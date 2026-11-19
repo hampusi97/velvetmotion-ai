@@ -510,7 +510,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
     <div className="flex flex-col h-[calc(100vh-5rem)] max-w-2xl mx-auto">
       {callOpen && <VoiceCallUI character={character} onClose={() => setCallOpen(false)} />}
 
-      <div className="flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
+      <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
         <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Back</button>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -533,6 +533,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
               +500 Free
             </button>
             {upcoming && <span className="text-zinc-500">next: {upcoming.label}</span>}
+            <div className="w-full mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-pink-500 to-fuchsia-500 transition-all" style={{ width: `${Math.min(100, intimacy)}%` }} />
+            </div>
+            <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5">
+              <span>New</span><span>Flirting</span><span>Crush</span><span>Close</span><span>Obsessed</span>
+            </div>
           </div>
         </div>
         <button type="button" onClick={() => setCallOpen(true)} className="p-2 rounded-xl border border-emerald-500/40 text-emerald-300" title="Voice call">
