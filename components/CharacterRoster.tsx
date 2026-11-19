@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { BadgeCheck, ImageIcon, Mic, Sparkles } from "lucide-react";
 import { filterCharacters, type Character } from "@/lib/characters";
-import { characterMediaUrl } from "@/lib/media";
+import { CandyGirlCard } from "@/components/CandyGirlCard";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -106,61 +105,14 @@ export function CharacterRoster({
         <p className="text-zinc-500 text-sm">No one matches that filter.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {visible.map((character, i) => {
-            const src = characterMediaUrl(character, "beauty");
-            const isNew = i < 6;
-            return (
-              <button
-                key={character.id}
-                onClick={() => onSelect(character)}
-                className="girl-card group text-left overflow-hidden transition hover:-translate-y-0.5"
-              >
-                <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={src}
-                    alt={character.name}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover object-top group-hover:scale-[1.06] transition duration-500"
-                    loading="lazy"
-                  />
-                  {isNew && (
-                    <div className="absolute top-2.5 left-2.5 rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1 shadow-lg shadow-pink-500/40">
-                      <Sparkles className="h-2.5 w-2.5" />
-                      NEW
-                    </div>
-                  )}
-                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
-                    <span
-                      title="Photo gallery"
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-zinc-100 backdrop-blur-md border border-white/10"
-                    >
-                      <ImageIcon className="h-3 w-3" />
-                    </span>
-                    <span
-                      title={`Voice: ${character.voice.label}`}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-pink-200 backdrop-blur-md border border-pink-500/20"
-                    >
-                      <Mic className="h-3 w-3" />
-                    </span>
-                  </div>
-                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black via-black/75 to-transparent">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-sm text-white truncate drop-shadow">{character.name}</span>
-                      <span className="text-xs text-zinc-300 shrink-0 tabular-nums">{character.age}</span>
-                      <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-pink-400" aria-hidden="true" />
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-pink-200/90">
-                      <span>{character.category}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="text-zinc-300 truncate">{character.voice.label}</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-400 mt-0.5 line-clamp-1">{character.tagline}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
+          {visible.map((character, i) => (
+            <CandyGirlCard
+              key={character.id}
+              character={character}
+              onSelect={onSelect}
+              isNew={i < 6}
+            />
+          ))}
         </div>
       )}
     </div>

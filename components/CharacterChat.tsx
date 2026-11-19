@@ -501,8 +501,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               ? splitInnerThoughtAndReply(m.content)
               : { innerThought: null, spokenReply: m.content };
           return (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-pink-600/90" : "bg-zinc-900/80 border border-white/10"}`}>
+            <div key={i} className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              {m.role === "assistant" && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={characterMediaUrl(character, "beauty")}
+                  alt=""
+                  className="h-8 w-8 shrink-0 rounded-full border border-pink-500/40 object-cover object-top"
+                />
+              )}
+              <div className={`max-w-[82%] px-4 py-2.5 text-sm shadow-sm ${m.role === "user" ? "rounded-2xl rounded-br-md bg-gradient-to-br from-pink-600 to-fuchsia-600 text-white" : "rounded-2xl rounded-bl-md border border-white/10 bg-zinc-900/85"}`}>
                 {parsed.innerThought && (
                   <div className="mb-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-950/40 px-3 py-1.5 text-xs italic text-fuchsia-200">
                     💭 <span className="font-semibold not-italic text-fuchsia-300">Inner Thought:</span> {parsed.innerThought}
