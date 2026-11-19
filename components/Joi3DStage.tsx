@@ -91,7 +91,10 @@ export function Joi3DStage({
       if (autoAdvance) {
         setLineIdx((i) => {
           const next = i + 1;
-          if (next >= script.length) return 0;
+          if (next >= script.length) {
+            // loop once softly
+            return 0;
+          }
           return next;
         });
       }
@@ -100,6 +103,7 @@ export function Joi3DStage({
   }, [autoVoice, autoAdvance, lineIdx, mode, script, girl]);
 
   const speakLine = (text?: string) => {
+
     const t = text || line;
     setSpeaking(true);
     speak(t, girl?.voice ? { ...girl.voice, whispery: true } : { pitch: 1.05, rate: 0.92 });
@@ -140,7 +144,7 @@ export function Joi3DStage({
     <div className="mx-auto max-w-lg space-y-3 pb-20">
       <button type="button" onClick={onHome} className="text-pink-400 text-sm">← Home</button>
       <h1 className="text-3xl text-cream">3D Stage</h1>
-      <p className="text-sm text-mist">Upload or library → dual presence, breed/sex/cuck, poses, locations. Hands-free on mobile.</p>
+      <p className="text-sm text-mist">Upload or library → dual presence, breed/sex/cuck, poses, locations.</p>
       <div className="flex flex-wrap gap-1.5">
         <button type="button" onClick={() => setSourceTab("library")} className={`px-2.5 py-1 rounded-full text-[11px] border ${sourceTab === "library" ? "border-pink-500 bg-pink-500/20" : "border-white/10"}`}>library</button>
         <button type="button" onClick={() => setSourceTab("upload")} className={`px-2.5 py-1 rounded-full text-[11px] border ${sourceTab === "upload" ? "border-pink-500 bg-pink-500/20" : "border-white/10"}`}>upload</button>
