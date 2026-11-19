@@ -231,3 +231,19 @@ export function resolveCharacterAvatar(character: Character): string {
   // /avatars/*.svg → replace with Flux beauty portrait
   return characterMediaUrl(character, "beauty", `${character.name} beauty portrait`);
 }
+
+
+/** Freeform image — any prompt, face-locked when character given */
+export function freeformImageUrl(
+  prompt: string,
+  character?: Pick<Character, "id" | "figure" | "name">,
+  seedExtra = "",
+): string {
+  const base = character
+    ? `${character.figure || character.name}, same face, photorealistic, adult woman 18+, `
+    : "photorealistic adult woman 18+, ";
+  const full = `${base}${prompt}, uncensored nsfw, sharp focus, cinematic`;
+  const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
+  const enc = encodeURIComponent(full);
+  return `https://image.pollinations.ai/prompt/${enc}?width=768&height=1024&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
+}
