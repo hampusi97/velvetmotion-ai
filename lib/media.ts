@@ -1,14 +1,14 @@
 /**
  * VelvetMotion Media Engine
- * Candy-style photoreal + optional local ComfyUI/Forge + aggressive face seeds.
- * All adult moods stay fully NSFW-capable.
+ * Candy-style photoreal with proper photography prompts.
+ * Face-locked via seed + detailed figure strings.
  */
 
 import type { Character } from "./charactersTypes";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 
-/** Cloudflare Workers AI image endpoint — free tier ~173/day, no 45s limit. */
+/** Cloudflare Workers AI image endpoint */
 const CF_IMAGE_WORKER = "https://velvetmotion-image.hampusi97.workers.dev/generate";
 
 export type MediaMood =
@@ -46,32 +46,32 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
-/** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult, max heat */
+/** Candy.ai quality prompts — photography language, natural skin, real lighting */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "professional photography, 85mm f/1.4 lens, soft natural window light, realistic skin texture with pores and subtle freckles, detailed individual hair strands, bright catchlights in eyes, natural makeup, soft smile, looking at camera, shallow depth of field, bokeh background, candy.ai quality, photorealistic, 8k uhd, sharp focus on face, natural proportions, cinematic lighting",
+    "Shot on Sony A7IV, 85mm f/1.4 lens, soft natural window light from the left creating gentle catchlights in the eyes, shallow depth of field with creamy bokeh. Realistic skin texture with visible pores, subtle freckles, and natural imperfections. Individual hair strands with soft flyaways. Natural makeup, soft genuine smile, looking directly at camera. Kodak Portra 400 color science, warm highlights, clean sharp focus on the eyes.",
   seductive:
-    "seductive bedroom mirror selfie, heavy-lidded eyes, soft neon + warm lamp, parted glossy lips, intimate atmosphere, slight head tilt, photoreal influencer, adult sensual heat, dynamic pose",
+    "Intimate bedroom portrait, shot on 50mm f/1.8, warm bedside lamp mixed with soft neon rim light. Heavy-lidded eyes with a knowing half-smile, parted glossy lips, slight head tilt. Soft shadows across collarbones, realistic skin with natural sheen. Shallow depth of field, cinematic color grade, photoreal adult sensual atmosphere.",
   lingerie:
-    "sexy sheer lingerie mirror selfie, lace bra half off, panties, bedroom, soft rim light, arched back, detailed fabric, candy-style adult, looking at viewer, hot",
+    "Mirror selfie in sheer lace lingerie, shot on iPhone with natural window light. Lace bra slightly off one shoulder, soft fabric texture visible. Arched back, looking over shoulder at camera. Soft rim light outlining the figure, realistic skin pores, bedroom with soft bokeh background. Candid influencer aesthetic, warm tones.",
   nude:
-    "fully nude selfie, completely naked adult body, bare breasts, detailed skin pores, soft window light, looking at camera, photorealistic, aroused flush, high detail, uncensored",
+    "Fully nude portrait, soft morning window light from the side. Completely bare adult body, natural skin texture with visible pores and subtle flush. Soft shadows defining form, looking at camera with calm expression. Shot on 85mm, shallow depth of field, unretouched skin, photorealistic, warm natural color.",
   explicit:
-    "explicit nude selfie, aroused expression, detailed anatomy, glistening skin, intense eye contact, highly detailed erotic photography, uncensored photoreal adult 21+, wet look, high resolution, cinematic lighting",
+    "Explicit nude photography, intense eye contact, aroused expression with flushed cheeks. Detailed natural anatomy, glistening skin with realistic texture. Soft directional lighting, high detail on skin pores and individual hair strands. Shot on medium format, cinematic lighting, uncensored photoreal adult 21+, wet look highlights.",
   sex:
-    "explicit sex scene, any position, blowjob doggy cowgirl missionary standing, moaning dirty talk, detailed anatomy, sweaty skin, uncensored photoreal adult, intense, cinematic",
+    "Explicit intimate scene, any position, sweaty skin with realistic texture and natural flush. Moaning expression, detailed anatomy, dynamic motion blur on limbs. Cinematic lighting with practical sources, uncensored photoreal adult, intense atmosphere, high detail.",
   aftercare:
-    "post-sex aftercare portrait, soft sheets, satisfied smile, gentle embrace energy, warm morning light, photoreal intimate, messy hair",
+    "Post-intimacy portrait, soft morning light through sheer curtains. Satisfied soft smile, messy hair, gentle embrace energy. Warm skin tones, realistic pores, soft sheets in background. Shot on 50mm, natural light, intimate and tender atmosphere.",
   dual:
-    "two beautiful adult women together, intimate dual scene, looking at viewer, detailed bodies touching, erotic composition, photoreal, hot",
+    "Two beautiful adult women together, intimate dual scene, both looking at viewer. Soft shared lighting, detailed natural skin on both, bodies close. Warm bedroom atmosphere, photoreal, high detail, cinematic composition.",
   sph:
-    "dominant woman looking down at viewer from above, teasing amused smile, pointing, SPH humiliation vibe, lingerie or nude, confident posture, low camera angle, photoreal, sharp unique face",
+    "Dominant woman looking down at camera from above, low angle. Amused teasing smile, pointing finger, confident posture. Lingerie or nude, sharp unique face with natural skin texture. Soft overhead light, photoreal, sharp focus on eyes.",
   bnwo:
-    "powerful dominant Black woman in charge, luxury room, lingerie or nude, confident commanding gaze, BNWO fantasy aesthetic, regal posture, photoreal adult, gold accents",
+    "Powerful dominant Black woman in luxury setting, confident commanding gaze. Natural skin texture with realistic sheen, gold jewelry catching light. Regal posture, lingerie or nude, warm directional lighting, photoreal adult, high detail.",
   joi:
-    "woman giving JOI to viewer, pointing at camera, seductive instructional pose, lingerie on edge of bed, intense eye contact, explicit adult coaching vibe, photoreal, unique face",
+    "Woman giving JOI to viewer, pointing directly at camera, intense eye contact. Seductive instructional pose on edge of bed, lingerie. Soft bedroom lighting, realistic skin texture, sharp focus on face and hands. Photoreal adult coaching vibe.",
   "joi-finish":
-    "woman encouraging climax, open mouth, intense eye contact, nude or open lingerie, finish-now command pose, erotic photography, uncensored, wet lips",
+    "Close-up of woman encouraging climax, open mouth, intense eye contact. Nude or open lingerie, finish-now energy. Soft flash lighting, wet lips, realistic skin texture, uncensored photoreal, high detail.",
 };
 
 function buildPrompt(
@@ -81,18 +81,17 @@ function buildPrompt(
 ): string {
   const figure =
     character.figure ||
-    "beautiful adult woman, photoreal influencer aesthetic, unique face, detailed body";
+    "beautiful adult woman with unique distinctive face, natural features, photoreal";
   return [
-    "masterpiece, best quality, ultra detailed, photorealistic, 8k uhd",
-    `adult woman ${character.age || 24} years old, 21+ only`,
     figure,
-    `${character.name}, same face identity every shot, consistent face and body, unique person`,
+    `adult woman ${character.age || 24} years old, 21+ only`,
+    `${character.name}, same face identity every shot, consistent unique person`,
     MOOD_PROMPTS[mood],
     extra,
-    "looking at viewer, sharp focused eyes, detailed iris, natural proportions, no text, no watermark, no logos, no cartoon, no anime unless style requested",
+    "looking at viewer, sharp focused eyes with detailed iris, natural proportions, no text, no watermark, no logos",
   ]
     .filter(Boolean)
-    .join(", ");
+    .join(". ");
 }
 
 function pollinationsUrl(
@@ -119,9 +118,7 @@ function pollinationsUrl(
     }
   }
 
-  // Prefer Cloudflare Workers AI (free tier, no 45s limit), fall back to Pollinations
   const cf = `${CF_IMAGE_WORKER}?prompt=${encodeURIComponent(prompt.slice(0, 1800))}&seed=${seed}`;
-  // Client can race or prefer CF; for static export we return CF URL directly
   return cf;
 }
 
@@ -133,7 +130,6 @@ export function characterMediaUrl(
   extra = "",
   opts?: { width?: number; height?: number; enhance?: boolean; seedOverride?: number },
 ): string {
-  // Prefer static high-quality portraits when available (no rate limit)
   if (mood === "beauty" && STATIC_PORTRAITS.has(character.id)) {
     return `/portraits/${character.id}.jpg`;
   }
@@ -161,7 +157,7 @@ export async function resolveBestMediaUrl(
       return { url: localRes.imageUrl, note: localRes.note };
     }
   }
-  return { url: fallbackUrl, note: "Pollinations Flux" };
+  return { url: fallbackUrl, note: "Cloudflare Flux" };
 }
 
 export function joiSequenceFrames(
@@ -232,17 +228,13 @@ export function characterGallery(character: Character): {
   }));
 }
 
-/** Always prefer live AI portrait over static SVG placeholders */
 export function resolveCharacterAvatar(character: Character): string {
   if (character.avatar?.startsWith("http") || character.avatar?.startsWith("data:")) {
     return character.avatar;
   }
-  // /avatars/*.svg → replace with Flux beauty portrait
   return characterMediaUrl(character, "beauty", `${character.name} beauty portrait`);
 }
 
-
-/** Freeform image — any prompt, face-locked when character given */
 export function freeformImageUrl(
   prompt: string,
   character?: Pick<Character, "id" | "figure" | "name">,
@@ -251,7 +243,7 @@ export function freeformImageUrl(
   const base = character
     ? `${character.figure || character.name}, same face, photorealistic, adult woman 18+, `
     : "photorealistic adult woman 18+, ";
-  const full = `${base}${prompt}, uncensored nsfw, sharp focus, cinematic`;
+  const full = `${base}${prompt}. Shot on 85mm, natural light, realistic skin texture with pores, uncensored nsfw, sharp focus on eyes.`;
   const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
   const enc = encodeURIComponent(full);
   return `https://image.pollinations.ai/prompt/${enc}?width=1024&height=1536&nologo=true&model=flux&seed=${seed % 100000}&enhance=true&quality=100&private=true`;
