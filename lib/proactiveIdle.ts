@@ -1,11 +1,13 @@
 /**
  * Lite "live mode": when the user is idle, she may text first.
  * Uses Notification API / SW when permission granted (PWA-friendly).
+ * Pulls short/mid memory so pings feel personal (Nomi-style).
  */
 
 import type { Character } from "./charactersTypes";
 import { getIntimacy } from "./storage";
 import { showProactiveNotification, ensureNotificationPermission } from "./pwaProactive";
+import { loadMemory } from "./memoryTiers";
 
 export type ProactivePing = {
   characterId: string;
@@ -27,7 +29,26 @@ const TEMPLATES = [
   (n: string) => `I kept the light on. ${n} is waiting.`,
   (n: string) => `Don't leave me on read forever… ${n} 💕`,
   (n: string) => `Random thought: I want your hands on me later. — ${n}`,
+  (n: string) => `${n}: still wet from earlier. Opening chat would be mean of you not to…`,
+  (n: string) => `Be honest — did you think about breeding me, or just scrolling? — ${n}`,
 ];
+
+function memoryHook(characterId: string, name: string): string | null {
+  try {
+    const mem = loadMemory(characterId);
+    const pool = [...mem.long, ...mem.mid].filter(Boolean);
+    if (!pool.length) return null;
+    const fact = pool[Math.floor(Math.random() * pool.length)].slice(0, 80);
+    const hooks = [
+      `You said something about “${fact}”… I keep replaying it. — ${name}`,
+      `${name} remembers: ${fact}. Want to pick that up again?`,
+      `Still thinking about ${fact}. Come back and tell me more.`,
+    ];
+    return hooks[Math.floor(Math.random() * hooks.length)];
+  } catch {
+    return null;
+  }
+}
 
 export function loadProactiveQueue(): ProactivePing[] {
   if (typeof window === "undefined") return [];
@@ -76,17 +97,24 @@ export function markProactiveFired() {
 
 export function buildProactivePing(character: Character): ProactivePing {
   const intimacy = getIntimacy(character.id, character.intimacy);
-  const text = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)](
-    character.name.split(" ")[0],
-  );
-  const spicy =
-    intimacy >= 55
-      ? ` ${Math.random() > 0.5 ? "I might be undressed already." : "Tribute me later if you miss me."}`
-      : "";
+  const first = character.name.split(" ")[0];
+  const memLine = Math.random() < 0.45 ? memoryHook(character.id, first) : null;
+  let text =
+    memLine ||
+    TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)](first);
+  if (!memLine && intimacy >= 55) {
+    text +=
+      Math.random() > 0.5
+        ? " I might be undressed already."
+        : " Tribute me later if you miss me.";
+  }
+  if (intimacy >= 75 && Math.random() > 0.6) {
+    text += " Bring that kink we talked about.";
+  }
   return {
     characterId: character.id,
     characterName: character.name,
-    text: text + spicy,
+    text,
     at: Date.now(),
   };
 }
