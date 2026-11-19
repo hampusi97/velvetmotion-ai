@@ -93,10 +93,12 @@ function shuffle<T>(arr: T[]): T[] {
 export function DiscoverSwipe({
   onMatch,
   onHome,
+  onMeet3D,
   extra = [],
 }: {
   onMatch: (c: Character) => void;
   onHome: () => void;
+  onMeet3D?: (c: Character) => void;
   extra?: Character[];
 }) {
   const [customGirls, setCustomGirls] = useState<Character[]>([]);
@@ -432,91 +434,227 @@ export function DiscoverSwipe({
       </div>
 
       <div className="flex justify-center items-center gap-4 mt-7">
-        <button type="button" onClick={pass} className="w-14 h-14 rounded-full bg-zinc-900 border border-white/15 text-xl hover:border-red-400 hover:text-red-400 transition" aria-label="Pass">✕</button>
-        <button type="button" onClick={cyclePeek} className="w-12 h-12 rounded-full bg-zinc-900 border border-fuchsia-500/40 text-sm text-fuchsia-300 hover:bg-fuchsia-500/20 font-medium" aria-label="Undress peek">{peekLevel === 0 ? "🔥" : peekLevel === 1 ? "👙" : peekLevel === 2 ? "nude" : "💦"}</button>
-        <button type="button" onClick={() => like(true)} className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-lg shadow-lg shadow-blue-500/30 hover:scale-105 transition" aria-label="Super Like">★</button>
-        <button type="button" onClick={() => like(false)} className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-600 text-2xl shadow-lg shadow-pink-500/40 hover:scale-105 transition" aria-label="Like">♥</button>
+        <button
+          type="button"
+          onClick={pass}
+          className="w-14 h-14 rounded-full bg-zinc-950/90 border border-white/15 text-xl text-zinc-300 hover:border-red-400 hover:text-red-400 hover:shadow-[0_0_24px_rgba(248,113,113,0.25)] transition active:scale-95"
+          aria-label="Pass"
+        >
+          ✕
+        </button>
+        <button
+          type="button"
+          onClick={cyclePeek}
+          className="w-12 h-12 rounded-full bg-zinc-950/90 border border-fuchsia-500/45 text-sm text-fuchsia-200 hover:bg-fuchsia-500/20 hover:shadow-[0_0_24px_rgba(217,70,239,0.3)] font-medium transition active:scale-95"
+          aria-label="Undress peek"
+        >
+          {peekLevel === 0 ? "🔥" : peekLevel === 1 ? "👙" : peekLevel === 2 ? "nude" : "💦"}
+        </button>
+        <button
+          type="button"
+          onClick={() => like(true)}
+          className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-lg shadow-lg shadow-blue-500/30 hover:scale-105 transition"
+          aria-label="Super Like"
+        >
+          ★
+        </button>
+        <button
+          type="button"
+          onClick={() => like(false)}
+          className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-fuchsia-600 text-2xl shadow-[0_0_36px_rgba(236,72,153,0.45)] hover:scale-105 active:scale-95 transition"
+          aria-label="Like"
+        >
+          ♥
+        </button>
       </div>
-      <p className="text-center text-[11px] text-zinc-500 mt-4">Undo · Matches · Profile · ♥ · ★ Super · Peek 🔥</p>
+      <p className="text-center text-[11px] text-zinc-500 mt-4">
+        Undo · Matches list · ♥ match · ★ Super · Peek 🔥
+      </p>
 
       {rejected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80" onClick={() => { setRejected(false); next(); }} />
+          <div
+            className="absolute inset-0 bg-black/80"
+            onClick={() => {
+              setRejected(false);
+              next();
+            }}
+          />
           <div className="relative w-full max-w-sm rounded-3xl border border-white/15 bg-zinc-950 p-6 text-center">
             <p className="text-zinc-400 text-sm uppercase tracking-widest">She passed</p>
-            <h3 className="mt-3 text-xl font-bold text-cream">{current.name.split(" ")[0]} isn&apos;t matching right now</h3>
-            <button type="button" onClick={() => { setRejected(false); next(); }} className="mt-5 w-full py-3 rounded-2xl bg-zinc-800 font-medium">Keep swiping</button>
+            <h3 className="mt-3 text-xl font-bold text-cream">
+              {current.name.split(" ")[0]} isn&apos;t matching right now
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setRejected(false);
+                next();
+              }}
+              className="mt-5 w-full py-3 rounded-2xl bg-zinc-800 font-medium"
+            >
+              Keep swiping
+            </button>
           </div>
         </div>
       )}
 
+      
       {showProfile && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => profileComplete(profile) && setShowProfile(false)} />
           <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-pink-500/40 bg-zinc-950 p-5 max-h-[90vh] overflow-y-auto shadow-[0_0_60px_rgba(236,72,153,0.25)]">
             <h3 className="text-lg font-bold text-cream">Your Discover profile</h3>
-            <p className="text-[11px] text-zinc-500 mt-1">Who you are on the swipe deck. Pick man/woman, what you want, and a filthy-honest bio.</p>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              Who you are on the swipe deck. Girls react to this — pick man/woman, what you want, and a filthy-honest bio.
+            </p>
+
             <div className="mt-4 space-y-4">
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500">Display name</label>
-                <input value={draft.displayName} onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))} placeholder="e.g. Alex" className="mt-1 w-full rounded-xl bg-zinc-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-pink-500" />
+                <input
+                  value={draft.displayName}
+                  onChange={(e) => setDraft((d) => ({ ...d, displayName: e.target.value }))}
+                  placeholder="e.g. Alex"
+                  className="mt-1 w-full rounded-xl bg-zinc-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-pink-500"
+                />
               </div>
+
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500">I am a</label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {GENDER_OPTIONS.map((g) => (
-                    <button key={g.id} type="button" onClick={() => setDraft((d) => ({ ...d, gender: g.id }))} className={`rounded-full px-3 py-1.5 text-xs border ${draft.gender === g.id ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/10 text-zinc-400"}`}>{g.label}</button>
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, gender: g.id }))}
+                      className={`rounded-full px-3 py-1.5 text-xs border ${
+                        draft.gender === g.id
+                          ? "border-pink-500 bg-pink-500/20 text-pink-100"
+                          : "border-white/10 text-zinc-400"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
                   ))}
                 </div>
               </div>
+
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500">Looking for</label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {LOOKING_OPTIONS.map((g) => (
-                    <button key={g.id} type="button" onClick={() => setDraft((d) => ({ ...d, lookingFor: g.id }))} className={`rounded-full px-3 py-1.5 text-xs border ${draft.lookingFor === g.id ? "border-fuchsia-500 bg-fuchsia-500/20 text-fuchsia-100" : "border-white/10 text-zinc-400"}`}>{g.label}</button>
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, lookingFor: g.id }))}
+                      className={`rounded-full px-3 py-1.5 text-xs border ${
+                        draft.lookingFor === g.id
+                          ? "border-fuchsia-500 bg-fuchsia-500/20 text-fuchsia-100"
+                          : "border-white/10 text-zinc-400"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
                   ))}
                 </div>
               </div>
+
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500">Age</label>
-                <input type="number" min={18} max={99} value={draft.age} onChange={(e) => setDraft((d) => ({ ...d, age: Math.max(18, Math.min(99, parseInt(e.target.value || "18", 10))) }))} className="mt-1 w-24 rounded-xl bg-zinc-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-pink-500" />
+                <input
+                  type="number"
+                  min={18}
+                  max={99}
+                  value={draft.age}
+                  onChange={(e) => setDraft((d) => ({ ...d, age: Math.max(18, Math.min(99, parseInt(e.target.value || "18", 10))) }))}
+                  className="mt-1 w-24 rounded-xl bg-zinc-900 border border-white/10 px-3 py-2.5 text-sm outline-none focus:border-pink-500"
+                />
               </div>
+
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500">Bio · what you want tonight</label>
-                <textarea value={draft.bio} onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value.slice(0, 280) }))} rows={3} placeholder="e.g. Want a girl who texts first, sends nudes, and edges me until I beg…" className="mt-1 w-full rounded-xl bg-zinc-900 border border-white/10 px-3 py-2.5 text-sm resize-none outline-none focus:border-pink-500" />
+                <textarea
+                  value={draft.bio}
+                  onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value.slice(0, 280) }))}
+                  rows={3}
+                  placeholder="e.g. Want a girl who texts first, sends nudes, and edges me until I beg…"
+                  className="mt-1 w-full rounded-xl bg-zinc-900 border border-white/10 px-3 py-2.5 text-sm resize-none outline-none focus:border-pink-500"
+                />
               </div>
+
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-zinc-500">Vibe tags</label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {PROFILE_TAG_SUGGESTIONS.map((t) => {
                     const on = draft.tags.includes(t);
                     return (
-                      <button key={t} type="button" onClick={() => setDraft((d) => ({ ...d, tags: on ? d.tags.filter((x) => x !== t) : [...d.tags, t].slice(0, 6) }))} className={`rounded-full px-2.5 py-1 text-[10px] border ${on ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/10 text-zinc-500"}`}>{t}</button>
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            tags: on ? d.tags.filter((x) => x !== t) : [...d.tags, t].slice(0, 6),
+                          }))
+                        }
+                        className={`rounded-full px-2.5 py-1 text-[10px] border ${
+                          on ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/10 text-zinc-500"
+                        }`}
+                      >
+                        {t}
+                      </button>
                     );
                   })}
                 </div>
               </div>
             </div>
+
             <div className="mt-5 flex gap-2">
               {profileComplete(profile) && (
-                <button type="button" onClick={() => setShowProfile(false)} className="flex-1 py-2.5 rounded-xl border border-white/15 text-sm text-zinc-300">Cancel</button>
+                <button
+                  type="button"
+                  onClick={() => setShowProfile(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/15 text-sm text-zinc-300"
+                >
+                  Cancel
+                </button>
               )}
-              <button type="button" onClick={() => { const nextP = { ...draft, displayName: draft.displayName.trim() || "Guest" }; saveDiscoverProfile(nextP); setProfile(nextP); setShowProfile(false); }} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 text-sm font-semibold">Save & swipe</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = { ...draft, displayName: draft.displayName.trim() || "Guest" };
+                  saveDiscoverProfile(next);
+                  setProfile(next);
+                  setShowProfile(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 text-sm font-semibold"
+              >
+                Save & swipe
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {showMatch && (
+{showMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => setShowMatch(null)} />
           <div className="relative w-full max-w-sm rounded-3xl border border-pink-500/50 bg-gradient-to-b from-zinc-900 to-black p-6 text-center shadow-[0_0_80px_rgba(236,72,153,0.4)]">
-            <p className="text-pink-300 text-sm uppercase tracking-[0.25em] font-medium">{superLiked ? "Super Match ✨" : "It's a match"}</p>
+            <p className="text-pink-300 text-sm uppercase tracking-[0.25em] font-medium">
+              {superLiked ? "Super Match ✨" : "It's a match"}
+            </p>
             <div className="mt-5 mx-auto h-36 w-36 rounded-full overflow-hidden border-2 border-pink-400 shadow-lg shadow-pink-500/30">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={characterMediaUrl(showMatch, "nude")} alt="" className="h-full w-full object-cover" />
+              <img
+                src={characterMediaUrl(showMatch, "nude")}
+                alt=""
+                className="h-full w-full object-cover"
+              />
             </div>
-            <h3 className="mt-4 text-2xl font-bold text-white">{showMatch.name.split(" ")[0]} liked you back</h3>
+            <h3 className="mt-4 text-2xl font-bold text-white">
+              {showMatch.name.split(" ")[0]} liked you back
+            </h3>
             <p className="mt-2 text-sm text-zinc-400">{showMatch.voiceIntro}</p>
             {profile.displayName ? (
               <p className="mt-3 text-xs text-pink-200/90 rounded-xl border border-pink-500/30 bg-pink-500/10 px-3 py-2">
@@ -524,8 +662,36 @@ export function DiscoverSwipe({
               </p>
             ) : null}
             <div className="mt-6 flex flex-col gap-2">
-              <button type="button" onClick={openHer} className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30">Open chat · nudes · JOI / SPH</button>
-              <button type="button" onClick={() => { setShowMatch(null); next(); }} className="w-full py-3 rounded-2xl border border-white/15 text-sm text-zinc-300 hover:bg-white/5">Keep swiping</button>
+              <button
+                type="button"
+                onClick={openHer}
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30"
+              >
+                Open chat · nudes · JOI / SPH
+              </button>
+              {onMeet3D && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = showMatch || current;
+                    setShowMatch(null);
+                    onMeet3D(c);
+                  }}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-rose-700 to-pink-700 font-semibold shadow-lg shadow-rose-500/25 border border-rose-400/30"
+                >
+                  Meet in 3D · bed · fuck
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMatch(null);
+                  next();
+                }}
+                className="w-full py-3 rounded-2xl border border-white/15 text-sm text-zinc-300 hover:bg-white/5"
+              >
+                Keep swiping
+              </button>
             </div>
           </div>
         </div>
