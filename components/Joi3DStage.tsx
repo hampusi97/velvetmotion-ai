@@ -2,13 +2,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CHARACTERS, getCharacter } from "@/lib/characters";
 import type { Character } from "@/lib/characters";
-import { characterMediaUrl, seedFromPhotoDataUrl } from "@/lib/media";
 import { getIntimacy } from "@/lib/storage";
 import { speak, stopSpeaking } from "@/lib/speech";
 import { startJoiBeat, stopJoiBeat, startIntimacyAudio, stopIntimacyAudio } from "@/lib/audioEngine";
 import { setCharacterFaceSeed } from "@/lib/mediaSettings";
+import { seedFromPhotoDataUrl } from "@/lib/media";
 import type { StageMode, Pose } from "@/lib/joi3dContent";
-import { LOCATIONS, SCRIPTS, POSE_LABELS, SEX_POSES, VOICE_PACKS } from "@/lib/joi3dContent";
+import { LOCATIONS, SCRIPTS, POSE_LABELS, SEX_POSES, VOICE_PACKS as STAGE_PACKS } from "@/lib/joi3dContent";
+import { VOICE_PACKS as REF_PACKS, speakWithPack } from "@/lib/companionRefs";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { Joi3DScene } from "@/components/Joi3DScene";
 
 export function Joi3DStage({
@@ -68,15 +70,11 @@ export function Joi3DStage({
   useEffect(() => {
     if (uploadPreview) { setTextureUrl(uploadPreview); return; }
     if (!girl) return;
-    const spicy = mode === "sex" || mode === "breed" || fucking || SEX_POSES.includes(pose);
-    const mood = spicy || intimacy >= 55 ? "explicit" : intimacy >= 40 ? "nude" : "lingerie";
-    const extra = mode === "breed" ? `${location} ${pose} breeding creampie explicit` : `${location} ${pose} intimate`;
-    setTextureUrl(characterMediaUrl(girl, mood as "lingerie" | "nude" | "explicit", extra));
-  }, [girl, intimacy, uploadPreview, mode, pose, fucking, location]);
+    setTextureUrl(staticPortraitUrl(girl.id));
+  }, [girl, uploadPreview]);
 
   useEffect(() => () => { stopJoiBeat(); stopIntimacyAudio(); stopSpeaking(); }, []);
 
-  // Hands-free: auto speak current line, optionally advance through script
   useEffect(() => {
     if (!autoVoice && !autoAdvance) return;
     if (!script.length) return;
@@ -89,21 +87,13 @@ export function Joi3DStage({
     const timer = window.setTimeout(() => {
       setSpeaking(false);
       if (autoAdvance) {
-        setLineIdx((i) => {
-          const next = i + 1;
-          if (next >= script.length) {
-            // loop once softly
-            return 0;
-          }
-          return next;
-        });
+        setLineIdx((i) => (i + 1 >= script.length ? 0 : i + 1));
       }
     }, holdMs);
     return () => window.clearTimeout(timer);
   }, [autoVoice, autoAdvance, lineIdx, mode, script, girl]);
 
   const speakLine = (text?: string) => {
-
     const t = text || line;
     setSpeaking(true);
     speak(t, girl?.voice ? { ...girl.voice, whispery: true } : { pitch: 1.05, rate: 0.92 });
@@ -127,8 +117,7 @@ export function Joi3DStage({
   };
 
   const startScene = (m: "sex" | "breed") => {
-    // auto voice on breed/cuck
-    if (m === "breed" || m === "sex") setAutoVoice(true);
+    setAutoVoice(true);
     setMode(m);
     setPose("missionary");
     setFucking(true);
@@ -164,7 +153,7 @@ export function Joi3DStage({
             <button key={c.id} type="button" onClick={() => { setGirlId(c.id); setUploadPreview(null); setLineIdx(0); }}
               className={`aspect-[3/4] rounded-lg overflow-hidden border-2 ${c.id === girlId && !uploadPreview ? "border-pink-500" : "border-transparent opacity-80"}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.avatar?.startsWith("data:") || c.avatar?.startsWith("http") ? c.avatar : characterMediaUrl(c, "beauty")} alt={c.name} className="h-full w-full object-cover" />
+              <img src={staticPortraitUrl(c.id)} alt={c.name} className="h-full w-full object-cover" />
             </button>
           ))}
         </div>
@@ -220,22 +209,33 @@ export function Joi3DStage({
         <div className="pt-1">
           <p className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1.5">Voice packs</p>
           <div className="flex flex-wrap gap-1.5">
-            {VOICE_PACKS.map((pack) => (
+            {STAGE_PACKS.map((pack) => (
               <button
                 key={pack.id}
                 type="button"
                 onClick={() => {
                   const line = pack.lines[Math.floor(Math.random() * pack.lines.length)];
-                  if (pack.id === "breed-fill") {
-                    setMode("breed");
-                    setFucking(true);
-                    setShowGuy(true);
-                  } else if (pack.id === "cuck-report") setMode("cuck");
+                  if (pack.id === "breed-fill") { setMode("breed"); setFucking(true); setShowGuy(true); }
+                  else if (pack.id === "cuck-report") setMode("cuck");
                   else if (pack.id === "bnwo-rank") setMode("bnwo");
-                  else if (pack.id === "edge" || pack.id === "finish" || pack.id === "whisper") setMode("joi");
+                  else setMode("joi");
                   speakLine(line);
                 }}
                 className="px-2.5 py-1.5 rounded-full text-[11px] border border-pink-500/35 bg-pink-500/10 text-pink-100 hover:bg-pink-500/20"
+              >
+                {pack.label}
+              </button>
+            ))}
+            {REF_PACKS.map((pack) => (
+              <button
+                key={pack.id}
+                type="button"
+                onClick={() => {
+                  speakWithPack(line, pack.id);
+                  setSpeaking(true);
+                  setTimeout(() => setSpeaking(false), 4000);
+                }}
+                className="px-2.5 py-1.5 rounded-full text-[11px] border border-fuchsia-500/35 bg-fuchsia-500/10 text-fuchsia-100 hover:bg-fuchsia-500/20"
               >
                 {pack.label}
               </button>
