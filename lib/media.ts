@@ -125,7 +125,7 @@ function pollinationsUrl(
   return cf;
 }
 
-const STATIC_PORTRAITS = new Set(["briony","calla","isolde","liora","maren","nadine","tess","vesper"]);
+const STATIC_PORTRAITS = new Set(["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper"]);
 
 export function characterMediaUrl(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
