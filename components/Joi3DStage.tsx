@@ -8,7 +8,7 @@ import { speak, stopSpeaking } from "@/lib/speech";
 import { startJoiBeat, stopJoiBeat, startIntimacyAudio, stopIntimacyAudio } from "@/lib/audioEngine";
 import { setCharacterFaceSeed } from "@/lib/mediaSettings";
 import type { StageMode, Pose } from "@/lib/joi3dContent";
-import { LOCATIONS, SCRIPTS, POSE_LABELS, SEX_POSES } from "@/lib/joi3dContent";
+import { LOCATIONS, SCRIPTS, POSE_LABELS, SEX_POSES, VOICE_PACKS } from "@/lib/joi3dContent";
 import { Joi3DScene } from "@/components/Joi3DScene";
 
 export function Joi3DStage({
@@ -35,6 +35,8 @@ export function Joi3DStage({
   const [textureUrl, setTextureUrl] = useState("");
   const [sourceTab, setSourceTab] = useState<"library" | "upload">("library");
   const [customRoster, setCustomRoster] = useState<Character[]>([]);
+  const [autoVoice, setAutoVoice] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
 
   useEffect(() => {
     try {
@@ -73,6 +75,29 @@ export function Joi3DStage({
   }, [girl, intimacy, uploadPreview, mode, pose, fucking, location]);
 
   useEffect(() => () => { stopJoiBeat(); stopIntimacyAudio(); stopSpeaking(); }, []);
+
+  // Hands-free: auto speak current line, optionally advance through script
+  useEffect(() => {
+    if (!autoVoice && !autoAdvance) return;
+    if (!script.length) return;
+    const current = script[Math.min(lineIdx, script.length - 1)];
+    if (autoVoice) {
+      setSpeaking(true);
+      speak(current, girl?.voice ? { ...girl.voice, whispery: true } : { pitch: 1.05, rate: 0.92 });
+    }
+    const holdMs = Math.min(14000, Math.max(4500, current.length * 55));
+    const timer = window.setTimeout(() => {
+      setSpeaking(false);
+      if (autoAdvance) {
+        setLineIdx((i) => {
+          const next = i + 1;
+          if (next >= script.length) return 0;
+          return next;
+        });
+      }
+    }, holdMs);
+    return () => window.clearTimeout(timer);
+  }, [autoVoice, autoAdvance, lineIdx, mode, script, girl]);
 
   const speakLine = (text?: string) => {
     const t = text || line;
@@ -115,7 +140,7 @@ export function Joi3DStage({
     <div className="mx-auto max-w-lg space-y-3 pb-20">
       <button type="button" onClick={onHome} className="text-pink-400 text-sm">← Home</button>
       <h1 className="text-3xl text-cream">3D Stage</h1>
-      <p className="text-sm text-mist">Upload or library → dual presence, breed/sex/cuck, poses, locations.</p>
+      <p className="text-sm text-mist">Upload or library → dual presence, breed/sex/cuck, poses, locations. Hands-free on mobile.</p>
       <div className="flex flex-wrap gap-1.5">
         <button type="button" onClick={() => setSourceTab("library")} className={`px-2.5 py-1 rounded-full text-[11px] border ${sourceTab === "library" ? "border-pink-500 bg-pink-500/20" : "border-white/10"}`}>library</button>
         <button type="button" onClick={() => setSourceTab("upload")} className={`px-2.5 py-1 rounded-full text-[11px] border ${sourceTab === "upload" ? "border-pink-500 bg-pink-500/20" : "border-white/10"}`}>upload</button>
@@ -168,13 +193,50 @@ export function Joi3DStage({
             className={`px-3 py-2 rounded-xl border text-sm ${fucking ? "border-rose-400 bg-rose-500/20" : "border-white/15"}`}>{fucking ? "Thrusting ON" : "Thrust"}</button>
           <button type="button" onClick={() => speakLine()} className="px-3 py-2 rounded-xl bg-pink-600 text-sm">Speak</button>
           <button type="button" onClick={() => { const n = Math.min(script.length - 1, lineIdx + 1); setLineIdx(n); setTimeout(() => speakLine(script[n]), 40); }} className="px-3 py-2 rounded-xl border border-white/15 text-sm">Next</button>
+          <button type="button" onClick={() => setAutoVoice((v) => !v)}
+            className={`px-3 py-2 rounded-xl border text-xs ${autoVoice ? "border-emerald-400 bg-emerald-500/20 text-emerald-100" : "border-white/15"}`}>
+            {autoVoice ? "Auto voice ON" : "Auto voice"}
+          </button>
+          <button type="button" onClick={() => { setAutoAdvance((v) => !v); if (!autoVoice) setAutoVoice(true); }}
+            className={`px-3 py-2 rounded-xl border text-xs ${autoAdvance ? "border-emerald-400 bg-emerald-500/20 text-emerald-100" : "border-white/15"}`}>
+            {autoAdvance ? "Auto advance ON" : "Auto advance"}
+          </button>
+          <button type="button" onClick={() => { setAutoVoice(true); setAutoAdvance(true); setBeatOn(true); startJoiBeat(108); setBreathOn(true); startIntimacyAudio(72); }}
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-xs font-semibold">
+            Hands-free
+          </button>
           <button type="button" onClick={() => { if (beatOn) { stopJoiBeat(); setBeatOn(false); } else { startJoiBeat(108); setBeatOn(true); } }}
             className={`px-3 py-2 rounded-xl border text-xs ${beatOn ? "border-pink-400 bg-pink-500/20" : "border-white/15"}`}>{beatOn ? "Beat ON" : "Beat"}</button>
           <button type="button" onClick={() => { if (breathOn) { stopIntimacyAudio(); setBreathOn(false); } else { startIntimacyAudio(72); setBreathOn(true); } }}
             className={`px-3 py-2 rounded-xl border text-xs ${breathOn ? "border-fuchsia-400 bg-fuchsia-500/20" : "border-white/15"}`}>{breathOn ? "Breath ON" : "Breath"}</button>
         </div>
+        <div className="pt-1">
+          <p className="text-[10px] uppercase tracking-wide text-zinc-500 mb-1.5">Voice packs</p>
+          <div className="flex flex-wrap gap-1.5">
+            {VOICE_PACKS.map((pack) => (
+              <button
+                key={pack.id}
+                type="button"
+                onClick={() => {
+                  const line = pack.lines[Math.floor(Math.random() * pack.lines.length)];
+                  if (pack.id === "breed-fill") {
+                    setMode("breed");
+                    setFucking(true);
+                    setShowGuy(true);
+                  } else if (pack.id === "cuck-report") setMode("cuck");
+                  else if (pack.id === "bnwo-rank") setMode("bnwo");
+                  else if (pack.id === "edge" || pack.id === "finish" || pack.id === "whisper") setMode("joi");
+                  speakLine(line);
+                }}
+                className="px-2.5 py-1.5 rounded-full text-[11px] border border-pink-500/35 bg-pink-500/10 text-pink-100 hover:bg-pink-500/20"
+              >
+                {pack.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
-      <p className="text-[11px] text-zinc-500">{girl?.name}{uploadPreview ? " · upload" : ""} · {mode} · {pose} · {location}{fucking ? " · thrusting" : ""} · {intimacy}%</p>
+      <p className="text-[11px] text-zinc-500">{girl?.name}{uploadPreview ? " · upload" : ""} · {mode} · {pose} · {location}{fucking ? " · thrusting" : ""}{autoVoice ? " · auto voice" : ""}{autoAdvance ? " · auto advance" : ""} · {intimacy}%</p>
     </div>
   );
 }
