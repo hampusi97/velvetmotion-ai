@@ -43,7 +43,7 @@ import {
   type StoredMessage,
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
-import { characterMediaUrl, resolveBestMediaUrl, type MediaMood } from "@/lib/media";
+import { characterMediaUrl, freeformImageUrl, resolveBestMediaUrl, type MediaMood } from "@/lib/media";
 import {
   runSequenceGeneration,
   enhanceSequenceWithVideo,
@@ -107,6 +107,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
   const [edgeLocked, setEdgeLocked] = useState(false);
+  const [freeformPrompt, setFreeformPrompt] = useState("");
   // Daily heat: streak changes default mood
   useEffect(() => {
     try {
@@ -725,7 +726,30 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         ))}
       </div>
 
-      <div className="flex gap-2 pt-1">
+      
+      <div className="flex gap-2 pb-2">
+        <input
+          value={freeformPrompt}
+          onChange={(e) => setFreeformPrompt(e.target.value)}
+          placeholder="Any scene… (blowjob, doggy, hotel, outdoor, JOI…)"
+          className="flex-1 rounded-xl border border-pink-500/30 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder:text-zinc-500 outline-none"
+        />
+        <button
+          type="button"
+          disabled={busy || !freeformPrompt.trim()}
+          onClick={() => {
+            const url = freeformImageUrl(freeformPrompt, character);
+            const msg = { role: "assistant" as const, content: `*Any scene:* ${freeformPrompt}`, imageUrl: url };
+            setMessages((m) => [...m, msg]);
+            setFreeformPrompt("");
+            setIntimacy(bumpIntimacy(character.id, 4));
+          }}
+          className="rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 btn-candy"
+        >
+          Make it
+        </button>
+      </div>
+<div className="flex gap-2 pt-1">
         <textarea
           ref={inputRef}
           value={input}
