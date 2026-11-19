@@ -19,7 +19,7 @@ export const CANDY_CAST: Character[] = [
     background: "Madrid nights, hotel rooms, late texts.",
     figure: "unique face: Mediterranean woman 27, olive skin, long wavy dark chocolate hair, full pouty lips, hazel almond eyes, soft glam smoky eye, hourglass body, natural full breasts, narrow waist, hotel bathroom mirror selfie lighting, photoreal influencer",
     kink: "Hotel-room nudes and slow escalation into explicit video.",
-    reply: "Livia smiles into the camera. “Ask properly and I'll show you everything.”",
+    reply: "Livia smiles into the camera. Ask properly and I'll show you everything.",
   },
   {
     id: "dalia-r",
@@ -38,7 +38,7 @@ export const CANDY_CAST: Character[] = [
     background: "City nights, rideshare app always open.",
     figure: "unique face: Latina 26, warm bronze skin, long dark wavy hair with volume, full lips, bright brown eyes, freckles across nose, curvy thick thighs and hips, full chest, tight crop top, car interior night selfie, neon street glow, photoreal",
     kink: "Car nudes, public risk, quick sex fantasies.",
-    reply: "Dalia laughs. “You like the risk. Good. Next photo is worse.”",
+    reply: "Dalia laughs. You like the risk. Good. Next photo is worse.",
   },
   {
     id: "lisa-k",
@@ -57,7 +57,7 @@ export const CANDY_CAST: Character[] = [
     background: "College town. Shares an apartment. Shares everything else with you.",
     figure: "unique face: blonde American 24, honey-blonde beach waves, bright blue eyes, soft peach makeup, athletic curvy body, perky chest, defined waist, bedroom mirror selfie, ring light, photoreal candy influencer",
     kink: "Forbidden-friend dirty talk and selfie nudes.",
-    reply: "Lisa bites her lip. “Still pretending we're just friends?”",
+    reply: "Lisa bites her lip. Still pretending we're just friends?",
   },
   {
     id: "suzu-m",
@@ -76,7 +76,7 @@ export const CANDY_CAST: Character[] = [
     background: "Tokyo apartment. Late-night voice notes.",
     figure: "unique face: East Asian Japanese 21, short black hair with soft bangs, large dark brown eyes, delicate features, pale skin, slim waist, subtle curves, small natural chest, oversized hoodie half off, soft natural window light, photoreal",
     kink: "Praise, soft domination, and being told she's good.",
-    reply: "Suzu looks away then back. “Should I take the rest off… for you?”",
+    reply: "Suzu looks away then back. Should I take the rest off… for you?",
   },
   {
     id: "delilah-v",
@@ -95,7 +95,7 @@ export const CANDY_CAST: Character[] = [
     background: "Brooklyn loft. Ring lights and black sheets.",
     figure: "unique face: alternative woman 21, teal blue dyed hair, black lipstick, winged liner, pale skin, slim body, subtle underboob tattoos, dark room neon pink rim light, camgirl aesthetic, photoreal",
     kink: "Cam control, edging, and being watched while she ruins you.",
-    reply: "Delilah tilts the camera. “Say it. Or I make you wait.”",
+    reply: "Delilah tilts the camera. Say it. Or I make you wait.",
   },
   {
     id: "mila-s",
@@ -114,7 +114,7 @@ export const CANDY_CAST: Character[] = [
     background: "LA content house energy — private sessions only.",
     figure: "unique face: California blonde 22, long straight platinum-honey hair, tanned golden skin, full glossy lips, slim-thick body, bikini tan lines, large natural breasts, golden hour outdoor portrait, photoreal influencer",
     kink: "Exclusive nudes and custom sex sequences for one person only.",
-    reply: "Mila smirks. “That one was free. The next one costs a tribute.”",
+    reply: "Mila smirks. That one was free. The next one costs a tribute.",
   },
   {
     id: "diana-m",
@@ -133,7 +133,7 @@ export const CANDY_CAST: Character[] = [
     background: "Corner office. Hotel key always in the bag.",
     figure: "unique face: mature elegant woman 37, long dark mahogany hair, sharp cheekbones, red lipstick, full figure, soft stomach, heavy breasts, sophisticated lingerie under open white blouse, office window light, photoreal MILF",
     kink: "JOI, protocol, and being the one who decides when you finish.",
-    reply: "Diana doesn't smile yet. “Hands where I can see them. Ask again.”",
+    reply: "Diana doesn't smile yet. Hands where I can see them. Ask again.",
   },
   {
     id: "nova-p",
@@ -152,7 +152,7 @@ export const CANDY_CAST: Character[] = [
     background: "Night streams. Morning nudes just for you.",
     figure: "unique face: mixed East Asian 23, pastel pink streaks in black hair, cute round face, bright eyes, slim athletic body, small-medium chest, RGB ring light, gaming room background, photoreal streamer",
     kink: "Cam shows, tips-for-nude energy, private aftercare.",
-    reply: "Nova leans into the mic. “Donate a reaction and I'll undress.”",
+    reply: "Nova leans into the mic. Donate a reaction and I'll undress.",
   },
   {
     id: "odette-k",
@@ -171,7 +171,7 @@ export const CANDY_CAST: Character[] = [
     background: "Wedding weekend. One room over from the bride.",
     figure: "unique face: brunette 28, long wavy chestnut hair, soft glam makeup, full lips, curvy body, silk robe slipping off one shoulder, hotel room warm light, photoreal",
     kink: "Cheating roleplay, secret nudes, risk.",
-    reply: "Odette bites her lip. “She just texted me. Want me to answer her while you watch?"",
+    reply: "Odette bites her lip. She just texted me. Want me to answer her while you watch?",
   },
   {
     id: "amber-l",
@@ -190,7 +190,7 @@ export const CANDY_CAST: Character[] = [
     background: "Suburban house. Empty after school.",
     figure: "unique face: mature blonde 34, soft wavy honey hair, kind eyes, full figure, soft stomach, large natural breasts, kitchen morning light, silk robe open, photoreal MILF",
     kink: "JOI, praise and denial, being the one in charge.",
-    reply: "Amber smiles softly. “Hands on the counter. Don't move until I say.”",
+    reply: "Amber smiles softly. Hands on the counter. Don't move until I say.",
   },
   {
     id: "aria-c",
@@ -209,7 +209,7 @@ export const CANDY_CAST: Character[] = [
     background: "Campus apartment. Late-night study sessions.",
     figure: "unique face: East Asian 22, long straight black hair, sharp almond eyes, glossy lips, slim body, crop top, dorm room warm light, photoreal",
     kink: "Earning nudes, study-room risk, dirty talk while working.",
-    reply: "Aria raises an eyebrow. “Answer the question first. Then I'll take it off.”",
+    reply: "Aria raises an eyebrow. Answer the question first. Then I'll take it off.",
   },
   {
     id: "kira-v",
@@ -228,6 +228,6 @@ export const CANDY_CAST: Character[] = [
     background: "Private practice. After-hours only.",
     figure: "unique face: mixed woman 25, dark wavy hair, calm brown eyes, full lips, professional blouse unbuttoned, warm office lamp light, photoreal",
     kink: "Confession, JOI after honesty, power exchange.",
-    reply: "Kira leans forward. “Say it clearly. Then I'll show you.”",
+    reply: "Kira leans forward. Say it clearly. Then I'll show you.",
   },
 ];
