@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { BadgeCheck, Search, Sparkles, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { riseContainer, riseItem } from "@/lib/motion";
 import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
@@ -13,15 +13,15 @@ import { CandyGirlCard } from "./CandyGirlCard";
 import { canClaimDaily, claimDaily, getCoins } from "@/lib/storage";
 import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
-import { characterMediaUrl } from "@/lib/media";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
 
 const EXPERIENCES = [
-  { id: "create" as SectionId, title: "CREATE HER", subtitle: "Look · personality · heat", neon: "from-pink-400 to-cyan-400", imageMood: "beauty" as const },
-  { id: "tinder" as SectionId, title: "DISCOVER", subtitle: "Swipe · match · undress", neon: "from-fuchsia-400 to-pink-400", imageMood: "lingerie" as const },
-  { id: "joi" as SectionId, title: "PRIVATE", subtitle: "JOI · galleries · tributes", neon: "from-pink-300 to-rose-400", imageMood: "seductive" as const },
-  { id: "blindfold" as SectionId, title: "BLINDFOLD", subtitle: "Audio first · reveal later", neon: "from-zinc-200 to-pink-300", imageMood: "nude" as const },
-  { id: "penthouse" as SectionId, title: "3D SUITE", subtitle: "Hotspots · lighting", neon: "from-fuchsia-300 to-violet-400", imageMood: "beauty" as const },
-  { id: "room" as SectionId, title: "GOON ROOM", subtitle: "Timed · dual", neon: "from-rose-400 to-pink-500", imageMood: "explicit" as const },
+  { id: "create" as SectionId, title: "CREATE HER", subtitle: "Look · personality · heat", neon: "from-pink-400 to-cyan-400" },
+  { id: "tinder" as SectionId, title: "DISCOVER", subtitle: "Swipe · match · undress", neon: "from-fuchsia-400 to-pink-400" },
+  { id: "joi" as SectionId, title: "PRIVATE", subtitle: "JOI · galleries · tributes", neon: "from-pink-300 to-rose-400" },
+  { id: "blindfold" as SectionId, title: "BLINDFOLD", subtitle: "Audio first · reveal later", neon: "from-zinc-200 to-pink-300" },
+  { id: "penthouse" as SectionId, title: "3D SUITE", subtitle: "Hotspots · lighting", neon: "from-fuchsia-300 to-violet-400" },
+  { id: "room" as SectionId, title: "GOON ROOM", subtitle: "Timed · dual", neon: "from-rose-400 to-pink-500" },
 ];
 
 export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
@@ -67,7 +67,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show">
       <motion.section variants={riseItem} className="relative mb-8 overflow-hidden rounded-[1.75rem] border border-pink-500/25 candy-hero">
         <div className="relative aspect-[2.2/1] min-h-[240px] sm:min-h-[320px]">
-          <img src={characterMediaUrl(hero, "beauty")} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+          <img src={staticPortraitUrl(hero.id)} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
           <div className="relative z-10 flex h-full flex-col justify-end p-6 sm:p-10 max-w-lg">
@@ -109,7 +109,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
             const face = CHARACTERS[i % CHARACTERS.length];
             return (
               <button key={exp.id} type="button" onClick={() => onNavigate(exp.id)} className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 text-left girl-card">
-                <img src={characterMediaUrl(face, exp.imageMood)} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                <img src={staticPortraitUrl(face.id)} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4">
                   <div className={`text-xl font-black tracking-tight bg-gradient-to-r ${exp.neon} bg-clip-text text-transparent`}>{exp.title}</div>
@@ -138,7 +138,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
           {searchOpen && <input type="search" value={homeQuery} onChange={(e) => setHomeQuery(e.target.value)} placeholder="Search…" className="mb-4 w-full rounded-xl border border-white/15 bg-zinc-900/90 px-4 py-2 text-sm outline-none focus:border-pink-500" autoFocus />}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5">
             {featured.map((c, i) => (
-              <CandyGirlCard key={c.id} character={c} onSelect={() => onOpenGirl(c.id)} mood={i % 3 === 0 ? "lingerie" : "beauty"} isNew={i < 4} />
+              <CandyGirlCard key={c.id} character={c} onSelect={() => onOpenGirl(c.id)} isNew={i < 4} />
             ))}
           </div>
         </motion.section>
