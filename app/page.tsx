@@ -395,7 +395,7 @@ export default function Home() {
           {view === "tribute" && (
             <>
               <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
-              <TributeBrowser onStartWithGirl={openChatById} />
+              <TributeBrowser />
             </>
           )}
           {view === "packs" && (
@@ -407,7 +407,7 @@ export default function Home() {
           {view === "joi" && (
             <>
               <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
-              <JoiBrowser onStartWithGirl={openChatById} />
+              <JoiBrowser />
             </>
           )}
           {view === "gallery" && (
