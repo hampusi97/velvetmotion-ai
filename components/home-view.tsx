@@ -9,6 +9,7 @@ import { FeatureCard } from "./feature-card";
 import { DailyFeed } from "./DailyFeed";
 import { FeaturedPair } from "./FeaturedPair";
 import { ProactiveInbox } from "./ProactiveInbox";
+import { CandyGirlCard } from "./CandyGirlCard";
 import { canClaimDaily, claimDaily, getCoins } from "@/lib/storage";
 import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
@@ -59,24 +60,24 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
   };
 
   const categories = useMemo(() => ["All", ...characterCategories()], []);
-  const featured = useMemo(() => filterCharacters({ query: homeQuery, category: homeCategory }).slice(0, 24), [homeQuery, homeCategory]);
+  const featured = useMemo(() => filterCharacters({ query: homeQuery, category: homeCategory }).slice(0, 30), [homeQuery, homeCategory]);
   const hero = CHARACTERS[heroIdx % CHARACTERS.length];
 
   return (
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show">
       <motion.section variants={riseItem} className="relative mb-8 overflow-hidden rounded-[1.75rem] border border-pink-500/25 candy-hero">
-        <div className="relative aspect-[2.2/1] min-h-[220px] sm:min-h-[280px]">
+        <div className="relative aspect-[2.2/1] min-h-[240px] sm:min-h-[320px]">
           <img src={characterMediaUrl(hero, "beauty")} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/55 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
           <div className="relative z-10 flex h-full flex-col justify-end p-6 sm:p-10 max-w-lg">
             <div className="flex items-center gap-2 mb-2">
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Online
               </span>
-              <span className="rounded-full bg-pink-600/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Featured</span>
+              <span className="rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Featured</span>
             </div>
-            <h1 className="font-display text-4xl sm:text-6xl text-white leading-none tracking-tight">{hero.name.split(" ")[0]}</h1>
+            <h1 className="font-display text-5xl sm:text-7xl text-transparent bg-gradient-to-b from-amber-200 via-yellow-100 to-amber-400 bg-clip-text leading-none tracking-tight drop-shadow-lg">{hero.name.split(" ")[0]}</h1>
             <p className="mt-1 text-base sm:text-lg text-pink-100/90 font-medium">{hero.tagline.slice(0, 70)}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <button type="button" onClick={() => onOpenGirl?.(hero.id)} className="candy-cta px-7 py-2.5 text-sm">Play with her</button>
@@ -135,15 +136,9 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
             ))}
           </div>
           {searchOpen && <input type="search" value={homeQuery} onChange={(e) => setHomeQuery(e.target.value)} placeholder="Search…" className="mb-4 w-full rounded-xl border border-white/15 bg-zinc-900/90 px-4 py-2 text-sm outline-none focus:border-pink-500" autoFocus />}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2.5">
             {featured.map((c, i) => (
-              <button key={c.id} type="button" onClick={() => onOpenGirl(c.id)} className="girl-card relative aspect-[3/4] rounded-xl overflow-hidden border border-white/10 bg-zinc-950 group text-left">
-                <img src={characterMediaUrl(c, i % 3 === 0 ? "lingerie" : "beauty")} alt={c.name} className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition duration-500" loading="lazy" />
-                {i < 3 && <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><Sparkles className="h-2 w-2" />NEW</span>}
-                <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/95 via-black/60 to-transparent">
-                  <div className="flex items-center gap-1"><span className="font-semibold text-xs text-white truncate">{c.name}</span><span className="text-[10px] text-zinc-400">{c.age}</span><BadgeCheck className="h-3 w-3 text-pink-400" /></div>
-                </div>
-              </button>
+              <CandyGirlCard key={c.id} character={c} onSelect={() => onOpenGirl(c.id)} mood={i % 3 === 0 ? "lingerie" : "beauty"} isNew={i < 4} />
             ))}
           </div>
         </motion.section>
