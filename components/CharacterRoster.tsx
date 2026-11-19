@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { BadgeCheck, ImageIcon, Mic, Sparkles } from "lucide-react";
 import { filterCharacters, type Character } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
+import { getCachedPortrait, setCachedPortrait } from "@/lib/portraitCache";
 import { getPinned, togglePin } from "@/lib/storage";
 import { useState } from "react";
 
@@ -109,7 +110,7 @@ export function CharacterRoster({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {visible.map((character, i) => {
-            const src = characterMediaUrl(character, "beauty");
+            const src = getCachedPortrait(character.id) || characterMediaUrl(character, "beauty");
             const isNew = i < 6;
             return (
               <button
