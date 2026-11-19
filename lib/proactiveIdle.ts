@@ -98,6 +98,7 @@ export function markProactiveFired() {
 export function buildProactivePing(character: Character): ProactivePing {
   const intimacy = getIntimacy(character.id, character.intimacy);
   const first = character.name.split(" ")[0];
+  // Prefer memory-aware line ~40% of the time when we have facts
   const memLine = Math.random() < 0.45 ? memoryHook(character.id, first) : null;
   let text =
     memLine ||
