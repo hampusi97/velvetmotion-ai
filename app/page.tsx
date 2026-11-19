@@ -20,6 +20,8 @@ import { TributeBrowser } from "@/components/TributeBrowser";
 import { CreateGirlWizard } from "@/components/CreateGirlWizard";
 import { GoonRoom } from "@/components/GoonRoom";
 import { DiscoverSwipe } from "@/components/DiscoverSwipe";
+import { StripRoulette } from "@/components/StripRoulette";
+import { EdgeTimer } from "@/components/EdgeTimer";
 import { RouletteRoom } from "@/components/RouletteRoom";
 import { BlindfoldJoi } from "@/components/BlindfoldJoi";
 import { Joi3DStage } from "@/components/Joi3DStage";
@@ -370,6 +372,8 @@ export default function Home() {
             <GoonRoom onHome={() => setView("home")} onChat={openChatById} onOpenDual={openDualWithPair} />
           )}
           {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "strip" && <StripRoulette onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "edge" && <EdgeTimer onHome={() => setView("home")} />}
           {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
           {view === "joi3d" && (
             <Joi3DStage
