@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Heart, MessageCircle, Pause, Play, Volume2 } from "lucide-react";
+import { Download, Heart, MessageCircle, Pause, Play, Volume2 } from "lucide-react";
 import { CHARACTERS } from "@/lib/characters";
 import { SHORTS_GENRES, SHORTS_SERIES } from "@/lib/shortsCatalog";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { speakWithNeuralVoice } from "@/lib/kokoroTts";
+import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
 
 const kenburns = `@keyframes kenburns { 0% { transform: scale(1) translate(0,0); } 50% { transform: scale(1.1) translate(-1.5%,-1%); } 100% { transform: scale(1) translate(0,0); } } .animate-kenburns { animation: kenburns 11s ease-in-out infinite; }`;
 
@@ -20,6 +21,32 @@ export function ShortsFeed({
   const [paused, setPaused] = useState(false);
   const [pace, setPace] = useState<1 | 1.5>(1);
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
+  const [exportingId, setExportingId] = useState<string | null>(null);
+  const [exportNote, setExportNote] = useState<string | null>(null);
+
+  const exportClip = async (seriesId: string, portraitUrl: string, title: string) => {
+    if (exportingId) return;
+    setExportingId(seriesId);
+    setExportNote("Rendering 5s WebM motion clip…");
+    try {
+      const res = await generateStudioVideoClip({
+        imageUrl: portraitUrl,
+        motionId: "slow-zoom-blink",
+        durationSec: 5,
+        speed: pace === 1.5 ? 1.25 : 1,
+        prompt: `${title}, smooth motion loop, adult fictional companion`,
+      });
+      const a = document.createElement("a");
+      a.href = res.videoUrl;
+      a.download = `${seriesId}.webm`;
+      a.click();
+      setExportNote(`Saved 5s clip via ${res.engine}`);
+    } catch {
+      setExportNote("Video export failed — try again in a desktop/mobile Chromium browser.");
+    } finally {
+      setExportingId(null);
+    }
+  };
 
   const items = useMemo(() => {
     const filtered = genre === "All" ? SHORTS_SERIES : SHORTS_SERIES.filter((s) => s.genre === genre);
@@ -135,7 +162,23 @@ export function ShortsFeed({
                   >
                     {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                   </button>
+                  <button
+                    type="button"
+                    aria-label="Export .webm video clip"
+                    disabled={exportingId === series.id}
+                    onClick={() => void exportClip(series.id, portrait, ep.title)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full neon-glass text-[#00ffa3] disabled:opacity-50"
+                    title="Generate & Download 5s .webm Motion Loop"
+                  >
+                    <Download className={`h-4 w-4 ${exportingId === series.id ? "animate-bounce" : ""}`} />
+                  </button>
                 </div>
+
+                {exportNote && exportingId === null && (
+                  <div className="absolute left-3 top-3 z-20 rounded-full border border-[#00ffa3]/40 bg-black/75 px-3 py-1 text-[10px] font-semibold text-[#00ffa3]">
+                    {exportNote}
+                  </div>
+                )}
 
                 {/* Bottom Overlay Info */}
                 <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-[#05050a] via-black/80 to-transparent z-10 pr-16">

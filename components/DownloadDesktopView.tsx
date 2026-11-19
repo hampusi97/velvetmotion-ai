@@ -100,6 +100,7 @@ const OS_OPTIONS: Record<DetectedOs, { label: string; installer: string; note: s
 export function DownloadDesktopView() {
   const [os, setOs] = useState<DetectedOs>("windows");
   const [releaseTag, setReleaseTag] = useState<string | null>(null);
+  const [releaseNotes, setReleaseNotes] = useState<string | null>(null);
   const [releaseAssets, setReleaseAssets] = useState<GithubReleaseAsset[]>([]);
   const [releaseState, setReleaseState] = useState<"checking" | "live" | "pending">("checking");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -110,15 +111,57 @@ export function DownloadDesktopView() {
   useEffect(() => {
     setOs(detectOs());
     let active = true;
+    const repos = Array.from(
+      new Set(
+        [process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim(), "hampusi97/velvetmotion-releases", "hampusi97/velvetmotion-ai"].filter(
+          (r): r is string => Boolean(r)
+        )
+      )
+    );
     const loadRelease = async () => {
+      // 1) Try Tauri updater latest.json first for version, release notes & updater URLs
+      for (const repo of repos) {
+        try {
+          const res = await fetch(`https://github.com/${repo}/releases/latest/download/latest.json`, {
+            cache: "no-store",
+          });
+          if (!res.ok) continue;
+          const manifest = (await res.json()) as {
+            version?: string;
+            notes?: string;
+            platforms?: Record<string, { url?: string }>;
+          };
+          if (!active) return;
+          if (manifest?.version) {
+            setReleaseTag(manifest.version.startsWith("v") ? manifest.version : `v${manifest.version}`);
+            if (manifest.notes) setReleaseNotes(manifest.notes);
+            if (manifest.platforms) {
+              const mapped: GithubReleaseAsset[] = Object.entries(manifest.platforms)
+                .filter(([, p]) => Boolean(p?.url))
+                .map(([platform, p]) => ({
+                  name: `${platform}-${p.url!.split("/").pop() || platform}`,
+                  browser_download_url: p.url!,
+                }));
+              if (mapped.length > 0) setReleaseAssets(mapped);
+            }
+            setReleaseState("live");
+            break;
+          }
+        } catch {
+          /* CORS or latest.json pending; continue to GitHub Releases API */
+        }
+      }
+
+      // 2) Load GitHub Releases API assets list so direct .exe/.dmg/.AppImage installers resolve cleanly
       for (const apiUrl of Array.from(new Set([RELEASE_API, FALLBACK_RELEASE_API]))) {
         try {
           const res = await fetch(apiUrl);
           if (!res.ok) continue;
-          const data = (await res.json()) as { tag_name?: string; assets?: GithubReleaseAsset[] } | null;
+          const data = (await res.json()) as { tag_name?: string; body?: string; assets?: GithubReleaseAsset[] } | null;
           if (!active) return;
           if (data && data.tag_name && Array.isArray(data.assets) && data.assets.length > 0) {
             setReleaseTag(data.tag_name);
+            if (data.body) setReleaseNotes(data.body);
             setReleaseAssets(data.assets);
             setReleaseState("live");
             return;
@@ -127,7 +170,7 @@ export function DownloadDesktopView() {
           /* try next release endpoint */
         }
       }
-      if (active) setReleaseState("pending");
+      if (active) setReleaseState((prev) => (prev === "live" ? "live" : "pending"));
     };
     void loadRelease();
     return () => {
@@ -201,6 +244,12 @@ export function DownloadDesktopView() {
                   : rec.note}
             </span>
           </div>
+
+          {releaseNotes && (
+            <p className="mx-auto max-w-xl text-[11px] text-[#a6a6c4] line-clamp-2">
+              {releaseNotes}
+            </p>
+          )}
 
           {/* All OS Download Pills */}
           <div className="pt-3 flex flex-wrap justify-center gap-2 text-xs">
