@@ -138,7 +138,10 @@ export function HomeView({
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 Online
               </span>
+              <div className="flex items-center gap-2 mb-1">
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300">100% free</span>
               <p className="text-xs uppercase tracking-[0.25em] text-pink-300">Featured companion</p>
+            </div>
             </div>
             <h1 className="mt-2 font-display text-3xl sm:text-5xl text-white leading-tight">
               {hero.name.split(" ")[0]}
