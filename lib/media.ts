@@ -1,13 +1,13 @@
 /**
  * VelvetMotion Media Engine
- * Beauty/seductive → Cloudflare Flux worker (high quality, SFW-safe).
- * Nude / explicit / sex / JOI / SPH / BNWO → Pollinations Flux (uncensored fallback).
- * Static portraits kept as optional home-grid fallback.
+ * Beauty/seductive → Cloudflare Flux worker.
+ * NSFW moods → AI Horde (free, nsfw:true) with Pollinations fallback.
  */
 
 import type { Character } from "./charactersTypes";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
+import { generateHordeImage } from "./aiHorde";
 
 const CF_IMAGE_WORKER =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_IMAGE_WORKER_URL) ||
@@ -87,15 +87,12 @@ function pollinationsUncensoredUrl(character: Pick<Character, "id" | "name" | "f
 const STATIC_PORTRAITS = new Set(["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper","livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p","valentina","lana-rho","lena-plug","dalia-x","riley-re"]);
 
 export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood = "beauty", extra = "", opts?: { seedOverride?: number; preferStatic?: boolean }): string {
-  // Home grid: optional static high-quality portraits
   if (mood === "beauty" && opts?.preferStatic && STATIC_PORTRAITS.has(character.id)) {
     return `/portraits/${character.id}.jpg`;
   }
-  // NSFW moods → Pollinations (Cloudflare blocks explicit)
   if (NSFW_MOODS.has(mood)) {
     return pollinationsUncensoredUrl(character, mood, extra, opts);
   }
-  // Beauty / seductive / lingerie / aftercare → Cloudflare Flux worker
   return workerUrl(character, mood, extra, opts);
 }
 
@@ -107,6 +104,18 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
     const localRes = await generateLocalImage({ prompt, seed, width: 768, height: 1152, characterId: character.id });
     if (localRes.ok && localRes.imageUrl) return { url: localRes.imageUrl, note: localRes.note };
   }
+
+  if (NSFW_MOODS.has(mood) && typeof window !== "undefined") {
+    try {
+      const prompt = buildPrompt(character, mood, extra);
+      const seed = (faceSeed(character) * 97 + mediaSeed(character.id, mood, extra)) % 100000;
+      const horde = await generateHordeImage({ prompt, seed, nsfw: true, width: 768, height: 1152 });
+      return horde;
+    } catch {
+      return { url: pollinationsUncensoredUrl(character, mood, extra), note: "Pollinations fallback" };
+    }
+  }
+
   const url = characterMediaUrl(character, mood, extra);
   const note = NSFW_MOODS.has(mood) ? "Pollinations Flux" : "Cloudflare Flux";
   return { url, note };
