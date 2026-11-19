@@ -32,8 +32,8 @@ function loadCompanionsViaTsx() {
       })),
     }));
   `;
-  const tsxBin = path.join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
-  const out = execFileSync(tsxBin, ["-e", inline], { cwd: ROOT, encoding: "utf8" });
+  const tsxCli = path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
+  const out = execFileSync(process.execPath, [tsxCli, "-e", inline], { cwd: ROOT, encoding: "utf8" });
   return JSON.parse(out);
 }
 
