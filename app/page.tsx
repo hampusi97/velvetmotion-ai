@@ -186,6 +186,60 @@ export default function Home() {
     );
   }, [authReady, user, selectedId, customCharacter]);
 
+  useEffect(() => {
+    if (!authReady || !user?.isFirebase || !user?.uid) return;
+    let unsubGallery = () => {};
+    let unsubCompanions = () => {};
+    void import("@/lib/firebase")
+      .then((fb) => {
+        unsubGallery = fb.subscribeUserGallery(user.uid!, (cloudItems) => {
+          if (!cloudItems.length) return;
+          try {
+            const raw = localStorage.getItem("vm-gallery");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const item of [...cloudItems, ...(Array.isArray(local) ? local : [])]) {
+              if (item && typeof item.id === "string" && !map.has(item.id)) {
+                map.set(item.id, item);
+              }
+            }
+            localStorage.setItem("vm-gallery", JSON.stringify(Array.from(map.values()).slice(0, 200)));
+          } catch {
+            /* ignore */
+          }
+        });
+        unsubCompanions = fb.subscribeUserCompanions(user.uid!, (cloudGirls) => {
+          if (!cloudGirls.length) return;
+          try {
+            const raw = localStorage.getItem("vm-custom-girls");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const g of Array.isArray(local) ? local : []) {
+              if (g && typeof g.id === "string") map.set(g.id, g);
+            }
+            for (const cg of cloudGirls) {
+              if (!map.has(cg.id)) {
+                map.set(cg.id, {
+                  ...CHARACTERS[0],
+                  ...cg,
+                  traits: ["Custom", cg.personality],
+                  initialMessage: `Hey baby… I'm ${cg.name}. ${cg.tagline}`,
+                });
+              }
+            }
+            localStorage.setItem("vm-custom-girls", JSON.stringify(Array.from(map.values())));
+          } catch {
+            /* ignore */
+          }
+        });
+      })
+      .catch(() => {});
+    return () => {
+      unsubGallery();
+      unsubCompanions();
+    };
+  }, [authReady, user?.isFirebase, user?.uid]);
+
   const navigate = (next: string) => {
     setMenuOpen(false);
     if (next === "girls" || next === "romance") openRoster(next === "romance");

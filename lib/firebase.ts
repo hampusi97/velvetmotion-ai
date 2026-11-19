@@ -106,7 +106,7 @@ export function handleFirestoreError(
   error: unknown,
   operationType: OperationType,
   path: string | null,
-): never {
+): void {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -124,8 +124,7 @@ export function handleFirestoreError(
     operationType,
     path,
   };
-  console.error("Firestore Error: ", JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.warn("Firestore Sync Info:", JSON.stringify(errInfo));
 }
 
 let connectionTested = false;
@@ -292,6 +291,7 @@ export async function ensureUserProfileInFirestore(user: User, defaultCoins = 50
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+    return defaultCoins;
   }
 }
 

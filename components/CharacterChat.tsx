@@ -24,7 +24,9 @@ import {
   extractMemoriesFromMessage,
   loadMemories,
   saveMemories,
+  splitInnerThoughtAndReply,
 } from "@/lib/memoryMap";
+import { claimFreeWalletRefill } from "@/lib/wallet";
 import { pushShort, memoryPromptBlock, pinLong } from "@/lib/memoryTiers";
 import { stageFromIntimacy, nextStage } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
@@ -330,6 +332,85 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
     void generateSequence(preset.kind as SequenceKind);
   };
 
+  const runFullScenePipeline = async () => {
+    if (busy) return;
+    setBusy(true);
+    setClipStatus("Running 5-stage Director Pipeline (Mood → Monologue → Selfie → Sequence)…");
+    try {
+      const promptText =
+        input.trim() ||
+        messages.filter((m) => m.role === "user").at(-1)?.content ||
+        "Pull me close into a private late-night scene.";
+      if (input.trim()) setInput("");
+      const res = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: character.id,
+          customCharacter: character,
+          userMessage: promptText,
+          messages: messages.slice(-10),
+          intimacy,
+          romanceMode,
+          includeSelfie: true,
+          sequenceKind: intimacy >= 60 ? "sex" : "joi",
+          includeAftercare: true,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const frames: string[] | undefined = data.sequence?.frames;
+        const imageUrl: string | undefined = data.sceneSelfie?.url || frames?.[0];
+        if (imageUrl) {
+          addToGallery({
+            characterId: character.id,
+            characterName: character.name,
+            type: data.sceneSelfie?.mood || "lingerie",
+            url: imageUrl,
+            frames,
+            prompt: data.sceneSelfie?.label || `${character.name} pipeline scene`,
+          });
+        }
+        const combinedText = [
+          data.rawReply || data.dialogue,
+          data.aftercare ? `\n\n*Aftercare:* “${data.aftercare}”` : "",
+        ]
+          .filter(Boolean)
+          .join("");
+        const next: ChatMessage[] = [
+          ...messages,
+          ...(promptText ? [{ role: "user" as const, content: promptText }] : []),
+          {
+            role: "assistant",
+            content: combinedText || `*${character.name} leans closer.*`,
+            imageUrl,
+            frames,
+            mediaType: data.sequence?.kind || "lingerie",
+          },
+        ];
+        persist(next);
+        if (imageUrl) {
+          setActiveMedia({
+            url: imageUrl,
+            frames,
+            type: data.sequence?.kind || "lingerie",
+            note: `Pipeline (${(data.stages || []).length} stages)`,
+          });
+        }
+        const nextInt = bumpIntimacy(character.id, data.relationship?.intimacyDelta || 6);
+        setIntimacy(nextInt);
+        setClipStatus(`Pipeline complete: ${(data.stages || []).join(" → ")}`);
+        if (voiceOn && data.dialogue) {
+          speak(String(data.dialogue).slice(0, 260), { ...character.voice });
+        }
+      }
+    } catch {
+      setClipStatus("Pipeline fallback completed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendGift = (giftId: string) => {
     const gift = GIFTS.find((g) => g.id === giftId);
     if (!gift) return;
@@ -368,9 +449,20 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-cream truncate">{character.name}</div>
-          <div className="text-xs text-zinc-400 flex flex-wrap gap-x-2">
+          <div className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-2">
             <span className="text-pink-300">{intimacy}% · {stage.label}</span>
-            <span>{coins} coins</span>
+            <span className="text-amber-200">🪙 {coins} coins</span>
+            <button
+              type="button"
+              onClick={() => {
+                const { balance } = claimFreeWalletRefill(500);
+                setCoinsState(balance);
+              }}
+              className="rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-200 hover:bg-emerald-500/25"
+              title="Instant free +500 coin refill"
+            >
+              +500 Free
+            </button>
             {upcoming && <span className="text-zinc-500">next: {upcoming.label}</span>}
           </div>
         </div>
@@ -403,33 +495,44 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       )}
 
       <div className="flex-1 overflow-y-auto py-4 space-y-4">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-pink-600/90" : "bg-zinc-900/80 border border-white/10"}`}>
-              <div className="whitespace-pre-wrap">{m.content}</div>
-              {m.role === "assistant" && (
-                <button
-                  type="button"
-                  className="mt-1 text-[10px] text-pink-400/80 hover:text-pink-300"
-                  onClick={() => speak(m.content.slice(0, 280), { ...character.voice })}
-                >
-                  ▶ Voice note
-                </button>
-              )}
-              {m.videoUrl && <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />}
-              {m.imageUrl && !m.videoUrl && (
-                <div className="mt-2 rounded-xl overflow-hidden">
-                  {m.frames && m.frames.length > 1 ? (
-                    <MotionSequencePlayer frames={m.frames} alt={character.name} />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={m.imageUrl} alt="" className="w-full max-h-80 object-cover" />
-                  )}
-                </div>
-              )}
+        {messages.map((m, i) => {
+          const parsed =
+            m.role === "assistant"
+              ? splitInnerThoughtAndReply(m.content)
+              : { innerThought: null, spokenReply: m.content };
+          return (
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-pink-600/90" : "bg-zinc-900/80 border border-white/10"}`}>
+                {parsed.innerThought && (
+                  <div className="mb-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-950/40 px-3 py-1.5 text-xs italic text-fuchsia-200">
+                    💭 <span className="font-semibold not-italic text-fuchsia-300">Inner Thought:</span> {parsed.innerThought}
+                  </div>
+                )}
+                <div className="whitespace-pre-wrap">{parsed.spokenReply}</div>
+                {m.role === "assistant" && (
+                  <button
+                    type="button"
+                    className="mt-1 text-[10px] text-pink-400/80 hover:text-pink-300"
+                    onClick={() => speak(parsed.spokenReply.slice(0, 280), { ...character.voice })}
+                  >
+                    ▶ Voice note
+                  </button>
+                )}
+                {m.videoUrl && <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />}
+                {m.imageUrl && !m.videoUrl && (
+                  <div className="mt-2 rounded-xl overflow-hidden">
+                    {m.frames && m.frames.length > 1 ? (
+                      <MotionSequencePlayer frames={m.frames} alt={character.name} />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.imageUrl} alt="" className="w-full max-h-80 object-cover" />
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {busy && <div className="text-xs text-zinc-500 animate-pulse">She is typing…</div>}
         <div ref={bottomRef} />
       </div>
@@ -518,6 +621,15 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
         ))}
         <button type="button" onClick={() => { startIntimacyAudio?.(Math.min(90, intimacy + 10)); setShowTributeNudge(true); }} className="px-3 py-1.5 rounded-full border border-white/15 text-xs text-zinc-300">
           <Flame className="inline h-3.5 w-3.5" /> Ambience
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void runFullScenePipeline()}
+          className="px-3 py-1.5 rounded-full border border-amber-400/50 bg-gradient-to-r from-amber-500/20 via-pink-500/20 to-fuchsia-500/20 text-xs font-semibold text-amber-200 hover:opacity-95 disabled:opacity-50"
+          title="Run 5-stage Director Pipeline (Mood + Inner Thought + Dialogue + Selfie + Motion Sequence)"
+        >
+          ⚡ Full Scene Pipeline
         </button>
       </div>
 

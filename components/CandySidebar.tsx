@@ -38,7 +38,7 @@ export function CandySidebar({
 }) {
   return (
     <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-zinc-950/80 py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
-      <nav className="flex flex-col gap-1">
+      <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 pr-1">
         {ITEMS.map((item) => {
           const isActive =
             active === item.id ||

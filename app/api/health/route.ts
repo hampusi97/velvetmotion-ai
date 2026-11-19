@@ -3,6 +3,8 @@ import { CHARACTERS } from "@/lib/characters";
 import { JOI_PRESETS, STORY_PACKS } from "@/lib/content";
 import { SHORTS_SERIES } from "@/lib/shortsCatalog";
 import { TRIBUTES } from "@/lib/tributes";
+import { OWNER_PRIZES, PRIMARY_BTC_WALLET } from "@/lib/wallet";
+import firebaseConfig from "../../../firebase-applet-config.json";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +36,21 @@ export async function GET() {
       music: geminiConfigured ? "lyria-3-with-wav-fallback" : "velvet-synth-wav",
       voice: geminiConfigured ? "gemini-live-with-webspeech-fallback" : "webspeech-tts",
       telegramBridge: telegramConfigured ? "configured" : "client-or-worker",
+      directorPipeline: "active-5-stage",
+      loungeRelay: "firestore-plus-cloud-relay",
+    },
+    firebase: {
+      projectId: firebaseConfig.projectId,
+      appId: firebaseConfig.appId,
+      firestoreDatabaseId: firebaseConfig.firestoreDatabaseId,
+      authProviders: ["emailPassword", "google", "anonymous"],
+      rulesPublished: true,
+    },
+    wallet: {
+      primaryBtcWallet: PRIMARY_BTC_WALLET,
+      recommendedDonationUsd: 5,
+      ownerPrizesCount: OWNER_PRIZES.length,
+      leaderboardActive: true,
     },
     catalog: {
       companions: CHARACTERS.length,

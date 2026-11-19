@@ -19,6 +19,10 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.ok, true);
+    assert.equal(data.firebase.projectId, "ivory-sunset-mxq1s");
+    assert.equal(data.firebase.appId, "1:738750089666:web:8950a5b6c603c03ac32e5b");
+    assert.ok(data.firebase.authProviders.includes("emailPassword"));
+    assert.equal(data.wallet.primaryBtcWallet, "bc1qjmf9u3cmrn59q5nqmzgkvrgy7exegnfmph999k");
     assert.ok(data.catalog.companions >= 20);
     assert.ok(data.catalog.storyPacks >= 10);
     assert.ok(data.catalog.joiScenarios >= 14);

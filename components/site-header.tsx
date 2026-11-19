@@ -6,7 +6,13 @@ import { sections, type ViewId } from "@/lib/sections";
 import { CloseIcon, Mark, MenuIcon } from "./icons";
 import { getUser, login, logout, type LocalUser } from "@/lib/auth";
 import { getCoins } from "@/lib/storage";
-import { googleSignIn, initAuth, subscribeAuthState } from "@/lib/firebase";
+import {
+  emailPasswordSignIn,
+  emailPasswordSignUp,
+  googleSignIn,
+  initAuth,
+  subscribeAuthState,
+} from "@/lib/firebase";
 import { GoogleSignInButton } from "./WorkspaceHub";
 import { GoonStreakWidget } from "./GoonStreakWidget";
 
@@ -28,6 +34,9 @@ export function SiteHeader({
   const [coins, setCoins] = useState(0);
   const [loginOpen, setLoginOpen] = useState(false);
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,12 +46,17 @@ export function SiteHeader({
     const unsubState = subscribeAuthState((fbUser) => {
       if (fbUser) {
         const nextUser: LocalUser = {
-          username: fbUser.displayName || fbUser.email?.split("@")[0] || "Google User",
+          username: fbUser.displayName || fbUser.email?.split("@")[0] || "VelvetMember",
           joinedAt: Date.now(),
           uid: fbUser.uid,
           email: fbUser.email,
           isFirebase: true,
         };
+        try {
+          localStorage.setItem("vm-user", JSON.stringify(nextUser));
+        } catch {
+          /* ignore */
+        }
         setUser(nextUser);
         onUserChange?.(nextUser);
       } else {
@@ -96,6 +110,39 @@ export function SiteHeader({
       setName("");
       setAuthError(null);
       onUserChange?.(u);
+    }
+  };
+
+  const doEmailAuth = async () => {
+    setAuthError(null);
+    const cleanEmail = email.trim();
+    if (!cleanEmail.includes("@") || password.length < 6) {
+      setAuthError("Enter a valid email and a 6+ character password.");
+      return;
+    }
+    try {
+      const res =
+        authMode === "signup"
+          ? await emailPasswordSignUp(cleanEmail, password, name.trim() || undefined)
+          : await emailPasswordSignIn(cleanEmail, password);
+      const nextUser: LocalUser = {
+        username:
+          res.user.displayName || name.trim() || res.user.email?.split("@")[0] || "VelvetMember",
+        joinedAt: Date.now(),
+        uid: res.user.uid,
+        email: res.user.email,
+        isFirebase: true,
+      };
+      try {
+        localStorage.setItem("vm-user", JSON.stringify(nextUser));
+      } catch {
+        /* ignore */
+      }
+      setUser(nextUser);
+      setLoginOpen(false);
+      onUserChange?.(nextUser);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Email authentication failed.");
     }
   };
 
@@ -179,10 +226,16 @@ export function SiteHeader({
               <button
                 type="button"
                 onClick={doLogout}
-                className="hidden sm:inline-flex max-w-[9rem] truncate rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-cream hover:bg-white/10"
-                title="Log out"
+                className="hidden sm:inline-flex items-center gap-1.5 max-w-[11rem] truncate rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-cream hover:bg-white/10"
+                title={user.isFirebase ? "Firebase Cloud Sync Active — Click to log out" : "Local session — Click to log out"}
               >
-                {user.username}
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full shrink-0",
+                    user.isFirebase ? "bg-emerald-400" : "bg-amber-400",
+                  )}
+                />
+                <span className="truncate">{user.username}</span>
               </button>
             ) : (
               <button
@@ -287,37 +340,95 @@ export function SiteHeader({
       {loginOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/75" onClick={() => setLoginOpen(false)} />
-          <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-2xl">
-            <h2 className="font-display text-xl text-cream">Log in</h2>
-            <p className="mt-1 text-sm text-mist">
-              Sign in with Google for Firebase & Workspace sync, or choose a local username on this device.
+          <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-2xl space-y-3">
+            <h2 className="font-display text-xl text-cream">Log in to VelvetMotion</h2>
+            <p className="text-xs text-mist">
+              Sign in with Email/Password or Google for Firebase Cloud Sync (`ivory-sunset-mxq1s`), or use a local username.
             </p>
-            <div className="mt-4 flex justify-center">
+
+            <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-ink-950 p-1">
+              <button
+                type="button"
+                onClick={() => setAuthMode("signin")}
+                className={cn(
+                  "rounded-lg py-1.5 text-xs font-medium",
+                  authMode === "signin" ? "bg-rose-600 text-white" : "text-zinc-400",
+                )}
+              >
+                Sign In (Email)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode("signup")}
+                className={cn(
+                  "rounded-lg py-1.5 text-xs font-medium",
+                  authMode === "signup" ? "bg-rose-600 text-white" : "text-zinc-400",
+                )}
+              >
+                Create Account
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {authMode === "signup" && (
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Display username"
+                  className="w-full rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-xs outline-none focus:border-rose-500"
+                />
+              )}
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email address"
+                className="w-full rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-xs outline-none focus:border-rose-500"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void doEmailAuth()}
+                placeholder="Password (6+ characters)"
+                className="w-full rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-xs outline-none focus:border-rose-500"
+              />
+              <button
+                type="button"
+                onClick={() => void doEmailAuth()}
+                className="w-full rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-500"
+              >
+                {authMode === "signup" ? "Create Email Account" : "Sign In with Email"}
+              </button>
+            </div>
+
+            <div className="flex justify-center pt-1">
               <GoogleSignInButton onClick={doGoogleLogin} />
             </div>
-            {authError && <p className="mt-2 text-xs text-rose-300">{authError}</p>}
-            <div className="my-4 flex items-center gap-3 text-xs text-zinc-500">
+            {authError && <p className="text-xs text-rose-300">{authError}</p>}
+            <div className="flex items-center gap-3 text-xs text-zinc-500">
               <span className="h-px flex-1 bg-white/10" />
-              <span>or local username</span>
+              <span>or quick username</span>
               <span className="h-px flex-1 bg-white/10" />
             </div>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && doLogin()}
-              placeholder="Choose a name"
-              aria-label="Local username"
-              className="w-full rounded-2xl border border-white/10 bg-ink-950 px-4 py-3 text-sm outline-none focus:border-rose-500"
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={doLogin}
-              disabled={name.trim().length < 2}
-              className="mt-4 w-full rounded-2xl bg-rose-600 py-3 text-sm font-medium text-white disabled:opacity-40"
-            >
-              Continue
-            </button>
+            <div className="flex gap-2">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && doLogin()}
+                placeholder="Choose a name"
+                aria-label="Local username"
+                className="flex-1 rounded-xl border border-white/10 bg-ink-950 px-3 py-2 text-xs outline-none focus:border-rose-500"
+              />
+              <button
+                type="button"
+                onClick={doLogin}
+                disabled={name.trim().length < 2}
+                className="rounded-xl border border-rose-500/40 bg-rose-500/20 px-3 py-2 text-xs font-medium text-rose-100 disabled:opacity-40"
+              >
+                Enter
+              </button>
+            </div>
           </div>
         </div>
       )}

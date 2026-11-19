@@ -8,6 +8,7 @@ const TABS = [
   { id: "create", label: "Create", icon: "✨" },
   { id: "my-girls", label: "My Girls", icon: "💗" },
   { id: "girls", label: "Chat", icon: "💬" },
+  { id: "wallet", label: "Wallet", icon: "🪙" },
 ] as const;
 
 export function MobileBottomNav({
