@@ -15,6 +15,8 @@ export type SectionId =
   | "gallery"
   | "packs"
   | "tribute"
+  | "strip"
+  | "edge"
   | "workspace";
 
 export type ViewId = "home" | SectionId;
@@ -147,10 +149,20 @@ export const sections: Section[] = [
     summary: "Suggest a feature.",
     art: "bg-[radial-gradient(76%_64%_at_74%_0%,#e6c7a2_0%,transparent_44%),linear-gradient(160deg,#2a1c22,#100c10)]",
   },
-];
 
-export function findSection(id: SectionId): Section {
-  const section = sections.find((item) => item.id === id);
-  if (!section) throw new Error(`Unknown section: ${id}`);
-  return section;
-}
+  {
+    id: "strip",
+    title: "Strip Roulette",
+    kicker: "Game",
+    summary: "Spin for a girl, clothing piece, and position.",
+    art: "bg-[radial-gradient(80%_70%_at_30%_20%,#f472b6_0%,transparent_50%),linear-gradient(160deg,#4a1030,#0c0a12)]",
+  },
+  {
+    id: "edge",
+    title: "Edge Timer",
+    kicker: "Game",
+    summary: "She sets the pace. Survive or restart.",
+    art: "bg-[radial-gradient(80%_70%_at_70%_20%,#e879f9_0%,transparent_50%),linear-gradient(160deg,#3b0764,#0c0a12)]",
+  },
+
+];
