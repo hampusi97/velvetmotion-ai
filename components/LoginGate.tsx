@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { login, type LocalUser } from "@/lib/auth";
 import {
   emailPasswordSignIn,
@@ -17,6 +17,11 @@ export function LoginGate({ onLoggedIn }: { onLoggedIn: (u: LocalUser) => void }
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onLoggedIn({ username: "guest", joinedAt: Date.now(), email: null }); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onLoggedIn]);
 
   const persistAndEnter = (u: LocalUser) => {
     try {
@@ -124,7 +129,7 @@ export function LoginGate({ onLoggedIn }: { onLoggedIn: (u: LocalUser) => void }
   return (
     <main className="min-h-screen bg-[#07050c] text-white flex items-center justify-center p-6">
       <div className="relative max-w-md w-full rounded-3xl border border-pink-500/40 bg-gradient-to-b from-zinc-950 to-black p-8 shadow-[0_0_80px_rgba(236,72,153,0.25)]">
-        <button type="button" onClick={() => onLoggedIn({ username: "guest", joinedAt: Date.now(), email: null })} className="absolute top-4 right-4 text-zinc-400 hover:text-white text-2xl z-10">✕</button>
+        <button type="button" onClick={() => onLoggedIn({ username: "guest", joinedAt: Date.now(), email: null })} className="absolute top-4 right-4 text-zinc-400 hover:text-white text-2xl z-10" aria-label="Close">✕</button>
         <div className="text-5xl mb-3 text-center">💋</div>
         <h1 className="text-3xl font-extrabold text-center bg-gradient-to-r from-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
           VelvetMotion

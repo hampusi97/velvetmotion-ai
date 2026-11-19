@@ -660,7 +660,7 @@ export function DiscoverSwipe({
               />
             </div>
             <h3 className="mt-4 text-2xl font-bold text-white">
-              {(showMatch?.name || "She").split(" ")[0]} liked you back
+              {showMatch.name.split(" ")[0]} liked you back
             </h3>
             <p className="mt-2 text-sm text-zinc-400">{showMatch.voiceIntro}</p>
             {profile.displayName ? (

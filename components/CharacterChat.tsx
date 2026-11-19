@@ -1,5 +1,6 @@
 "use client";
 
+import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { useEffect, useRef, useState } from "react";
 import {
   Flame,
@@ -602,7 +603,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         }} /></label>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
+          <img src={staticPortraitUrl(character.id)} alt={character.name} className="h-full w-full object-cover" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-cream truncate">{character.name}</div>

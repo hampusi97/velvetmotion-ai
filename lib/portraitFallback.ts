@@ -16,7 +16,7 @@ const POOL = [
 
 const OWN: Record<string, string> = {
   chloe: "chloe", elena: "elena", aria: "aria", sienna: "sienna",
-  raven: "raven", yuki: "yuki", scarlett: "scarlett", mia: "mia", genevieve: "genevieve",
+  raven: "raven", yuki: "yuki", scarlett: "scarlett", mia: "mia", "blondie-m": "mia", genevieve: "genevieve",
   briony: "briony", calla: "calla", freya: "freya", isolde: "isolde",
   liora: "liora", maren: "maren", nadine: "nadine", nova: "nova",
   tess: "tess", vesper: "vesper",
