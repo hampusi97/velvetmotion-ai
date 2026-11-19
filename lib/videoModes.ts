@@ -9,7 +9,7 @@ import { spendCoins, addToGallery, GEN_COST } from "./storage";
 import { saveTribute } from "./rewards";
 import { MOTION_PROMPTS, requestImg2Vid, sequenceOnlyResult } from "./img2vid";
 
-export type SequenceKind = "joi" | "sph" | "bnwo" | "sex";
+export type SequenceKind = "joi" | "sph" | "bnwo" | "sex" | "doggy" | "cowgirl" | "shower";
 
 export function buildSequence(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
@@ -18,7 +18,7 @@ export function buildSequence(
   if (kind === "joi") return joiSequenceFrames(character);
   if (kind === "sph") return sphSequenceFrames(character);
   if (kind === "bnwo") return bnwoSequenceFrames(character);
-  return sexSequenceFrames(character);
+  return sexSequenceFrames(character); // sex, doggy, cowgirl, shower
 }
 
 export function runSequenceGeneration(
