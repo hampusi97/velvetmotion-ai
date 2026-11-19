@@ -54,9 +54,7 @@ export function setCoins(n: number) {
 }
 
 export function spendCoins(cost: number): boolean {
-  const current = getCoins();
-  if (current < cost) return false;
-  setCoins(current - cost);
+  // Free forever — never block generation on coins.
   return true;
 }
 
@@ -186,19 +184,19 @@ export function bumpIntimacy(characterId: string, delta = 2) {
 
 /** Free-forever generous costs — daily claim + high default coins keep users generating. */
 export const GEN_COST: Record<string, number> = {
-  portrait: 4,
-  beauty: 4,
-  seductive: 5,
-  lingerie: 6,
-  nude: 8,
-  explicit: 10,
-  sex: 12,
-  joi: 10,
-  sph: 10,
-  bnwo: 12,
-  video: 14,
-  aftercare: 5,
-  dual: 12,
+  portrait: 0,
+  beauty: 0,
+  seductive: 0,
+  lingerie: 0,
+  nude: 0,
+  explicit: 0,
+  sex: 0,
+  joi: 0,
+  sph: 0,
+  bnwo: 0,
+  video: 0,
+  aftercare: 0,
+  dual: 0,
 };
 
 
