@@ -1,14 +1,10 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
   note:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: echo "Repo is ready. Connect Cloudflare Pages or Netlify to this repo for auto-deploy."
-      - run: echo "Cloudflare: https://velvetmotion-ai.pages.dev"
+      - run: echo "Connect Cloudflare Pages or Netlify for auto-deploy."
