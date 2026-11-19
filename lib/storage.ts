@@ -200,3 +200,15 @@ export const GEN_COST: Record<string, number> = {
   aftercare: 5,
   dual: 12,
 };
+
+
+const PIN_KEY = "vm-pinned-girls";
+export function getPinned(): string[] {
+  try { return JSON.parse(localStorage.getItem(PIN_KEY) || "[]"); } catch { return []; }
+}
+export function togglePin(id: string): string[] {
+  const cur = getPinned();
+  const next = cur.includes(id) ? cur.filter((x) => x !== id) : [id, ...cur];
+  try { localStorage.setItem(PIN_KEY, JSON.stringify(next.slice(0, 20))); } catch {}
+  return next;
+}
