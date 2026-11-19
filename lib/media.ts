@@ -46,7 +46,7 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
 /** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult, max heat */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "ultra photoreal beauty portrait, 85mm lens, soft glam lighting, natural skin pores and texture, candid influencer selfie, bright catchlights, candy.ai aesthetic, stunning adult woman 21+, seductive half-smile, sharp unique face identity, high detail, 8k quality",
+    "ultra photoreal beauty portrait, 85mm f/1.4 lens, soft window light, natural skin pores and freckles, candid influencer selfie, bright catchlights in eyes, candy.ai aesthetic, stunning adult woman 21+, subtle smile, sharp unique face identity, detailed hair strands, high detail, 8k quality, magazine cover",
   seductive:
     "seductive bedroom mirror selfie, heavy-lidded eyes, soft neon + warm lamp, parted glossy lips, intimate atmosphere, photoreal influencer, adult sensual heat",
   lingerie:
@@ -106,8 +106,8 @@ function pollinationsUrl(
       ? mediaSeed(character.id, mood, extra) % 17
       : mediaSeed(character.id, mood, extra);
   const seed = (baseFace * 97 + moodJitter) % 100000;
-  const w = opts?.width ?? 768;
-  const h = opts?.height ?? 1152;
+  const w = opts?.width ?? 1024;
+  const h = opts?.height ?? 1536;
 
   if (settings?.preferLocal && settings.localImageBase) {
     const base = settings.localImageBase.replace(/\/$/, "");
