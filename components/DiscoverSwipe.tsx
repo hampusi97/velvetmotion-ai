@@ -1,5 +1,6 @@
 "use client";
 
+import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { useEffect, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
@@ -653,13 +654,13 @@ export function DiscoverSwipe({
             <div className="mt-5 mx-auto h-36 w-36 rounded-full overflow-hidden border-2 border-pink-400 shadow-lg shadow-pink-500/30">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={characterMediaUrl(showMatch, "nude")}
+                src={staticPortraitUrl(showMatch.id)}
                 alt=""
                 className="h-full w-full object-cover"
               />
             </div>
             <h3 className="mt-4 text-2xl font-bold text-white">
-              {showMatch.name.split(" ")[0]} liked you back
+              {(showMatch?.name || "She").split(" ")[0]} liked you back
             </h3>
             <p className="mt-2 text-sm text-zinc-400">{showMatch.voiceIntro}</p>
             {profile.displayName ? (

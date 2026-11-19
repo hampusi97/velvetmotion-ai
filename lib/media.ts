@@ -6,6 +6,7 @@
  */
 
 import type { Character } from "./charactersTypes";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 import { generateHordeImage } from "./aiHorde";
@@ -89,14 +90,8 @@ function pollinationsUncensoredUrl(character: Pick<Character, "id" | "name" | "f
 const STATIC_PORTRAITS = new Set(["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper","livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p","valentina","lana-rho","lena-plug","dalia-x","riley-re"]);
 
 export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, _mood: MediaMood = "beauty", _extra = "", _opts?: { seedOverride?: number; preferStatic?: boolean }): string {
-  // Static local portrait only — no Pollinations. Generation uses resolveBestMediaUrl.
-  const known = ["chloe","elena","aria","sienna","raven","yuki","scarlett","mia","genevieve","briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper"];
-  const id = character.id || "";
-  if (known.includes(id)) return `/portraits/${id}.jpg`;
-  // hash to a known file
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return `/portraits/${known[Math.abs(h) % known.length]}.jpg`;
+  // Use the same portrait fallback as Explore cards for consistency
+  return staticPortraitUrl(character.id || "chloe");
 }
 
 export async function resolveBestMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood = "beauty", extra = ""): Promise<{ url: string; note: string }> {

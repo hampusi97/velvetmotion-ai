@@ -382,9 +382,10 @@ export function SiteHeader({
       ) : null}
 
       {loginOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onKeyDown={(e) => e.key === "Escape" && setLoginOpen(false)} tabIndex={-1}>
           <div className="absolute inset-0 bg-black/75" onClick={() => setLoginOpen(false)} />
           <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-ink-900 p-6 shadow-2xl space-y-3">
+            <button type="button" onClick={() => setLoginOpen(false)} className="absolute top-3 right-3 text-zinc-400 hover:text-white text-2xl z-10">✕</button>
             <h2 className="font-display text-xl text-cream">Log in to VelvetMotion</h2>
             <p className="text-xs text-mist">
               Sign in with Email/Password or Google for Firebase Cloud Sync (`ivory-sunset-mxq1s`), or use a local username.
