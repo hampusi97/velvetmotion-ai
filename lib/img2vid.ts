@@ -7,6 +7,23 @@
 
 import { getMediaSettings } from "./mediaSettings";
 
+
+/** Generate free frame sequence using image worker for animation. */
+export async function generateFreeFrames(
+  baseImageUrl: string,
+  motionPrompt: string,
+  count = 4,
+): Promise<string[]> {
+  const frames: string[] = [];
+  const worker = "https://velvetmotion-image.hampusi97.workers.dev/generate";
+  for (let i = 0; i < count; i++) {
+    const prompt = `${motionPrompt}, frame ${i + 1} of sequence, slight variation, photorealistic`;
+    const url = `${worker}?prompt=${encodeURIComponent(prompt.slice(0, 800))}&seed=${Date.now() % 100000 + i}`;
+    frames.push(url);
+  }
+  return frames;
+}
+
 export type VideoClipResult = {
   /** True MP4/WebM URL when available */
   videoUrl: string | null;
@@ -80,14 +97,28 @@ export async function requestImg2Vid(
     }
   }
 
-  // Attempt Pollinations video URL (browser may stream MP4 when key/quota ok)
+  // Free path: generate frame sequence from image worker
+  try {
+    const freeFrames = await generateFreeFrames(imageUrl, motionPrompt, 4);
+    if (freeFrames.length > 1) {
+      return {
+        videoUrl: null,
+        frames: freeFrames,
+        mode: "sequence",
+        note: "Free animated sequence from image worker",
+      };
+    }
+  } catch {
+    /* fall through */
+  }
+
+  // Fallback: Pollinations video URL (may require key)
   const videoUrl = buildPollinationsVideoUrl(imageUrl, motionPrompt);
   return {
     videoUrl,
     frames,
     mode: "mp4",
-    note:
-      "Attempting live video URL (Pollinations wan). If it fails to play, sequence frames still work.",
+    note: "Attempting video URL. Sequence frames available as fallback.",
   };
 }
 
