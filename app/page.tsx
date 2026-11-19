@@ -203,29 +203,30 @@ export default function Home() {
 
   if (!adult) {
     return (
-      <main className="min-h-screen bg-[#07050c] text-white flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-3xl border border-pink-500/30 bg-gradient-to-b from-zinc-950 to-black p-8 shadow-[0_0_80px_rgba(236,72,153,0.2)]">
-          <div className="text-5xl mb-4 text-center">💋</div>
-          <h1 className="text-3xl font-extrabold text-center bg-gradient-to-r from-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
-            VelvetMotion
-          </h1>
-          <p className="text-sm text-zinc-400 leading-relaxed mb-6 mt-3 text-center">
-            Match → chat → 3D. Private uncensored companions. Fictional adults 21+ only.
-          </p>
-          <div className="flex gap-3 justify-center text-xs text-zinc-500 mb-4">
-            <button type="button" className="underline hover:text-pink-300" onClick={() => setView("terms")}>Terms</button>
-            <button type="button" className="underline hover:text-pink-300" onClick={() => setView("privacy")}>Privacy</button>
-            <button type="button" className="underline hover:text-pink-300" onClick={() => setView("safety")}>18+ Policy</button>
+      <main className="min-h-screen bg-[#07050c] text-white relative overflow-hidden">
+        <div className="absolute inset-0 blur-md scale-105 opacity-70 pointer-events-none">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
+            {["chloe","elena","aria","sienna","raven","yuki","scarlett","mia"].map((f) => (
+              <img key={f} src={`/portraits/${f}.jpg`} alt="" className="aspect-[2/3] w-full object-cover rounded-2xl" />
+            ))}
           </div>
-          <button
-            onClick={() => {
-              try { localStorage.setItem("velvet-age", "true"); } catch { /* */ }
-              setAdult(true);
-            }}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30"
-          >
-            I am 18 or older — Enter
-          </button>
+        </div>
+        <div className="absolute inset-0 bg-black/55 backdrop-blur-md" />
+        <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
+          <div className="max-w-md w-full rounded-3xl border border-pink-500/30 bg-black/70 backdrop-blur-md p-8 shadow-[0_0_80px_rgba(236,72,153,0.25)]">
+            <div className="text-5xl mb-3 text-center font-display bg-gradient-to-r from-pink-400 to-fuchsia-400 bg-clip-text text-transparent">V</div>
+            <h1 className="text-3xl font-extrabold text-center bg-gradient-to-r from-pink-400 to-fuchsia-400 bg-clip-text text-transparent">VelvetMotion</h1>
+            <p className="text-sm text-zinc-300 leading-relaxed mb-6 mt-3 text-center">Match → chat → 3D. Private uncensored companions. Fictional adults 18+ only.</p>
+            <div className="flex gap-3 justify-center text-xs text-zinc-400 mb-4">
+              <button type="button" className="underline hover:text-pink-300" onClick={() => setView("terms")}>Terms</button>
+              <button type="button" className="underline hover:text-pink-300" onClick={() => setView("privacy")}>Privacy</button>
+              <button type="button" className="underline hover:text-pink-300" onClick={() => setView("safety")}>18+ Policy</button>
+            </div>
+            <button
+              onClick={() => { try { localStorage.setItem("velvet-age", "true"); } catch { /* */ } setAdult(true); }}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30"
+            >I am 18+ — Enter</button>
+          </div>
         </div>
       </main>
     );

@@ -5,9 +5,9 @@ import { cn } from "@/lib/cn";
 /** Five primary thumbs zones — vault/wallet live under My Girls / Home menus */
 const TABS = [
   { id: "home", label: "Home", icon: "🏠" },
-  { id: "tinder", label: "Discover", icon: "🔥" },
+  { id: "tinder", label: "Explore", icon: "🔥" },
   { id: "create", label: "Create", icon: "✨" },
-  { id: "girls", label: "Chat", icon: "💬" },
+  { id: "girls", label: "Chats", icon: "💬" },
   { id: "joi3d", label: "3D", icon: "🎬" },
 ] as const;
 

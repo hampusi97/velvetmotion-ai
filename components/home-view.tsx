@@ -69,7 +69,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
   return (
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show">
       <motion.section variants={riseItem} className="relative mb-8 overflow-hidden rounded-[1.75rem] border border-pink-500/25 candy-hero neon-pulse">
-        <div className="relative aspect-[2.2/1] min-h-[240px] sm:min-h-[320px]">
+        <div className="relative aspect-[3/1] min-h-[140px] sm:min-h-[180px]">
           <img src={`/portraits/${heroFace}.jpg`} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
