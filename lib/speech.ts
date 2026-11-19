@@ -117,11 +117,17 @@ export function speak(
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  const basePitch = voice?.pitch ?? 1;
-  const baseRate = voice?.rate ?? 1;
-  utterance.pitch = voice?.whispery ? Math.max(0.75, basePitch - 0.08) : basePitch;
-  utterance.rate = voice?.whispery ? Math.max(0.72, baseRate - 0.12) : baseRate;
-  if (voice?.whispery) utterance.volume = 0.88;
+  const basePitch = voice?.pitch ?? 1.05;
+  const baseRate = voice?.rate ?? 0.96;
+  utterance.pitch = voice?.whispery ? Math.max(0.78, basePitch - 0.1) : basePitch;
+  utterance.rate = voice?.whispery ? Math.max(0.7, baseRate - 0.1) : baseRate;
+  utterance.volume = voice?.whispery ? 0.85 : 0.95;
+  // Prefer a natural female voice
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = voices.find((v) => /female|woman|samantha|google uk english female|jenny|aria/i.test(v.name))
+    || voices.find((v) => v.lang.startsWith("en") && /female|samantha/i.test(v.name))
+    || voices.find((v) => v.lang.startsWith("en"));
+  if (preferred) utterance.voice = preferred;
   utterance.onstart = () => callbacks?.onStart?.();
   utterance.onend = () => callbacks?.onEnd?.();
   utterance.onerror = () => callbacks?.onEnd?.();
