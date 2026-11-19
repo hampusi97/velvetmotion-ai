@@ -1,0 +1,38 @@
+name: Deploy Firestore Rules
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "firestore.rules"
+      - "firebase.json"
+      - ".firebaserc"
+      - ".github/workflows/deploy-firestore-rules.yml"
+
+jobs:
+  deploy-rules:
+    name: Validate & Deploy Firestore Rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies & verify Firestore rules suite
+        run: |
+          npm ci
+          npx tsx --test firestore.rules.test.ts
+
+      - name: Deploy firestore.rules to Firebase (if FIREBASE_TOKEN is set)
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            npx firebase-tools deploy --only firestore:rules --project ivory-sunset-mxq1s --token "$FIREBASE_TOKEN" --non-interactive
+          else
+            echo "FIREBASE_TOKEN secret not configured; rules validated and ready for 'npm run deploy:rules' or Firebase Console publish."
+          fi

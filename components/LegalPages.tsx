@@ -11,16 +11,25 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "safety", label: "Safety & 18+" },
 ];
 
-export function LegalPages({ onBack }: { onBack?: () => void }) {
-  const [tab, setTab] = useState<Tab>("safety");
+export function LegalPages({
+  page,
+  onBack,
+  onHome,
+}: {
+  page?: Tab;
+  onBack?: () => void;
+  onHome?: () => void;
+}) {
+  const [tab, setTab] = useState<Tab>(page || "safety");
+  const handleBack = onBack || onHome;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">
       <div className="flex items-center gap-3">
-        {onBack && (
+        {handleBack && (
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleBack}
             className="text-sm text-zinc-400 hover:text-white"
           >
             ← Back

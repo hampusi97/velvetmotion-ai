@@ -11,6 +11,7 @@ import { GET as getComfy } from "../app/api/comfy/route";
 import { buildComfyWorkflowGraph } from "./comfyClient";
 import { GET as getPipeline, POST as postPipeline } from "../app/api/pipeline/route";
 import { GET as getWallet, POST as postWallet } from "../app/api/wallet/route";
+import { GET as getLounge, POST as postLounge } from "../app/api/lounge/route";
 
 describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
   it("GET /api/health reports active engines and catalog counts", async () => {
@@ -225,5 +226,31 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     const pData = await wPost.json();
     assert.equal(pData.ok, true);
     assert.equal(pData.grantedCoins, 3500);
+  });
+
+  it("GET & POST /api/lounge handles production multi-room lounge reads and writes", async () => {
+    const lGet = await getLounge(new Request("http://localhost:3000/api/lounge?room=public"));
+    assert.equal(lGet.status, 200);
+    const lData = await lGet.json();
+    assert.equal(lData.ok, true);
+    assert.equal(lData.roomId, "public");
+    assert.ok(Array.isArray(lData.messages) && lData.messages.length >= 1);
+
+    const lPost = await postLounge(
+      new Request("http://localhost:3000/api/lounge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId: "nsfw",
+          from: "VelvetTester",
+          text: "Testing production lounge write",
+        }),
+      }),
+    );
+    assert.equal(lPost.status, 200);
+    const postOut = await lPost.json();
+    assert.equal(postOut.ok, true);
+    assert.equal(postOut.roomId, "nsfw");
+    assert.equal(postOut.message.from, "VelvetTester");
   });
 });

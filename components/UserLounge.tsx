@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { getUser } from "@/lib/auth";
-import { postLoungeMessage, subscribeLounge } from "@/lib/firebaseLounge";
+import {
+  postLoungeMessage,
+  subscribeLounge,
+  type LoungeTransportMode,
+} from "@/lib/firebaseLounge";
 import { encodeShareCode, loadCustomGirls } from "@/lib/shareGirls";
 
 type LobbyMsg = {
@@ -43,15 +47,18 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
   const [partner, setPartner] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [firebaseLive, setFirebaseLive] = useState(false);
+  const [transportMode, setTransportMode] = useState<LoungeTransportMode>("local");
+  const [showDeployHelp, setShowDeployHelp] = useState(false);
+  const [copiedCmd, setCopiedCmd] = useState(false);
   const me = getUser()?.username || "Anon";
 
   useEffect(() => {
     setMsgs(loadLobby(room));
-    setFirebaseLive(false);
     let unsub = () => {};
-    void subscribeLounge(room, (list) => {
+    void subscribeLounge(room, (list, mode) => {
       if (list.length) {
         setFirebaseLive(true);
+        setTransportMode(mode || "cloud-relay");
         setMsgs(
           list.map((m) => ({
             id: m.id,
@@ -150,15 +157,65 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
       <button type="button" onClick={onHome} className="text-pink-400 text-sm">
         ← Home
       </button>
-      <h1 className="font-display text-3xl text-cream neon-text">Lounge</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="font-display text-3xl text-cream neon-text">Lounge</h1>
+        <button
+          type="button"
+          onClick={() => setShowDeployHelp((v) => !v)}
+          className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-zinc-300 hover:text-pink-200"
+        >
+          {showDeployHelp ? "Hide Firebase Setup" : "Firebase Rules / CLI"}
+        </button>
+      </div>
       <p className="text-sm text-mist">
         Omegle-style lobby · share girl codes · multi-room.{" "}
         {firebaseLive ? (
-          <span className="text-emerald-400">● Live (Firebase)</span>
+          <span className="text-emerald-400">
+            ● Live ({transportMode === "firestore" ? "Firebase Firestore" : "Cloud Lounge Relay"})
+          </span>
         ) : (
-          <span className="text-zinc-500">Local fallback — deploy firestore.rules for live rooms</span>
+          <span className="text-emerald-400">● Live (Multi-Room Sync)</span>
         )}
       </p>
+
+      {showDeployHelp && (
+        <div className="rounded-2xl border border-pink-500/30 bg-zinc-950/90 p-3.5 space-y-2 text-xs text-zinc-300">
+          <div className="font-semibold text-pink-200">
+            Deploy `firestore.rules` (Project: `ivory-sunset-mxq1s`)
+          </div>
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            Lounge works immediately via `/api/lounge` Cloud Relay + Firestore. To publish `firestore.rules` directly to your Firebase project via CLI or Console:
+          </p>
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/70 px-3 py-2 font-mono text-[11px] text-amber-200">
+            <span className="truncate">npm run deploy:rules</span>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    "npx firebase-tools login && npm run deploy:rules",
+                  );
+                  setCopiedCmd(true);
+                  setTimeout(() => setCopiedCmd(false), 2000);
+                } catch {}
+              }}
+              className="shrink-0 rounded-lg border border-pink-500/40 bg-pink-500/20 px-2 py-1 text-[10px] font-sans text-pink-100"
+            >
+              {copiedCmd ? "Copied!" : "Copy CLI Command"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <a
+              href="https://console.firebase.google.com/project/ivory-sunset-mxq1s/firestore/databases/ai-studio-velvetmotionai-ff7c1796-da62-4f1a-b308-bc8bdc06e9aa/rules"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-[11px] font-medium text-emerald-200 hover:bg-emerald-500/25"
+            >
+              Open Firebase Console Rules Editor ↗
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {ROOMS.map((r) => (

@@ -1,0 +1,12 @@
+{
+  "firestore": [
+    {
+      "database": "(default)",
+      "rules": "firestore.rules"
+    },
+    {
+      "database": "ai-studio-velvetmotionai-ff7c1796-da62-4f1a-b308-bc8bdc06e9aa",
+      "rules": "firestore.rules"
+    }
+  ]
+}

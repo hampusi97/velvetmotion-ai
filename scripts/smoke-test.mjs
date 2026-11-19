@@ -24,13 +24,17 @@ assert.ok(compose.includes("velvetmotion-web:"), "docker-compose missing web ser
 assert.ok(compose.includes("local-media-proxy:"), "docker-compose missing local-media-proxy service");
 assert.ok(compose.includes("telegram-bridge:"), "docker-compose missing telegram-bridge service");
 
-// 4. Verify Firestore Lounge Rules & PWA Assets
+// 4. Verify Firestore Lounge Rules, Firebase CLI Config, & PWA Assets
 const rules = fs.readFileSync("./firestore.rules", "utf8");
 assert.ok(
   rules.includes("match /loungeRooms/{roomId}/messages/{messageId}"),
   "firestore.rules missing loungeRooms collection match",
 );
 assert.ok(rules.includes("isValidLoungeMessage"), "firestore.rules missing isValidLoungeMessage");
+const firebaseJson = JSON.parse(fs.readFileSync("./firebase.json", "utf8"));
+assert.ok(Array.isArray(firebaseJson.firestore) && firebaseJson.firestore.length === 2, "firebase.json missing firestore targets");
+const firebaserc = JSON.parse(fs.readFileSync("./.firebaserc", "utf8"));
+assert.equal(firebaserc.projects?.default, "ivory-sunset-mxq1s", ".firebaserc project mismatch");
 assert.ok(fs.existsSync("./public/icon-192.png"), "Missing public/icon-192.png");
 assert.ok(fs.existsSync("./public/icon-512.png"), "Missing public/icon-512.png");
 

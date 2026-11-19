@@ -514,9 +514,9 @@ export default function Home() {
             <MyGirlsHub
               onHome={() => setView("home")}
               onCreate={() => setView("create")}
-              onOpenChat={(id, customChar) => {
-                if (customChar) setCustomCharacter(customChar);
-                openChatById(id);
+              onOpenChat={(character) => {
+                if (character.id.startsWith("custom-")) setCustomCharacter(character);
+                openChatById(character.id);
               }}
             />
           )}
