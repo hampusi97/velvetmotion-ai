@@ -133,7 +133,13 @@ export function HomeView({
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/70 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
           <div className="relative z-10 flex h-full flex-col justify-end p-6 sm:p-10 max-w-xl">
-            <p className="text-xs uppercase tracking-[0.25em] text-pink-300">Featured companion</p>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] uppercase tracking-wider text-emerald-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Online
+              </span>
+              <p className="text-xs uppercase tracking-[0.25em] text-pink-300">Featured companion</p>
+            </div>
             <h1 className="mt-2 font-display text-3xl sm:text-5xl text-white leading-tight">
               {hero.name.split(" ")[0]}
               <span className="block text-lg sm:text-2xl text-pink-200 font-sans font-medium mt-1">
