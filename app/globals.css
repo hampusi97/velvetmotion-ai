@@ -223,9 +223,17 @@ body {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(12, 10, 16, 0.9);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 .girl-card:hover {
-  border-color: rgba(255, 77, 154, 0.45);
+  border-color: rgba(255, 77, 154, 0.55);
+  box-shadow: 0 12px 40px rgba(255, 77, 154, 0.18), 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+.girl-card img {
+  transition: transform 0.4s ease;
+}
+.girl-card:hover img {
+  transform: scale(1.04);
 }
 /* Chat media frame */
 .vm-media-frame {
