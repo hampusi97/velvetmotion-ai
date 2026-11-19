@@ -1,14 +1,10 @@
 import type { MetadataRoute } from "next";
 
+export const dynamic = "force-static";
+
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [
-      {
-        userAgent: "*",
-        allow: "/",
-        disallow: ["/api/"],
-      },
-    ],
-    sitemap: "https://velvetmotion-ai.vercel.app/sitemap.xml",
+    rules: { userAgent: "*", allow: "/" },
+    sitemap: "https://velvetmotion-ai-git.pages.dev/sitemap.xml",
   };
 }
