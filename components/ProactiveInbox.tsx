@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { getProactiveMessages, type ProactiveMessage } from "@/lib/proactive";
 import { loadProactiveQueue } from "@/lib/proactiveIdle";
 import { CHARACTERS, getCharacter } from "@/lib/characters";
-import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { SafeImage } from "@/components/SafeImage";
 
 export function ProactiveInbox({
   onOpen,
@@ -49,12 +50,10 @@ export function ProactiveInbox({
               onClick={() => onOpen(m.characterId, m.text)}
               className="w-full flex items-center gap-3 rounded-2xl border border-pink-500/30 bg-gradient-to-r from-pink-950/50 to-zinc-900/80 p-3 text-left hover:border-pink-400/50 transition"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <SafeImage
                 src={staticPortraitUrl(c.id)}
-                alt=""
-                onError={onPortraitError}
-                className="h-12 w-12 rounded-full object-cover border border-pink-400/40"
+                alt={c.name}
+                className="h-12 w-12 rounded-full object-cover object-top border border-pink-400/40"
               />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-cream">{m.characterName}</div>

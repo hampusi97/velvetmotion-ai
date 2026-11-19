@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Cpu, Download, Laptop, Shield, Smartphone, Sparkles } from "lucide-react";
+import { Check, Copy, Cpu, Download, Laptop, RefreshCw, Shield, Smartphone, Sparkles, Volume2 } from "lucide-react";
+import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
+import { useLocalEngineStatus } from "@/lib/localEngineBridge";
+import { SafeImage } from "@/components/SafeImage";
 
 type DetectedOs = "mac-arm" | "mac-intel" | "windows" | "linux" | "mobile";
 
@@ -97,6 +100,10 @@ export function DownloadDesktopView() {
   const [releaseTag, setReleaseTag] = useState<string | null>(null);
   const [releaseAssets, setReleaseAssets] = useState<GithubReleaseAsset[]>([]);
   const [releaseState, setReleaseState] = useState<"checking" | "live" | "pending">("checking");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [probeToast, setProbeToast] = useState<string | null>(null);
+  const engine = useLocalEngineStatus();
+  const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
 
   useEffect(() => {
     setOs(detectOs());
@@ -248,6 +255,98 @@ export function DownloadDesktopView() {
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* Detected RAM SOTA Nov 2026 Models + Port Tester */}
+      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+              <Cpu className="h-5 w-5 text-[#ff5678]" /> Recommended for Your Hardware · {ramCatalog.label} ({engine.ramGb} GB RAM)
+            </h2>
+            <p className="text-xs text-[#a6a6c4]">
+              One-click launch commands for KoboldCpp (:5001), Fish Audio Drama 3 (:5002), Ollama (:11434), and ComfyUI (:8188).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void engine.refresh().then(() => setProbeToast("Probed :5001, :5002, :11434, and :8188."))}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[#ff5678]/45 bg-[#ff5678]/15 px-3.5 py-1.5 text-xs font-bold text-[#ff8aa1] hover:bg-[#ff5678]/25"
+          >
+            <RefreshCw className="h-3.5 w-3.5" /> Test Local Connection
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          {[
+            ["KoboldCpp :5001", engine.koboldOnline],
+            ["Fish Drama :5002", engine.fishOnline],
+            ["Ollama :11434", engine.ollamaOnline],
+            ["ComfyUI :8188", engine.comfyOnline],
+          ].map(([lbl, on]) => (
+            <div
+              key={String(lbl)}
+              className={`rounded-xl border px-3 py-2 text-center font-semibold ${
+                on ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-[#141418] text-zinc-400"
+              }`}
+            >
+              ● {lbl}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {ramCatalog.presets.map((preset) => (
+            <div key={preset.id} className="rounded-2xl border border-white/10 bg-[#141418] p-4 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-white">{preset.name}</span>
+                <span className="shrink-0 rounded-full bg-[#ff5678]/20 border border-[#ff5678]/40 px-2 py-0.5 text-[10px] font-bold text-[#ff8aa1]">
+                  {preset.badge}
+                </span>
+              </div>
+              <p className="text-xs text-[#a6a6c4] leading-relaxed">{preset.description}</p>
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#0d0d11] px-3 py-2 font-mono text-[11px] text-zinc-300">
+                <span className="truncate">{preset.launchCommand}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(preset.launchCommand);
+                    setCopiedId(preset.id);
+                    setProbeToast(`Copied ${preset.name} command.`);
+                    setTimeout(() => setCopiedId(null), 1500);
+                  }}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#ff5678]/45 bg-[#ff5678]/15 px-2.5 py-1 text-[11px] font-sans font-bold text-white"
+                >
+                  {copiedId === preset.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {copiedId === preset.id ? "Copied" : "Copy Launch Command"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {probeToast && <p className="text-xs font-semibold text-emerald-300">{probeToast}</p>}
+      </section>
+
+      {/* SOTA Voice Engines */}
+      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-3">
+        <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+          <Volume2 className="h-5 w-5 text-[#ff5678]" /> Neural Voice Engines (Browser WebGPU &amp; Local Audio.cpp)
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {VOICE_ENGINE_OPTIONS.map((v) => (
+            <div key={v.id} className="rounded-2xl border border-white/10 bg-[#141418] p-3.5 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-white">{v.label}</span>
+                <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold text-[#ff8aa1]">
+                  {v.footprint}
+                </span>
+              </div>
+              <div className="text-[10px] font-bold text-emerald-300">{v.badge}</div>
+              <p className="text-[11px] text-[#a6a6c4] leading-snug">{v.description}</p>
+            </div>
+          ))}
         </div>
       </section>
 

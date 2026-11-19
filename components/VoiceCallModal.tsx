@@ -4,7 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, MicOff, PhoneOff, Volume2, VolumeX } from "lucide-react";
 import type { Character } from "@/lib/charactersTypes";
 import { generateCompanionReply } from "@/lib/chatRouter";
-import { speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
+import {
+  getPreferredVoiceEngine,
+  setPreferredVoiceEngine,
+  speakWithNeuralVoice,
+  stopNeuralSpeech,
+  type VoiceEngineId,
+} from "@/lib/kokoroTts";
+import { VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { earnCompanionXp } from "@/lib/progression";
 import { getTimeMood } from "@/lib/timeMood";
@@ -52,6 +59,7 @@ export function VoiceCallModal({
   const [elapsed, setElapsed] = useState(0);
   const [transcript, setTranscript] = useState<string>(character.voiceIntro || `Hey... I'm right here.`);
   const [engineUsed, setEngineUsed] = useState<string>("Kokoro / WebSpeech");
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngineId>(() => getPreferredVoiceEngine());
 
   const recogRef = useRef<SpeechRecognitionInstance | null>(null);
   const activeRef = useRef(true);
@@ -114,7 +122,7 @@ export function VoiceCallModal({
           pitch: character.voice?.pitch,
           rate: character.voice?.rate,
         });
-        setEngineUsed(tts.engine === "kokoro" ? "Kokoro-82M Neural" : "Web Speech HD");
+        setEngineUsed(tts.label);
         setSpeaking(false);
         if (activeRef.current && !muted) startMicLoop();
       };
@@ -138,7 +146,7 @@ export function VoiceCallModal({
       voiceId: character.voiceId,
       whispery: whisperMode,
     }).then((r) => {
-      setEngineUsed(r.engine === "kokoro" ? "Kokoro-82M Neural" : "Web Speech HD");
+      setEngineUsed(r.label);
       setSpeaking(false);
       if (activeRef.current && !muted) startMicLoop();
     });
@@ -205,6 +213,26 @@ export function VoiceCallModal({
           </div>
 
           <AmbientMixer compact={false} />
+
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#141418] px-3 py-2 text-left">
+            <span className="text-[11px] font-semibold text-zinc-400 shrink-0">Voice Engine</span>
+            <select
+              aria-label="Voice Engine"
+              value={voiceEngine}
+              onChange={(e) => {
+                const next = e.target.value as VoiceEngineId;
+                setVoiceEngine(next);
+                setPreferredVoiceEngine(next);
+              }}
+              className="min-w-0 flex-1 bg-transparent text-right text-[11px] font-semibold text-[#ff8aa1] outline-none"
+            >
+              {VOICE_ENGINE_OPTIONS.map((v) => (
+                <option key={v.id} value={v.id} className="bg-[#141418] text-white">
+                  {v.label} ({v.footprint})
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div className="flex items-center justify-center gap-3">
             <button

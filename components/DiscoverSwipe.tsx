@@ -9,6 +9,7 @@ import { useCoinsStore } from '@/lib/coinsStore';
 import { saveMatchDB } from '@/lib/db';
 import { playMatchChime, playSuperLikeZap, playSwipeTick } from '@/lib/neonAudio';
 import { hapticMatch, hapticSuperLike, hapticSwipe } from '@/lib/haptics';
+import { SafeImage } from '@/components/SafeImage';
 
 export interface DiscoverCard extends CompanionProfile {
   prompts?: { question: string; answer: string };
@@ -335,15 +336,11 @@ export function DiscoverSwipe({
               }}
               className={`relative aspect-[3/4.6] w-full cursor-grab touch-none select-none overflow-hidden rounded-3xl border bg-[#0c0c16] active:cursor-grabbing ${dragTone}`}
             >
-              <img
+              <SafeImage
                 src={current.extraPhotos?.[photoIdx] || current.portraitUrl}
                 alt={current.isSecretAdmirer && !admirerRevealed ? 'Secret Admirer' : current.name}
                 draggable={false}
-                onError={(e) => {
-                  if (e.currentTarget.src !== fallbackPortraitUrl) {
-                    e.currentTarget.src = fallbackPortraitUrl;
-                  }
-                }}
+                fallbackSrc={fallbackPortraitUrl || '/portraits/chloe-parker.webp'}
                 className={`h-full w-full object-cover object-top transition duration-500 ${
                   current.isSecretAdmirer && !admirerRevealed ? 'blur-2xl scale-110 brightness-75' : ''
                 }`}
@@ -474,12 +471,10 @@ export function DiscoverSwipe({
             onSubmit={handleSubmitRizz}
             className="w-full max-w-xs rounded-3xl neon-glass p-5 text-center shadow-2xl"
           >
-            <img
+            <SafeImage
               src={rizzTarget.portraitUrl}
               alt={rizzTarget.name}
-              onError={(e) => {
-                if (e.currentTarget.src !== fallbackPortraitUrl) e.currentTarget.src = fallbackPortraitUrl;
-              }}
+              fallbackSrc={fallbackPortraitUrl || '/portraits/chloe-parker.webp'}
               className="mx-auto h-20 w-20 rounded-full object-cover object-top ring-2 ring-[#ff1e8e]"
             />
             <h3 className="mt-3 text-base font-extrabold">{rizzTarget.name} wants your best opener</h3>
@@ -519,14 +514,10 @@ export function DiscoverSwipe({
               <p className="text-xs font-black uppercase tracking-widest text-[#00f5ff] neon-text-glow">
                 It&apos;s a Match!
               </p>
-              <img
+              <SafeImage
                 src={matchedCard.portraitUrl}
                 alt={matchedCard.name}
-                onError={(e) => {
-                  if (e.currentTarget.src !== fallbackPortraitUrl) {
-                    e.currentTarget.src = fallbackPortraitUrl;
-                  }
-                }}
+                fallbackSrc={fallbackPortraitUrl || '/portraits/chloe-parker.webp'}
                 className="mx-auto mt-3 h-28 w-28 rounded-full object-cover object-top ring-4 ring-[#ff1e8e]/70 shadow-[0_0_24px_rgba(255,30,142,0.5)]"
               />
               <h3 className="mt-3 text-lg font-extrabold">{matchedCard.name} liked you back</h3>

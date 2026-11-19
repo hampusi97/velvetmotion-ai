@@ -11,6 +11,7 @@ import { DailyFeed } from "./DailyFeed";
 import { FeaturedPair } from "./FeaturedPair";
 import { ProactiveInbox } from "./ProactiveInbox";
 import { CandyGirlCard } from "./CandyGirlCard";
+import { SafeImage } from "./SafeImage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { claimDailyDropReward, getDailyDropClaimState } from "@/lib/progression";
 import { getEdgeStreak } from "@/lib/streaks";
@@ -154,7 +155,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
       {/* candy.ai-inspired Obsidian Editorial Hero Carousel */}
       <motion.section variants={riseItem} className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#16161b] shadow-2xl">
         <div className="relative aspect-[16/7] sm:aspect-[16/5] min-h-[185px]">
-          <img
+          <SafeImage
             src={heroImage}
             alt={hero.name}
             className="absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-500"
@@ -294,7 +295,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
                     href="/shorts/"
                     className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-purple-500/40 bg-[#161322] text-center block"
                   >
-                    <img
+                    <SafeImage
                       src="/promos/shorts-card.webp"
                       alt="VelvetMotion Shorts"
                       className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
@@ -318,7 +319,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
                     href="/private/"
                     className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-[#ff5678]/40 bg-[#1b141a] text-center block"
                   >
-                    <img
+                    <SafeImage
                       src="/promos/private-card.webp"
                       alt="Private Content"
                       className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
@@ -355,7 +356,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
         <motion.section variants={riseItem} className="neon-border-sweep">
           <div className="neon-sweep-inner p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5 min-w-0">
-              <img
+              <SafeImage
                 src={staticPortraitUrl(dailyDrop.companionId)}
                 alt={dailyDrop.companionName}
                 className="h-14 w-14 rounded-2xl object-cover object-top border border-[#ff5678]/50 shrink-0"
@@ -438,7 +439,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
                   className="group relative w-52 shrink-0 rounded-2xl overflow-hidden neon-glass text-left girl-card"
               >
                 <div className="relative aspect-[3/4]">
-                  <img src={card.portraitUrl} alt={card.name} className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
+                  <SafeImage src={card.portraitUrl} alt={card.name} className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
                   <div className="candy-scrim absolute inset-0" />
                   <span className="absolute left-2.5 top-2.5 rounded-full border border-[#ff5678]/50 bg-[#141418]/85 px-2 py-0.5 text-[9px] font-extrabold text-[#ff8aa1]">
                     {card.creator}
@@ -466,7 +467,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
               href={exp.href}
               className="group relative aspect-[3/4] overflow-hidden rounded-2xl neon-glass text-left girl-card block"
             >
-              <img src={`/portraits/${exp.face}.jpg`} alt={exp.title} className="absolute inset-0 h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
+              <SafeImage src={`/portraits/${exp.face}.jpg`} alt={exp.title} className="absolute inset-0 h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
               <div className="candy-scrim absolute inset-0" />
               <div className="absolute inset-x-0 bottom-0 p-3.5">
                 <div className={`text-lg font-black tracking-tight bg-gradient-to-r ${exp.neon} bg-clip-text text-transparent neon-text-glow`}>

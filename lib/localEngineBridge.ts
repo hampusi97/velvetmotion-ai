@@ -20,6 +20,7 @@ export interface SpeedMetrics {
 export interface LocalEngineStatus {
   isDesktop: boolean;
   koboldOnline: boolean;
+  fishOnline: boolean;
   ollamaOnline: boolean;
   comfyOnline: boolean;
   anyLocalOnline: boolean;
@@ -80,13 +81,13 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     if (Number.isFinite(mem) && mem > 0) ramGb = mem;
   }
 
-  let nativePorts: { koboldOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
+  let nativePorts: { koboldOnline?: boolean; fishOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
   if (desktop && window.__TAURI_INTERNALS__?.invoke) {
     try {
       const [specsRes, portsRes] = await Promise.all([
         window.__TAURI_INTERNALS__.invoke<SystemSpecs>("get_system_specs").catch(() => null),
         window.__TAURI_INTERNALS__
-          .invoke<{ koboldOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
+          .invoke<{ koboldOnline: boolean; fishOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
           .catch(() => null),
       ]);
       specs = specsRes;
@@ -97,21 +98,24 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     }
   }
 
-  const [koboldHttp, ollamaHttp, comfyHttp] = await Promise.all([
+  const [koboldHttp, fishHttp, ollamaHttp, comfyHttp] = await Promise.all([
     nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
+    nativePorts?.fishOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5002/health"),
     nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
     nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
   ]);
   const koboldOnline = Boolean(nativePorts?.koboldOnline || koboldHttp);
+  const fishOnline = Boolean(nativePorts?.fishOnline || fishHttp);
   const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp);
   const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp);
 
   return {
     isDesktop: desktop,
     koboldOnline,
+    fishOnline,
     ollamaOnline,
     comfyOnline,
-    anyLocalOnline: koboldOnline || ollamaOnline || comfyOnline,
+    anyLocalOnline: koboldOnline || fishOnline || ollamaOnline || comfyOnline,
     ramGb,
     ramTier: ramTierForGb(ramGb),
     specs,
@@ -165,6 +169,7 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
   const [status, setStatus] = useState<LocalEngineStatus>({
     isDesktop: false,
     koboldOnline: false,
+    fishOnline: false,
     ollamaOnline: false,
     comfyOnline: false,
     anyLocalOnline: false,

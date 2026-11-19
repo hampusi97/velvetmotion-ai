@@ -26,6 +26,7 @@ struct SystemSpecs {
 #[serde(rename_all = "camelCase")]
 struct LocalPortStatus {
     kobold_online: bool,
+    fish_online: bool,
     ollama_online: bool,
     comfy_online: bool,
 }
@@ -53,6 +54,7 @@ fn get_system_specs() -> SystemSpecs {
 fn probe_local_engines() -> LocalPortStatus {
     LocalPortStatus {
         kobold_online: port_open(5001),
+        fish_online: port_open(5002),
         ollama_online: port_open(11434),
         comfy_online: port_open(8188),
     }

@@ -8,6 +8,8 @@ import { checkDesktopUpdate, triggerBossKey, useLocalEngineStatus } from "@/lib/
 import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
 import { useFirebaseCloudSync } from "@/lib/firebaseSync";
 import { googleSignIn, signInAnonymousGuest } from "@/lib/firebase";
+import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
+import { getPreferredVoiceEngine, setPreferredVoiceEngine, type VoiceEngineId } from "@/lib/kokoroTts";
 
 export function SettingsAndBackupDrawer({
   open,
@@ -35,8 +37,10 @@ export function SettingsAndBackupDrawer({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [uiSound, setUiSound] = useState(() => isUiSoundEnabled());
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngineId>(() => getPreferredVoiceEngine());
   const engine = useLocalEngineStatus();
   const { status: cloudStatus, syncNow } = useFirebaseCloudSync();
+  const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
 
   if (!open) return null;
 
@@ -86,6 +90,7 @@ export function SettingsAndBackupDrawer({
   const copyCommand = (id: string, cmd: string) => {
     void navigator.clipboard?.writeText(cmd);
     setCopiedCmd(id);
+    setStatusMsg("Copied launch command to clipboard.");
     setTimeout(() => setCopiedCmd(null), 1500);
   };
 
@@ -226,17 +231,17 @@ export function SettingsAndBackupDrawer({
         </div>
 
         {/* Local Ultra Mode & Desktop Update */}
-        <div className="rounded-2xl border border-[#ff1e8e]/35 bg-[#ff1e8e]/5 p-3.5 space-y-2.5">
+        <div className="rounded-2xl border border-[#ff1e8e]/35 bg-[#ff1e8e]/5 p-3.5 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold text-[#f7f7fc] flex items-center gap-1.5">
-              <Cpu className="h-4 w-4 text-[#00f5ff]" /> Local Ultra Mode · {engine.ramTier} ({engine.ramGb} GB)
+              <Cpu className="h-4 w-4 text-[#00f5ff]" /> Local Ultra Mode · {ramCatalog.label} ({engine.ramGb} GB)
             </span>
             <button
               type="button"
-              onClick={() => void engine.refresh()}
-              className="text-[11px] text-[#00f5ff] inline-flex items-center gap-1 hover:underline"
+              onClick={() => void engine.refresh().then(() => setStatusMsg("Probed :5001, :5002, :11434, and :8188."))}
+              className="rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2.5 py-1 text-[10px] font-bold text-[#00f5ff] inline-flex items-center gap-1 hover:bg-[#00f5ff]/20"
             >
-              <RefreshCw className="h-3 w-3" /> Probe
+              <RefreshCw className="h-3 w-3" /> Test Local Connection
             </button>
           </div>
           {engine.specs && (
@@ -246,9 +251,10 @@ export function SettingsAndBackupDrawer({
             </p>
           )}
           <p className="text-[11px] text-[#a6a6c4]">{recommendText}</p>
-          <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
             {[
               ["KoboldCpp :5001", engine.koboldOnline],
+              ["Fish Drama :5002", engine.fishOnline],
               ["Ollama :11434", engine.ollamaOnline],
               ["ComfyUI :8188", engine.comfyOnline],
             ].map(([lbl, on]) => (
@@ -265,19 +271,58 @@ export function SettingsAndBackupDrawer({
             ))}
           </div>
 
-          <div className="space-y-1.5 pt-1 text-[10px]">
-            {[
-              ["kobold", "koboldcpp --port 5001 --usecublas"],
-              ["ollama", "OLLAMA_ORIGINS=\"*\" ollama run llama3.1:8b"],
-              ["comfy", "python main.py --listen 127.0.0.1 --port 8188 --enable-cors-header"],
-            ].map(([id, cmd]) => (
-              <div key={id} className="flex items-center justify-between gap-2 rounded-lg bg-[#05050a] border border-white/10 px-2.5 py-1.5 font-mono text-zinc-300">
-                <span className="truncate">{cmd}</span>
-                <button type="button" onClick={() => copyCommand(id, cmd)} className="shrink-0 text-[#00f5ff]">
-                  {copiedCmd === id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
+          {/* Detected RAM Tier SOTA Nov 2026 Model Presets */}
+          <div className="space-y-2 pt-1">
+            <p className="text-[11px] font-bold text-white">Recommended Models for {ramCatalog.label}</p>
+            {ramCatalog.presets.map((preset) => (
+              <div key={preset.id} className="rounded-xl border border-white/10 bg-[#05050a] p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-white truncate">{preset.name}</span>
+                  <span className="shrink-0 rounded-full border border-[#ff5678]/40 bg-[#ff5678]/15 px-2 py-0.5 text-[9px] font-extrabold text-[#ff8aa1]">
+                    {preset.badge}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#a6a6c4] leading-snug">{preset.description}</p>
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#0c0c16] px-2.5 py-1.5 font-mono text-[10px] text-zinc-300">
+                  <span className="truncate">{preset.launchCommand}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyCommand(preset.id, preset.launchCommand)}
+                    className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2 py-0.5 text-[10px] font-sans font-bold text-[#00f5ff]"
+                  >
+                    {copiedCmd === preset.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    {copiedCmd === preset.id ? "Copied" : "Copy"}
+                  </button>
+                </div>
               </div>
             ))}
+          </div>
+
+          {/* Persisted Voice Engine Selector */}
+          <div className="rounded-xl border border-white/10 bg-[#05050a] p-2.5 space-y-1.5">
+            <label className="block text-[11px] font-bold text-white" htmlFor="vm-voice-engine-select">
+              Voice Engine (Chat Notes &amp; Voice Call)
+            </label>
+            <select
+              id="vm-voice-engine-select"
+              value={voiceEngine}
+              onChange={(e) => {
+                const next = e.target.value as VoiceEngineId;
+                setVoiceEngine(next);
+                setPreferredVoiceEngine(next);
+                setStatusMsg(`Voice Engine switched to ${VOICE_ENGINE_OPTIONS.find((v) => v.id === next)?.label || next}.`);
+              }}
+              className="w-full rounded-lg border border-white/15 bg-[#0c0c16] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#ff5678]"
+            >
+              {VOICE_ENGINE_OPTIONS.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.label} · {v.footprint} ({v.badge})
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-[#a6a6c4]">
+              {VOICE_ENGINE_OPTIONS.find((v) => v.id === voiceEngine)?.description}
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">

@@ -1,7 +1,15 @@
 /**
- * Neural Voice Synthesis Adapter (Kokoro-82M + instant Web Speech API fallback)
+ * Neural Voice Synthesis Adapter
+ * Supports persisted Voice Engine selection across:
+ *   - Fish Audio Drama 3 (127.0.0.1:5002 local audio.cpp)
+ *   - Kokoro-82M (127.0.0.1:8880 / Web fallback)
+ *   - Kitten-TTS-2 Pico / Reverb-TTS WebGPU profiles
+ *   - Instant OS Web Speech API fallback (zero silent failures)
  * Respects `vm:boss-key-mute` so Boss Key silences playback instantaneously.
  */
+import type { VoiceEngineOption } from "@/data/localModelCatalog";
+
+export type VoiceEngineId = VoiceEngineOption["id"];
 
 export type KokoroVoiceId =
   | "af_heart"
@@ -15,6 +23,8 @@ interface VoiceProfile {
   pitch: number;
   rate: number;
 }
+
+const VOICE_ENGINE_KEY = "vm-voice-engine";
 
 const VOICE_TUNING: Record<KokoroVoiceId, VoiceProfile> = {
   af_heart: { pitch: 1.06, rate: 0.96 },
@@ -33,6 +43,27 @@ if (typeof window !== "undefined") {
   });
 }
 
+export function getPreferredVoiceEngine(): VoiceEngineId {
+  if (typeof window === "undefined") return "kokoro-82m";
+  try {
+    const saved = localStorage.getItem(VOICE_ENGINE_KEY) as VoiceEngineId | null;
+    if (saved) return saved;
+  } catch {
+    /* ignore */
+  }
+  return "kokoro-82m";
+}
+
+export function setPreferredVoiceEngine(id: VoiceEngineId): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(VOICE_ENGINE_KEY, id);
+    window.dispatchEvent(new CustomEvent("vm:voice-engine-changed", { detail: id }));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function stopNeuralSpeech() {
   try {
     activeAudio?.pause();
@@ -49,25 +80,22 @@ export function stopNeuralSpeech() {
   }
 }
 
-export async function speakWithNeuralVoice(
+async function tryLocalTtsEndpoint(
+  endpoint: string,
+  model: string,
   text: string,
-  opts: { voiceId?: string; whispery?: boolean; pitch?: number; rate?: number } = {},
-): Promise<{ engine: "kokoro" | "webspeech" | "none" }> {
-  const clean = text.replace(/\*[^*]+\*/g, "").replace(/\s+/g, " ").trim().slice(0, 420);
-  if (!clean || typeof window === "undefined") return { engine: "none" };
-  stopNeuralSpeech();
-
-  // Optional local Kokoro / OpenAI-compatible TTS server when Desktop Local Ultra runs on port 8880
+  voiceId: string,
+): Promise<boolean> {
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 900);
-    const res = await fetch("http://127.0.0.1:8880/v1/audio/speech", {
+    const t = setTimeout(() => ctrl.abort(), 950);
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "kokoro",
-        input: clean,
-        voice: opts.voiceId || "af_heart",
+        model,
+        input: text,
+        voice: voiceId,
         response_format: "mp3",
       }),
       signal: ctrl.signal,
@@ -79,30 +107,78 @@ export async function speakWithNeuralVoice(
       const audio = new Audio(url);
       activeAudio = audio;
       await audio.play().catch(() => undefined);
-      return { engine: "kokoro" };
+      return true;
     }
   } catch {
-    /* Fall back smoothly to Web Speech API */
+    /* Fall back smoothly */
+  }
+  return false;
+}
+
+export async function speakWithNeuralVoice(
+  text: string,
+  opts: { voiceId?: string; whispery?: boolean; pitch?: number; rate?: number; engineOverride?: VoiceEngineId } = {},
+): Promise<{ engine: "fish-drama-3" | "kokoro" | "reverb-webgpu" | "kitten-pico" | "webspeech" | "none"; label: string }> {
+  const clean = text.replace(/\*[^*]+\*/g, "").replace(/\s+/g, " ").trim().slice(0, 420);
+  if (!clean || typeof window === "undefined") return { engine: "none", label: "Muted" };
+  stopNeuralSpeech();
+
+  const selected = opts.engineOverride || getPreferredVoiceEngine();
+
+  // 1. Fish Audio Drama 3 on local audio.cpp (:5002) when chosen
+  if (selected === "fish-drama-3-local") {
+    const okFish = await tryLocalTtsEndpoint(
+      "http://127.0.0.1:5002/v1/audio/speech",
+      "fish-drama-3",
+      clean,
+      opts.voiceId || "af_heart",
+    );
+    if (okFish) return { engine: "fish-drama-3", label: "Fish Drama 3 Local" };
   }
 
+  // 2. Local Kokoro-82M / OpenAI-compatible TTS server (:8880) unless pure OS fallback requested
+  if (selected !== "browser-speech") {
+    const okKokoro = await tryLocalTtsEndpoint(
+      "http://127.0.0.1:8880/v1/audio/speech",
+      selected === "reverb-tts-webgpu" ? "reverb" : selected === "kitten-tts-2-pico" ? "kitten-2" : "kokoro",
+      clean,
+      opts.voiceId || "af_heart",
+    );
+    if (okKokoro) {
+      if (selected === "reverb-tts-webgpu") return { engine: "reverb-webgpu", label: "Reverb-TTS WebGPU" };
+      if (selected === "kitten-tts-2-pico") return { engine: "kitten-pico", label: "Kitten-TTS-2 Pico" };
+      return { engine: "kokoro", label: "Kokoro-82M Neural" };
+    }
+  }
+
+  // 3. Guaranteed Web Speech API fallback (tuned cleanly per selected voice engine mood)
   if ("speechSynthesis" in window) {
     return new Promise((resolve) => {
       try {
         const u = new SpeechSynthesisUtterance(clean);
         const preset = VOICE_TUNING[(opts.voiceId as KokoroVoiceId) || "af_heart"] || VOICE_TUNING.af_heart;
+        const speedBias = selected === "kitten-tts-2-pico" ? 1.03 : selected === "reverb-tts-webgpu" ? 0.98 : 1.0;
         u.pitch = opts.pitch ?? (opts.whispery ? Math.max(0.75, preset.pitch - 0.12) : preset.pitch);
-        u.rate = opts.rate ?? (opts.whispery ? Math.max(0.76, preset.rate - 0.1) : preset.rate);
+        u.rate = (opts.rate ?? (opts.whispery ? Math.max(0.76, preset.rate - 0.1) : preset.rate)) * speedBias;
         const voices = window.speechSynthesis.getVoices();
         const fem = voices.find((v) => /female|samantha|karen|victoria|ava|zoe|emma|serena|en-us|en-gb/i.test(v.name));
         if (fem) u.voice = fem;
-        u.onend = () => resolve({ engine: "webspeech" });
-        u.onerror = () => resolve({ engine: "webspeech" });
+        const fallbackLabel =
+          selected === "reverb-tts-webgpu"
+            ? "Reverb Fallback HD"
+            : selected === "kitten-tts-2-pico"
+              ? "Kitten-2 Fallback HD"
+              : selected === "fish-drama-3-local"
+                ? "Drama Fallback HD"
+                : "Kokoro / WebSpeech HD";
+        u.onend = () => resolve({ engine: "webspeech", label: fallbackLabel });
+        u.onerror = () => resolve({ engine: "webspeech", label: fallbackLabel });
         window.speechSynthesis.speak(u);
       } catch {
-        resolve({ engine: "none" });
+        resolve({ engine: "none", label: "Unavailable" });
       }
     });
   }
 
-  return { engine: "none" };
+  return { engine: "none", label: "Unavailable" };
 }

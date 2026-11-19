@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sparkles, Users } from "lucide-react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { SafeImage } from "@/components/SafeImage";
 import { generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
 import { assertCompliance } from "@/lib/complianceFilter";
 import { earnCompanionXp } from "@/lib/progression";
@@ -157,7 +158,7 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
                 onClick={() => toggle(c.id)}
                 className={`relative rounded-2xl border overflow-hidden text-left transition ${ringClass}`}
               >
-                <img src={staticPortraitUrl(c.id)} alt={c.name} className="aspect-[3/4] w-full object-cover object-top" />
+                <SafeImage src={staticPortraitUrl(c.id)} alt={c.name} className="aspect-[3/4] w-full object-cover object-top" />
                 {idx >= 0 && (
                   <span
                     className={`absolute top-1.5 right-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white ${
@@ -196,7 +197,7 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
           </button>
           <div className="flex -space-x-2">
             {girls.map((g, idx) => (
-              <img
+              <SafeImage
                 key={g.id}
                 src={staticPortraitUrl(g.id)}
                 alt={g.name}

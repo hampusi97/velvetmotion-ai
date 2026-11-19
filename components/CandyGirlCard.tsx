@@ -2,7 +2,8 @@
 
 import { BadgeCheck, Film, Lock, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/characters";
-import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { SafeImage } from "@/components/SafeImage";
 
 export function CandyGirlCard({
   character,
@@ -21,11 +22,10 @@ export function CandyGirlCard({
       aria-label={`Open ${character.name}`}
       className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#1a1a1f] text-left transition-all duration-300 hover:-translate-y-1 hover:border-[#ff5678]/60 hover:shadow-[0_12px_28px_rgba(0,0,0,0.55),0_0_20px_rgba(255,86,120,0.2)]"
     >
-      <img
+      <SafeImage
         src={staticPortraitUrl(character.id)}
         alt={character.name}
         loading="lazy"
-        onError={onPortraitError}
         className="absolute inset-0 h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.06]"
       />
 
