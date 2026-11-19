@@ -23,6 +23,9 @@ const ROOMS = [
   { id: "public", label: "Public" },
   { id: "nsfw", label: "NSFW" },
   { id: "share", label: "Share codes" },
+  { id: "cuck", label: "Cuck" },
+  { id: "bnwo", label: "BNWO" },
+  { id: "breeding", label: "Breeding" },
 ] as const;
 
 function loadLobby(room: string): LobbyMsg[] {
