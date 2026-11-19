@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   BookmarkPlus,
   Copy,
+  Dices,
+  Download,
   Flame,
   Gift,
+  GitBranch,
   Heart,
   Image as ImageIcon,
   Maximize2,
@@ -23,7 +26,20 @@ import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } f
 import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
 import { generateCompanionReply, sanitizeCompanionReply } from "@/lib/chatRouter";
 import { assertCompliance } from "@/lib/complianceFilter";
-import { loadChatDB, saveChatDB, saveGalleryDB } from "@/lib/db";
+import {
+  listChatBranchesDB,
+  loadChatDB,
+  loadGalleryDB,
+  saveChatBranchDB,
+  saveChatDB,
+  saveGalleryDB,
+  type BranchRow,
+} from "@/lib/db";
+import { getTimeMood } from "@/lib/timeMood";
+import { playLevelUpSwell } from "@/lib/neonAudio";
+import { hapticLevelUp } from "@/lib/haptics";
+import { ChatMiniGames } from "@/components/ChatMiniGames";
+import { AmbientMixer } from "@/components/AmbientMixer";
 import { computeMoodState } from "@/lib/moodEngine";
 import { extractMemoriesFromMessage, loadMemories, saveMemories, splitInnerThoughtAndReply } from "@/lib/memoryMap";
 import { memoryPromptBlock, pinLong, pushShort } from "@/lib/memoryTiers";
@@ -133,6 +149,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [safetyError, setSafetyError] = useState<string | null>(null);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [progression, setProgression] = useState<CompanionProgression>(() => getCompanionProgression(character.id));
+  const [timeMood] = useState(() => getTimeMood());
+  const [branches, setBranches] = useState<BranchRow[]>([]);
+  const [activeBranchId, setActiveBranchId] = useState<string>("main");
+  const [gamesOpen, setGamesOpen] = useState(false);
+  const [rightTab, setRightTab] = useState<"memory" | "diary">("memory");
+  const [diaryPhotos, setDiaryPhotos] = useState<Array<{ id: string; url: string; label: string }>>([]);
 
   const { coins, spend, earn } = useCoinsStore();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -149,16 +171,35 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const stage = stageFromIntimacy(intimacy);
   const progStats = levelProgressPercent(progression.xp);
 
+  const refreshDiary = () => {
+    const lsItems = getGallery()
+      .filter((g) => g.characterId === character.id)
+      .map((g) => ({ id: g.id, url: g.url, label: g.type || "selfie" }));
+    void loadGalleryDB(character.id).then((dbItems) => {
+      const merged = new Map<string, { id: string; url: string; label: string }>();
+      for (const r of dbItems) merged.set(r.url, { id: r.id, url: r.url, label: r.mood || "selfie" });
+      for (const l of lsItems) if (!merged.has(l.url)) merged.set(l.url, l);
+      setDiaryPhotos(Array.from(merged.values()));
+    });
+  };
+
   useEffect(() => {
     setProgression(getCompanionProgression(character.id));
     setGifts(getGiftsFor(character.id));
     setIntimacy(getIntimacy(character.id, character.intimacy));
+    setActiveBranchId("main");
+    refreshDiary();
+    void listChatBranchesDB(character.id).then(setBranches);
     void (async () => {
       const dbLoaded = await loadChatDB(character.id);
       const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
       if (loaded.length > 0) setMessages(loaded);
-      else setMessages([{ role: "assistant", content: character.initialMessage }]);
+      else {
+        const adapted = `${character.initialMessage}\n\n*${timeMood.label}:* ${timeMood.greetingLine(character.name.split(" ")[0])}`;
+        setMessages([{ role: "assistant", content: adapted }]);
+      }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [character.id, character.initialMessage, character.intimacy]);
 
   useEffect(() => {
@@ -169,8 +210,52 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
   const persist = (next: ChatMessage[]) => {
     setMessages(next);
-    void saveChatDB(character.id, next);
-    saveChat(character.id, next);
+    if (activeBranchId === "main") {
+      void saveChatDB(character.id, next);
+      saveChat(character.id, next);
+    } else {
+      const active = branches.find((b) => b.branchId === activeBranchId);
+      void saveChatBranchDB({
+        characterId: character.id,
+        branchId: activeBranchId,
+        label: active?.label || `Timeline ${activeBranchId}`,
+        messages: next,
+        createdAt: active?.createdAt || Date.now(),
+      }).then(() => listChatBranchesDB(character.id).then(setBranches));
+    }
+  };
+
+  const forkFromMessage = async (idx: number) => {
+    const slice = messages.slice(0, idx + 1);
+    const branchId = `b-${Date.now().toString(36)}`;
+    const label = `What-If #${branches.length + 1}`;
+    const saved = await saveChatBranchDB({
+      characterId: character.id,
+      branchId,
+      label,
+      messages: slice,
+      parentBranch: activeBranchId,
+      createdAt: Date.now(),
+    });
+    const nextList = await listChatBranchesDB(character.id);
+    setBranches(nextList.length ? nextList : [...branches, saved]);
+    setActiveBranchId(branchId);
+    setMessages(slice);
+    notifySaved(`Forked ${label}`);
+  };
+
+  const switchBranch = async (branchId: string) => {
+    setActiveBranchId(branchId);
+    if (branchId === "main") {
+      const dbLoaded = await loadChatDB(character.id);
+      const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
+      setMessages(loaded.length ? loaded : [{ role: "assistant", content: character.initialMessage }]);
+      return;
+    }
+    const found = branches.find((b) => b.branchId === branchId);
+    if (found && Array.isArray(found.messages)) {
+      setMessages(found.messages as ChatMessage[]);
+    }
   };
 
   const notifySaved = (label: string) => {
@@ -193,9 +278,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         url: saved.url,
         mood,
         createdAt: saved.createdAt,
-      });
+      }).then(refreshDiary);
     }
-    notifySaved("Saved to Collection");
+    notifySaved("Saved to Collection & Photo Diary");
   };
 
   const requestReplyForHistory = async (historyMsgs: ChatMessage[], userPrompt: string) => {
@@ -269,8 +354,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     return fallbackReply(character, userPrompt, romanceMode, mood);
   };
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (overrideText?: string, bonusXp = 6) => {
+    const text = (overrideText ?? input).trim();
     if (!text || busy) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
@@ -278,7 +363,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       return;
     }
 
-    setInput("");
+    if (!overrideText) setInput("");
     const userMsg: ChatMessage = { role: "user", content: text };
     const next = [...messages, userMsg];
     persist(next);
@@ -297,14 +382,18 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
       const newInt = bumpIntimacy(character.id, 3);
       setIntimacy(newInt);
-      const { progression: nextProg, leveledUp } = earnCompanionXp(character.id, 6);
+      const { progression: nextProg, leveledUp } = earnCompanionXp(character.id, bonusXp);
       setProgression(nextProg);
-      if (leveledUp) notifySaved(`Level ${nextProg.level} Unlocked! +15 🪙`);
+      if (leveledUp) {
+        playLevelUpSwell();
+        hapticLevelUp();
+        notifySaved(`Level ${nextProg.level} Unlocked! +15 🪙`);
+      }
 
       if (voiceOn) {
         void speakWithNeuralVoice(stripStage(replyText).slice(0, 280), {
           voiceId: character.voiceId,
-          whispery: progression.level >= 4,
+          whispery: progression.level >= 4 || timeMood.whisperBias,
           pitch: character.voice?.pitch,
           rate: character.voice?.rate,
         });
@@ -346,7 +435,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     setBusy(true);
     setGeneratingPhoto(true);
     try {
-      const resolved = await resolveBestMediaUrl(character, mood, extra);
+      const themedExtra = [extra, timeMood.sceneLightingBias].filter(Boolean).join(", ");
+      const resolved = await resolveBestMediaUrl(character, mood, themedExtra);
       const url = resolved.url;
       const note = resolved.note;
       addToGallery({
@@ -362,7 +452,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         url,
         mood,
         createdAt: Date.now(),
-      });
+      }).then(refreshDiary);
 
       const isExplicit = ["nude", "explicit", "sex"].includes(mood);
       const caption = `*${label} · ${note}*`;
@@ -568,21 +658,42 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 className="h-10 w-10 rounded-full object-cover object-top border border-[#ff1e8e]/60 shrink-0"
               />
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-extrabold text-sm text-[#f7f7fc] truncate">{character.name}</span>
+                  <span className="hidden sm:inline-block rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2 py-0.5 text-[9px] font-bold text-[#00f5ff]">
+                    {timeMood.badge}
+                  </span>
                   {progression.level >= 10 && (
                     <span className="rounded-full bg-[#00f5ff]/20 border border-[#00f5ff] px-1.5 py-0.5 text-[9px] font-black text-[#00f5ff]">
                       SOULMATE
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[#a6a6c4] truncate">
-                  <span className="text-[#00ffa3] font-semibold">Online</span> · {stage.label} · Lv. {progStats.level}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[11px] text-[#a6a6c4] truncate">
+                    <span className="text-[#00ffa3] font-semibold">Online</span> · {stage.label} · Lv. {progStats.level}
+                  </p>
+                  {branches.length > 0 && (
+                    <select
+                      aria-label="Switch What-If branch"
+                      value={activeBranchId}
+                      onChange={(e) => void switchBranch(e.target.value)}
+                      className="rounded-full border border-[#ff1e8e]/50 bg-[#0c0c16] px-2 py-0.5 text-[10px] font-bold text-pink-200 outline-none"
+                    >
+                      <option value="main">Main Timeline</option>
+                      {branches.map((b) => (
+                        <option key={b.branchId} value={b.branchId}>
+                          ⑂ {b.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              <AmbientMixer compact />
               <span className="rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-1 text-[11px] font-bold text-amber-200 tabular-nums">
                 🪙 {coins}
               </span>
@@ -747,6 +858,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       </button>
                     </>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => void forkFromMessage(i)}
+                    className="inline-flex items-center gap-0.5 text-[#00f5ff] hover:underline"
+                    title="Fork What-If timeline from here"
+                  >
+                    <GitBranch className="h-3 w-3" /> Fork Here
+                  </button>
                   <button
                     type="button"
                     onClick={() => rewindTo(i)}
@@ -918,6 +1037,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             </div>
           )}
 
+          <ChatMiniGames
+            open={gamesOpen}
+            companionName={character.name}
+            onClose={() => setGamesOpen(false)}
+            onPlayPrompt={(prompt, bonusXp) => void send(prompt, bonusXp || 8)}
+          />
+
           {/* Horizontal Zero-Clip Gift Strip */}
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar px-3 py-1">
             {GIFTS.slice(0, 6).map((g) => (
@@ -933,7 +1059,21 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           </div>
 
           {/* Pinned Bottom Composer */}
-          <div className="flex gap-2 px-1">
+          <div className="flex gap-1.5 sm:gap-2 px-1">
+            <button
+              type="button"
+              onClick={() => setGamesOpen((g) => !g)}
+              aria-label="Open Mini-Games"
+              title="Truth or Dare & Neon Spin Wheel"
+              className={`shrink-0 inline-flex items-center gap-1 rounded-2xl border px-3 py-2 text-xs font-bold transition ${
+                gamesOpen
+                  ? "border-[#00f5ff] bg-[#00f5ff]/20 text-[#00f5ff]"
+                  : "border-white/15 bg-[#0c0c16] text-pink-200 hover:border-[#ff1e8e]"
+              }`}
+            >
+              <Dices className="h-4 w-4" />
+              <span className="hidden sm:inline">Games</span>
+            </button>
             <textarea
               ref={inputRef}
               value={input}
@@ -952,7 +1092,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               type="button"
               disabled={busy || !input.trim()}
               onClick={() => void send()}
-              className="px-5 rounded-2xl neon-btn-primary font-bold text-sm text-white disabled:opacity-45"
+              className="px-4 sm:px-5 rounded-2xl neon-btn-primary font-bold text-sm text-white disabled:opacity-45"
             >
               Send
             </button>
@@ -1001,27 +1141,56 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           </div>
         </div>
 
-        {/* Docked Memory Vault */}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <MemoryVaultPanel characterId={character.id} characterName={character.name} />
+        {/* Right Column Tabs: Memory Vault vs Instagram-Style Photo Diary */}
+        <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-[#05050a] p-1 text-[11px] font-bold shrink-0">
+          <button
+            type="button"
+            onClick={() => setRightTab("memory")}
+            className={`rounded-lg py-1.5 transition ${rightTab === "memory" ? "neon-btn-primary text-white" : "text-[#a6a6c4]"}`}
+          >
+            Memory Vault
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setRightTab("diary");
+              refreshDiary();
+            }}
+            className={`rounded-lg py-1.5 transition ${rightTab === "diary" ? "neon-btn-primary text-white" : "text-[#a6a6c4]"}`}
+          >
+            Diary ({diaryPhotos.length || localGallery.length})
+          </button>
         </div>
 
-        {/* Mini Selfie Gallery */}
-        {localGallery.length > 0 && (
-          <div className="shrink-0 space-y-1.5 border-t border-white/10 pt-2">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[#a6a6c4]">Recent Selfies</div>
-            <div className="grid grid-cols-3 gap-1.5">
-              {localGallery.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => setLightboxUrl(g.url)}
-                  className="aspect-square rounded-xl overflow-hidden border border-white/10 hover:border-[#ff1e8e]"
-                >
-                  <SafeImage src={g.url} alt="" className="h-full w-full object-cover object-top" />
-                </button>
-              ))}
-            </div>
+        {rightTab === "memory" ? (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <MemoryVaultPanel characterId={character.id} characterName={character.name} />
+          </div>
+        ) : (
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+            {diaryPhotos.length === 0 && localGallery.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-[#05050a]/70 p-4 text-center text-xs text-[#a6a6c4]">
+                No photos collected for {character.name.split(" ")[0]} yet. Tap Scene Selfies to capture her first diary shot.
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-1.5">
+                {(diaryPhotos.length ? diaryPhotos : localGallery.map((g) => ({ id: g.id, url: g.url, label: g.type }))).map((item) => (
+                  <div key={item.id} className="group relative aspect-square rounded-xl overflow-hidden border border-white/10 hover:border-[#ff1e8e]">
+                    <button type="button" onClick={() => setLightboxUrl(item.url)} className="h-full w-full">
+                      <SafeImage src={item.url} alt={item.label} className="h-full w-full object-cover object-top" />
+                    </button>
+                    <a
+                      href={item.url}
+                      download={`${character.id}-${item.id}.jpg`}
+                      aria-label="Download diary photo"
+                      className="absolute right-1 bottom-1 rounded-md bg-black/75 p-1 text-[#00f5ff] opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <Download className="h-2.5 w-2.5" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </aside>

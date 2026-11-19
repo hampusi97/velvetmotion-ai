@@ -6,6 +6,7 @@ import { saveCustomCompanionToFirestore } from "@/lib/firebase";
 import { CreatePostActions } from "@/components/CreatePostActions";
 import { SafeImage } from "@/components/SafeImage";
 import { validateCharacterCompliance } from "@/lib/complianceFilter";
+import { encodeSharedCharacterUrl } from "@/lib/shareCardUrl";
 import { saveCustomCompanionDB } from "@/lib/db";
 import { characterMediaUrl, faceSeed, seedFromPhotoDataUrl } from "@/lib/media";
 import { setCharacterFaceSeed } from "@/lib/mediaSettings";
@@ -146,6 +147,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<Character | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const [permHint, setPermHint] = useState<string | null>(null);
   const [genNote, setGenNote] = useState<string | null>(null);
 
@@ -329,9 +331,21 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
           <button
             type="button"
             onClick={() => onDone(created)}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25"
+            className="w-full py-3.5 rounded-2xl neon-btn-primary font-semibold shadow-lg shadow-pink-500/25"
           >
             Sextext with {first}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const url = await encodeSharedCharacterUrl(created, typeof window !== "undefined" ? window.location.origin : undefined);
+              await navigator.clipboard?.writeText(url).catch(() => {});
+              setShareCopied(true);
+              setTimeout(() => setShareCopied(false), 2200);
+            }}
+            className="w-full py-3.5 rounded-2xl border border-[#00f5ff]/55 bg-[#00f5ff]/15 text-[#00f5ff] font-bold hover:bg-[#00f5ff]/25"
+          >
+            {shareCopied ? "Share Link Copied ✓" : "🔗 Copy Share Link"}
           </button>
           {onOpen3D && (
             <button

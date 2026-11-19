@@ -44,6 +44,15 @@ export interface SettingRow {
   value: unknown;
   updatedAt: number;
 }
+export interface BranchRow {
+  id: string;
+  characterId: string;
+  branchId: string;
+  label: string;
+  messages: unknown[];
+  parentBranch?: string;
+  createdAt: number;
+}
 
 class VelvetDB extends Dexie {
   chats!: Table<ChatRow, string>;
@@ -53,6 +62,7 @@ class VelvetDB extends Dexie {
   progression!: Table<ProgressionRow, string>;
   companions!: Table<CompanionRow, string>;
   settings!: Table<SettingRow, string>;
+  branches!: Table<BranchRow, string>;
 
   constructor() {
     super("velvetmotion");
@@ -70,6 +80,16 @@ class VelvetDB extends Dexie {
       progression: "id, level, updatedAt",
       companions: "id, createdAt",
       settings: "key, updatedAt",
+    });
+    this.version(3).stores({
+      chats: "id, updatedAt",
+      memory: "id, updatedAt",
+      matches: "id, matchedAt",
+      gallery: "id, characterId, createdAt",
+      progression: "id, level, updatedAt",
+      companions: "id, createdAt",
+      settings: "key, updatedAt",
+      branches: "id, characterId, createdAt",
     });
   }
 }
@@ -126,10 +146,35 @@ export async function saveGalleryDB(item: GalleryRow) {
   await d.gallery.put(item);
 }
 
-export async function loadGalleryDB(): Promise<GalleryRow[]> {
+export async function loadGalleryDB(characterId?: string): Promise<GalleryRow[]> {
   const d = getDb();
   if (!d) return [];
+  if (characterId) {
+    return d.gallery.where("characterId").equals(characterId).reverse().sortBy("createdAt");
+  }
   return d.gallery.orderBy("createdAt").reverse().toArray();
+}
+
+export async function saveChatBranchDB(branch: Omit<BranchRow, "id">): Promise<BranchRow> {
+  const full: BranchRow = {
+    ...branch,
+    id: `${branch.characterId}::${branch.branchId}`,
+  };
+  const d = getDb();
+  if (d) await d.branches.put(full);
+  return full;
+}
+
+export async function listChatBranchesDB(characterId: string): Promise<BranchRow[]> {
+  const d = getDb();
+  if (!d) return [];
+  return d.branches.where("characterId").equals(characterId).sortBy("createdAt");
+}
+
+export async function deleteChatBranchDB(characterId: string, branchId: string) {
+  const d = getDb();
+  if (!d) return;
+  await d.branches.delete(`${characterId}::${branchId}`);
 }
 
 export async function saveProgressionDB(row: ProgressionRow) {

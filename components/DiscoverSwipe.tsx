@@ -7,6 +7,8 @@ import type { Character } from '@/lib/characters';
 import { bumpIntimacy, saveMatch } from '@/lib/storage';
 import { useCoinsStore } from '@/lib/coinsStore';
 import { saveMatchDB } from '@/lib/db';
+import { playMatchChime, playSuperLikeZap, playSwipeTick } from '@/lib/neonAudio';
+import { hapticMatch, hapticSuperLike, hapticSwipe } from '@/lib/haptics';
 
 export interface DiscoverCard extends CompanionProfile {
   prompts?: { question: string; answer: string };
@@ -131,9 +133,8 @@ export function DiscoverSwipe({
         }
         return next;
       });
-      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-        navigator.vibrate?.(15);
-      }
+      playMatchChime();
+      hapticMatch();
       setMatchedBonus(bonus);
       setMatchedCard({ ...card, id: cleanId });
     },
@@ -158,12 +159,16 @@ export function DiscoverSwipe({
       if (!swipedCompanion) return;
 
       if (direction === 'left') {
+        playSwipeTick(false);
+        hapticSwipe();
         isTransitioning.current = true;
         advanceDeck();
         return;
       }
 
       if (isSuperLike) {
+        playSuperLikeZap();
+        hapticSuperLike();
         isTransitioning.current = true;
         const today = new Date().toISOString().slice(0, 10);
         try {

@@ -5,6 +5,7 @@ import { Check, Copy, Cpu, Download, RefreshCw, Shield, Sparkles, Upload, X } fr
 import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
 import { loadRouterSettings, saveRouterSettings } from "@/lib/chatRouter";
 import { checkDesktopUpdate, triggerBossKey, useLocalEngineStatus } from "@/lib/localEngineBridge";
+import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
 
 export function SettingsAndBackupDrawer({
   open,
@@ -31,6 +32,7 @@ export function SettingsAndBackupDrawer({
   });
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+  const [uiSound, setUiSound] = useState(() => isUiSoundEnabled());
   const engine = useLocalEngineStatus();
 
   if (!open) return null;
@@ -132,6 +134,18 @@ export function SettingsAndBackupDrawer({
               ))}
             </div>
           </div>
+          <label className="flex items-center gap-2 text-xs text-[#a6a6c4] cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={uiSound}
+              onChange={(e) => {
+                setUiSound(e.target.checked);
+                setUiSoundEnabled(e.target.checked);
+              }}
+              className="accent-[#00f5ff]"
+            />
+            Synthesized Neon UI Sound Effects (swipes, matches, level-ups)
+          </label>
         </div>
 
         {/* 1-Click .json Backup */}

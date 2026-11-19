@@ -13,6 +13,7 @@ import { generateHordeImage } from "./aiHorde";
 import { fetchWorkerImage } from "./imageWorker";
 import { remoteImageToStableDataUrl } from "./imageStore";
 import { checkContentSafety } from "./safety";
+import { reportGenerationSpeed } from "./localEngineBridge";
 import { QUALITY_PROMPT, IMAGE_STEPS, IMAGE_WIDTH, IMAGE_HEIGHT } from "./quality";
 
 const CF_IMAGE_WORKER =
@@ -107,9 +108,18 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
   const seed = (faceSeed(character) * 97 + (mediaSeed(character.id, mood, extra) % 17)) % 100000;
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
 
+  const t0 = Date.now();
+  const reportImg = (engine: string) => {
+    const sec = Number(Math.max(0.2, (Date.now() - t0) / 1000).toFixed(1));
+    reportGenerationSpeed({ imgSec: sec, lastEngine: engine });
+  };
+
   if (settings?.preferLocal && settings.localImageBase) {
     const localRes = await generateLocalImage({ prompt, seed, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, characterId: character.id });
-    if (localRes.ok && localRes.imageUrl) return { url: localRes.imageUrl, note: localRes.note };
+    if (localRes.ok && localRes.imageUrl) {
+      reportImg("local-gpu");
+      return { url: localRes.imageUrl, note: localRes.note };
+    }
   }
 
   if (typeof window !== "undefined") {
@@ -117,7 +127,10 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
 
     if (!isNsfw) {
       const worker = await fetchWorkerImage(prompt, { steps: 6, seed });
-      if (worker.ok) return { url: worker.url, note: "Cloudflare Flux" };
+      if (worker.ok) {
+        reportImg("cf-flux");
+        return { url: worker.url, note: "Cloudflare Flux" };
+      }
     }
 
     try {
@@ -131,8 +144,10 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
       });
       try {
         const stableUrl = await remoteImageToStableDataUrl(horde.url);
+        reportImg("ai-horde");
         return { url: stableUrl, note: horde.note };
       } catch {
+        reportImg("ai-horde");
         return horde;
       }
     } catch {

@@ -9,6 +9,8 @@ import { containerClass } from "@/lib/cn";
 import { getUser, login, type LocalUser } from "@/lib/auth";
 import { loadChat, saveChat } from "@/lib/storage";
 import { useCoinsStore } from "@/lib/coinsStore";
+import { decodeSharedCharacterHash } from "@/lib/shareCardUrl";
+import { saveCustomCompanionDB } from "@/lib/db";
 import { dismissProactive, startProactiveWatcher, type ProactivePing } from "@/lib/proactiveIdle";
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
@@ -137,6 +139,10 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   const [studioModalOpen, setStudioModalOpen] = useState(false);
   const [proactive, setProactive] = useState<ProactivePing | null>(null);
   const [dualPair, setDualPair] = useState<{ a: string; b: string } | null>(null);
+  const [sharedImportPreview, setSharedImportPreview] = useState<{
+    character?: Character;
+    error?: string;
+  } | null>(null);
 
   const { refresh: refreshCoins } = useCoinsStore();
   const toggleMenu = useCallback(() => setMenuOpen((o) => !o), []);
@@ -158,6 +164,15 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       if (qView && pathname === "/") setView(qView);
       const qId = params.get("id");
       if (qId) setSelectedId(qId);
+
+      // Phase 8 #8: Auto-open import preview modal if URL hash contains #import=<compressed>
+      if (window.location.hash && window.location.hash.includes("import=")) {
+        const hashPart = window.location.hash.split("import=")[1] || "";
+        void decodeSharedCharacterHash(hashPart).then((res) => {
+          if (res.ok) setSharedImportPreview({ character: res.character });
+          else setSharedImportPreview({ error: res.error });
+        });
+      }
     } catch {
       setAdult(false);
     }
@@ -302,6 +317,12 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
             <HomeView
               onNavigate={navigate}
               onOpenGirl={(id, note) => openChatById(id, undefined, note)}
+              onOpenCustomCharacter={(charObj) => {
+                setCustomCharacter(charObj);
+                setSelectedId(charObj.id);
+                setRomanceMode(false);
+                setView("chat");
+              }}
               onOpenDual={(a, b) => {
                 setDualPair({ a, b });
                 setView("dual");
@@ -476,6 +497,80 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
         <MediaStudioModal isOpen={studioModalOpen} onClose={() => setStudioModalOpen(false)} />
       </NeonErrorBoundary>
+
+      {sharedImportPreview && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
+          <div className="w-full max-w-sm neon-border-sweep">
+            <div className="neon-sweep-inner p-6 text-center space-y-4">
+              {sharedImportPreview.error ? (
+                <>
+                  <h2 className="text-lg font-extrabold text-rose-400">Share Link Blocked / Invalid</h2>
+                  <p className="text-xs text-[#a6a6c4]">{sharedImportPreview.error}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSharedImportPreview(null);
+                      window.history.replaceState(null, "", window.location.pathname);
+                    }}
+                    className="w-full rounded-full border border-white/15 py-2.5 text-xs font-bold text-white"
+                  >
+                    Dismiss
+                  </button>
+                </>
+              ) : sharedImportPreview.character ? (
+                <>
+                  <span className="inline-block rounded-full border border-[#00f5ff]/50 bg-[#00f5ff]/15 px-3 py-0.5 text-[10px] font-black text-[#00f5ff]">
+                    SHARED FICTIONAL 18+ COMPANION
+                  </span>
+                  <img
+                    src={sharedImportPreview.character.avatar}
+                    alt={sharedImportPreview.character.name}
+                    className="mx-auto h-28 w-24 rounded-2xl object-cover object-top border border-[#ff1e8e]/60"
+                  />
+                  <div>
+                    <h2 className="text-xl font-extrabold text-white">
+                      {sharedImportPreview.character.name}, {sharedImportPreview.character.age}
+                    </h2>
+                    <p className="text-xs text-pink-200 mt-1">{sharedImportPreview.character.tagline}</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const c = sharedImportPreview.character!;
+                        try {
+                          const raw = localStorage.getItem("velvet-custom-girls");
+                          const prev = raw ? JSON.parse(raw) : [];
+                          localStorage.setItem("velvet-custom-girls", JSON.stringify([c, ...prev].slice(0, 40)));
+                        } catch {}
+                        void saveCustomCompanionDB(c.id, c as unknown as Record<string, unknown>);
+                        setCustomCharacter(c);
+                        setSelectedId(c.id);
+                        setSharedImportPreview(null);
+                        window.history.replaceState(null, "", window.location.pathname);
+                        setView("chat");
+                      }}
+                      className="w-full rounded-full neon-btn-primary py-2.5 text-xs font-extrabold text-white"
+                    >
+                      Import Companion &amp; Start Chat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSharedImportPreview(null);
+                        window.history.replaceState(null, "", window.location.pathname);
+                      }}
+                      className="w-full rounded-full border border-white/15 py-2 text-xs text-[#a6a6c4]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       {proactive && (
         <ProactiveToast

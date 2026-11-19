@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Settings, X } from "lucide-react";
+import { Settings, Volume2, VolumeX, X } from "lucide-react";
 import { containerClass, cn } from "@/lib/cn";
 import { type ViewId } from "@/lib/sections";
 import { CloseIcon, Mark, MenuIcon } from "./icons";
 import { getUser, login, logout, type LocalUser } from "@/lib/auth";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
+import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
 import { emailPasswordSignIn, emailPasswordSignUp } from "@/lib/firebase";
 
 const NAV_LINKS = [
@@ -45,9 +46,14 @@ export function SiteHeader({
   const [authError, setAuthError] = useState<string | null>(null);
   const { coins } = useCoinsStore();
   const engine = useLocalEngineStatus();
+  const [soundOn, setSoundOn] = useState(true);
 
   useEffect(() => {
     setUser(getUser());
+    setSoundOn(isUiSoundEnabled());
+    const onSound = () => setSoundOn(isUiSoundEnabled());
+    window.addEventListener("vm:ui-sound-changed", onSound);
+    return () => window.removeEventListener("vm:ui-sound-changed", onSound);
   }, []);
 
   // Close Auth modal or mobile menu cleanly on Escape
@@ -141,19 +147,35 @@ export function SiteHeader({
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            {/* Phase 5 Hybrid Local/Cloud Status Pill */}
+            {/* Phase 5 & 8 Live Speed HUD Pill */}
             <Link
               href="/download/"
               title={engine.anyLocalOnline ? "Local GPU/RAM Engine Connected" : "Running on Cloud Free Inference"}
               className={cn(
-                "hidden sm:inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                "hidden sm:inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition tabular-nums",
                 engine.anyLocalOnline
                   ? "border-[#00f5ff]/60 bg-[#00f5ff]/15 text-[#00f5ff] shadow-[0_0_12px_rgba(0,245,255,0.28)]"
                   : "border-white/15 bg-white/5 text-[#a6a6c4] hover:border-[#00f5ff]/45",
               )}
             >
-              {engine.anyLocalOnline ? `⚡ Local Ultra (${engine.ramGb} GB RAM)` : "☁️ Cloud Free"}
+              {engine.anyLocalOnline
+                ? `⚡ Local Ultra · ${engine.metrics.tokPerSec ? `${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? `${engine.metrics.imgSec}s img` : `${engine.ramGb} GB RAM`}`
+                : `☁️ Cloud Free${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""}`}
             </Link>
+
+            <button
+              type="button"
+              aria-label={soundOn ? "Mute UI sounds" : "Enable UI sounds"}
+              title={soundOn ? "Neon UI SFX On" : "Neon UI SFX Muted"}
+              onClick={() => {
+                const next = !soundOn;
+                setSoundOn(next);
+                setUiSoundEnabled(next);
+              }}
+              className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0c0c16] text-[#a6a6c4] hover:border-[#00f5ff] hover:text-[#00f5ff]"
+            >
+              {soundOn ? <Volume2 className="h-3.5 w-3.5 text-[#00f5ff]" /> : <VolumeX className="h-3.5 w-3.5" />}
+            </button>
 
             <Link
               href="/?view=wallet"

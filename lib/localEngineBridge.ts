@@ -11,6 +11,12 @@ export interface SystemSpecs {
   os: string;
 }
 
+export interface SpeedMetrics {
+  tokPerSec?: number;
+  imgSec?: number;
+  lastEngine?: string;
+}
+
 export interface LocalEngineStatus {
   isDesktop: boolean;
   koboldOnline: boolean;
@@ -21,6 +27,16 @@ export interface LocalEngineStatus {
   ramTier: RamTier;
   specs: SystemSpecs | null;
   checking: boolean;
+  metrics: SpeedMetrics;
+}
+
+let latestMetrics: SpeedMetrics = {};
+
+export function reportGenerationSpeed(next: SpeedMetrics) {
+  latestMetrics = { ...latestMetrics, ...next };
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("vm:engine-metrics", { detail: latestMetrics }));
+  }
 }
 
 declare global {
@@ -89,6 +105,7 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     ramTier: ramTierForGb(ramGb),
     specs,
     checking: false,
+    metrics: latestMetrics,
   };
 }
 
@@ -144,6 +161,7 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
     ramTier: "8 GB Lite",
     specs: null,
     checking: true,
+    metrics: latestMetrics,
   });
 
   const refresh = useCallback(async () => {
@@ -156,7 +174,15 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
     const id = setInterval(() => {
       void refresh();
     }, 15000);
-    return () => clearInterval(id);
+    const onMetrics = (e: Event) => {
+      const detail = (e as CustomEvent<SpeedMetrics>).detail;
+      setStatus((prev) => ({ ...prev, metrics: detail || latestMetrics }));
+    };
+    window.addEventListener("vm:engine-metrics", onMetrics);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("vm:engine-metrics", onMetrics);
+    };
   }, [refresh]);
 
   return { ...status, refresh };

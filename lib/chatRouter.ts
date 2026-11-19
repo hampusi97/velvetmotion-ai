@@ -8,6 +8,7 @@
  *  5. Context-Aware In-Character Fallback
  */
 import { assertCompliance } from "./complianceFilter";
+import { reportGenerationSpeed } from "./localEngineBridge";
 
 export interface RouterMessage {
   role: "user" | "assistant";
@@ -250,29 +251,39 @@ export async function generateCompanionReply(
     ...history.slice(-12).map((m) => ({ role: m.role, content: m.text })),
   ];
 
+  const measureAndReturn = (text: string, providerUsed: string, startedMs: number) => {
+    const elapsedSec = Math.max(0.15, (Date.now() - startedMs) / 1000);
+    const estTokens = Math.max(6, Math.round(text.split(/\s+/).length * 1.35));
+    reportGenerationSpeed({ tokPerSec: Math.round(estTokens / elapsedSec), lastEngine: providerUsed });
+    return { text, providerUsed };
+  };
+
   // Tier 1: Local KoboldCpp (127.0.0.1:5001)
   if (typeof window !== "undefined") {
+    const t0 = Date.now();
     const koboldRaw = await fetchOpenAICompat("http://127.0.0.1:5001/v1/chat/completions", chatMessages, {
       model: "koboldcpp",
       timeoutMs: 2500,
     });
     const koboldClean = sanitizeCompanionReply(koboldRaw, persona.name);
-    if (koboldClean) return { text: koboldClean, providerUsed: "koboldcpp-local" };
+    if (koboldClean) return measureAndReturn(koboldClean, "koboldcpp-local", t0);
   }
 
   // Tier 2: Local Ollama (127.0.0.1:11434 or configured URL)
   if (typeof window !== "undefined") {
+    const t0 = Date.now();
     const ollamaBase = (settings.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
     const ollamaRaw = await fetchOpenAICompat(`${ollamaBase}/v1/chat/completions`, chatMessages, {
       model: settings.ollamaModel || "llama3.1:8b",
       timeoutMs: 3200,
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, persona.name);
-    if (ollamaClean) return { text: ollamaClean, providerUsed: "ollama-local" };
+    if (ollamaClean) return measureAndReturn(ollamaClean, "ollama-local", t0);
   }
 
   // Tier 3: User BYOK Custom endpoint or OpenRouter API Key
   if (settings.customBaseUrl) {
+    const t0 = Date.now();
     const base = settings.customBaseUrl.replace(/\/+$/, "");
     const customRaw = await fetchOpenAICompat(`${base}/chat/completions`, chatMessages, {
       apiKey: settings.customApiKey,
@@ -280,7 +291,7 @@ export async function generateCompanionReply(
       timeoutMs: 8000,
     });
     const customClean = sanitizeCompanionReply(customRaw, persona.name);
-    if (customClean) return { text: customClean, providerUsed: "byok-custom" };
+    if (customClean) return measureAndReturn(customClean, "byok-custom", t0);
   }
 
   if (settings.openRouterApiKey) {

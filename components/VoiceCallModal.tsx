@@ -7,6 +7,8 @@ import { generateCompanionReply } from "@/lib/chatRouter";
 import { speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { earnCompanionXp } from "@/lib/progression";
+import { getTimeMood } from "@/lib/timeMood";
+import { AmbientMixer } from "@/components/AmbientMixer";
 
 interface SpeechRecognitionAlternativeLike {
   transcript?: string;
@@ -44,7 +46,7 @@ export function VoiceCallModal({
 }) {
   const [connected, setConnected] = useState(true);
   const [muted, setMuted] = useState(false);
-  const [whisperMode, setWhisperMode] = useState(false);
+  const [whisperMode, setWhisperMode] = useState(() => getTimeMood().whisperBias);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -201,6 +203,8 @@ export function VoiceCallModal({
           <div className="min-h-[3.5rem] rounded-2xl border border-white/10 bg-[#05050a]/80 p-3 text-xs text-[#f7f7fc] leading-relaxed">
             {transcript}
           </div>
+
+          <AmbientMixer compact={false} />
 
           <div className="flex items-center justify-center gap-3">
             <button

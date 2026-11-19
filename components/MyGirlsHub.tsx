@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { getGallery, loadChat, getIntimacy, type GalleryItem } from "@/lib/storage";
+import { encodeSharedCharacterUrl } from "@/lib/shareCardUrl";
 import { cn } from "@/lib/cn";
 
 type HubGirl = {
@@ -16,14 +17,19 @@ type HubGirl = {
 
 function loadCustomCharacters(): Character[] {
   if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem("vm-custom-girls");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+  const combined: Character[] = [];
+  for (const k of ["velvet-custom-girls", "vm-custom-girls"]) {
+    try {
+      const raw = localStorage.getItem(k);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) combined.push(...parsed);
+      }
+    } catch {
+      /* ignore */
+    }
   }
+  return combined;
 }
 
 export function MyGirlsHub({
@@ -37,6 +43,15 @@ export function MyGirlsHub({
 }) {
   const [customs, setCustoms] = useState<Character[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [sharedId, setSharedId] = useState<string | null>(null);
+
+  const shareCharacter = async (e: React.MouseEvent, character: Character) => {
+    e.stopPropagation();
+    const url = await encodeSharedCharacterUrl(character, typeof window !== "undefined" ? window.location.origin : undefined);
+    await navigator.clipboard?.writeText(url).catch(() => {});
+    setSharedId(character.id);
+    setTimeout(() => setSharedId(null), 2000);
+  };
 
   useEffect(() => {
     setCustoms(loadCustomCharacters());
@@ -149,7 +164,18 @@ export function MyGirlsHub({
                     <span>{row.galleryCount} media</span>
                   </div>
                 </div>
-                <span className="self-center text-pink-300 text-sm font-medium shrink-0">Continue →</span>
+                <div className="self-center flex items-center gap-2 shrink-0">
+                  {row.isCustom && (
+                    <button
+                      type="button"
+                      onClick={(e) => void shareCharacter(e, row.character)}
+                      className="rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/10 px-2.5 py-1 text-[11px] font-bold text-[#00f5ff] hover:bg-[#00f5ff]/20"
+                    >
+                      {sharedId === row.character.id ? "Copied ✓" : "🔗 Share Link"}
+                    </button>
+                  )}
+                  <span className="text-pink-300 text-sm font-medium">Continue →</span>
+                </div>
               </button>
             </li>
           ))}

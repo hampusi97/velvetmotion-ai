@@ -16,6 +16,23 @@ import { claimDailyDropReward, getDailyDropClaimState } from "@/lib/progression"
 import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { getTimeMood } from "@/lib/timeMood";
+import type { Character } from "@/lib/charactersTypes";
+
+interface CommunitySpotlightItem {
+  id: string;
+  name: string;
+  age: number;
+  creator: string;
+  category: string;
+  portraitUrl: string;
+  tagline: string;
+  personality: string;
+  initialMessage: string;
+  visualDna: string;
+  voiceId: string;
+  tags: string[];
+}
 
 interface DailyDropEntry {
   day: number;
@@ -37,14 +54,17 @@ const EXPERIENCES = [
   { id: "group" as SectionId, href: "/group/", title: "2-ON-1 DRAMA", subtitle: "Two companions · Live banter", neon: "from-rose-400 to-[#a855f7]", face: "tess" },
 ];
 
-export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
+export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomCharacter }: {
   onNavigate: (id: SectionId | "dual" | "group" | "lounge" | "shorts" | "vault" | "import" | "share" | "advanced" | "wallet" | "my-girls" | "private" | "collection" | "studio" | "download") => void;
   onOpenGirl?: (id: string, incomingMessage?: string) => void;
   onOpenDual?: (aId: string, bId: string) => void;
+  onOpenCustomCharacter?: (character: Character) => void;
 }) {
   const reduce = useReducedMotion();
   const { coins, refresh } = useCoinsStore();
   const [dailyDrop, setDailyDrop] = useState<DailyDropEntry | null>(null);
+  const [spotlight, setSpotlight] = useState<CommunitySpotlightItem[]>([]);
+  const [timeMood] = useState(() => getTimeMood());
   const [dropState, setDropState] = useState({ streak: 0, claimedToday: false });
   const [claimMsg, setClaimMsg] = useState("");
   const [streak, setStreak] = useState(0);
@@ -63,6 +83,12 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
           const idx = Math.floor(Date.now() / 86400000) % list.length;
           setDailyDrop(list[idx]);
         }
+      })
+      .catch(() => {});
+    void fetch("/data/community-featured.json")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: CommunitySpotlightItem[]) => {
+        if (Array.isArray(list)) setSpotlight(list);
       })
       .catch(() => {});
   }, []);
@@ -186,7 +212,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
         </motion.section>
       )}
 
-      {/* Streak & Coins Telemetry */}
+      {/* Streak & Coins Telemetry + Live Clock Mood */}
       <motion.div variants={riseItem} className="flex flex-wrap items-center gap-2 text-sm">
         <span className="rounded-full border border-amber-400/35 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-200 tabular-nums">
           🪙 {coins} Free Coins
@@ -194,11 +220,74 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
         <span className="rounded-full border border-[#ff1e8e]/35 bg-[#ff1e8e]/10 px-3 py-1 text-xs font-bold text-pink-200 tabular-nums">
           🔥 {Math.max(streak, dropState.streak)}d Streak
         </span>
+        <span className="rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-3 py-1 text-xs font-bold text-[#00f5ff]">
+          {timeMood.badge}
+        </span>
         {claimMsg && <span className="text-xs font-semibold text-[#00ffa3]">{claimMsg}</span>}
         <Link href="/download/" className="ml-auto rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/10 px-3 py-1 text-xs font-bold text-[#00f5ff] hover:bg-[#00f5ff]/20">
           ⚡ Desktop Ultra Mode
         </Link>
       </motion.div>
+
+      {/* Phase 8 #10: Weekly Community Spotlight Rail */}
+      {spotlight.length > 0 && (
+        <motion.section variants={riseItem} className="space-y-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="font-display text-xl sm:text-2xl font-extrabold text-[#f7f7fc] neon-text-glow flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-[#00f5ff]" /> Community Spotlight
+              </h2>
+              <p className="text-xs text-[#a6a6c4]">Curated weekly creator cards ready to chat &amp; fork</p>
+            </div>
+          </div>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+            {spotlight.map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => {
+                  const charObj: Character = {
+                    id: card.id,
+                    name: card.name,
+                    age: Math.max(18, card.age),
+                    tagline: card.tagline,
+                    category: card.category,
+                    avatar: card.portraitUrl,
+                    voiceIntro: card.initialMessage,
+                    initialMessage: card.initialMessage,
+                    tags: card.tags,
+                    intimacy: 60,
+                    voice: { label: card.voiceId, pitch: 1, rate: 0.96, style: card.personality },
+                    voiceId: card.voiceId,
+                    visualDna: card.visualDna,
+                    personality: card.personality,
+                    traits: card.tags.slice(0, 3),
+                    background: `Featured weekly community card by ${card.creator}.`,
+                    figure: card.visualDna,
+                    kink: card.category,
+                    reply: card.initialMessage,
+                  };
+                  if (onOpenCustomCharacter) onOpenCustomCharacter(charObj);
+                  else onOpenGirl?.(card.id, card.initialMessage);
+                }}
+                className="group relative w-52 shrink-0 rounded-2xl overflow-hidden neon-glass text-left girl-card"
+              >
+                <div className="relative aspect-[3/4]">
+                  <img src={card.portraitUrl} alt={card.name} className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105" />
+                  <div className="candy-scrim absolute inset-0" />
+                  <span className="absolute left-2.5 top-2.5 rounded-full border border-[#00f5ff]/50 bg-[#05050a]/80 px-2 py-0.5 text-[9px] font-extrabold text-[#00f5ff]">
+                    {card.creator}
+                  </span>
+                  <div className="absolute inset-x-0 bottom-0 p-3">
+                    <div className="text-sm font-extrabold text-white truncate">{card.name}, {card.age}</div>
+                    <p className="text-[11px] text-[#a6a6c4] line-clamp-2 mt-0.5">{card.tagline}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </motion.section>
+      )}
 
       {onOpenGirl && <motion.div variants={riseItem}><ProactiveInbox onOpen={onOpenGirl} /></motion.div>}
 
