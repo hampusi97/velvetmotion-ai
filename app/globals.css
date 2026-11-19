@@ -57,29 +57,6 @@ body::before {
 
 button {
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-
-@supports (padding: max(0px)) {
-  .safe-bottom {
-    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-  }
-  .safe-top {
-    padding-top: max(0px, env(safe-area-inset-top));
-  }
-}
-
-@media (display-mode: standalone) {
-  body {
-    overscroll-behavior-y: contain;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  input,
-  textarea {
-    -webkit-user-select: text;
-    user-select: text;
-  }
 }
 
 .font-display {
@@ -107,6 +84,7 @@ body {
   transform: scale(0.98);
 }
 
+/* Neon glass card — Candy-style */
 .glass-card {
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
   border: 1px solid rgba(255, 77, 154, 0.28);
@@ -118,6 +96,7 @@ body {
 }
 
 .glass-card:hover {
+  box-shadow: 0 0 40px rgba(255, 77, 154, 0.25);
   border-color: rgba(255, 77, 154, 0.55);
   box-shadow:
     0 0 55px rgba(255, 45, 149, 0.22),
@@ -125,12 +104,9 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
+/* Candy-style card lift */
 .girl-card {
   transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
-  border-radius: 1.25rem;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(12, 10, 16, 0.9);
 }
 .girl-card:hover {
   transform: translateY(-6px);
@@ -148,8 +124,13 @@ body {
 }
 
 @keyframes neon-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(255, 45, 149, 0.15); }
-  50% { box-shadow: 0 0 36px rgba(255, 45, 149, 0.35), 0 0 60px rgba(232, 121, 249, 0.15); }
+  0%,
+  100% {
+    box-shadow: 0 0 20px rgba(255, 45, 149, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 36px rgba(255, 45, 149, 0.35), 0 0 60px rgba(232, 121, 249, 0.15);
+  }
 }
 
 .neon-pulse {
@@ -162,6 +143,7 @@ body {
     border-color: rgba(248, 201, 216, 0.5);
     box-shadow: 0 12px 40px rgba(255, 77, 154, 0.18);
   }
+
   .feature-card:hover:active {
     transform: translateY(-2px) scale(0.985);
   }
@@ -177,24 +159,45 @@ body {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: #120e16;
 }
+
 ::-webkit-scrollbar-thumb {
   background: #ff4d9a;
   border-radius: 999px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  [data-motion],
+  .feature-card,
+  .feature-card:hover,
+  .feature-card:active,
+  .feature-card:hover:active,
+  .press:active,
+  .girl-card:hover,
+  .neon-pulse {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
 }
 
+/* Candy-tier polish — denser glass, softer cards, thumb-safe chips */
 .vm-panel {
   @apply rounded-3xl border border-white/10 bg-zinc-950/70 backdrop-blur-md;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -214,11 +217,24 @@ body {
 .vm-cta:hover {
   filter: brightness(1.06);
 }
+/* Roster / discover tiles */
+.girl-card {
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 10, 16, 0.9);
+}
+.girl-card:hover {
+  border-color: rgba(255, 77, 154, 0.45);
+}
+/* Chat media frame */
 .vm-media-frame {
   @apply relative overflow-hidden rounded-2xl border border-pink-500/40 bg-black;
   box-shadow: 0 12px 40px rgba(236, 72, 153, 0.15);
 }
 
+
+/* Candy.ai-tier polish */
 .candy-hero {
   background: linear-gradient(160deg, rgba(255, 45, 149, 0.12) 0%, rgba(7, 6, 10, 0.4) 50%, rgba(154, 35, 79, 0.15) 100%);
   border: 1px solid rgba(255, 77, 154, 0.25);
