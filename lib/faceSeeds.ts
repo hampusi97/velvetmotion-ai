@@ -57,6 +57,11 @@ export const FACE_SEEDS: Record<string, string> = {
   "suzu-m": "unique face seed suzu-v2: Japanese woman 23, soft oval face, dark eyes, straight black hair with subtle bangs, delicate features, photoreal identity lock",
   "tess": "unique face seed tess-v2: Lanky woman 29, cropped auburn hair, crooked grin, green eyes, studio headphones energy, photoreal identity lock",
   "vesper": "unique face seed vesper-v2: Soft-curved woman 26, dark hair low twist, deep red lipstick, brown eyes, hostess elegance, photoreal identity lock",
+  "hotwife-sable": "unique face seed sable-v2: Gorgeous brunette 29, full lips, bedroom eyes, long dark waves, soft curves, photoreal identity lock",
+  "bnwo-indigo": "unique face seed indigo-v2: Stunning Black woman 27, high cheekbones, full lips, long braids or sleek bun, confident gaze, photoreal identity lock",
+  "breed-ophelia": "unique face seed ophelia-v2: Soft blonde 25, blue eyes, full lips, flushed cheeks, long wavy hair, photoreal identity lock",
+  "cheat-maren": "unique face seed maren-c-v2: Athletic brunette 28, sharp jaw, green eyes, messy bun, photoreal identity lock",
+  "step-fantasy-lena": "unique face seed lena-s-v2: Elegant woman 32, dark hair, sharp brows, full lips, photoreal identity lock",
 };
 
 export function applyFaceSeed<T extends { id: string; figure?: string }>(c: T): T {
