@@ -343,7 +343,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         ...m,
         {
           role: "assistant",
-          content: `Couldn't generate that ${label} right now. Tap the mood again or try another (lingerie / nude / explicit).`,
+          content: `Rate limit — wait ~45s and tap ${label} again. Portraits cache after the first load.`,
         },
       ]);
     } finally {
