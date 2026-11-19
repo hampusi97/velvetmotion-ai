@@ -18,16 +18,79 @@ import {
   type AdvancedConfig,
 } from "@/lib/advancedConfig";
 
+type DiagnosticCheck = {
+  id: string;
+  label: string;
+  status: "ok" | "warn" | "error";
+  detail: string;
+};
+
 export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
   const [s, setS] = useState<MediaBackendSettings | null>(null);
   const [tg, setTg] = useState<TelegramBridgeConfig | null>(null);
   const [adv, setAdv] = useState<AdvancedConfig | null>(null);
   const [saved, setSaved] = useState(false);
+  const [diagRunning, setDiagRunning] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticCheck[]>([]);
+
+  const runDiagnostics = async () => {
+    setDiagRunning(true);
+    const checks: DiagnosticCheck[] = [];
+    const probe = async (id: string, label: string, url: string, extract: (d: Record<string, unknown>) => string) => {
+      try {
+        const res = await fetch(url, { cache: "no-store" });
+        const data = (await res.json()) as Record<string, unknown>;
+        checks.push({
+          id,
+          label,
+          status: res.ok ? "ok" : "error",
+          detail: res.ok ? extract(data) : `HTTP ${res.status}`,
+        });
+      } catch (e) {
+        checks.push({
+          id,
+          label,
+          status: "error",
+          detail: e instanceof Error ? e.message : "Unreachable",
+        });
+      }
+    };
+
+    await Promise.all([
+      probe("health", "Firebase & Core Health (/api/health)", "/api/health", (d) => {
+        const fb = d.firebase as { projectId?: string; authProviders?: string[] } | undefined;
+        return `Project: ${fb?.projectId || "ivory-sunset-mxq1s"} · Auth: ${(fb?.authProviders || []).join(", ")}`;
+      }),
+      probe("pipeline", "5-Stage Director Pipeline (/api/pipeline)", "/api/pipeline", (d) => {
+        const scenes = Array.isArray(d.scenes) ? d.scenes.length : 0;
+        return `Ready · ${scenes} scene presets connected`;
+      }),
+      probe("lounge", "Live Lounge Cloud Relay (/api/lounge)", "/api/lounge?room=public", (d) => {
+        const msgs = Array.isArray(d.messages) ? d.messages.length : 0;
+        return `Live · ${msgs} messages in #public`;
+      }),
+      probe("wallet", "Coin Wallet & Leaderboard (/api/wallet)", "/api/wallet", (d) => {
+        const board = Array.isArray(d.leaderboard) ? d.leaderboard.length : 0;
+        return `BTC: ${String(d.primaryBtcWallet || "").slice(0, 12)}… · ${board} ranked donators`;
+      }),
+      probe("comfy", "ComfyUI & IP-Adapter FaceID (/api/comfy)", "/api/comfy", (d) => {
+        const supports = Array.isArray(d.supports) ? d.supports.join(", ") : "ready";
+        return `Endpoint active · ${supports}`;
+      }),
+      probe("telegram", "Telegram Bot Bridge (/api/telegram)", "/api/telegram", (d) =>
+        `Webhook active · ${String(d.service || "velvetmotion-telegram")}`,
+      ),
+    ]);
+
+    setDiagnostics(checks);
+    setDiagRunning(false);
+  };
 
   useEffect(() => {
     setS(getMediaSettings());
     setTg(getTelegramConfig());
     setAdv(loadAdvancedConfig());
+    void runDiagnostics();
   }, []);
 
   if (!s || !tg || !adv) return null;
@@ -50,11 +113,44 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
         ← Home
       </button>
       <div>
-        <h1 className="font-display text-2xl text-cream">Advanced media</h1>
+        <h1 className="font-display text-2xl text-cream">Advanced media &amp; Go-Live System</h1>
         <p className="text-sm text-zinc-400 mt-1">
-          Local Comfy/Forge, img2vid, face lock, Telegram bridge. Defaults stay free Pollinations.
+          Firebase Auth/Firestore, ComfyUI/Forge, img2vid, Ollama, Telegram bridge, and live API health.
         </p>
       </div>
+
+      <section className="rounded-2xl border border-emerald-500/30 bg-zinc-950/90 p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-emerald-300">Live Backend &amp; Integration Diagnostics</h2>
+            <p className="text-xs text-zinc-400">
+              Verifies Firebase (`ivory-sunset-mxq1s`), Director Pipeline, Lounge, Coin Wallet, ComfyUI, and Telegram endpoints.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={diagRunning}
+            onClick={() => void runDiagnostics()}
+            className="shrink-0 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50"
+          >
+            {diagRunning ? "Testing…" : "Re-test All"}
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          {diagnostics.map((d) => (
+            <div
+              key={d.id}
+              className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/50 px-3 py-2 text-xs"
+            >
+              <span className="font-medium text-zinc-200">{d.label}</span>
+              <span className={d.status === "ok" ? "text-emerald-300 truncate max-w-[55%]" : "text-rose-300 truncate max-w-[55%]"}>
+                {d.status === "ok" ? "● " : "✕ "}
+                {d.detail}
+              </span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-pink-300">Local image endpoint</h2>

@@ -11,6 +11,8 @@ import {
   emailPasswordSignUp,
   googleSignIn,
   initAuth,
+  refreshFirebaseUser,
+  resendVerificationEmail,
   subscribeAuthState,
 } from "@/lib/firebase";
 import { GoogleSignInButton } from "./WorkspaceHub";
@@ -38,6 +40,8 @@ export function SiteHeader({
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [needsEmailVerify, setNeedsEmailVerify] = useState(false);
+  const [verifyNotice, setVerifyNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setUser(getUser());
@@ -45,6 +49,7 @@ export function SiteHeader({
     const unsubInit = initAuth();
     const unsubState = subscribeAuthState((fbUser) => {
       if (fbUser) {
+        setNeedsEmailVerify(!fbUser.isAnonymous && !fbUser.emailVerified);
         const nextUser: LocalUser = {
           username: fbUser.displayName || fbUser.email?.split("@")[0] || "VelvetMember",
           joinedAt: Date.now(),
@@ -60,6 +65,7 @@ export function SiteHeader({
         setUser(nextUser);
         onUserChange?.(nextUser);
       } else {
+        setNeedsEmailVerify(false);
         const local = getUser();
         setUser(local);
         onUserChange?.(local);
@@ -259,6 +265,43 @@ export function SiteHeader({
           </div>
         </div>
       </header>
+      {needsEmailVerify && (
+        <div className="border-b border-amber-500/30 bg-amber-950/60 px-4 py-1.5 text-center text-xs text-amber-100 flex flex-wrap items-center justify-center gap-2">
+          <span>
+            📧 Verify your email ({user?.email}) to activate full Firestore Cloud Sync for your vault &amp; coins.
+          </span>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await resendVerificationEmail();
+                setVerifyNotice("Verification email resent!");
+              } catch {
+                setVerifyNotice("Wait a moment before resending.");
+              }
+            }}
+            className="rounded-lg border border-amber-400/50 bg-amber-500/20 px-2 py-0.5 font-semibold hover:bg-amber-500/30"
+          >
+            Resend Link
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const refreshed = await refreshFirebaseUser();
+              if (refreshed?.emailVerified) {
+                setNeedsEmailVerify(false);
+                setVerifyNotice(null);
+              } else {
+                setVerifyNotice("Not verified yet — click the link in your inbox first.");
+              }
+            }}
+            className="rounded-lg border border-emerald-400/50 bg-emerald-500/20 px-2 py-0.5 font-semibold text-emerald-100 hover:bg-emerald-500/30"
+          >
+            I Verified — Refresh
+          </button>
+          {verifyNotice && <span className="text-emerald-300">{verifyNotice}</span>}
+        </div>
+      )}
       {menuOpen ? (
         <div
           className="fixed inset-x-0 bottom-0 z-40 md:hidden"

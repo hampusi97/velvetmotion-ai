@@ -254,6 +254,25 @@ export async function resetEmailPassword(email: string): Promise<void> {
   await sendPasswordResetEmail(auth, email.trim());
 }
 
+export async function resendVerificationEmail(): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user || user.emailVerified || user.isAnonymous) return false;
+  await sendEmailVerification(user);
+  return true;
+}
+
+export async function refreshFirebaseUser(): Promise<User | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  await user.reload();
+  const refreshed = auth.currentUser;
+  if (refreshed?.emailVerified) {
+    await ensureUserProfileInFirestore(refreshed, 500).catch(() => {});
+  }
+  notifyListeners(refreshed, cachedAccessToken);
+  return refreshed;
+}
+
 export async function getAccessToken(): Promise<string | null> {
   return cachedAccessToken;
 }

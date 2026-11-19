@@ -42,4 +42,17 @@ assert.equal(firebaserc.projects?.default, "ivory-sunset-mxq1s", ".firebaserc pr
 assert.ok(fs.existsSync("./public/icon-192.png"), "Missing public/icon-192.png");
 assert.ok(fs.existsSync("./public/icon-512.png"), "Missing public/icon-512.png");
 
+// 5. Verify no corrupted placeholder/stub source files exist
+for (const dir of ["./app", "./components", "./lib"]) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
+      const content = fs.readFileSync(`${dir}/${entry.name}`, "utf8").trim();
+      assert.ok(
+        !/^(see_file_local|see local|PLACEHOLDER)/i.test(content),
+        `Corrupted placeholder file detected: ${dir}/${entry.name}`,
+      );
+    }
+  }
+}
+
 console.log("ok: multi-language smoke check passed (GLSL, Bash, Batch, Docker, Firestore Lounge, PWA)");
