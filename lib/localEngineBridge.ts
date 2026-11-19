@@ -23,6 +23,8 @@ export interface LocalEngineStatus {
   fishOnline: boolean;
   ollamaOnline: boolean;
   comfyOnline: boolean;
+  homeEngineOnline: boolean;
+  homeTunnelUrl?: string | null;
   anyLocalOnline: boolean;
   ramGb: number;
   ramTier: RamTier;
@@ -98,16 +100,57 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     }
   }
 
-  const [koboldHttp, fishHttp, ollamaHttp, comfyHttp] = await Promise.all([
+  let homeEngineBase = "http://127.0.0.1:8787";
+  try {
+    const rawLlm = localStorage.getItem("velvetmotion_llm_settings");
+    if (rawLlm) {
+      const parsed = JSON.parse(rawLlm) as { homeEngineUrl?: string };
+      if (parsed?.homeEngineUrl?.trim()) homeEngineBase = parsed.homeEngineUrl.trim().replace(/\/+$/, "");
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const probeHomeHealth = async () => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 900);
+      const res = await fetch(`${homeEngineBase}/api/health`, { signal: ctrl.signal });
+      clearTimeout(t);
+      if (!res.ok) return null;
+      return (await res.json()) as {
+        totalRamGb?: number;
+        availableRamGb?: number;
+        cpuCores?: number;
+        publicTunnelUrl?: string | null;
+        engines?: { koboldcpp?: boolean; ollama?: boolean; comfyui?: boolean };
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const [koboldHttp, fishHttp, ollamaHttp, comfyHttp, homeHealth] = await Promise.all([
     nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
     nativePorts?.fishOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5002/health"),
     nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
     nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
+    probeHomeHealth(),
   ]);
-  const koboldOnline = Boolean(nativePorts?.koboldOnline || koboldHttp);
+  const homeEngineOnline = Boolean(homeHealth);
+  if (homeHealth?.totalRamGb && !specs) {
+    ramGb = Math.round(homeHealth.totalRamGb);
+    specs = {
+      totalRamGb: homeHealth.totalRamGb,
+      availableRamGb: homeHealth.availableRamGb ?? Math.round(homeHealth.totalRamGb * 0.5),
+      cpuCores: homeHealth.cpuCores ?? 4,
+      os: "home-engine",
+    };
+  }
+  const koboldOnline = Boolean(nativePorts?.koboldOnline || koboldHttp || homeHealth?.engines?.koboldcpp);
   const fishOnline = Boolean(nativePorts?.fishOnline || fishHttp);
-  const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp);
-  const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp);
+  const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp || homeHealth?.engines?.ollama);
+  const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp || homeHealth?.engines?.comfyui);
 
   return {
     isDesktop: desktop,
@@ -115,7 +158,9 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     fishOnline,
     ollamaOnline,
     comfyOnline,
-    anyLocalOnline: koboldOnline || fishOnline || ollamaOnline || comfyOnline,
+    homeEngineOnline,
+    homeTunnelUrl: homeHealth?.publicTunnelUrl || null,
+    anyLocalOnline: koboldOnline || fishOnline || ollamaOnline || comfyOnline || homeEngineOnline,
     ramGb,
     ramTier: ramTierForGb(ramGb),
     specs,
@@ -182,6 +227,8 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
     fishOnline: false,
     ollamaOnline: false,
     comfyOnline: false,
+    homeEngineOnline: false,
+    homeTunnelUrl: null,
     anyLocalOnline: false,
     ramGb: 8,
     ramTier: "8 GB Lite",

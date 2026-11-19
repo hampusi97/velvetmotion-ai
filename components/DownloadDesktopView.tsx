@@ -327,19 +327,20 @@ export function DownloadDesktopView() {
           </div>
           <button
             type="button"
-            onClick={() => void engine.refresh().then(() => setProbeToast("Probed :5001, :5002, :11434, and :8188."))}
+            onClick={() => void engine.refresh().then(() => setProbeToast("Probed :5001, :5002, :11434, :8188, and Home Engine :8787."))}
             className="inline-flex items-center gap-1.5 rounded-full border border-[#ff5678]/45 bg-[#ff5678]/15 px-3.5 py-1.5 text-xs font-bold text-[#ff8aa1] hover:bg-[#ff5678]/25"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Test Local Connection
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
           {[
             ["KoboldCpp :5001", engine.koboldOnline],
             ["Fish Drama :5002", engine.fishOnline],
             ["Ollama :11434", engine.ollamaOnline],
             ["ComfyUI :8188", engine.comfyOnline],
+            ["Home Engine :8787", engine.homeEngineOnline],
           ].map(([lbl, on]) => (
             <div
               key={String(lbl)}
@@ -383,6 +384,58 @@ export function DownloadDesktopView() {
         </div>
 
         {probeToast && <p className="text-xs font-semibold text-emerald-300">{probeToast}</p>}
+      </section>
+
+      {/* Self-Hosted Home Server & RAM/GPU Supplement Engine */}
+      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-3 border border-[#00f5ff]/30">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-[#00f5ff]" /> VelvetMotion Home Engine (:8787 + Quick Tunnel)
+            </h2>
+            <p className="text-xs text-[#a6a6c4]">
+              Zero-dependency Python bridge tapping into your PC&apos;s RAM/GPU (KoboldCpp, Ollama, ComfyUI) with Cloudflare Quick Tunnel support.
+            </p>
+          </div>
+          <span
+            className={`rounded-full px-3 py-1 text-[11px] font-bold border ${
+              engine.homeEngineOnline
+                ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
+                : "border-white/15 bg-[#141418] text-zinc-300"
+            }`}
+          >
+            {engine.homeEngineOnline ? "● Connected (:8787)" : "○ Offline (Run Launcher)"}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs">
+          <a
+            href="/downloads/velvetmotion_home_engine.py"
+            download
+            className="inline-flex items-center gap-1.5 rounded-full neon-btn-primary px-4 py-2 font-bold text-white"
+          >
+            <Download className="h-3.5 w-3.5" /> velvetmotion_home_engine.py
+          </a>
+          <a
+            href="/downloads/start-velvet-engine.bat"
+            download
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-[#141418] px-4 py-2 font-semibold text-white hover:border-[#ff5678]"
+          >
+            <Download className="h-3.5 w-3.5" /> Windows Launcher (.bat)
+          </a>
+          <a
+            href="/downloads/start-velvet-engine.command"
+            download
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-[#141418] px-4 py-2 font-semibold text-white hover:border-[#00f5ff]"
+          >
+            <Download className="h-3.5 w-3.5" /> macOS Launcher (.command)
+          </a>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-[#0d0d11] px-3 py-2 font-mono text-[11px] text-zinc-300">
+          python3 velvetmotion_home_engine.py
+          {engine.homeTunnelUrl ? ` · Tunnel live: ${engine.homeTunnelUrl}` : ""}
+        </div>
       </section>
 
       {/* SOTA Voice Engines */}

@@ -42,6 +42,7 @@ export interface ChatRouterSettings {
   customModel?: string;
   ollamaUrl?: string;
   ollamaModel?: string;
+  homeEngineUrl?: string;
   aiHordeApiKey?: string;
 }
 
@@ -256,6 +257,35 @@ export async function generateCompanionReply(
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, persona.name);
     if (ollamaClean) return measureAndReturn(ollamaClean, "ollama-local", t0);
+  }
+
+  // Tier 2.5: VelvetMotion Home Engine (:8787 or Cloudflared Quick Tunnel URL)
+  if (typeof window !== "undefined") {
+    const t0 = Date.now();
+    const homeBase = (settings.homeEngineUrl || "http://127.0.0.1:8787").replace(/\/+$/, "");
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const res = await fetch(`${homeBase}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: settings.ollamaModel || "llama3.1:8b",
+          messages: chatMessages,
+          temperature: 0.86,
+          max_tokens: 220,
+        }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const data = (await res.json().catch(() => null)) as { reply?: string; provider?: string } | null;
+        const clean = sanitizeCompanionReply(data?.reply || "", persona.name);
+        if (clean) return measureAndReturn(clean, `home-engine-${data?.provider || "local"}`, t0);
+      }
+    } catch {
+      /* home engine offline; continue to BYOK / Cloud fallbacks */
+    }
   }
 
   // Tier 3: User BYOK Custom endpoint or OpenRouter API Key

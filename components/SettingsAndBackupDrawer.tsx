@@ -25,6 +25,7 @@ export function SettingsAndBackupDrawer({
   });
   const [openRouterKey, setOpenRouterKey] = useState(initialRouter.openRouterApiKey || "");
   const [customUrl, setCustomUrl] = useState(initialRouter.customBaseUrl || "");
+  const [homeEngineUrl, setHomeEngineUrl] = useState(initialRouter.homeEngineUrl || "");
   const [ollamaModel, setOllamaModel] = useState(initialRouter.ollamaModel || "llama3.1:8b");
   const [stealthNotif, setStealthNotif] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -75,6 +76,7 @@ export function SettingsAndBackupDrawer({
     saveRouterSettings({
       openRouterApiKey: openRouterKey.trim() || undefined,
       customBaseUrl: customUrl.trim() || undefined,
+      homeEngineUrl: homeEngineUrl.trim() || undefined,
       ollamaModel: ollamaModel.trim() || "llama3.1:8b",
     });
     try {
@@ -238,7 +240,7 @@ export function SettingsAndBackupDrawer({
             </span>
             <button
               type="button"
-              onClick={() => void engine.refresh().then(() => setStatusMsg("Probed :5001, :5002, :11434, and :8188."))}
+              onClick={() => void engine.refresh().then(() => setStatusMsg("Probed :5001, :5002, :11434, :8188, and Home Engine :8787."))}
               className="rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2.5 py-1 text-[10px] font-bold text-[#00f5ff] inline-flex items-center gap-1 hover:bg-[#00f5ff]/20"
             >
               <RefreshCw className="h-3 w-3" /> Test Local Connection
@@ -251,12 +253,13 @@ export function SettingsAndBackupDrawer({
             </p>
           )}
           <p className="text-[11px] text-[#a6a6c4]">{recommendText}</p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px]">
             {[
               ["KoboldCpp :5001", engine.koboldOnline],
               ["Fish Drama :5002", engine.fishOnline],
               ["Ollama :11434", engine.ollamaOnline],
               ["ComfyUI :8188", engine.comfyOnline],
+              ["Home Engine :8787", engine.homeEngineOnline],
             ].map(([lbl, on]) => (
               <div
                 key={String(lbl)}
@@ -361,6 +364,12 @@ export function SettingsAndBackupDrawer({
             onChange={(e) => setCustomUrl(e.target.value)}
             placeholder="Custom OpenAI-compatible URL (e.g. http://127.0.0.1:5001/v1)"
             className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
+          />
+          <input
+            value={homeEngineUrl}
+            onChange={(e) => setHomeEngineUrl(e.target.value)}
+            placeholder="Home Engine / Tunnel URL (http://127.0.0.1:8787 or https://...trycloudflare.com)"
+            className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#00f5ff]"
           />
           <div className="grid grid-cols-2 gap-2">
             <input
