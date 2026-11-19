@@ -16,9 +16,13 @@ import { checkContentSafety } from "./safety";
 import { reportGenerationSpeed } from "./localEngineBridge";
 import { QUALITY_PROMPT, IMAGE_STEPS, IMAGE_WIDTH, IMAGE_HEIGHT } from "./quality";
 
-const CF_IMAGE_WORKER =
+const CF_IMAGE_WORKER_BASE = (
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_IMAGE_WORKER_URL) ||
-  "https://velvetmotion-image.hampusi97.workers.dev/generate";
+  "https://velvetmotion-image.hampusi97.workers.dev"
+)
+  .replace(/\/generate\/?$/, "")
+  .replace(/\/$/, "");
+const CF_IMAGE_WORKER = `${CF_IMAGE_WORKER_BASE}/generate`;
 
 const POLLINATIONS_BASE = "https://image.pollinations.ai/prompt";
 
@@ -79,7 +83,7 @@ function workerUrl(character: Pick<Character, "id" | "name" | "figure" | "age">,
     const base = settings.localImageBase.replace(/\/$/, "");
     if (settings.localImageMode === "prompt-url") return `${base}/${encodeURIComponent(prompt)}?seed=${seed}`;
   }
-  return `${CF_IMAGE_WORKER}?prompt=${encodeURIComponent(prompt.slice(0, 1800))}&steps=8`;
+  return `${CF_IMAGE_WORKER}?prompt=${encodeURIComponent(prompt.slice(0, 1800))}&steps=8&seed=${seed}`;
 }
 
 function pollinationsUncensoredUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood, extra = "", opts?: { seedOverride?: number }): string {

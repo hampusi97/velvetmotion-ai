@@ -447,8 +447,16 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     try {
       const themedExtra = [extra, timeMood.sceneLightingBias].filter(Boolean).join(", ");
       const resolved = await resolveBestMediaUrl(character, mood, themedExtra);
-      const url = resolved.url;
-      const note = resolved.note;
+      const rawUrl = resolved?.url || "";
+      const isValidUrl =
+        rawUrl.startsWith("/portraits/") ||
+        rawUrl.startsWith("http://") ||
+        rawUrl.startsWith("https://") ||
+        rawUrl.startsWith("blob:") ||
+        (rawUrl.startsWith("data:image/") && rawUrl.length > 64);
+      const url = isValidUrl ? rawUrl : staticPortraitUrl(character.id || "chloe");
+      const note = isValidUrl ? resolved.note : "Portrait fallback (image worker unavailable)";
+
       addToGallery({
         characterId: character.id,
         characterName: character.name,
@@ -476,6 +484,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       setIntimacy(bumpIntimacy(character.id, 5));
       const { progression: nextProg } = earnCompanionXp(character.id, 8);
       setProgression(nextProg);
+    } catch (err) {
+      setSafetyError(err instanceof Error ? err.message : "Could not generate Scene Selfie. Please try again.");
     } finally {
       setGeneratingPhoto(false);
       setBusy(false);
