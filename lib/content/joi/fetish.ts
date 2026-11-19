@@ -245,8 +245,7 @@ export const FETISH_JOI: JoiScenario[] = [
       },
     ],
   },
-,
-{
+  {
     id: "bnwo-edge-only",
     label: "BNWO Edge Only",
     tone: "Dominant, patient, race-aware fantasy",
