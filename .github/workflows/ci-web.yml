@@ -40,6 +40,8 @@ jobs:
 
       - name: Build static export (out/)
         run: npm run build
+        env:
+          NODE_ENV: production
 
       - name: Deploy PR Preview to Cloudflare Workers
         if: github.event_name == 'pull_request' && env.CF_TOKEN != ''

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Cpu } from "lucide-react";
 import { CHARACTERS, characterCategories, getCharacter, type Character } from "@/lib/characters";
 import { containerClass } from "@/lib/cn";
@@ -124,42 +124,6 @@ function ComingSoon3DCard({ onBack }: { onBack: () => void }) {
       </div>
     </div>
   );
-}
-
-function SearchParamViewSync({
-  pathname,
-  onSync,
-}: {
-  pathname: string;
-  onSync: (view: ShellRouteView | null, id: string | null) => void;
-}) {
-  const searchParams = useSearchParams();
-  const lastSearchRef = useRef<string | null>(null);
-  const hadViewRef = useRef(false);
-  const searchStr = searchParams?.toString() ?? "";
-
-  useEffect(() => {
-    if (lastSearchRef.current === searchStr) return;
-    const isInitial = lastSearchRef.current === null;
-    lastSearchRef.current = searchStr;
-    const qView = searchParams?.get("view") as ShellRouteView | null;
-    const qId = searchParams?.get("id");
-    if (pathname === "/") {
-      if (qView) {
-        hadViewRef.current = true;
-        onSync(qView, qId);
-      } else if (!isInitial && hadViewRef.current) {
-        hadViewRef.current = false;
-        onSync("home", qId);
-      } else if (qId) {
-        onSync(null, qId);
-      }
-    } else if (qId) {
-      onSync(null, qId);
-    }
-  }, [onSync, pathname, searchParams, searchStr]);
-
-  return null;
 }
 
 export function AppShell({ initialView = "home" }: { initialView?: ShellRouteView }) {
@@ -311,10 +275,50 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
-  const syncSearchView = useCallback((qView: ShellRouteView | null, qId: string | null) => {
-    if (qView) setView(qView);
-    if (qId) setSelectedId(qId);
-  }, []);
+  const lastSearchRef = useRef<string | null>(null);
+  const hadQueryViewRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncFromLocation = () => {
+      const searchStr = window.location.search || "";
+      if (lastSearchRef.current === searchStr) return;
+      const isInitial = lastSearchRef.current === null;
+      lastSearchRef.current = searchStr;
+      const params = new URLSearchParams(searchStr);
+      const qView = params.get("view") as ShellRouteView | null;
+      const qId = params.get("id");
+      if (window.location.pathname === "/") {
+        if (qView) {
+          hadQueryViewRef.current = true;
+          setView(qView);
+        } else if (!isInitial && hadQueryViewRef.current) {
+          hadQueryViewRef.current = false;
+          setView("home");
+        }
+      }
+      if (qId) setSelectedId(qId);
+    };
+
+    const origPush = window.history.pushState.bind(window.history);
+    const origReplace = window.history.replaceState.bind(window.history);
+    const emit = () => queueMicrotask(syncFromLocation);
+    window.history.pushState = function pushState(...args) {
+      origPush(...args);
+      emit();
+    };
+    window.history.replaceState = function replaceState(...args) {
+      origReplace(...args);
+      emit();
+    };
+    window.addEventListener("popstate", emit);
+    syncFromLocation();
+    return () => {
+      window.history.pushState = origPush;
+      window.history.replaceState = origReplace;
+      window.removeEventListener("popstate", emit);
+    };
+  }, [pathname]);
 
   if (adult === null) return <div className="min-h-screen bg-[#05050a]" />;
 
@@ -373,9 +377,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
 
   return (
     <div className="min-h-screen bg-[#05050a] text-[#f7f7fc] pb-16 lg:pb-0">
-      <Suspense fallback={null}>
-        <SearchParamViewSync pathname={pathname} onSync={syncSearchView} />
-      </Suspense>
       <SiteHeader
         view={view}
         menuOpen={menuOpen}

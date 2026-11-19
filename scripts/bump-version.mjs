@@ -67,4 +67,14 @@ fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, "utf8");
 fs.writeFileSync(tauriConfPath, `${JSON.stringify(tauriConf, null, 2)}\n`, "utf8");
 fs.writeFileSync(cargoPath, nextCargo, "utf8");
 
-console.log(`[bump-version] Synced package.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml -> ${nextVersion}`);
+const lockPath = path.join(root, "package-lock.json");
+if (fs.existsSync(lockPath)) {
+  const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+  lock.version = nextVersion;
+  if (lock.packages && lock.packages[""]) {
+    lock.packages[""].version = nextVersion;
+  }
+  fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+}
+
+console.log(`[bump-version] Synced package.json, package-lock.json, src-tauri/tauri.conf.json, and src-tauri/Cargo.toml -> ${nextVersion}`);
