@@ -65,7 +65,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
 
   return (
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show">
-      <motion.section variants={riseItem} className="relative mb-8 overflow-hidden rounded-[1.75rem] border border-pink-500/25 candy-hero">
+      <motion.section variants={riseItem} className="relative mb-8 overflow-hidden rounded-[1.75rem] border border-pink-500/25 candy-hero neon-pulse">
         <div className="relative aspect-[2.2/1] min-h-[240px] sm:min-h-[320px]">
           <img src={staticPortraitUrl(hero.id)} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent" />
@@ -77,7 +77,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
               </span>
               <span className="rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">Featured</span>
             </div>
-            <h1 className="font-display text-5xl sm:text-7xl text-transparent bg-gradient-to-b from-amber-200 via-yellow-100 to-amber-400 bg-clip-text leading-none tracking-tight drop-shadow-lg">{hero.name.split(" ")[0]}</h1>
+            <h1 className="font-display text-5xl sm:text-7xl text-transparent bg-gradient-to-b from-amber-200 via-yellow-100 to-amber-400 bg-clip-text leading-none tracking-tight drop-shadow-lg neon-text">{hero.name.split(" ")[0]}</h1>
             <p className="mt-1 text-base sm:text-lg text-pink-100/90 font-medium">{hero.tagline.slice(0, 70)}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <button type="button" onClick={() => onOpenGirl?.(hero.id)} className="candy-cta px-7 py-2.5 text-sm">Play with her</button>
@@ -108,11 +108,11 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
           {EXPERIENCES.map((exp, i) => {
             const face = CHARACTERS[i % CHARACTERS.length];
             return (
-              <button key={exp.id} type="button" onClick={() => onNavigate(exp.id)} className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 text-left girl-card">
+              <button key={exp.id} type="button" onClick={() => onNavigate(exp.id)} className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 text-left girl-card glass-card">
                 <img src={staticPortraitUrl(face.id)} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4">
-                  <div className={`text-xl font-black tracking-tight bg-gradient-to-r ${exp.neon} bg-clip-text text-transparent`}>{exp.title}</div>
+                  <div className={`text-xl font-black tracking-tight bg-gradient-to-r ${exp.neon} bg-clip-text text-transparent neon-text`}>{exp.title}</div>
                   <p className="text-xs text-zinc-300 mt-0.5">{exp.subtitle}</p>
                 </div>
               </button>
@@ -132,7 +132,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
               {searchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
             </button>
             {categories.map((cat) => (
-              <button key={cat} type="button" onClick={() => setHomeCategory(cat)} className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium ${homeCategory === cat ? "border-pink-500 bg-pink-600/25 text-white" : "border-white/10 bg-white/5 text-zinc-300"}`}>{cat}</button>
+              <button key={cat} type="button" onClick={() => setHomeCategory(cat)} className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium ${homeCategory === cat ? "border-pink-500 bg-pink-600/25 text-white chip-active" : "border-white/10 bg-white/5 text-zinc-300"}`}>{cat}</button>
             ))}
           </div>
           {searchOpen && <input type="search" value={homeQuery} onChange={(e) => setHomeQuery(e.target.value)} placeholder="Search…" className="mb-4 w-full rounded-xl border border-white/15 bg-zinc-900/90 px-4 py-2 text-sm outline-none focus:border-pink-500" autoFocus />}
