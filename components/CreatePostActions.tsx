@@ -141,7 +141,10 @@ export function CreatePostActions({
             // eslint-disable-next-line @next/next/no-img-element
             <img src={preview.url} alt="" className="w-full max-h-64 object-cover" />
           ) : null}
-          <p className="text-[11px] text-zinc-400 p-2">{preview.label}{preview.note ? ` · ${preview.note}` : " · Ready for chat or 3D"}</p>
+          <p className="text-[11px] text-zinc-400 p-2">
+            {preview.label}
+            {preview.note ? ` · ${preview.note}` : " · Ready for chat or 3D"}
+          </p>
         </div>
       )}
     </div>
