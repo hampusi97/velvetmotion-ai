@@ -220,24 +220,25 @@ export function DiscoverSwipe({
   };
 
   const like = (isSuper = false) => {
+    const liked = current; // capture before any index change
     const chance = isSuper ? 1 : matchChance(race, profile.gender);
     const hits = Math.random() < chance;
     if (!hits) {
-      setHistory((h) => [...h, { idx, action: "reject", id: current.id }]);
+      setHistory((h) => [...h, { idx, action: "reject", id: liked.id }]);
       setRejected(true);
-      setLiked((L) => [...L, current.id]);
+      setLiked((L) => [...L, liked.id]);
       return;
     }
-    setHistory((h) => [...h, { idx, action: "like", id: current.id }]);
-    setLiked((L) => [...L, current.id]);
-    const nextMatches = [current.id, ...matchIds.filter((id) => id !== current.id)];
+    setHistory((h) => [...h, { idx, action: "like", id: liked.id }]);
+    setLiked((L) => [...L, liked.id]);
+    const nextMatches = [liked.id, ...matchIds.filter((id) => id !== liked.id)];
     setMatchIds(nextMatches);
     saveMatchIds(nextMatches);
     const reward = isSuper ? 8 : 3;
     addCoins(reward);
     setCoins(getCoins());
     setSuperLiked(isSuper);
-    setShowMatch(current);
+    setShowMatch(liked); // set matched BEFORE any index increment
   };
 
   const openHer = () => {

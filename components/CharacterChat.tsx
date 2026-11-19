@@ -686,7 +686,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto py-4 space-y-4">
+      <div className="flex-1 min-h-[320px] overflow-y-auto py-4 space-y-4">
         {messages.map((m, i) => {
           const parsed =
             m.role === "assistant"
@@ -712,11 +712,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
                         return;
                       }
                       setSpeakingId(i);
-                      speak(parsed.spokenReply.slice(0, 280), { ...character.voice });
-                      setTimeout(() => setSpeakingId(null), 4000);
+                      setTimeout(() => speak(parsed.spokenReply.slice(0, 280), { ...character.voice }), 100);
+                      setTimeout(() => setSpeakingId(null), 4500);
                     }}
                   >
-                    {speakingId === i ? "■ Stop" : "▶ Voice note"}
+                    {speakingId === i ? "■ Playing" : "▶ Voice note"}
                   </button>
                 )}
                 {m.videoUrl ? (
