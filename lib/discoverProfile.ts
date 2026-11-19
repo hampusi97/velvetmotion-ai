@@ -12,9 +12,7 @@ export type DiscoverProfile = {
   lookingFor: LookingFor;
   age: number;
   bio: string;
-  /** Optional data URL or remote avatar */
   photoUrl?: string | null;
-  /** Flavor tags for match hooks */
   tags: string[];
   updatedAt: number;
 };
@@ -63,7 +61,6 @@ export function profileComplete(p: DiscoverProfile): boolean {
   return Boolean(p.displayName.trim()) && p.gender !== "unspecified";
 }
 
-/** Horny-guy style hooks personalized by gender / looking-for */
 export function personalizedHooks(profile: DiscoverProfile): string[] {
   const name = profile.displayName.trim() || "you";
   const base = [
