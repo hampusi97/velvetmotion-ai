@@ -11,13 +11,16 @@ import type { VoiceEngineOption } from "@/data/localModelCatalog";
 
 export type VoiceEngineId = VoiceEngineOption["id"];
 
-export type KokoroVoiceId =
-  | "af_heart"
-  | "af_bella"
-  | "af_nicole"
-  | "af_sky"
-  | "af_sarah"
-  | "bf_emma";
+export const FEMALE_KOKORO_VOICES = [
+  "af_heart",
+  "af_bella",
+  "af_nova",
+  "af_sarah",
+  "af_sky",
+  "bf_emma",
+] as const;
+
+export type KokoroVoiceId = (typeof FEMALE_KOKORO_VOICES)[number];
 
 interface VoiceProfile {
   pitch: number;
@@ -27,13 +30,99 @@ interface VoiceProfile {
 const VOICE_ENGINE_KEY = "vm-voice-engine";
 
 const VOICE_TUNING: Record<KokoroVoiceId, VoiceProfile> = {
-  af_heart: { pitch: 1.06, rate: 0.96 },
+  af_heart: { pitch: 1.08, rate: 0.96 },
   af_bella: { pitch: 1.12, rate: 1.02 },
-  af_nicole: { pitch: 0.94, rate: 0.89 },
-  af_sky: { pitch: 1.15, rate: 1.0 },
-  af_sarah: { pitch: 1.0, rate: 0.94 },
-  bf_emma: { pitch: 0.9, rate: 0.91 },
+  af_nova: { pitch: 1.08, rate: 0.95 },
+  af_sky: { pitch: 1.14, rate: 1.0 },
+  af_sarah: { pitch: 1.04, rate: 0.94 },
+  bf_emma: { pitch: 1.04, rate: 0.92 },
 };
+
+const MALE_VOICE_EXCLUSION_RX =
+  /\b(david|mark|george|daniel|alex|guy|ryan|richard|paul|james|john|william|thomas|christopher|andrew|matthew|male)\b/i;
+
+const FEMALE_PRIORITY_PATTERNS: RegExp[] = [
+  /\bjenny\b/i,
+  /\baria\b/i,
+  /\bzira\b/i,
+  /\bsonia\b/i,
+  /\bemma\b/i,
+  /\bsamantha\b/i,
+  /\bvictoria\b/i,
+  /google us english/i,
+  /\bnatural\b/i,
+  /female|woman|karen|ava|zoe|serena|kate|tessa|moira|libby|maisie/i,
+];
+
+/** Strictly maps any companion voice ID to one of the 6 female Kokoro voices. */
+export function normalizeFemaleKokoroVoice(voiceId?: string): KokoroVoiceId {
+  const normalized = (voiceId || "").trim().toLowerCase();
+  if ((FEMALE_KOKORO_VOICES as readonly string[]).includes(normalized)) {
+    return normalized as KokoroVoiceId;
+  }
+  if (normalized === "af_nicole") return "af_nova";
+  if (normalized.startsWith("bf_")) return "bf_emma";
+  return "af_heart";
+}
+
+/** Strips emojis, *action* asterisks, and bracketed [Image of ...] / [Photo of ...] tags before TTS. */
+export function cleanSpeechText(raw: string): string {
+  return raw
+    .replace(/\[(?:image|photo|selfie)\b[^\]]*\]/gi, " ")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/\*[^*]+\*/g, " ")
+    .replace(/\*/g, " ")
+    .replace(/\p{Extended_Pictographic}/gu, " ")
+    .replace(/[\uFE0F\u200D]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Selects the best female English Web Speech voice and excludes male system voices. */
+export function selectFemaleEnglishVoice(
+  voices: SpeechSynthesisVoice[],
+): SpeechSynthesisVoice | undefined {
+  if (!Array.isArray(voices) || voices.length === 0) return undefined;
+  const nonMale = voices.filter((v) => !MALE_VOICE_EXCLUSION_RX.test(v.name || ""));
+  const englishNonMale = nonMale.filter((v) => /^en\b/i.test(v.lang || ""));
+  const pool = englishNonMale.length > 0 ? englishNonMale : nonMale;
+
+  for (const pattern of FEMALE_PRIORITY_PATTERNS) {
+    const match = pool.find((v) => pattern.test(v.name || ""));
+    if (match) return match;
+  }
+  return englishNonMale[0];
+}
+
+/** Waits for speechSynthesis `onvoiceschanged` when voices are not loaded immediately. */
+export function loadWebSpeechVoices(timeoutMs = 700): Promise<SpeechSynthesisVoice[]> {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    return Promise.resolve([]);
+  }
+  const initial = window.speechSynthesis.getVoices();
+  if (initial.length > 0) return Promise.resolve(initial);
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const synth = window.speechSynthesis;
+    const prevHandler = synth.onvoiceschanged;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (synth.onvoiceschanged === onChanged) {
+        synth.onvoiceschanged = prevHandler ?? null;
+      }
+      resolve(synth.getVoices());
+    };
+    const onChanged = (ev: Event) => {
+      if (typeof prevHandler === "function") prevHandler.call(synth, ev);
+      if (synth.getVoices().length > 0) finish();
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    synth.onvoiceschanged = onChanged;
+  });
+}
 
 let activeAudio: HTMLAudioElement | null = null;
 
@@ -119,11 +208,12 @@ export async function speakWithNeuralVoice(
   text: string,
   opts: { voiceId?: string; whispery?: boolean; pitch?: number; rate?: number; engineOverride?: VoiceEngineId } = {},
 ): Promise<{ engine: "fish-drama-3" | "kokoro" | "reverb-webgpu" | "kitten-pico" | "webspeech" | "none"; label: string }> {
-  const clean = text.replace(/\*[^*]+\*/g, "").replace(/\s+/g, " ").trim().slice(0, 420);
+  const clean = cleanSpeechText(text).slice(0, 420);
   if (!clean || typeof window === "undefined") return { engine: "none", label: "Muted" };
   stopNeuralSpeech();
 
   const selected = opts.engineOverride || getPreferredVoiceEngine();
+  const femaleKokoroVoice = normalizeFemaleKokoroVoice(opts.voiceId);
 
   // 1. Fish Audio Drama 3 on local audio.cpp (:5002) when chosen
   if (selected === "fish-drama-3-local") {
@@ -131,7 +221,7 @@ export async function speakWithNeuralVoice(
       "http://127.0.0.1:5002/v1/audio/speech",
       "fish-drama-3",
       clean,
-      opts.voiceId || "af_heart",
+      femaleKokoroVoice,
     );
     if (okFish) return { engine: "fish-drama-3", label: "Fish Drama 3 Local" };
   }
@@ -142,7 +232,7 @@ export async function speakWithNeuralVoice(
       "http://127.0.0.1:8880/v1/audio/speech",
       selected === "reverb-tts-webgpu" ? "reverb" : selected === "kitten-tts-2-pico" ? "kitten-2" : "kokoro",
       clean,
-      opts.voiceId || "af_heart",
+      femaleKokoroVoice,
     );
     if (okKokoro) {
       if (selected === "reverb-tts-webgpu") return { engine: "reverb-webgpu", label: "Reverb-TTS WebGPU" };
@@ -151,17 +241,17 @@ export async function speakWithNeuralVoice(
     }
   }
 
-  // 3. Guaranteed Web Speech API fallback (tuned cleanly per selected voice engine mood)
+  // 3. Guaranteed Web Speech API fallback (strictly female voice, awaits onvoiceschanged)
   if ("speechSynthesis" in window) {
+    const voices = await loadWebSpeechVoices();
     return new Promise((resolve) => {
       try {
         const u = new SpeechSynthesisUtterance(clean);
-        const preset = VOICE_TUNING[(opts.voiceId as KokoroVoiceId) || "af_heart"] || VOICE_TUNING.af_heart;
+        const preset = VOICE_TUNING[femaleKokoroVoice] || VOICE_TUNING.af_heart;
         const speedBias = selected === "kitten-tts-2-pico" ? 1.03 : selected === "reverb-tts-webgpu" ? 0.98 : 1.0;
-        u.pitch = opts.pitch ?? (opts.whispery ? Math.max(0.75, preset.pitch - 0.12) : preset.pitch);
+        u.pitch = opts.pitch ?? (opts.whispery ? Math.max(0.95, preset.pitch - 0.08) : 1.08);
         u.rate = (opts.rate ?? (opts.whispery ? Math.max(0.76, preset.rate - 0.1) : preset.rate)) * speedBias;
-        const voices = window.speechSynthesis.getVoices();
-        const fem = voices.find((v) => /female|samantha|karen|victoria|ava|zoe|emma|serena|en-us|en-gb/i.test(v.name));
+        const fem = selectFemaleEnglishVoice(voices);
         if (fem) u.voice = fem;
         const fallbackLabel =
           selected === "reverb-tts-webgpu"

@@ -203,11 +203,19 @@ export function DiscoverSwipe({
 
   const playVoicePrompt = useCallback((line: string) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(line);
-    u.rate = 0.98;
-    u.pitch = 1.06;
-    window.speechSynthesis.speak(u);
+    void import('@/lib/kokoroTts').then(({ cleanSpeechText, loadWebSpeechVoices, selectFemaleEnglishVoice }) => {
+      const clean = cleanSpeechText(line);
+      if (!clean) return;
+      window.speechSynthesis.cancel();
+      void loadWebSpeechVoices().then((voices) => {
+        const u = new SpeechSynthesisUtterance(clean);
+        u.rate = 0.96;
+        u.pitch = 1.08;
+        const fem = selectFemaleEnglishVoice(voices);
+        if (fem) u.voice = fem;
+        window.speechSynthesis.speak(u);
+      });
+    });
   }, []);
 
   useEffect(() => {

@@ -284,3 +284,19 @@ export function stopJoiBeat() {
 export function isJoiBeatRunning(): boolean {
   return joiBeatRunning;
 }
+
+/** Speak an audio-session voice cue using strictly female English TTS (pitch 1.08, no male fallback). */
+export async function speakAudioCueFemale(text: string, opts: { whispery?: boolean; rate?: number } = {}) {
+  if (typeof window === "undefined") return;
+  const { cleanSpeechText, loadWebSpeechVoices, selectFemaleEnglishVoice } = await import("./kokoroTts");
+  const clean = cleanSpeechText(text);
+  if (!clean || !("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const voices = await loadWebSpeechVoices();
+  const u = new SpeechSynthesisUtterance(clean);
+  u.pitch = opts.whispery ? 1.0 : 1.08;
+  u.rate = opts.rate ?? (opts.whispery ? 0.88 : 0.96);
+  const female = selectFemaleEnglishVoice(voices);
+  if (female) u.voice = female;
+  window.speechSynthesis.speak(u);
+}

@@ -11,6 +11,13 @@ import { sanitizeCompanionReply } from "./chatRouter";
 import { buildSamplerPayload, DAVIDAU_RECOMMENDED_GGUFS, DAVIDAU_RESOURCES, ANTI_SLOP_BAN_PHRASES, buildContinueSteeringMessages } from "./samplerPresets";
 import { generateHordeImage } from "./aiHorde";
 import { fetchWorkerImage, imageWorkerBase } from "./imageWorker";
+import {
+  cleanSpeechText,
+  FEMALE_KOKORO_VOICES,
+  normalizeFemaleKokoroVoice,
+  selectFemaleEnglishVoice,
+} from "./kokoroTts";
+import { buildDynamicSystemPrompt, extractInlineImageRequests } from "./dynamicChatEngine";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -165,5 +172,42 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
     } finally {
       globalThis.fetch = origFetch;
     }
+  });
+
+  it("forces female Kokoro & WebSpeech voices, strips emojis/tags before TTS, and extracts inline [Image of ...] tags", () => {
+    for (const v of FEMALE_KOKORO_VOICES) {
+      assert.equal(normalizeFemaleKokoroVoice(v), v);
+    }
+    assert.equal(normalizeFemaleKokoroVoice("af_nicole"), "af_nova");
+    assert.equal(normalizeFemaleKokoroVoice("am_michael"), "af_heart");
+
+    const spoken = cleanSpeechText("*smiles softly* Hey gorgeous 😏 [Image of a neon balcony selfie] Come closer.");
+    assert.equal(spoken, "Hey gorgeous Come closer.");
+
+    const fakeVoices = [
+      { name: "Microsoft David - English (United States)", lang: "en-US" },
+      { name: "Microsoft Mark - English (United States)", lang: "en-US" },
+      { name: "Microsoft Jenny Online (Natural) - English (United States)", lang: "en-US" },
+    ] as unknown as SpeechSynthesisVoice[];
+    assert.equal(selectFemaleEnglishVoice(fakeVoices)?.name.includes("Jenny"), true);
+
+    const onlyMaleVoices = [
+      { name: "Microsoft David", lang: "en-US" },
+      { name: "Alex", lang: "en-US" },
+    ] as unknown as SpeechSynthesisVoice[];
+    assert.equal(selectFemaleEnglishVoice(onlyMaleVoices), undefined);
+
+    const extracted = extractInlineImageRequests(
+      "Look at the view tonight. [Image of wearing sheer black lace on a neon balcony] What do you think?",
+    );
+    assert.equal(extracted.cleanText, "Look at the view tonight. What do you think?");
+    assert.deepEqual(extracted.imagePrompts, ["wearing sheer black lace on a neon balcony"]);
+
+    const sysPrompt = buildDynamicSystemPrompt({
+      companion: { id: "chloe", name: "Chloe", age: 24, personality: "Warm", backstory: "Designer" },
+      memories: [],
+      relationshipLevel: 3,
+    });
+    assert.ok(sysPrompt.includes("Do NOT write [Image of ...] or [Photo of ...]"));
   });
 });

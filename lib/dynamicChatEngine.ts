@@ -109,9 +109,37 @@ export function buildDynamicSystemPrompt(params: {
     '3. Keep replies punchy and natural (2 to 4 short sentences max) with varied rhythm and occasional playful *action* beats.',
     '4. Always react directly to what the user just said AND keep momentum alive with a natural hook (a playful tease, bold question, dare, or mini-story) so the conversation never stalls.',
     '5. Stay strictly fictional adults (18+) only.',
+    '6. Do NOT write [Image of ...] or [Photo of ...] brackets in text replies unless sending an actual photo.',
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+const INLINE_IMAGE_TAG_RX = /\[(?:image|photo|selfie)(?:\s+of|\s*:)?\s+([^\]]+)\]/gi;
+
+/**
+ * Extracts inline LLM tags such as `[Image of ...]`, `[Photo of ...]`, or `[Selfie: ...]`
+ * and returns clean display text with those tags stripped plus extracted scene prompts.
+ */
+export function extractInlineImageRequests(rawReply: string): {
+  cleanText: string;
+  imagePrompts: string[];
+} {
+  if (!rawReply || typeof rawReply !== 'string') {
+    return { cleanText: '', imagePrompts: [] };
+  }
+  const imagePrompts: string[] = [];
+  const cleanText = rawReply
+    .replace(INLINE_IMAGE_TAG_RX, (_full, inner: string) => {
+      const prompt = (inner || '').trim();
+      if (prompt) imagePrompts.push(prompt);
+      return '';
+    })
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return { cleanText, imagePrompts };
 }
 
 /** Strips <think>, <reasoning>, role echoes, and robotic fallback strings cleanly. */

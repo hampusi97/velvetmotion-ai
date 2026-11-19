@@ -17,7 +17,20 @@ import { checkContentSafety } from "./safety";
 import { reportGenerationSpeed } from "./localEngineBridge";
 import { QUALITY_PROMPT, IMAGE_WIDTH, IMAGE_HEIGHT } from "./quality";
 
-export type MediaMood = "beauty" | "lingerie" | "nude" | "explicit" | "sex" | "seductive" | "aftercare" | "dual" | "sph" | "bnwo" | "joi" | "joi-finish";
+export type MediaMood =
+  | "beauty"
+  | "lingerie"
+  | "nude"
+  | "explicit"
+  | "sex"
+  | "seductive"
+  | "aftercare"
+  | "dual"
+  | "sph"
+  | "bnwo"
+  | "joi"
+  | "joi-finish"
+  | "scene";
 
 export interface ResolvedMediaResult {
   url: string;
@@ -66,6 +79,7 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
   bnwo: PHOTO_BASE + " Dominant Black adult woman, confident direct gaze, natural skin sheen with pores, gold jewelry. Warm directional light, photoreal adult, powerful presence, 21+.",
   joi: PHOTO_BASE + " Adult woman giving JOI, pointing at camera, intense eye contact. Seductive pose in lingerie or nude. Soft bedroom light, realistic skin, sharp face, 21+.",
   "joi-finish": PHOTO_BASE + " Close-up face and upper body, open mouth, intense eye contact. Nude or open lingerie. Soft flash or warm light, wet lips, realistic skin texture, 21+.",
+  scene: PHOTO_BASE + " Candid realistic scene, atmospheric editorial lighting, natural pose and authentic skin texture with pores, 21+.",
 };
 
 type PromptCharacter = Pick<Character, "id" | "name" | "figure" | "age"> & { visualDna?: string };

@@ -1,5 +1,10 @@
 import type { CharacterVoice } from "@/lib/charactersTypes";
 import { playCountdownChime } from "@/lib/audioEngine";
+import {
+  cleanSpeechText,
+  loadWebSpeechVoices,
+  selectFemaleEnglishVoice,
+} from "@/lib/kokoroTts";
 
 export type JoiVoiceTrack = {
   id: string;
@@ -115,23 +120,27 @@ export function speak(
   callbacks?: { onStart?: () => void; onEnd?: () => void },
 ) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const clean = cleanSpeechText(text);
+  if (!clean) {
+    callbacks?.onEnd?.();
+    return;
+  }
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  const basePitch = voice?.pitch ?? 1.05;
-  const baseRate = voice?.rate ?? 0.96;
-  utterance.pitch = voice?.whispery ? Math.max(0.78, basePitch - 0.1) : basePitch;
-  utterance.rate = voice?.whispery ? Math.max(0.7, baseRate - 0.1) : baseRate;
-  utterance.volume = voice?.whispery ? 0.85 : 0.95;
-  // Prefer a natural female voice
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find((v) => /female|woman|samantha|google uk english female|jenny|aria/i.test(v.name))
-    || voices.find((v) => v.lang.startsWith("en") && /female|samantha/i.test(v.name))
-    || voices.find((v) => v.lang.startsWith("en"));
-  if (preferred) utterance.voice = preferred;
-  utterance.onstart = () => callbacks?.onStart?.();
-  utterance.onend = () => callbacks?.onEnd?.();
-  utterance.onerror = () => callbacks?.onEnd?.();
-  window.speechSynthesis.speak(utterance);
+  void loadWebSpeechVoices().then((voices) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(clean);
+    const basePitch = voice?.pitch ?? 1.08;
+    const baseRate = voice?.rate ?? 0.96;
+    utterance.pitch = voice?.whispery ? Math.max(0.92, basePitch - 0.08) : Math.max(1.04, basePitch);
+    utterance.rate = voice?.whispery ? Math.max(0.76, baseRate - 0.08) : baseRate;
+    utterance.volume = voice?.whispery ? 0.85 : 0.95;
+    const preferred = selectFemaleEnglishVoice(voices);
+    if (preferred) utterance.voice = preferred;
+    utterance.onstart = () => callbacks?.onStart?.();
+    utterance.onend = () => callbacks?.onEnd?.();
+    utterance.onerror = () => callbacks?.onEnd?.();
+    window.speechSynthesis.speak(utterance);
+  });
 }
 
 export function stopSpeaking() {

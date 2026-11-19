@@ -51,7 +51,7 @@ import { extractMemoriesFromMessage, loadMemories, saveMemories, splitInnerThoug
 import { memoryPromptBlock, pinLong, pushShort } from "@/lib/memoryTiers";
 import { stageFromIntimacy } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
-import { speakWithNeuralVoice } from "@/lib/kokoroTts";
+import { cleanSpeechText, speakWithNeuralVoice } from "@/lib/kokoroTts";
 import { useCoinsStore } from "@/lib/coinsStore";
 import {
   earnCompanionXp,
@@ -84,6 +84,7 @@ import { VoiceCallModal } from "@/components/VoiceCallModal";
 import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories, type MemoryCategory } from "@/components/MemoryVaultDrawer";
 import {
   buildProactiveFollowUp,
+  extractInlineImageRequests,
   extractMemoriesFromMessage as extractDynamicMemories,
   generateQuickReplySuggestions,
   getLocalTimeVibe,
@@ -115,10 +116,6 @@ function toVaultCategory(cat: CompanionMemoryItem["category"]): MemoryCategory {
 }
 import { SafeImage } from "@/components/SafeImage";
 import { useDelayedLingerieDrop } from "@/components/ChatExtrasHooks";
-
-function stripStage(text: string): string {
-  return text.replace(/\*[^*]+\*/g, "").replace(/\([^)]+\)/g, "").replace(/\s+/g, " ").trim();
-}
 
 type ChatMessage = StoredMessage & {
   id?: string;
@@ -459,6 +456,58 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     return fallbackReply(character, userPrompt, romanceMode, mood);
   };
 
+  const attachInlinePhotoAt = async (baseBatch: ChatMessage[], targetIdx: number, scenePrompt: string) => {
+    setGeneratingPhoto(true);
+    try {
+      const resolved = await resolveBestMediaUrl(character, "scene", scenePrompt);
+      const valid =
+        resolved.url.startsWith("http://") ||
+        resolved.url.startsWith("https://") ||
+        resolved.url.startsWith("blob:") ||
+        (resolved.url.startsWith("data:image/") && resolved.url.length > 64);
+
+      if (!mountedRef.current) return;
+      const updated = baseBatch.map((msg, idx) => {
+        if (idx !== targetIdx) return msg;
+        if (resolved.isFallback || !valid) {
+          return {
+            ...msg,
+            isFallback: true,
+            error: resolved.error || resolved.note || "Scene photo generator unavailable",
+            mediaType: "scene",
+            retrySpec: { mood: "scene" as MediaMood, label: "Scene Photo", cost: 0, extra: scenePrompt },
+          };
+        }
+        return {
+          ...msg,
+          imageUrl: resolved.url,
+          mediaType: "scene",
+          note: resolved.note,
+        };
+      });
+      persist(updated);
+      if (!resolved.isFallback && valid) {
+        addToGallery({
+          characterId: character.id,
+          characterName: character.name,
+          type: "scene",
+          url: resolved.url,
+          prompt: scenePrompt,
+        });
+        void saveGalleryDB({
+          id: `inline-${Date.now()}`,
+          characterId: character.id,
+          url: resolved.url,
+          mood: "scene",
+          createdAt: Date.now(),
+        }).then(refreshDiary);
+        setRevealed((s) => new Set(s).add(targetIdx));
+      }
+    } finally {
+      if (mountedRef.current) setGeneratingPhoto(false);
+    }
+  };
+
   const send = async (overrideText?: string, bonusXp = 6) => {
     const text = (overrideText ?? input).trim();
     if (!text || busy) return;
@@ -476,22 +525,28 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
     try {
       const kinks = getKinks(character.id);
-      let replyText = (await requestReplyForHistory(next, text)) || fallbackReply(character, text, romanceMode);
+      const rawReply = (await requestReplyForHistory(next, text)) || fallbackReply(character, text, romanceMode);
+      const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
+      let replyText = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
       if (kinks.length && Math.random() < 0.25) {
         replyText += `\n\n*She remembers.* “Still thinking about ${kinks[kinks.length - 1]}…”`;
       }
 
       pushShort(character.id, "assistant", replyText);
       const bubbles = splitIntoNaturalBubbles(replyText);
-      const firstBatch: ChatMessage[] = [...next, { role: "assistant", content: bubbles[0] || replyText }];
-      persist(firstBatch);
+      let latestBatch: ChatMessage[] = [...next, { role: "assistant", content: bubbles[0] || replyText }];
+      persist(latestBatch);
 
       if (bubbles.length > 1) {
         await new Promise((r) => setTimeout(r, 750));
         if (mountedRef.current) {
-          const secondBatch: ChatMessage[] = [...firstBatch, { role: "assistant", content: bubbles.slice(1).join(" ") }];
-          persist(secondBatch);
+          latestBatch = [...latestBatch, { role: "assistant", content: bubbles.slice(1).join(" ") }];
+          persist(latestBatch);
         }
+      }
+
+      if (imagePrompts.length > 0 && mountedRef.current) {
+        await attachInlinePhotoAt(latestBatch, latestBatch.length - 1, imagePrompts[0]);
       }
 
       const newInt = bumpIntimacy(character.id, 3);
@@ -505,7 +560,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       }
 
       if (voiceOn) {
-        void speakWithNeuralVoice(stripStage(replyText).slice(0, 280), {
+        void speakWithNeuralVoice(cleanSpeechText(replyText).slice(0, 280), {
           voiceId: character.voiceId,
           whispery: progression.level >= 4 || timeMood.whisperBias,
           pitch: character.voice?.pitch,
@@ -524,9 +579,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     const lastUser = [...prior].reverse().find((m) => m.role === "user")?.content || "Continue right where we left off";
     setBusy(true);
     try {
-      const nextReply = (await requestReplyForHistory(prior, lastUser)) || fallbackReply(character, lastUser, romanceMode);
+      const rawReply = (await requestReplyForHistory(prior, lastUser)) || fallbackReply(character, lastUser, romanceMode);
+      const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
+      const nextReply = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
       const updated = [...prior, { role: "assistant" as const, content: nextReply }, ...messages.slice(assistantIndex + 1)];
       persist(updated);
+      if (imagePrompts.length > 0 && mountedRef.current) {
+        await attachInlinePhotoAt(updated, prior.length, imagePrompts[0]);
+      }
     } finally {
       setBusy(false);
     }
@@ -1098,13 +1158,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                               fallbackId={character.id}
                               onClick={() => m.imageUrl && setLightboxUrl(m.imageUrl)}
                               className={`w-full max-h-80 object-cover cursor-pointer transition ${
-                                revealed.has(i) || m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive"
+                                revealed.has(i) || m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive" || m.mediaType === "scene"
                                   ? ""
                                   : "blur-xl scale-105"
                               }`}
                             />
                             {!revealed.has(i) &&
-                              !(m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive") && (
+                              !(m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive" || m.mediaType === "scene") && (
                                 <button
                                   type="button"
                                   onClick={() => setRevealed((s) => new Set(s).add(i))}
@@ -1162,7 +1222,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                         type="button"
                         onClick={() => {
                           setSpeakingId(i);
-                          void speakWithNeuralVoice(stripStage(cleanDisplay), {
+                          void speakWithNeuralVoice(cleanSpeechText(cleanDisplay), {
                             voiceId: character.voiceId,
                             whispery: progression.level >= 4,
                           }).finally(() => setSpeakingId(null));

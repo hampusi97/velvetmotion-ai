@@ -20,12 +20,21 @@ export const VOICE_PACKS = [
   { id: "bnwo", label: "BNWO rank", pitch: 0.88, rate: 0.86 },
 ];
 
+import { cleanSpeechText, loadWebSpeechVoices, selectFemaleEnglishVoice } from "@/lib/kokoroTts";
+
 export function speakWithPack(text: string, packId = "whisper") {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
+  const clean = cleanSpeechText(text);
+  if (!clean) return;
   const pack = VOICE_PACKS.find((p) => p.id === packId) || VOICE_PACKS[0];
-  const u = new SpeechSynthesisUtterance(text);
-  u.pitch = pack.pitch;
-  u.rate = pack.rate;
   window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
+  void loadWebSpeechVoices().then((voices) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(clean);
+    u.pitch = Math.max(1.04, pack.pitch);
+    u.rate = pack.rate;
+    const fem = selectFemaleEnglishVoice(voices);
+    if (fem) u.voice = fem;
+    window.speechSynthesis.speak(u);
+  });
 }
