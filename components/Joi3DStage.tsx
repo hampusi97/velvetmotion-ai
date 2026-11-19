@@ -128,7 +128,7 @@ export function Joi3DStage({
 
   const startScene = (m: "sex" | "breed") => {
     // auto voice on breed/cuck
-    if (m === "breed") setAutoVoice(true);
+    if (m === "breed" || m === "sex") setAutoVoice(true);
     setMode(m);
     setPose("missionary");
     setFucking(true);
@@ -180,7 +180,8 @@ export function Joi3DStage({
         {(["sex", "breed", "joi", "cuck", "bnwo", "cheat", "sph"] as StageMode[]).map((m) => (
           <button key={m} type="button" onClick={() => {
             setMode(m); setLineIdx(0);
-            if (m === "sex" || m === "cheat" || m === "breed") { setFucking(true); setShowGuy(true); }
+            if (m === "sex" || m === "cheat" || m === "breed") { setFucking(true); setShowGuy(true); setAutoVoice(true); }
+            if (m === "cuck" || m === "bnwo" || m === "sph" || m === "joi") setAutoVoice(true);
           }} className={`px-2.5 py-1 rounded-full text-[11px] border capitalize ${mode === m ? "border-fuchsia-500 bg-fuchsia-500/20" : "border-white/10"}`}>{m}</button>
         ))}
       </div>
