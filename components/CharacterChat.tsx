@@ -81,6 +81,9 @@ const NSFW_CHIPS = [
 
 const VIDEO_CHIPS: { id: SequenceKind; label: string }[] = [
   { id: "sex", label: "Sex video" },
+  { id: "doggy", label: "Doggy" },
+  { id: "cowgirl", label: "Cowgirl" },
+  { id: "shower", label: "Shower" },
   { id: "joi", label: "JOI video" },
   { id: "sph", label: "SPH video" },
   { id: "bnwo", label: "BNWO video" },
@@ -88,6 +91,9 @@ const VIDEO_CHIPS: { id: SequenceKind; label: string }[] = [
 
 const SEQUENCE_LINES: Record<SequenceKind, string> = {
   sex: "*She starts a private sex sequence…*\n\n“Finish on me when you’re ready. I want to see it.”",
+  doggy: "*Doggy style.*\n\n“From behind. Stay deep.”",
+  cowgirl: "*Cowgirl.*\n\n“I’m on top. Watch me ride.”",
+  shower: "*Shower sex.*\n\n“Wet. Against the wall.”",
   joi: "*JOI mode.*\n\n“Stroke for me. Match my pace. Don’t finish until I say.”",
   sph: "*SPH sequence.*\n\n“Look at you… go on, keep watching. I want to see that face.”",
   bnwo: "*BNWO sequence.*\n\n“You’re mine for this. Stay on your knees for the camera.”",
