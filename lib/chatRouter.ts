@@ -213,23 +213,12 @@ export function buildContextAwareFallback(
   return `*${first} smiles slowly, keeping her eyes locked on yours.* “Tell me more about ${topicSnippet}… you already have my full attention.”`;
 }
 
-export async function generateCompanionReply(
-  history: RouterMessage[],
-  persona: CompanionPersona,
-): Promise<{ text: string; providerUsed: string }> {
-  const lastUser = [...history].reverse().find((m) => m.role === "user")?.text || "";
-  const safety = assertCompliance(lastUser);
-  if (!safety.ok) {
-    return { text: safety.reason, providerUsed: "compliance-guard" };
-  }
-
+async function tryOpenAIChatTiers(
+  chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+  companionName: string,
+): Promise<{ text: string; providerUsed: string } | null> {
   const settings = loadRouterSettings();
-  const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-    { role: "system", content: systemPrompt(persona) },
-    ...history.slice(-16).map((m) => ({ role: m.role, content: m.text })),
-  ];
-
-  const measureAndReturn = (text: string, providerUsed: string, startedMs: number) => {
+  const measure = (text: string, providerUsed: string, startedMs: number) => {
     const elapsedSec = Math.max(0.15, (Date.now() - startedMs) / 1000);
     const estTokens = Math.max(6, Math.round(text.split(/\s+/).length * 1.35));
     reportGenerationSpeed({ tokPerSec: Math.round(estTokens / elapsedSec), lastEngine: providerUsed });
@@ -243,8 +232,8 @@ export async function generateCompanionReply(
       model: "koboldcpp",
       timeoutMs: 2500,
     });
-    const koboldClean = sanitizeCompanionReply(koboldRaw, persona.name);
-    if (koboldClean) return measureAndReturn(koboldClean, "koboldcpp-local", t0);
+    const koboldClean = sanitizeCompanionReply(koboldRaw, companionName);
+    if (koboldClean) return measure(koboldClean, "koboldcpp-local", t0);
   }
 
   // Tier 2: Local Ollama (127.0.0.1:11434 or configured URL)
@@ -255,8 +244,8 @@ export async function generateCompanionReply(
       model: settings.ollamaModel || "llama3.1:8b",
       timeoutMs: 3200,
     });
-    const ollamaClean = sanitizeCompanionReply(ollamaRaw, persona.name);
-    if (ollamaClean) return measureAndReturn(ollamaClean, "ollama-local", t0);
+    const ollamaClean = sanitizeCompanionReply(ollamaRaw, companionName);
+    if (ollamaClean) return measure(ollamaClean, "ollama-local", t0);
   }
 
   // Tier 2.5: VelvetMotion Home Engine (:8787 or Cloudflared Quick Tunnel URL)
@@ -280,8 +269,8 @@ export async function generateCompanionReply(
       clearTimeout(timer);
       if (res.ok) {
         const data = (await res.json().catch(() => null)) as { reply?: string; provider?: string } | null;
-        const clean = sanitizeCompanionReply(data?.reply || "", persona.name);
-        if (clean) return measureAndReturn(clean, `home-engine-${data?.provider || "local"}`, t0);
+        const clean = sanitizeCompanionReply(data?.reply || "", companionName);
+        if (clean) return measure(clean, `home-engine-${data?.provider || "local"}`, t0);
       }
     } catch {
       /* home engine offline; continue to BYOK / Cloud fallbacks */
@@ -297,8 +286,8 @@ export async function generateCompanionReply(
       model: settings.customModel || "local",
       timeoutMs: 8000,
     });
-    const customClean = sanitizeCompanionReply(customRaw, persona.name);
-    if (customClean) return measureAndReturn(customClean, "byok-custom", t0);
+    const customClean = sanitizeCompanionReply(customRaw, companionName);
+    if (customClean) return measure(customClean, "byok-custom", t0);
   }
 
   if (settings.openRouterApiKey) {
@@ -311,9 +300,48 @@ export async function generateCompanionReply(
         "X-Title": "VelvetMotion AI",
       },
     });
-    const orClean = sanitizeCompanionReply(orRaw, persona.name);
+    const orClean = sanitizeCompanionReply(orRaw, companionName);
     if (orClean) return { text: orClean, providerUsed: "openrouter-byok" };
   }
+
+  return null;
+}
+
+/** One-shot raw prompt runner used by Generative Pace Studio (pre-fetch + live cues). */
+export async function runGenerativePrompt(
+  system: string,
+  user: string,
+  companionName: string,
+): Promise<string> {
+  const safety = assertCompliance(user);
+  if (!safety.ok) return "";
+  const hit = await tryOpenAIChatTiers(
+    [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    companionName,
+  );
+  return hit?.text || "";
+}
+
+export async function generateCompanionReply(
+  history: RouterMessage[],
+  persona: CompanionPersona,
+): Promise<{ text: string; providerUsed: string }> {
+  const lastUser = [...history].reverse().find((m) => m.role === "user")?.text || "";
+  const safety = assertCompliance(lastUser);
+  if (!safety.ok) {
+    return { text: safety.reason, providerUsed: "compliance-guard" };
+  }
+
+  const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+    { role: "system", content: systemPrompt(persona) },
+    ...history.slice(-16).map((m) => ({ role: m.role, content: m.text })),
+  ];
+
+  const llmRes = await tryOpenAIChatTiers(chatMessages, persona.name);
+  if (llmRes) return llmRes;
 
   // Tier 4: Free Cloud Route (AI Horde text)
   const hordeRaw = await callHordeText(persona, history);

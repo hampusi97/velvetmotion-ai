@@ -1166,14 +1166,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           </div>
 
           {/* 3 Neon 1-Tap Quick Reply Suggestions */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1">
+          <div className="flex flex-wrap items-center gap-1.5 px-1">
             {quickReplies.map((chip) => (
               <button
                 key={chip}
                 type="button"
                 disabled={busy}
                 onClick={() => void send(chip)}
-                className="shrink-0 rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-3 py-1 text-[11px] font-medium text-[#e6faff] hover:border-[#ff1e8e] hover:bg-[#ff1e8e]/15 transition disabled:opacity-45"
+                className="rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-3 py-1 text-left text-[11px] font-medium text-[#e6faff] hover:border-[#ff1e8e] hover:bg-[#ff1e8e]/15 transition disabled:opacity-45"
               >
                 {chip}
               </button>
