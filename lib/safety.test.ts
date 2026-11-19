@@ -8,13 +8,9 @@ import {
 } from "./safety";
 import { assertCompliance } from "./complianceFilter";
 import { sanitizeCompanionReply } from "./chatRouter";
-import {
-  ANTI_SLOP_BAN_PHRASES,
-  buildContinueSteeringMessages,
-  buildSamplerPayload,
-  DAVIDAU_RECOMMENDED_GGUFS,
-  DAVIDAU_RESOURCES,
-} from "./samplerPresets";
+import { buildSamplerPayload, DAVIDAU_RECOMMENDED_GGUFS, DAVIDAU_RESOURCES, ANTI_SLOP_BAN_PHRASES, buildContinueSteeringMessages } from "./samplerPresets";
+import { generateHordeImage } from "./aiHorde";
+import { fetchWorkerImage, imageWorkerBase } from "./imageWorker";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -125,5 +121,49 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
     assert.equal(steered[0].role, "system");
     assert.ok(steered[0].content.includes("STEERING INSTRUCTION"));
     assert.equal(steered[steered.length - 1].role, "user");
+  });
+
+  it("caps AI Horde free requests at 512x768, 20 steps, n=1 and normalizes worker /generate URL", async () => {
+    assert.equal(imageWorkerBase("https://velvetmotion-image.hampusi97.workers.dev/generate/"), "https://velvetmotion-image.hampusi97.workers.dev");
+
+    const origFetch = globalThis.fetch;
+    const seenUrls: string[] = [];
+    let hordeBody: Record<string, unknown> | null = null;
+    try {
+      globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        seenUrls.push(url);
+        if (url.includes("/generate/async")) {
+          hordeBody = JSON.parse(String(init?.body || "{}")) as Record<string, unknown>;
+          return new Response(JSON.stringify({ id: "job-1" }), { status: 202 });
+        }
+        if (url.includes("/generate/check/")) {
+          return new Response(JSON.stringify({ done: true }), { status: 200 });
+        }
+        if (url.includes("/generate/status/")) {
+          return new Response(JSON.stringify({ generations: [{ img: "https://cdn.example.com/out.webp", censored: false }] }), { status: 200 });
+        }
+        return new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+          status: 200,
+          headers: { "Content-Type": "image/jpeg" },
+        });
+      }) as typeof fetch;
+
+      const workerRes = await fetchWorkerImage("neon balcony lace portrait", { steps: 8, seed: 777 });
+      assert.equal(workerRes.ok, true);
+      assert.ok(seenUrls[0].includes("/generate?"));
+      assert.ok(seenUrls[0].includes("steps=8"));
+      assert.ok(seenUrls[0].includes("seed=777"));
+
+      const hordeRes = await generateHordeImage({ prompt: "test", width: 1024, height: 1536, steps: 40, apiKey: "custom-key" });
+      assert.equal(hordeRes.url, "https://cdn.example.com/out.webp");
+      const params = (hordeBody as unknown as { params: Record<string, unknown> }).params;
+      assert.equal(params.width, 512);
+      assert.equal(params.height, 768);
+      assert.equal(params.steps, 20);
+      assert.equal(params.n, 1);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });

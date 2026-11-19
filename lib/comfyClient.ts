@@ -173,10 +173,92 @@ async function tryCustom(base: string, req: LocalGenRequest): Promise<LocalGenRe
   }
 }
 
-export async function generateLocalImage(req: LocalGenRequest): Promise<LocalGenResult> {
+async function blobToDataUrlLocal(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error("blob read failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Direct ComfyUI workflow runner (works in browser with --enable-cors-header or Tauri desktop). */
+export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Promise<LocalGenResult> {
+  const base = baseUrl.replace(/\/$/, "");
+  try {
+    const statsRes = await fetch(`${base}/system_stats`, { signal: AbortSignal.timeout(1000) });
+    if (!statsRes.ok) return { ok: false, note: `ComfyUI HTTP ${statsRes.status}` };
+  } catch {
+    return { ok: false, note: "ComfyUI offline" };
+  }
+
+  try {
+    const workflow = buildComfyWorkflowGraph({
+      prompt: req.prompt,
+      negativePrompt: req.negative,
+      seed: req.seed,
+      width: req.width || 768,
+      height: req.height || 1152,
+      referenceImageBase64: req.referenceImageBase64,
+    });
+    const queueRes = await fetch(`${base}/prompt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: workflow }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!queueRes.ok) return { ok: false, note: `ComfyUI queue HTTP ${queueRes.status}` };
+    const { prompt_id: promptId } = (await queueRes.json()) as { prompt_id?: string };
+    if (!promptId) return { ok: false, note: "ComfyUI returned no prompt_id" };
+
+    for (let i = 0; i < 45; i++) {
+      await new Promise((r) => setTimeout(r, 1200));
+      const histRes = await fetch(`${base}/history/${encodeURIComponent(promptId)}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!histRes.ok) continue;
+      const hist = (await histRes.json()) as Record<
+        string,
+        { outputs?: Record<string, { images?: Array<{ filename: string; subfolder?: string; type?: string }> }> }
+      >;
+      const outputs = hist?.[promptId]?.outputs;
+      if (!outputs) continue;
+      for (const nodeOut of Object.values(outputs)) {
+        const imgMeta = nodeOut?.images?.[0];
+        if (imgMeta?.filename) {
+          const params = new URLSearchParams({
+            filename: imgMeta.filename,
+            subfolder: imgMeta.subfolder || "",
+            type: imgMeta.type || "output",
+          });
+          const viewRes = await fetch(`${base}/view?${params.toString()}`, {
+            signal: AbortSignal.timeout(10000),
+          });
+          if (!viewRes.ok) continue;
+          const dataUrl = await blobToDataUrlLocal(await viewRes.blob());
+          if (dataUrl) {
+            return { ok: true, imageUrl: dataUrl, note: "Local ComfyUI (RTX/GPU)" };
+          }
+        }
+      }
+    }
+    return { ok: false, note: "ComfyUI generation timed out" };
+  } catch (e) {
+    return {
+      ok: false,
+      note: `ComfyUI failed: ${e instanceof Error ? e.message : "error"}`,
+    };
+  }
+}
+
+export async function generateLocalImage(
+  req: LocalGenRequest,
+  baseOverride?: string,
+): Promise<LocalGenResult> {
   const s = getMediaSettings();
-  if (!s.localImageBase) {
-    return { ok: false, note: "Set Advanced → Local image base (Comfy/Forge URL)" };
+  const base = (baseOverride || s.localImageBase || "").trim();
+  if (!base) {
+    return { ok: false, note: "Set Local image base (ComfyUI :8188 or Home Engine :8787)" };
   }
 
   let refPhoto = req.referenceImageBase64;
@@ -188,37 +270,9 @@ export async function generateLocalImage(req: LocalGenRequest): Promise<LocalGen
     }
   }
 
-  // First try server-side /api/comfy proxy (avoids browser CORS and supports ComfyUI + IP-Adapter FaceID)
-  if (s.localImageMode === "comfy" || s.localImageMode === "forge") {
-    try {
-      const apiRes = await fetch("/api/comfy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          baseUrl: s.localImageBase,
-          mode: s.localImageMode,
-          prompt: req.prompt,
-          negative: req.negative || DEFAULT_NEG,
-          seed: req.seed,
-          width: req.width || 768,
-          height: req.height || 1152,
-          referenceImageBase64: refPhoto,
-        }),
-      });
-      if (apiRes.ok) {
-        const data = await apiRes.json();
-        if (data.ok && data.imageUrl) {
-          return { ok: true, imageUrl: data.imageUrl, note: data.note || "Local Comfy/Forge" };
-        }
-      }
-    } catch {
-      /* fall through to direct browser fetch or local Python proxy */
-    }
+  if (s.localImageMode === "forge") return tryForge(base, req);
+  if (s.localImageMode === "prompt-url" && !base.includes(":8188")) {
+    return tryCustom(base, req);
   }
-
-  if (s.localImageMode === "forge") return tryForge(s.localImageBase, req);
-  if (s.localImageMode === "prompt-url") {
-    return tryCustom(s.localImageBase, req);
-  }
-  return tryCustom(s.localImageBase, req);
+  return tryComfyDirect(base, { ...req, referenceImageBase64: refPhoto });
 }

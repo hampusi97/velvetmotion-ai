@@ -24,13 +24,19 @@ export async function fetchWorkerImage(
   prompt: string,
   opts: { steps?: number; seed?: number; baseUrl?: string; timeoutMs?: number } = {},
 ): Promise<WorkerImageResult> {
-  const params = new URLSearchParams({ prompt: prompt.slice(0, 1500), steps: String(opts.steps ?? 8) });
-  if (opts.seed != null) params.set("seed", String(opts.seed));
+  const safeSteps = Math.min(8, Math.max(4, Math.round(opts.steps ?? 8)));
+  const randomSeed = opts.seed ?? Math.floor(Math.random() * 2_000_000_000) + 1;
+  const params = new URLSearchParams({
+    prompt: prompt.slice(0, 1500),
+    steps: String(safeSteps),
+    seed: String(randomSeed),
+  });
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 45000);
   try {
     const res = await fetch(`${imageWorkerBase(opts.baseUrl)}/generate?${params.toString()}`, {
       signal: ctrl.signal,
+      cache: "no-store",
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");

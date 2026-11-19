@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   BookmarkPlus,
   Check,
   Copy,
+  Cpu,
   Dices,
   Download,
   Flame,
@@ -70,6 +73,8 @@ import {
 } from "@/lib/storage";
 import { GIFTS, addGift, getGiftsFor } from "@/lib/gifts";
 import { characterMediaUrl, resolveBestMediaUrl, type MediaMood } from "@/lib/media";
+import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
+import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { enhanceSequenceWithVideo, runSequenceGeneration, type SequenceKind } from "@/lib/videoModes";
 import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
 import { toggleVaultItem } from "@/lib/vault";
@@ -115,7 +120,13 @@ function stripStage(text: string): string {
   return text.replace(/\*[^*]+\*/g, "").replace(/\([^)]+\)/g, "").replace(/\s+/g, " ").trim();
 }
 
-type ChatMessage = StoredMessage & { id?: string; note?: string };
+type ChatMessage = StoredMessage & {
+  id?: string;
+  note?: string;
+  isFallback?: boolean;
+  error?: string;
+  retrySpec?: { mood: MediaMood; label: string; cost: number; extra?: string };
+};
 
 type CharacterChatProps = {
   character: Character;
@@ -212,6 +223,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [editDraft, setEditDraft] = useState("");
 
   const { coins, spend, earn } = useCoinsStore();
+  const engineStatus = useLocalEngineStatus();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -595,7 +607,6 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       return;
     }
     setSafetyError(null);
-    if (cost > 0) spend(cost);
 
     setBusy(true);
     setGeneratingPhoto(true);
@@ -604,13 +615,30 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const resolved = await resolveBestMediaUrl(character, mood, themedExtra);
       const rawUrl = resolved?.url || "";
       const isValidUrl =
-        rawUrl.startsWith("/portraits/") ||
         rawUrl.startsWith("http://") ||
         rawUrl.startsWith("https://") ||
         rawUrl.startsWith("blob:") ||
         (rawUrl.startsWith("data:image/") && rawUrl.length > 64);
-      const url = isValidUrl ? rawUrl : staticPortraitUrl(character.id || "chloe");
-      const note = isValidUrl ? resolved.note : "Portrait fallback (image worker unavailable)";
+
+      if (resolved.isFallback || !isValidUrl) {
+        const reason = resolved.error || resolved.note || "Live image generators unavailable (Quota/Offline)";
+        const errMsg: ChatMessage = {
+          role: "assistant",
+          content: `*${label} couldn't render cleanly right now.*`,
+          isFallback: true,
+          error: reason,
+          mediaType: mood,
+          note: reason,
+          retrySpec: { mood, label, cost, extra },
+        };
+        persist([...messages, errMsg]);
+        setSafetyError(null);
+        return;
+      }
+
+      if (cost > 0) spend(cost);
+      const url = rawUrl;
+      const note = resolved.note;
 
       addToGallery({
         characterId: character.id,
@@ -649,29 +677,60 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
   const generateSequence = async (kind: SequenceKind) => {
     setBusy(true);
-    setClipStatus("Rendering motion clip...");
+    setClipStatus(kind === "joi" ? "Rendering JOI .webm video clip..." : "Rendering motion .webm clip...");
     try {
       const result = runSequenceGeneration(character, kind);
-      const frames = result.frames;
-      const url = frames[frames.length - 1];
+      const existingLiveImg = [...messages].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
+      let baseImageUrl = existingLiveImg || "";
+      if (!baseImageUrl) {
+        const liveShot = await resolveBestMediaUrl(character, kind === "joi" ? "joi" : "seductive", "cinematic framing");
+        baseImageUrl = liveShot.url;
+      }
+      const frames = baseImageUrl ? [baseImageUrl, ...result.frames.slice(1)] : result.frames;
+      const url = baseImageUrl || frames[frames.length - 1];
+
+      let videoUrl: string | null = null;
+      let note = "Live motion clip";
+
       const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
+      videoUrl = enhanced.videoUrl;
+      note = enhanced.note;
+
+      if (!videoUrl && url) {
+        try {
+          const webmClip = await generateStudioVideoClip({
+            imageUrl: url,
+            motionId: kind === "joi" ? "club-light-pulse" : "slow-zoom-blink",
+            durationSec: 5,
+            speed: kind === "joi" ? 1.25 : 1,
+            prompt: `${character.name} ${kind} video clip`,
+            comfyOnline: engineStatus.comfyOnline,
+          });
+          videoUrl = webmClip.videoUrl;
+          note = webmClip.engine;
+        } catch {
+          /* Headless or MediaRecorder-restricted environment: keep interactive sequence frames */
+        }
+      }
+
       const mediaMsg: ChatMessage = {
         role: "assistant",
         content: SEQUENCE_LINES[kind],
         imageUrl: url,
-        videoUrl: enhanced.videoUrl || undefined,
+        videoUrl: videoUrl || undefined,
         frames,
         mediaType: kind,
+        note,
       };
       persist([...messages, mediaMsg]);
       setActiveMedia({
         url,
         frames,
-        videoUrl: enhanced.videoUrl,
+        videoUrl,
         type: kind,
-        note: enhanced.note,
+        note,
       });
-      setClipStatus(enhanced.mode === "mp4" || enhanced.mode === "webm" ? "Live motion clip ready" : enhanced.note);
+      setClipStatus(videoUrl ? `Live .webm clip ready (${note})` : note);
       setIntimacy(bumpIntimacy(character.id, 7));
       const { progression: nextProg } = earnCompanionXp(character.id, 10);
       setProgression(nextProg);
@@ -977,52 +1036,109 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                     <div className="whitespace-pre-wrap">{cleanDisplay}</div>
                   )}
 
-                  {m.videoUrl ? (
-                    <video src={m.videoUrl} controls autoPlay loop muted playsInline className="mt-2 w-full max-h-72 rounded-xl bg-black" />
+                  {m.isFallback || m.error ? (
+                    <div className="mt-2 rounded-xl border border-amber-400/45 bg-amber-500/10 p-3 space-y-2 text-xs">
+                      <div className="flex items-start gap-2 text-amber-200">
+                        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-300" />
+                        <div className="space-y-0.5">
+                          <div className="font-bold">Live image generator unavailable</div>
+                          <div className="text-[11px] text-amber-100/85 break-words">
+                            {m.error || "Local ComfyUI, Cloudflare Flux, and AI Horde could not complete this request."}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {m.retrySpec && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void generate(
+                                m.retrySpec!.mood,
+                                m.retrySpec!.label,
+                                0,
+                                m.retrySpec!.extra || "",
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#00f5ff]/45 bg-[#00f5ff]/15 px-2.5 py-1 text-[11px] font-bold text-[#00f5ff] hover:bg-[#00f5ff]/25 disabled:opacity-45"
+                          >
+                            <RefreshCw className="h-3 w-3" /> Retry
+                          </button>
+                        )}
+                        <Link
+                          href="/download/"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#ff1e8e]/45 bg-[#ff1e8e]/15 px-2.5 py-1 text-[11px] font-bold text-[#ff8aa1] hover:bg-[#ff1e8e]/25"
+                        >
+                          <Cpu className="h-3 w-3" /> Connect Local ComfyUI
+                        </Link>
+                      </div>
+                    </div>
+                  ) : m.videoUrl ? (
+                    <div className="mt-2 space-y-1.5">
+                      <video src={m.videoUrl} controls autoPlay loop muted playsInline className="w-full max-h-72 rounded-xl bg-black" />
+                      {m.mediaType === "joi" && (
+                        <Link
+                          href="/?view=blindfold"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#ff1e8e]/45 bg-[#ff1e8e]/15 px-2.5 py-1 text-[11px] font-bold text-[#ff8aa1] hover:bg-[#ff1e8e]/25"
+                        >
+                          <Volume2 className="h-3 w-3" /> Open Generative Audio / JOI Studio →
+                        </Link>
+                      )}
+                    </div>
                   ) : m.imageUrl ? (
-                    <div className="mt-2 rounded-xl overflow-hidden relative border border-[#ff1e8e]/30">
-                      {m.frames && m.frames.length > 1 ? (
-                        <MotionSequencePlayer frames={m.frames} alt={character.name} />
-                      ) : (
-                        <>
-                          <SafeImage
-                            src={m.imageUrl}
-                            alt={character.name}
-                            fallbackId={character.id}
-                            onClick={() => m.imageUrl && setLightboxUrl(m.imageUrl)}
-                            className={`w-full max-h-80 object-cover cursor-pointer transition ${
-                              revealed.has(i) || m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive"
-                                ? ""
-                                : "blur-xl scale-105"
-                            }`}
-                          />
-                          {!revealed.has(i) &&
-                            !(m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive") && (
+                    <div className="mt-2 space-y-1.5">
+                      <div className="rounded-xl overflow-hidden relative border border-[#ff1e8e]/30">
+                        {m.frames && m.frames.length > 1 ? (
+                          <MotionSequencePlayer frames={m.frames} alt={character.name} />
+                        ) : (
+                          <>
+                            <SafeImage
+                              src={m.imageUrl}
+                              alt={character.name}
+                              fallbackId={character.id}
+                              onClick={() => m.imageUrl && setLightboxUrl(m.imageUrl)}
+                              className={`w-full max-h-80 object-cover cursor-pointer transition ${
+                                revealed.has(i) || m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive"
+                                  ? ""
+                                  : "blur-xl scale-105"
+                              }`}
+                            />
+                            {!revealed.has(i) &&
+                              !(m.mediaType === "beauty" || m.mediaType === "lingerie" || m.mediaType === "seductive") && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRevealed((s) => new Set(s).add(i))}
+                                  className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-bold text-white"
+                                >
+                                  Tap to reveal
+                                </button>
+                              )}
+                            <div className="flex items-center justify-between gap-2 bg-black/70 px-2.5 py-1.5 text-[10px]">
                               <button
                                 type="button"
-                                onClick={() => setRevealed((s) => new Set(s).add(i))}
-                                className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-bold text-white"
+                                onClick={() => m.imageUrl && setLightboxUrl(m.imageUrl)}
+                                className="inline-flex items-center gap-1 text-[#00f5ff] hover:underline"
                               >
-                                Tap to reveal
+                                <Maximize2 className="h-3 w-3" /> Enlarge
                               </button>
-                            )}
-                          <div className="flex items-center justify-between gap-2 bg-black/70 px-2.5 py-1.5 text-[10px]">
-                            <button
-                              type="button"
-                              onClick={() => m.imageUrl && setLightboxUrl(m.imageUrl)}
-                              className="inline-flex items-center gap-1 text-[#00f5ff] hover:underline"
-                            >
-                              <Maximize2 className="h-3 w-3" /> Enlarge
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => m.imageUrl && handleSaveToCollection(m.imageUrl, m.mediaType || "selfie")}
-                              className="inline-flex items-center gap-1 text-pink-200 hover:text-white"
-                            >
-                              <BookmarkPlus className="h-3 w-3" /> Save to Collection
-                            </button>
-                          </div>
-                        </>
+                              <button
+                                type="button"
+                                onClick={() => m.imageUrl && handleSaveToCollection(m.imageUrl, m.mediaType || "selfie")}
+                                className="inline-flex items-center gap-1 text-pink-200 hover:text-white"
+                              >
+                                <BookmarkPlus className="h-3 w-3" /> Save to Collection
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      {m.mediaType === "joi" && (
+                        <Link
+                          href="/?view=blindfold"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#ff1e8e]/45 bg-[#ff1e8e]/15 px-2.5 py-1 text-[11px] font-bold text-[#ff8aa1] hover:bg-[#ff1e8e]/25"
+                        >
+                          <Volume2 className="h-3 w-3" /> Open Generative Audio / JOI Studio →
+                        </Link>
                       )}
                     </div>
                   ) : null}
