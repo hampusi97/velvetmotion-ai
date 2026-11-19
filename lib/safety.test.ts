@@ -8,7 +8,13 @@ import {
 } from "./safety";
 import { assertCompliance } from "./complianceFilter";
 import { sanitizeCompanionReply } from "./chatRouter";
-import { buildSamplerPayload, DAVIDAU_RECOMMENDED_GGUFS } from "./samplerPresets";
+import {
+  ANTI_SLOP_BAN_PHRASES,
+  buildContinueSteeringMessages,
+  buildSamplerPayload,
+  DAVIDAU_RECOMMENDED_GGUFS,
+  DAVIDAU_RESOURCES,
+} from "./samplerPresets";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -102,9 +108,22 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
     assert.equal(o.options.repeat_last_n, 64);
     assert.equal(o.options.num_predict, 260);
 
+    const kNoSlop = buildSamplerPayload("koboldcpp", "creative-dry-class3", false);
+    assert.equal(kNoSlop.banned_tokens, undefined);
+    assert.deepEqual(k.banned_tokens, ANTI_SLOP_BAN_PHRASES);
+
     const or = buildSamplerPayload("openrouter", "creative-dry-class3");
     assert.equal(or.max_tokens, 280);
     assert.equal(or.dry_multiplier, undefined);
     assert.ok(DAVIDAU_RECOMMENDED_GGUFS.every((g) => g.url.startsWith("https://huggingface.co/")));
+    assert.ok(DAVIDAU_RESOURCES.antiSlopRepo.startsWith("https://"));
+
+    const steered = buildContinueSteeringMessages("Be natural.", [
+      { role: "user", content: "Hey" },
+      { role: "assistant", content: "Chloe leans on the rail, smiling." },
+    ]);
+    assert.equal(steered[0].role, "system");
+    assert.ok(steered[0].content.includes("STEERING INSTRUCTION"));
+    assert.equal(steered[steered.length - 1].role, "user");
   });
 });

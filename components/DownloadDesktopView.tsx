@@ -395,20 +395,38 @@ export function DownloadDesktopView() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-sm font-extrabold text-white">
-                Desktop Model Manager · DavidAU Roleplay GGUFs
+                Desktop Model Manager · DavidAU NEO Imatrix GGUFs (IQ4_XS)
               </h3>
               <p className="text-[11px] text-[#a6a6c4]">
-                Direct Hugging Face GGUF downloads pre-paired with Class 1–4 roleplay samplers (min_p 0.05, repeat_last_n 64, DRY).
+                Direct Hugging Face IQ4_XS GGUF downloads for optimal RAM vs. emotional nuance, pre-paired with Class 1–4 samplers + Anti-Slop.
               </p>
             </div>
-            <a
-              href={DAVIDAU_RESOURCES.samplersGuide}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-3 py-1 text-[11px] font-bold text-[#00f5ff] hover:bg-[#00f5ff]/20"
-            >
-              DavidAU Samplers Guide <ExternalLink className="h-3 w-3" />
-            </a>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <a
+                href={DAVIDAU_RESOURCES.samplersGuide}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2.5 py-1 text-[10px] font-bold text-[#00f5ff] hover:bg-[#00f5ff]/20"
+              >
+                Samplers Guide <ExternalLink className="h-3 w-3" />
+              </a>
+              <a
+                href={DAVIDAU_RESOURCES.autoCorrectTool}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-[#ff1e8e]/40 bg-[#ff1e8e]/10 px-2.5 py-1 text-[10px] font-bold text-[#ff8aa1] hover:bg-[#ff1e8e]/20"
+              >
+                AI Autocorrect &amp; Low-Quant <ExternalLink className="h-3 w-3" />
+              </a>
+              <a
+                href={DAVIDAU_RESOURCES.antiSlopRepo}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#141418] px-2.5 py-1 text-[10px] font-bold text-zinc-200 hover:border-[#00f5ff]"
+              >
+                Anti-Slop <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {DAVIDAU_RECOMMENDED_GGUFS.map((gguf) => (

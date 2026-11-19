@@ -12,6 +12,7 @@ import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localM
 import { getPreferredVoiceEngine, setPreferredVoiceEngine, type VoiceEngineId } from "@/lib/kokoroTts";
 import {
   DAVIDAU_RECOMMENDED_GGUFS,
+  DAVIDAU_RESOURCES,
   DAVIDAU_SAMPLER_PRESETS,
   SAMPLER_PRESET_LIST,
   type SamplerPresetId,
@@ -47,6 +48,9 @@ export function SettingsAndBackupDrawer({
   const [voiceEngine, setVoiceEngine] = useState<VoiceEngineId>(() => getPreferredVoiceEngine());
   const [samplerPreset, setSamplerPreset] = useState<SamplerPresetId>(
     () => initialRouter.samplerPreset || "roleplay-balanced",
+  );
+  const [enableAntiSlop, setEnableAntiSlop] = useState<boolean>(
+    () => initialRouter.enableAntiSlop !== false,
   );
   const engine = useLocalEngineStatus();
   const { status: cloudStatus, syncNow } = useFirebaseCloudSync();
@@ -88,6 +92,7 @@ export function SettingsAndBackupDrawer({
       homeEngineUrl: homeEngineUrl.trim() || undefined,
       ollamaModel: ollamaModel.trim() || "llama3.1:8b",
       samplerPreset,
+      enableAntiSlop,
     });
     try {
       localStorage.setItem("vm-stealth-notif", String(stealthNotif));
@@ -392,11 +397,57 @@ export function SettingsAndBackupDrawer({
                 </span>
               )}
             </div>
+            <label className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5 text-[10px] text-[#e5e7eb] cursor-pointer mt-1">
+              <span>
+                <strong className="text-white">Anti-Slop Cliché Filter</strong> · Ban stale AI phrases on KoboldCpp / llama.cpp
+              </span>
+              <input
+                type="checkbox"
+                checked={enableAntiSlop}
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setEnableAntiSlop(next);
+                  saveRouterSettings({ enableAntiSlop: next });
+                  setStatusMsg(`Anti-Slop filter ${next ? "enabled" : "disabled"} and saved locally.`);
+                }}
+                className="accent-[#ff1e8e] shrink-0"
+              />
+            </label>
           </div>
 
           {/* Desktop Model Manager — DavidAU Recommended Hugging Face GGUFs */}
           <div className="space-y-1.5 pt-1">
-            <p className="text-[11px] font-bold text-white">Desktop Model Manager · DavidAU NEO GGUFs</p>
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <p className="text-[11px] font-bold text-white">
+                Desktop Model Manager · DavidAU NEO Imatrix GGUFs (IQ4_XS)
+              </p>
+              <div className="flex flex-wrap items-center gap-1 text-[9px]">
+                <a
+                  href={DAVIDAU_RESOURCES.samplersGuide}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-2 py-0.5 font-semibold text-[#00f5ff] hover:underline"
+                >
+                  Samplers Guide <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+                <a
+                  href={DAVIDAU_RESOURCES.autoCorrectTool}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 rounded-full border border-[#ff1e8e]/35 bg-[#ff1e8e]/10 px-2 py-0.5 font-semibold text-[#ff8aa1] hover:underline"
+                >
+                  AI Autocorrect <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+                <a
+                  href={DAVIDAU_RESOURCES.antiSlopRepo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-0.5 rounded-full border border-white/15 bg-black/50 px-2 py-0.5 font-semibold text-zinc-300 hover:text-white"
+                >
+                  Anti-Slop <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              </div>
+            </div>
             {DAVIDAU_RECOMMENDED_GGUFS.map((gguf) => (
               <div key={gguf.id} className="rounded-xl border border-white/10 bg-[#05050a] p-2.5 space-y-1">
                 <div className="flex items-center justify-between gap-2">

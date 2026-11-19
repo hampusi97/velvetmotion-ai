@@ -99,7 +99,8 @@ def build_home_sampler_payload(provider, body):
             ext[key] = body[key]
     if provider == "koboldcpp":
         out = {**std, **ext}
-        out["banned_tokens"] = body.get("banned_tokens") or ANTI_SLOP_BAN_PHRASES
+        if body.get("enableAntiSlop", True):
+            out["banned_tokens"] = body.get("banned_tokens") or ANTI_SLOP_BAN_PHRASES
         return out
     return {
         **std,

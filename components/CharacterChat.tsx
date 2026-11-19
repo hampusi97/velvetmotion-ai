@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowRight,
   BookmarkPlus,
+  Check,
   Copy,
   Dices,
   Download,
@@ -12,6 +14,7 @@ import {
   Heart,
   Image as ImageIcon,
   Maximize2,
+  Pencil,
   Phone,
   RefreshCw,
   RotateCcw,
@@ -24,7 +27,7 @@ import {
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } from "@/lib/audioEngine";
 import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
-import { generateCompanionReply, sanitizeCompanionReply } from "@/lib/chatRouter";
+import { continueCompanionScene, generateCompanionReply, sanitizeCompanionReply } from "@/lib/chatRouter";
 import { assertCompliance } from "@/lib/complianceFilter";
 import {
   listChatBranchesDB,
@@ -205,6 +208,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [gamesOpen, setGamesOpen] = useState(false);
   const [rightTab, setRightTab] = useState<"memory" | "diary">("memory");
   const [diaryPhotos, setDiaryPhotos] = useState<Array<{ id: string; url: string; label: string }>>([]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
 
   const { coins, spend, earn } = useCoinsStore();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -364,6 +369,27 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     notifySaved("Saved to Collection & Photo Diary");
   };
 
+  const buildPersonaPayload = () => {
+    const dynamicMemories = toDynamicMemories(character.id);
+    const vaultNotes = loadCategorizedMemories(character.id)
+      .slice(0, 8)
+      .map((m) => `- [${m.category}] ${m.text}`)
+      .join("\n");
+    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id)].filter(Boolean).join("\n");
+    return {
+      id: character.id,
+      name: character.name,
+      age: character.age,
+      tagline: character.tagline,
+      personality: progression.customPromptOverride || character.personality,
+      backstory: character.background,
+      memoryBlock,
+      memories: dynamicMemories,
+      relationshipLevel: progStats.level,
+      recentMood: timeMood.badge,
+    };
+  };
+
   const requestReplyForHistory = async (historyMsgs: ChatMessage[], userPrompt: string) => {
     const safety = assertCompliance(userPrompt);
     if (!safety.ok) {
@@ -402,27 +428,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       /* ignore */
     }
 
-    const dynamicMemories = toDynamicMemories(character.id);
-    const vaultNotes = loadCategorizedMemories(character.id)
-      .slice(0, 8)
-      .map((m) => `- [${m.category}] ${m.text}`)
-      .join("\n");
-    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id)].filter(Boolean).join("\n");
-
     const routed = await generateCompanionReply(
       historyMsgs.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
-      {
-        id: character.id,
-        name: character.name,
-        age: character.age,
-        tagline: character.tagline,
-        personality: progression.customPromptOverride || character.personality,
-        backstory: character.background,
-        memoryBlock,
-        memories: dynamicMemories,
-        relationshipLevel: progStats.level,
-        recentMood: timeMood.badge,
-      },
+      buildPersonaPayload(),
     );
 
     const sanitized = sanitizeCompanionReply(routed.text, character.name);
@@ -513,8 +521,71 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const rewindTo = (index: number) => {
+    setEditingIndex(null);
     persist(messages.slice(0, index + 1));
     notifySaved("Rewound thread");
+  };
+
+  const saveEditedMessage = (assistantIndex: number) => {
+    const trimmed = editDraft.trim();
+    if (!trimmed) {
+      setEditingIndex(null);
+      return;
+    }
+    const guard = assertCompliance(trimmed);
+    if (!guard.ok) {
+      setSafetyError(guard.reason);
+      return;
+    }
+    setSafetyError(null);
+    const updated = messages.map((msg, idx) =>
+      idx === assistantIndex ? { ...msg, content: trimmed } : msg,
+    );
+    persist(updated);
+    setEditingIndex(null);
+    notifySaved("Saved edit to IndexedDB");
+  };
+
+  const continueAt = async (assistantIndex: number) => {
+    if (busy) return;
+    const baseMessages =
+      editingIndex === assistantIndex && editDraft.trim()
+        ? messages.map((msg, idx) =>
+            idx === assistantIndex ? { ...msg, content: editDraft.trim() } : msg,
+          )
+        : messages;
+    const target = baseMessages[assistantIndex];
+    if (!target || target.role !== "assistant") return;
+
+    const guard = assertCompliance(target.content);
+    if (!guard.ok) {
+      setSafetyError(guard.reason);
+      return;
+    }
+    setSafetyError(null);
+    setEditingIndex(null);
+    if (editingIndex === assistantIndex) persist(baseMessages);
+
+    setBusy(true);
+    try {
+      const slice = baseMessages.slice(0, assistantIndex + 1);
+      const routed = await continueCompanionScene(
+        slice.map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
+        buildPersonaPayload(),
+      );
+      const cont = sanitizeCompanionReply(routed.text, character.name) || routed.text.trim();
+      if (!cont) return;
+      const baseText = target.content.trim();
+      const joiner = /[.!?…"\u201D*]$/.test(baseText) ? " " : " ";
+      const nextContent = `${baseText}${joiner}${cont}`.trim();
+      const updated = baseMessages.map((msg, idx) =>
+        idx === assistantIndex ? { ...msg, content: nextContent } : msg,
+      );
+      persist(updated);
+      notifySaved("Continued scene");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const generate = async (mood: MediaMood, label: string, cost: number, extra = "") => {
@@ -876,7 +947,35 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       : "border border-white/12 bg-[#0c0c16] text-[#f7f7fc]"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap">{cleanDisplay}</div>
+                  {editingIndex === i ? (
+                    <div className="space-y-2 min-w-[240px]">
+                      <textarea
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        rows={3}
+                        aria-label="Edit companion reply"
+                        className="w-full rounded-xl border border-[#00f5ff]/45 bg-[#05050a] px-2.5 py-2 text-xs text-white outline-none focus:border-[#ff1e8e] resize-y"
+                      />
+                      <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setEditingIndex(null)}
+                          className="rounded-lg border border-white/15 px-2.5 py-1 text-zinc-300 hover:bg-white/5"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => saveEditedMessage(i)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#00ffa3]/45 bg-[#00ffa3]/15 px-2.5 py-1 font-bold text-[#00ffa3] hover:bg-[#00ffa3]/25"
+                        >
+                          <Check className="h-3 w-3" /> Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{cleanDisplay}</div>
+                  )}
 
                   {m.videoUrl ? (
                     <video src={m.videoUrl} controls autoPlay loop muted playsInline className="mt-2 w-full max-h-72 rounded-xl bg-black" />
@@ -955,6 +1054,25 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                         className="inline-flex items-center gap-0.5 text-[#00f5ff] hover:underline"
                       >
                         <Volume2 className="h-3 w-3" /> {speakingId === i ? "Playing" : "Voice"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingIndex(i);
+                          setEditDraft(cleanDisplay);
+                        }}
+                        className="inline-flex items-center gap-0.5 hover:text-[#00f5ff]"
+                        title="Edit her reply inline to steer the scene"
+                      >
+                        <Pencil className="h-3 w-3" /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void continueAt(i)}
+                        className="inline-flex items-center gap-0.5 text-[#ff8aa1] hover:text-[#ff1e8e]"
+                        title="Seamlessly continue from this reply"
+                      >
+                        <ArrowRight className="h-3 w-3" /> Continue
                       </button>
                       <button
                         type="button"

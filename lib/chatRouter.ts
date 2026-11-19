@@ -14,7 +14,11 @@ import {
   sanitizeCompanionReply as sanitizeWithDynamicEngine,
   type CompanionMemoryItem,
 } from "./dynamicChatEngine";
-import { buildSamplerPayload, type SamplerPresetId } from "./samplerPresets";
+import {
+  buildContinueSteeringMessages,
+  buildSamplerPayload,
+  type SamplerPresetId,
+} from "./samplerPresets";
 
 export interface RouterMessage {
   role: "user" | "assistant";
@@ -46,19 +50,34 @@ export interface ChatRouterSettings {
   homeEngineUrl?: string;
   aiHordeApiKey?: string;
   samplerPreset?: SamplerPresetId;
+  enableAntiSlop?: boolean;
 }
 
 const KEY = "velvetmotion_llm_settings";
 
 export function loadRouterSettings(): ChatRouterSettings {
-  if (typeof window === "undefined") return { provider: "auto", samplerPreset: "roleplay-balanced" };
+  if (typeof window === "undefined") {
+    return { provider: "auto", samplerPreset: "roleplay-balanced", enableAntiSlop: true };
+  }
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { provider: "auto", samplerPreset: "roleplay-balanced", ...JSON.parse(raw) };
+    if (raw) {
+      return {
+        provider: "auto",
+        samplerPreset: "roleplay-balanced",
+        enableAntiSlop: true,
+        ...JSON.parse(raw),
+      };
+    }
   } catch {
     /* ignore */
   }
-  return { provider: "auto", samplerPreset: "roleplay-balanced", aiHordeApiKey: "0000000000" };
+  return {
+    provider: "auto",
+    samplerPreset: "roleplay-balanced",
+    enableAntiSlop: true,
+    aiHordeApiKey: "0000000000",
+  };
 }
 
 export function saveRouterSettings(next: Partial<ChatRouterSettings>) {
@@ -226,6 +245,7 @@ async function tryOpenAIChatTiers(
 ): Promise<{ text: string; providerUsed: string } | null> {
   const settings = loadRouterSettings();
   const presetId: SamplerPresetId = settings.samplerPreset || "roleplay-balanced";
+  const enableAntiSlop = settings.enableAntiSlop !== false;
   const measure = (text: string, providerUsed: string, startedMs: number) => {
     const elapsedSec = Math.max(0.15, (Date.now() - startedMs) / 1000);
     const estTokens = Math.max(6, Math.round(text.split(/\s+/).length * 1.35));
@@ -239,7 +259,7 @@ async function tryOpenAIChatTiers(
     const koboldRaw = await fetchOpenAICompat("http://127.0.0.1:5001/v1/chat/completions", chatMessages, {
       model: "koboldcpp",
       timeoutMs: 2500,
-      samplerPayload: buildSamplerPayload("koboldcpp", presetId),
+      samplerPayload: buildSamplerPayload("koboldcpp", presetId, enableAntiSlop),
     });
     const koboldClean = sanitizeCompanionReply(koboldRaw, companionName);
     if (koboldClean) return measure(koboldClean, "koboldcpp-local", t0);
@@ -252,7 +272,7 @@ async function tryOpenAIChatTiers(
     const ollamaRaw = await fetchOpenAICompat(`${ollamaBase}/v1/chat/completions`, chatMessages, {
       model: settings.ollamaModel || "llama3.1:8b",
       timeoutMs: 3200,
-      samplerPayload: buildSamplerPayload("ollama", presetId),
+      samplerPayload: buildSamplerPayload("ollama", presetId, enableAntiSlop),
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, companionName);
     if (ollamaClean) return measure(ollamaClean, "ollama-local", t0);
@@ -272,7 +292,8 @@ async function tryOpenAIChatTiers(
           model: settings.ollamaModel || "llama3.1:8b",
           messages: chatMessages,
           samplerPreset: presetId,
-          ...buildSamplerPayload("koboldcpp", presetId),
+          enableAntiSlop,
+          ...buildSamplerPayload("koboldcpp", presetId, enableAntiSlop),
         }),
         signal: ctrl.signal,
       });
@@ -295,7 +316,7 @@ async function tryOpenAIChatTiers(
       apiKey: settings.customApiKey,
       model: settings.customModel || "local",
       timeoutMs: 8000,
-      samplerPayload: buildSamplerPayload("custom", presetId),
+      samplerPayload: buildSamplerPayload("custom", presetId, enableAntiSlop),
     });
     const customClean = sanitizeCompanionReply(customRaw, companionName);
     if (customClean) return measure(customClean, "byok-custom", t0);
@@ -310,7 +331,7 @@ async function tryOpenAIChatTiers(
         "HTTP-Referer": "https://velvetmotion-ai.hampusi97.workers.dev",
         "X-Title": "VelvetMotion AI",
       },
-      samplerPayload: buildSamplerPayload("openrouter", presetId),
+      samplerPayload: buildSamplerPayload("openrouter", presetId, enableAntiSlop),
     });
     const orClean = sanitizeCompanionReply(orRaw, companionName);
     if (orClean) return { text: orClean, providerUsed: "openrouter-byok" };
@@ -364,5 +385,36 @@ export async function generateCompanionReply(
   return {
     text: buildContextAwareFallback(history, persona),
     providerUsed: "context-fallback",
+  };
+}
+
+/**
+ * DavidAU Stop -> Edit -> Continue steering helper: takes a slice ending on the
+ * edited companion turn, calls the active LLM via `buildContinueSteeringMessages`,
+ * and falls back smoothly if local/cloud endpoints are offline.
+ */
+export async function continueCompanionScene(
+  historyWithEditedLastAssistant: RouterMessage[],
+  persona: CompanionPersona,
+): Promise<{ text: string; providerUsed: string }> {
+  const lastAssistantText =
+    [...historyWithEditedLastAssistant].reverse().find((m) => m.role === "assistant")?.text || "";
+  const safety = assertCompliance(lastAssistantText);
+  if (!safety.ok) {
+    return { text: safety.reason, providerUsed: "compliance-guard" };
+  }
+
+  const steeringMessages = buildContinueSteeringMessages(
+    systemPrompt(persona),
+    historyWithEditedLastAssistant.map((m) => ({ role: m.role, content: m.text })),
+  );
+
+  const llmRes = await tryOpenAIChatTiers(steeringMessages, persona.name);
+  if (llmRes) return llmRes;
+
+  const first = persona.name.split(/\s+/)[0] || persona.name;
+  return {
+    text: `*${first} lets that line linger in the quiet between you, leaning in a fraction closer.* “Your turn—keep going with me.”`,
+    providerUsed: "continue-fallback",
   };
 }
