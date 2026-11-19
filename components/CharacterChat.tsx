@@ -108,6 +108,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [voiceOn, setVoiceOn] = useState(true);
   const [edgeLocked, setEdgeLocked] = useState(false);
   const [freeformPrompt, setFreeformPrompt] = useState("");
+  const [freeformVideo, setFreeformVideo] = useState("");
   // Daily heat: streak changes default mood
   useEffect(() => {
     try {
@@ -270,6 +271,10 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
           giftCount: gifts.length,
         });
         replyText = fallbackReply(character, text, romanceMode, mood);
+      }
+      const kinks = getKinks(character.id);
+      if (kinks.length && Math.random() < 0.35) {
+        replyText += `\n\n*She remembers.* “Still thinking about that ${kinks[kinks.length - 1]} thing…”`;
       }
       if (intimacy > 40 && Math.random() < 0.18 && !/tribute/i.test(replyText)) {
         replyText += `\n\n*She glances at the camera.* “If you want to tribute me later… I won’t look away.”`;
@@ -747,6 +752,29 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
           className="rounded-xl bg-gradient-to-r from-pink-600 to-fuchsia-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 btn-candy"
         >
           Make it
+        </button>
+      </div>
+
+      <div className="flex gap-2 pb-2">
+        <input
+          value={freeformVideo}
+          onChange={(e) => setFreeformVideo(e.target.value)}
+          placeholder="Any video… (doggy, shower, JOI, breeding…)"
+          className="flex-1 rounded-xl border border-fuchsia-500/30 bg-zinc-900/60 px-3 py-2 text-sm text-white placeholder:text-zinc-500 outline-none"
+        />
+        <button
+          type="button"
+          disabled={busy || !freeformVideo.trim()}
+          onClick={() => {
+            const url = freeformImageUrl(freeformVideo + " motion sequence, cinematic", character);
+            const msg = { role: "assistant" as const, content: `*Any video:* ${freeformVideo}`, imageUrl: url, frames: [url] };
+            setMessages((m) => [...m, msg]);
+            setFreeformVideo("");
+            setIntimacy(bumpIntimacy(character.id, 6));
+          }}
+          className="rounded-xl bg-gradient-to-r from-fuchsia-600 to-pink-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 btn-candy"
+        >
+          Video
         </button>
       </div>
 <div className="flex gap-2 pt-1">
