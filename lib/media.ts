@@ -43,6 +43,7 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
+/** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult, max heat */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
     "ultra photoreal beauty portrait, 85mm, soft glam, natural skin pores, candid influencer selfie, catchlights, candy.ai aesthetic, stunning adult woman, seductive half-smile, sharp unique face",
@@ -115,6 +116,7 @@ function pollinationsUrl(
     }
   }
 
+  // enhance=true + flux for sharper Candy-like results
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(
     prompt,
   )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true`;
@@ -221,9 +223,11 @@ export function characterGallery(character: Character): {
   }));
 }
 
+/** Always prefer live AI portrait over static SVG placeholders */
 export function resolveCharacterAvatar(character: Character): string {
   if (character.avatar?.startsWith("http") || character.avatar?.startsWith("data:")) {
     return character.avatar;
   }
+  // /avatars/*.svg → replace with Flux beauty portrait
   return characterMediaUrl(character, "beauty", `${character.name} beauty portrait`);
 }
