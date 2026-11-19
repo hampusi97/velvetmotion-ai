@@ -52,7 +52,7 @@ import { registerServiceWorker } from "@/lib/pwaProactive";
 type HomeView =
   | "home" | "girls" | "penthouse" | "create" | "romance" | "bnwo" | "tinder"
   | "joi" | "joi3d" | "room" | "roulette" | "blindfold" | "scenario" | "suggest"
-  | "gallery" | "packs" | "tribute" | "workspace" | "dual" | "group" | "share"
+  | "gallery" | "packs" | "tribute" | "strip" | "edge" | "workspace" | "dual" | "group" | "share"
   | "lounge" | "shorts" | "advanced" | "import" | "vault" | "my-girls" | "wallet"
   | "terms" | "privacy" | "safety";
 
