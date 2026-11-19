@@ -57,6 +57,7 @@ const RELATIONSHIPS = [
 
 type WizardProps = {
   onDone: (character: Character) => void;
+  onOpen3D?: (character: Character) => void;
   onHome: () => void;
 };
 
@@ -74,7 +75,7 @@ function buildFigure(
   return `${styleHint}, adult woman 24, ${look}, consistent face identity`;
 }
 
-export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
+export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [style, setStyle] = useState<(typeof STYLES)[number]>("Realistic");
@@ -249,6 +250,7 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
   const steps = ["Style", "Look", "Details", "Mind", "Photo", "Finish"];
 
   if (created) {
+    const first = created.name.split(" ")[0];
     return (
       <div className="max-w-lg mx-auto pb-16 space-y-5">
         <button type="button" onClick={onHome} className="text-pink-400 text-sm hover:text-pink-300">
@@ -257,21 +259,40 @@ export function CreateGirlWizard({ onDone, onHome }: WizardProps) {
         <h2 className="text-2xl font-extrabold text-cream">{created.name} is ready</h2>
         <p className="text-sm text-mist">
           {photoDataUrl
-            ? "Face locked from your photo. AI keeps her consistent in chat."
-            : "AI-generated from your look choices — no photo needed. Face seed locked for consistent selfies."}
+            ? "Face locked from your photo. She stays consistent in chat, nudes, and 3D."
+            : "AI-built from your choices — face seed locked for chat, nudes, and 3D."}
         </p>
         <div className="aspect-[3/4] max-w-[220px] rounded-2xl overflow-hidden border border-pink-500/40 shadow-lg shadow-pink-500/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={created.avatar} alt="" className="w-full h-full object-cover" />
         </div>
-        <CreatePostActions character={created} onChat={() => onDone(created)} />
-        <button
-          type="button"
-          onClick={() => onDone(created)}
-          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold"
-        >
-          Open chat with {created.name.split(" ")[0]}
-        </button>
+        <p className="text-[11px] uppercase tracking-wide text-zinc-500">Start now</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onDone(created)}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25"
+          >
+            Sextext with {first}
+          </button>
+          {onOpen3D && (
+            <button
+              type="button"
+              onClick={() => onOpen3D(created)}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-semibold shadow-lg shadow-violet-500/25"
+            >
+              Animate {first} in 3D
+            </button>
+          )}
+        </div>
+        <CreatePostActions
+          character={created}
+          onChat={() => onDone(created)}
+          on3D={onOpen3D ? () => onOpen3D(created) : undefined}
+        />
+        <p className="text-xs text-zinc-500 text-center">
+          Nudify · explicit · sex sequence from the chips above — then pin favorites to your vault.
+        </p>
       </div>
     );
   }
