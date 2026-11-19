@@ -121,7 +121,8 @@ const phaseOrder: Record<JoiPhase, number> = {
   "warm-up": 0,
   build: 1,
   edge: 2,
-  finish: 3,
+  peak: 3,
+  finish: 4,
 };
 
 const joiIds = new Set<string>();
