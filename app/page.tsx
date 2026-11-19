@@ -401,7 +401,7 @@ export default function Home() {
           {view === "packs" && (
             <>
               <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
-              <StoryPackBrowser onStartWithGirl={openChatById} />
+              <StoryPackBrowser />
             </>
           )}
           {view === "joi" && (
