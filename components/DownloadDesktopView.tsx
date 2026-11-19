@@ -18,32 +18,71 @@ function detectOs(): DetectedOs {
   return "windows";
 }
 
-const RELEASE_BASE = "https://github.com/hampusi97/velvetmotion-ai/releases/latest";
+const RELEASES_INDEX = "https://github.com/hampusi97/velvetmotion-ai/releases";
+const RELEASE_API = "https://api.github.com/repos/hampusi97/velvetmotion-ai/releases/latest";
+
+interface GithubReleaseAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+function matchAssetUrl(assets: GithubReleaseAsset[], os: DetectedOs): string | null {
+  const lower = (s: string) => s.toLowerCase();
+  if (os === "windows") {
+    return (
+      assets.find((a) => lower(a.name).endsWith(".exe"))?.browser_download_url ||
+      assets.find((a) => lower(a.name).endsWith(".msi"))?.browser_download_url ||
+      null
+    );
+  }
+  if (os === "mac-arm") {
+    return (
+      assets.find((a) => /aarch64|arm64/.test(lower(a.name)) && lower(a.name).endsWith(".dmg"))?.browser_download_url ||
+      assets.find((a) => lower(a.name).endsWith(".dmg"))?.browser_download_url ||
+      null
+    );
+  }
+  if (os === "mac-intel") {
+    return (
+      assets.find((a) => /x64|x86_64/.test(lower(a.name)) && lower(a.name).endsWith(".dmg"))?.browser_download_url ||
+      assets.find((a) => lower(a.name).endsWith(".dmg"))?.browser_download_url ||
+      null
+    );
+  }
+  if (os === "linux") {
+    return (
+      assets.find((a) => lower(a.name).endsWith(".appimage"))?.browser_download_url ||
+      assets.find((a) => lower(a.name).endsWith(".deb"))?.browser_download_url ||
+      null
+    );
+  }
+  return null;
+}
 
 const OS_OPTIONS: Record<DetectedOs, { label: string; installer: string; note: string; href: string }> = {
   windows: {
     label: "Download for Windows (x64 .exe / .msi)",
     installer: ".exe Installer",
     note: "Windows 10/11 64-bit · Auto-updates daily via GitHub Releases",
-    href: `${RELEASE_BASE}?platform=windows`,
+    href: RELEASES_INDEX,
   },
   "mac-arm": {
     label: "Download for macOS Apple Silicon (.dmg)",
     installer: "M1/M2/M3/M4 .dmg",
     note: "Universal & Metal-ready · Auto-updates daily via GitHub Releases",
-    href: `${RELEASE_BASE}?platform=macos-arm64`,
+    href: RELEASES_INDEX,
   },
   "mac-intel": {
     label: "Download for macOS Intel (.dmg)",
     installer: "x64 .dmg",
     note: "macOS 12+ · Auto-updates daily via GitHub Releases",
-    href: `${RELEASE_BASE}?platform=macos-x64`,
+    href: RELEASES_INDEX,
   },
   linux: {
     label: "Download for Linux (.AppImage / .deb)",
     installer: "AppImage & .deb",
     note: "Ubuntu, Debian, Fedora, Arch · Auto-updates daily via GitHub Releases",
-    href: `${RELEASE_BASE}?platform=linux`,
+    href: RELEASES_INDEX,
   },
   mobile: {
     label: "Install Mobile PWA App (1-Tap)",
@@ -55,12 +94,35 @@ const OS_OPTIONS: Record<DetectedOs, { label: string; installer: string; note: s
 
 export function DownloadDesktopView() {
   const [os, setOs] = useState<DetectedOs>("windows");
+  const [releaseTag, setReleaseTag] = useState<string | null>(null);
+  const [releaseAssets, setReleaseAssets] = useState<GithubReleaseAsset[]>([]);
+  const [releaseState, setReleaseState] = useState<"checking" | "live" | "pending">("checking");
 
   useEffect(() => {
     setOs(detectOs());
+    let active = true;
+    fetch(RELEASE_API)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { tag_name?: string; assets?: GithubReleaseAsset[] } | null) => {
+        if (!active) return;
+        if (data && data.tag_name && Array.isArray(data.assets) && data.assets.length > 0) {
+          setReleaseTag(data.tag_name);
+          setReleaseAssets(data.assets);
+          setReleaseState("live");
+        } else {
+          setReleaseState("pending");
+        }
+      })
+      .catch(() => {
+        if (active) setReleaseState("pending");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const rec = OS_OPTIONS[os];
+  const resolvedHref = os === "mobile" ? "/" : matchAssetUrl(releaseAssets, os) || RELEASES_INDEX;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 pb-16">
@@ -109,15 +171,21 @@ export function DownloadDesktopView() {
               </Link>
             ) : (
               <a
-                href={rec.href}
+                href={resolvedHref}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full neon-btn-primary px-7 py-3.5 text-sm font-extrabold text-white"
               >
-                <Download className="h-4 w-4" /> {rec.label}
+                <Download className="h-4 w-4" /> {releaseTag ? `${rec.label} · ${releaseTag}` : rec.label}
               </a>
             )}
-            <span className="text-xs text-[#00ffa3] font-semibold">{rec.note}</span>
+            <span className="text-xs text-[#00ffa3] font-semibold">
+              {releaseState === "live" && releaseTag
+                ? `${releaseTag} Live Installer Ready · ${rec.note}`
+                : releaseState === "pending"
+                  ? "Installers build automatically once v1.0.0 tag is pushed · Full Web & PWA works now"
+                  : rec.note}
+            </span>
           </div>
 
           {/* All OS Download Pills */}
@@ -132,7 +200,7 @@ export function DownloadDesktopView() {
             ).map(([k, lbl]) => (
               <a
                 key={k}
-                href={RELEASE_BASE}
+                href={matchAssetUrl(releaseAssets, k) || RELEASES_INDEX}
                 target="_blank"
                 rel="noreferrer"
                 className={`rounded-full border px-3 py-1.5 font-semibold transition ${

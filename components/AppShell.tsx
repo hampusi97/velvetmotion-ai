@@ -47,6 +47,7 @@ import { CollectionGalleryView, PrivateContentView } from "@/components/Collecti
 import { DownloadDesktopView } from "@/components/DownloadDesktopView";
 import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
 import { SettingsAndBackupDrawer } from "@/components/SettingsAndBackupDrawer";
+import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { ProactiveToast } from "@/components/ProactiveToast";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
@@ -347,6 +348,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           aria-hidden={menuOpen || undefined}
           className={containerClass + (suppressFooter ? " flex-1 py-2 min-w-0" : " flex-1 py-6 min-w-0")}
         >
+          {!suppressFooter && <SupporterBanner onOpenWallet={() => navigate("wallet")} />}
           {view === "home" && (
             <HomeView
               onNavigate={navigate}

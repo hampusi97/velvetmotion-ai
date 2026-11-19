@@ -369,6 +369,14 @@ export function loadLeaderboard(): LeaderboardEntry[] {
   return buildRankedLeaderboard(DEFAULT_LEADERBOARD, myStats);
 }
 
+export function getKofiUrl(): string {
+  return (process.env.NEXT_PUBLIC_KOFI_URL || "").trim();
+}
+
+export function getSubscribeStarUrl(): string {
+  return (process.env.NEXT_PUBLIC_SUBSCRIBESTAR_URL || "").trim();
+}
+
 export function getDonationUrl(): string {
   if (typeof window !== "undefined") {
     try {

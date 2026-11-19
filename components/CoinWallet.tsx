@@ -295,7 +295,7 @@ export function CoinWallet({
 
         <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
           VelvetMotion is <strong className="text-emerald-300">100% free forever</strong> — grab free coin refills anytime above.
-          If you want to support the developer, a <strong className="text-pink-300">$5 donation</strong> is hugely appreciated
+          If you want to support the developer, a <strong className="text-pink-300">$3 Ko-fi tip or $5 crypto boost</strong> is hugely appreciated
           and climbs the <strong className="text-amber-300">Top Donators Leaderboard</strong> where repeat supporters win{" "}
           <strong className="text-pink-200">custom dream companions, private 4K video packs, and mystery prizes directly from the owner!</strong>
         </p>

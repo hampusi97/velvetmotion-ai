@@ -61,9 +61,11 @@ jobs:
           npm run audit:companions
           npm run build
 
-      - name: Determine release tag
+      - name: Determine release tag & signing flags
         id: meta
         shell: bash
+        env:
+          HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: |
           if [ -n "${{ github.event.inputs.tag_name }}" ]; then
             echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
@@ -71,6 +73,12 @@ jobs:
             echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
           else
             echo "tag=v$(date -u +%Y.%m.%d)" >> $GITHUB_OUTPUT
+          fi
+          if [ "$HAS_SIGNING_KEY" = "true" ]; then
+            echo "extra_args=" >> "$GITHUB_OUTPUT"
+          else
+            echo '{"bundle":{"createUpdaterArtifacts":false}}' > src-tauri/tauri.nosign.json
+            echo "extra_args=--config src-tauri/tauri.nosign.json" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build Tauri Bundles & Updater Manifest (latest.json)
@@ -85,4 +93,5 @@ jobs:
           releaseBody: 'Hybrid Tauri v2 release with Local Ultra RAM/GPU detection, Boss-Key stealth (CmdOrCtrl+Shift+H), and two-layer daily auto-updates.'
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          includeUpdaterJson: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          args: ${{ matrix.args }} ${{ steps.meta.outputs.extra_args }}

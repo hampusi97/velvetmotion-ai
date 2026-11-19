@@ -115,6 +115,14 @@ export function CandySidebar({
           <span className="text-[10px] text-amber-300">Wallet →</span>
         </Link>
         <Link
+          href="/?view=wallet"
+          onClick={() => onNavigate?.("wallet")}
+          className="w-full flex items-center justify-between text-xs text-pink-200 px-3 py-2 rounded-xl bg-[#ff1e8e]/10 border border-[#ff1e8e]/30 hover:bg-[#ff1e8e]/20 transition"
+        >
+          <span>💖 Support Dev ($3)</span>
+          <span className="text-[10px] text-[#00ffa3]">0% fee</span>
+        </Link>
+        <Link
           href="/download/"
           className="block text-center w-full rounded-xl neon-btn-primary py-2.5 text-xs font-extrabold text-white"
         >
