@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { BadgeCheck, Film, ImageIcon, Mic, Search, Sparkles, X } from "lucide-react";
+import { BadgeCheck, Search, Sparkles, X } from "lucide-react";
 import { riseContainer, riseItem } from "@/lib/motion";
 import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
@@ -123,7 +123,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
       {onOpenGirl && (
         <motion.section variants={riseItem} className="pb-10">
           <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-2xl text-cream">Featured</h2>
+            <h2 className="font-display text-2xl text-cream">Explore Featured Characters</h2>
             <button type="button" onClick={() => onNavigate("girls")} className="text-sm text-pink-300 hover:text-pink-200">See all →</button>
           </div>
           <div className="mb-4 flex items-center gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
