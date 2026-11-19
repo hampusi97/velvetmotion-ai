@@ -15,9 +15,29 @@ const STYLES: Record<string, string> = {
   sex:
     "explicit heterosexual sex scene, penetration, intimate couple on bed, sweaty glistening skin, uncensored nsfw, photorealistic, passionate motion, cinematic lighting, detailed anatomy, intense eye contact",
   doggy:
-    "explicit sex from behind, doggy style, arched back, uncensored nsfw, photorealistic, bedroom",
+    "explicit sex from behind, doggy style, arched back, uncensored nsfw, photorealistic, bedroom or hotel",
   cowgirl:
-    "woman on top cowgirl position, explicit, uncensored nsfw, photorealistic, intimate eye contact",
+    "woman on top cowgirl position, explicit, uncensored nsfw, photorealistic, intimate eye contact, riding",
+  blowjob:
+    "explicit oral sex, blowjob, looking up at camera, uncensored nsfw, photorealistic, wet lips, detailed",
+  missionary:
+    "explicit missionary sex, legs spread, eye contact, uncensored nsfw, photorealistic, passionate",
+  standing:
+    "explicit standing sex against wall or shower, uncensored nsfw, photorealistic, wet skin",
+  hotel:
+    "explicit sex in luxury hotel room, soft lighting, uncensored nsfw, photorealistic, cinematic",
+  car:
+    "explicit sex in car, risky, uncensored nsfw, photorealistic, night",
+  outdoor:
+    "explicit outdoor sex, private, uncensored nsfw, photorealistic, natural light",
+  joi:
+    "JOI style, she talks dirty while you stroke, looking at camera, uncensored nsfw, photorealistic",
+  sph:
+    "SPH energy, she laughs and rates, looking down, uncensored nsfw, photorealistic",
+  bnwo:
+    "BNWO fantasy, ranking, ownership, uncensored nsfw, photorealistic",
+  breeding:
+    "breeding creampie, filled, moaning, uncensored nsfw, photorealistic, intense",
   video:
     "cinematic still from adult film, explicit sex scene, dramatic rim light, shallow depth of field, film grain, 35mm, intense, uncensored",
 };
