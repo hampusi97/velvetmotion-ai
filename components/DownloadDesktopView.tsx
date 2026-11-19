@@ -20,12 +20,37 @@ function detectOs(): DetectedOs {
 
 const RELEASE_BASE = "https://github.com/hampusi97/velvetmotion-ai/releases/latest";
 
-const OS_OPTIONS: Record<DetectedOs, { label: string; installer: string; note: string }> = {
-  windows: { label: "Download for Windows (x64 .exe / .msi)", installer: ".exe Installer", note: "Windows 10/11 64-bit · Auto-updates daily" },
-  "mac-arm": { label: "Download for macOS Apple Silicon (.dmg)", installer: "M1/M2/M3/M4 .dmg", note: "Universal & Metal-ready · Auto-updates daily" },
-  "mac-intel": { label: "Download for macOS Intel (.dmg)", installer: "x64 .dmg", note: "macOS 12+ · Auto-updates daily" },
-  linux: { label: "Download for Linux (.AppImage / .deb)", installer: "AppImage & .deb", note: "Ubuntu, Debian, Fedora, Arch · Auto-updates daily" },
-  mobile: { label: "Install Mobile PWA App (1-Tap)", installer: "Home Screen App", note: "iOS Safari → Share → Add to Home Screen · Android Chrome → Install" },
+const OS_OPTIONS: Record<DetectedOs, { label: string; installer: string; note: string; href: string }> = {
+  windows: {
+    label: "Download for Windows (x64 .exe / .msi)",
+    installer: ".exe Installer",
+    note: "Windows 10/11 64-bit · Auto-updates daily via GitHub Releases",
+    href: `${RELEASE_BASE}?platform=windows`,
+  },
+  "mac-arm": {
+    label: "Download for macOS Apple Silicon (.dmg)",
+    installer: "M1/M2/M3/M4 .dmg",
+    note: "Universal & Metal-ready · Auto-updates daily via GitHub Releases",
+    href: `${RELEASE_BASE}?platform=macos-arm64`,
+  },
+  "mac-intel": {
+    label: "Download for macOS Intel (.dmg)",
+    installer: "x64 .dmg",
+    note: "macOS 12+ · Auto-updates daily via GitHub Releases",
+    href: `${RELEASE_BASE}?platform=macos-x64`,
+  },
+  linux: {
+    label: "Download for Linux (.AppImage / .deb)",
+    installer: "AppImage & .deb",
+    note: "Ubuntu, Debian, Fedora, Arch · Auto-updates daily via GitHub Releases",
+    href: `${RELEASE_BASE}?platform=linux`,
+  },
+  mobile: {
+    label: "Install Mobile PWA App (1-Tap)",
+    installer: "Home Screen App",
+    note: "iOS Safari → Share → Add to Home Screen · Android Chrome → Install",
+    href: "/",
+  },
 };
 
 export function DownloadDesktopView() {
@@ -59,6 +84,21 @@ export function DownloadDesktopView() {
             Cmd/Ctrl+Shift+H Boss-Key tray stealth, Offline Airplane Mode, and two-layer daily auto-updates.
           </p>
 
+          {/* Hyper-Neon Desktop Preview Showcase */}
+          <div className="mx-auto max-w-xl rounded-2xl border border-[#ff1e8e]/35 bg-[#05050a]/90 p-3 flex items-center justify-center gap-3">
+            <img src="/icon-512.png" alt="VelvetMotion Icon" className="h-14 w-14 rounded-2xl border border-[#00f5ff]/50 shadow-[0_0_20px_rgba(0,245,255,0.3)]" />
+            <div className="flex -space-x-3">
+              <img src="/portraits/nova-park.webp" alt="Nova Park" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#ff1e8e]" />
+              <img src="/portraits/chloe-parker.webp" alt="Chloe Parker" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#00f5ff]" />
+              <img src="/portraits/aria-montgomery.webp" alt="Aria Montgomery" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#a855f7]" />
+            </div>
+            <div className="text-left text-[11px] leading-tight">
+              <p className="font-extrabold text-[#00ffa3]">● Tauri v2 Native Bridge</p>
+              <p className="text-[#a6a6c4]">CORS-free :5001 · :11434 · :8188</p>
+              <p className="text-[#00f5ff]">Firebase + Cloudflare Synced</p>
+            </div>
+          </div>
+
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             {os === "mobile" ? (
               <Link
@@ -69,7 +109,7 @@ export function DownloadDesktopView() {
               </Link>
             ) : (
               <a
-                href={RELEASE_BASE}
+                href={rec.href}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full neon-btn-primary px-7 py-3.5 text-sm font-extrabold text-white"

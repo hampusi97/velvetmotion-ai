@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Cpu, Download, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
+import { Check, Cloud, Copy, Cpu, Download, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
 import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
 import { loadRouterSettings, saveRouterSettings } from "@/lib/chatRouter";
 import { checkDesktopUpdate, triggerBossKey, useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
+import { useFirebaseCloudSync } from "@/lib/firebaseSync";
+import { googleSignIn, signInAnonymousGuest } from "@/lib/firebase";
 
 export function SettingsAndBackupDrawer({
   open,
@@ -34,6 +36,7 @@ export function SettingsAndBackupDrawer({
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [uiSound, setUiSound] = useState(() => isUiSoundEnabled());
   const engine = useLocalEngineStatus();
+  const { status: cloudStatus, syncNow } = useFirebaseCloudSync();
 
   if (!open) return null;
 
@@ -171,6 +174,57 @@ export function SettingsAndBackupDrawer({
           </div>
         </div>
 
+        {/* Firebase Cloud Vault Sync */}
+        <div className="rounded-2xl border border-[#00ffa3]/30 bg-[#00ffa3]/5 p-3.5 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-[#00ffa3] flex items-center gap-1.5">
+              <Cloud className="h-4 w-4" />
+              {cloudStatus.signedIn ? "Firebase Cloud Vault Active" : "Firebase Cloud Sync (Optional)"}
+            </span>
+            <span className="text-[10px] text-[#a6a6c4]">
+              {cloudStatus.signedIn
+                ? cloudStatus.email || (cloudStatus.isAnonymous ? `Guest (${cloudStatus.uid?.slice(0, 6)})` : cloudStatus.uid?.slice(0, 8))
+                : "Offline Local-Only"}
+            </span>
+          </div>
+          {cloudStatus.signedIn ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] text-[#a6a6c4]">
+                {cloudStatus.syncing
+                  ? "Syncing vault..."
+                  : cloudStatus.lastSyncedAt
+                    ? `Last synced ${new Date(cloudStatus.lastSyncedAt).toLocaleTimeString()}`
+                    : "Ready to sync Coins, Memory Vault, Streaks & Custom Companions."}
+              </span>
+              <button
+                type="button"
+                disabled={cloudStatus.syncing}
+                onClick={() => void syncNow().then((ok) => setStatusMsg(ok ? "Cloud Vault synced with Firestore." : "Cloud Vault sync completed."))}
+                className="rounded-xl border border-[#00ffa3]/50 bg-[#00ffa3]/15 px-3 py-1.5 text-[11px] font-bold text-[#00ffa3] disabled:opacity-50"
+              >
+                {cloudStatus.syncing ? "Syncing..." : "Sync Cloud Vault Now"}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void googleSignIn().catch((e) => setStatusMsg(e instanceof Error ? e.message : "Google Sign-In failed"))}
+                className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white hover:border-[#00f5ff]"
+              >
+                Sign in with Google
+              </button>
+              <button
+                type="button"
+                onClick={() => void signInAnonymousGuest().then(() => setStatusMsg("Anonymous Cloud Sync enabled.")).catch(() => {})}
+                className="rounded-xl border border-[#00ffa3]/45 bg-[#00ffa3]/15 px-3 py-1.5 text-[11px] font-semibold text-[#00ffa3]"
+              >
+                Enable Anonymous Cloud Sync
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Local Ultra Mode & Desktop Update */}
         <div className="rounded-2xl border border-[#ff1e8e]/35 bg-[#ff1e8e]/5 p-3.5 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
@@ -185,6 +239,12 @@ export function SettingsAndBackupDrawer({
               <RefreshCw className="h-3 w-3" /> Probe
             </button>
           </div>
+          {engine.specs && (
+            <p className="text-[10px] font-mono text-[#00f5ff]/85">
+              HW: {engine.specs.totalRamGb} GB RAM ({engine.specs.availableRamGb} GB free) · {engine.specs.cpuCores} CPU cores · {engine.specs.os}
+              {engine.isDesktop ? " · Tauri Desktop Shell" : " · Browser"}
+            </p>
+          )}
           <p className="text-[11px] text-[#a6a6c4]">{recommendText}</p>
           <div className="grid grid-cols-3 gap-1.5 text-[10px]">
             {[

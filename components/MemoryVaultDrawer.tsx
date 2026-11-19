@@ -59,6 +59,7 @@ export function saveCategorizedMemories(characterId: string, items: VaultMemoryI
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(storageKey(characterId), JSON.stringify(items));
+    window.dispatchEvent(new Event("vm:cloud-sync-request"));
   } catch {
     /* ignore */
   }

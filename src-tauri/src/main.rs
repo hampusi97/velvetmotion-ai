@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::time::Duration;
 use sysinfo::System;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -20,6 +22,19 @@ struct SystemSpecs {
     os: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LocalPortStatus {
+    kobold_online: bool,
+    ollama_online: bool,
+    comfy_online: bool,
+}
+
+fn port_open(port: u16) -> bool {
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    TcpStream::connect_timeout(&addr, Duration::from_millis(220)).is_ok()
+}
+
 #[tauri::command]
 fn get_system_specs() -> SystemSpecs {
     let mut sys = System::new_all();
@@ -35,23 +50,32 @@ fn get_system_specs() -> SystemSpecs {
 }
 
 #[tauri::command]
+fn probe_local_engines() -> LocalPortStatus {
+    LocalPortStatus {
+        kobold_online: port_open(5001),
+        ollama_online: port_open(11434),
+        comfy_online: port_open(8188),
+    }
+}
+
+#[tauri::command]
 fn toggle_boss_key(app: AppHandle) {
-    let _ = app.emit("vm:boss-key-mute", true);
     if let Some(win) = app.get_webview_window("main") {
         let visible = win.is_visible().unwrap_or(true);
         if visible {
+            let _ = app.emit("vm:boss-key-mute", true);
+            let _ = win.eval("window.dispatchEvent(new Event('vm:boss-key-mute'))");
             let _ = win.hide();
         } else {
             let _ = win.show();
             let _ = win.set_focus();
+            let _ = app.emit("vm:boss-key-restore", true);
+            let _ = win.eval("window.dispatchEvent(new Event('vm:boss-key-restore'))");
         }
     }
 }
 
 fn check_live_web_reachable() -> bool {
-    // Fast TCP probe so airplane mode never hangs startup
-    use std::net::{TcpStream, ToSocketAddrs};
-    use std::time::Duration;
     if let Ok(mut addrs) = "velvetmotion-ai.hampusi97.workers.dev:443".to_socket_addrs() {
         if let Some(addr) = addrs.next() {
             return TcpStream::connect_timeout(&addr, Duration::from_millis(1400)).is_ok();
@@ -77,9 +101,12 @@ fn main() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![get_system_specs, toggle_boss_key])
+        .invoke_handler(tauri::generate_handler![
+            get_system_specs,
+            probe_local_engines,
+            toggle_boss_key
+        ])
         .setup(|app| {
-            // System Tray with Boss-Key & Show/Quit
             let show_item = MenuItem::with_id(app, "toggle", "Show / Stealth Hide", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit VelvetMotion", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
@@ -93,7 +120,6 @@ fn main() {
                 })
                 .build(app)?;
 
-            // Register CmdOrCtrl+Shift+H global Boss-Key
             let _ = app.global_shortcut().register("CmdOrCtrl+Shift+H");
 
             // Layer 1 Instant Daily Web Update (falls back to bundled ../out if offline)

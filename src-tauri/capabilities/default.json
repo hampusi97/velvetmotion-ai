@@ -1,12 +1,32 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default VelvetMotion Desktop capabilities",
+  "description": "Default VelvetMotion Desktop capabilities covering Cloudflare Workers, Firebase, Cloud AI, Local RAM/GPU ports, and Updater",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "updater:default",
     "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "https://velvetmotion-ai.hampusi97.workers.dev/**" },
+        { "url": "https://velvetmotion-image.hampusi97.workers.dev/**" },
+        { "url": "https://*.googleapis.com/**" },
+        { "url": "https://*.firebaseio.com/**" },
+        { "url": "https://*.firebaseapp.com/**" },
+        { "url": "https://identitytoolkit.googleapis.com/**" },
+        { "url": "https://securetoken.googleapis.com/**" },
+        { "url": "https://openrouter.ai/**" },
+        { "url": "https://aihorde.net/**" },
+        { "url": "https://*.aihorde.net/**" },
+        { "url": "https://github.com/hampusi97/velvetmotion-ai/releases/**" },
+        { "url": "http://127.0.0.1:5001/**" },
+        { "url": "http://127.0.0.1:11434/**" },
+        { "url": "http://127.0.0.1:8188/**" },
+        { "url": "http://127.0.0.1:8880/**" }
+      ]
+    },
     "shell:allow-open",
     "os:default",
     "process:default",

@@ -11,6 +11,7 @@ import { loadChat, saveChat } from "@/lib/storage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { decodeSharedCharacterHash } from "@/lib/shareCardUrl";
 import { saveCustomCompanionDB } from "@/lib/db";
+import { emitVaultUpdated, useFirebaseCloudSync } from "@/lib/firebaseSync";
 import { dismissProactive, startProactiveWatcher, type ProactivePing } from "@/lib/proactiveIdle";
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
@@ -145,7 +146,40 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   } | null>(null);
 
   const { refresh: refreshCoins } = useCoinsStore();
+  useFirebaseCloudSync();
+  const [bossPinLocked, setBossPinLocked] = useState(false);
+  const [bossPinInput, setBossPinInput] = useState("");
+  const [bossPinError, setBossPinError] = useState(false);
   const toggleMenu = useCallback(() => setMenuOpen((o) => !o), []);
+
+  useEffect(() => {
+    const checkPinLock = () => {
+      try {
+        const pin = localStorage.getItem("vm-boss-pin") || "";
+        if (pin.length === 4) {
+          setBossPinInput("");
+          setBossPinError(false);
+          setBossPinLocked(true);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    const onRestore = () => checkPinLock();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        window.dispatchEvent(new Event("vm:boss-key-mute"));
+        checkPinLock();
+      }
+    };
+    window.addEventListener("vm:boss-key-restore", onRestore);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("vm:boss-key-restore", onRestore);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     setView(initialView);
@@ -544,6 +578,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
                           localStorage.setItem("velvet-custom-girls", JSON.stringify([c, ...prev].slice(0, 40)));
                         } catch {}
                         void saveCustomCompanionDB(c.id, c as unknown as Record<string, unknown>);
+                        emitVaultUpdated();
                         setCustomCharacter(c);
                         setSelectedId(c.id);
                         setSharedImportPreview(null);
@@ -585,6 +620,48 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
             setProactive(null);
           }}
         />
+      )}
+
+      {bossPinLocked && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Workspace Locked"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[#05050a]/98 backdrop-blur-2xl p-6"
+        >
+          <div className="w-full max-w-xs rounded-3xl neon-glass p-6 text-center space-y-4">
+            <h2 className="font-display text-lg font-extrabold text-[#f7f7fc]">VelvetMotion Locked</h2>
+            <p className="text-xs text-[#a6a6c4]">Enter your 4-digit Boss-Key PIN to restore workspace.</p>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={4}
+              autoFocus
+              value={bossPinInput}
+              onChange={(e) => {
+                const next = e.target.value.replace(/\D/g, "").slice(0, 4);
+                setBossPinInput(next);
+                setBossPinError(false);
+                if (next.length === 4) {
+                  try {
+                    const expected = localStorage.getItem("vm-boss-pin") || "";
+                    if (!expected || next === expected) {
+                      setBossPinLocked(false);
+                      setBossPinInput("");
+                    } else {
+                      setBossPinError(true);
+                    }
+                  } catch {
+                    setBossPinLocked(false);
+                  }
+                }
+              }}
+              placeholder="••••"
+              className="w-full rounded-2xl border border-[#00f5ff]/50 bg-[#05050a] px-4 py-3 text-center text-xl tracking-[0.6em] font-mono text-white outline-none"
+            />
+            {bossPinError && <p className="text-xs text-rose-400">Incorrect PIN</p>}
+          </div>
+        </div>
       )}
     </div>
   );

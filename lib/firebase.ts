@@ -2,7 +2,9 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
+  getRedirectResult,
   signInWithPopup,
+  signInWithRedirect,
   signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -135,11 +137,9 @@ export async function testConnection(): Promise<void> {
   if (typeof window === "undefined" || connectionTested) return;
   connectionTested = true;
   try {
-    await getDocFromServer(doc(db, "test", "connection"));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("the client is offline")) {
-      console.error("Please check your Firebase configuration.");
-    }
+    await getDocFromServer(doc(db, "catalog", "status"));
+  } catch {
+    /* Optional offline mode: local IndexedDB always runs independently */
   }
 }
 
@@ -163,6 +163,17 @@ export function initAuth(
   onAuthFailure?: () => void,
 ): Unsubscribe {
   if (typeof window === "undefined") return () => {};
+  // Complete any redirect-based OAuth flow (critical for Tauri v2 desktop webviews & mobile browsers)
+  void getRedirectResult(auth)
+    .then((redirectCred) => {
+      if (redirectCred) {
+        const oauthCred = GoogleAuthProvider.credentialFromResult(redirectCred);
+        if (oauthCred?.accessToken) cachedAccessToken = oauthCred.accessToken;
+        notifyListeners(redirectCred.user, cachedAccessToken);
+      }
+    })
+    .catch(() => {});
+
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       try {
@@ -193,18 +204,49 @@ export function subscribeAuthState(
   };
 }
 
-export async function googleSignIn(): Promise<{ user: User; accessToken: string } | null> {
+function isWebviewOrTauri(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
+}
+
+export async function signInAnonymousGuest(): Promise<{ user: User }> {
+  isSigningIn = true;
+  try {
+    const cred = await signInAnonymously(auth);
+    notifyListeners(cred.user, null);
+    return { user: cred.user };
+  } finally {
+    isSigningIn = false;
+  }
+}
+
+export async function googleSignIn(): Promise<{ user: User; accessToken: string | null } | null> {
   try {
     isSigningIn = true;
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (!credential?.accessToken) {
-      throw new Error("Failed to get access token from Firebase Auth");
+    // Inside Tauri v2 desktop webviews, prefer redirect flow over popups to prevent blank child windows
+    if (isWebviewOrTauri()) {
+      await signInWithRedirect(auth, provider);
+      return null;
     }
-    cachedAccessToken = credential.accessToken;
-    await ensureUserProfileInFirestore(result.user, 500);
-    notifyListeners(result.user, cachedAccessToken);
-    return { user: result.user, accessToken: cachedAccessToken };
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      cachedAccessToken = credential?.accessToken ?? null;
+      await ensureUserProfileInFirestore(result.user, 500);
+      notifyListeners(result.user, cachedAccessToken);
+      return { user: result.user, accessToken: cachedAccessToken };
+    } catch (popupErr) {
+      const code = (popupErr as { code?: string })?.code || "";
+      if (
+        code === "auth/popup-blocked" ||
+        code === "auth/operation-not-supported-in-this-environment" ||
+        code === "auth/cancelled-popup-request"
+      ) {
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+      throw popupErr;
+    }
   } catch (error) {
     console.error("Sign in error:", error);
     throw error;
@@ -721,6 +763,94 @@ export async function upvoteSuggestionInFirestore(
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
     return false;
+  }
+}
+
+export async function syncVaultDocToFirestore(
+  docId: string,
+  payloadJson: string,
+  updatedAtMs: number,
+): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) return false;
+  const uid = sanitizeId(user.uid);
+  const cleanDoc = sanitizeId(docId);
+  if (uid !== user.uid) return false;
+  const path = `users/${uid}/vault/${cleanDoc}`;
+  try {
+    const ref = doc(db, "users", uid, "vault", cleanDoc);
+    const existing = await getDoc(ref).catch(() => null);
+    let prevTs = 0;
+    if (existing?.exists()) {
+      const existingData = existing.data();
+      prevTs = Number(existingData?.updatedAt?.toMillis?.() || 0);
+      if (typeof existingData?.payload === "string") {
+        try {
+          const parsed = JSON.parse(existingData.payload);
+          if (typeof parsed?.updatedAtMs === "number") {
+            prevTs = Math.max(prevTs, parsed.updatedAtMs);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    if (prevTs > updatedAtMs) return false;
+    const envelope = JSON.stringify({
+      updatedAtMs: Math.floor(updatedAtMs),
+      data: payloadJson.slice(0, 62000),
+    });
+    await setDoc(ref, {
+      userId: uid,
+      id: cleanDoc,
+      kind: "snapshot",
+      schemaVersion: 1,
+      payload: envelope.slice(0, 65500),
+      updatedAt: serverTimestamp(),
+    });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+    return false;
+  }
+}
+
+export async function readVaultDocFromFirestore(
+  docId: string,
+): Promise<{ payloadJson: string; updatedAtMs: number } | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  const uid = sanitizeId(user.uid);
+  const cleanDoc = sanitizeId(docId);
+  if (uid !== user.uid) return null;
+  const path = `users/${uid}/vault/${cleanDoc}`;
+  try {
+    const snap = await getDoc(doc(db, "users", uid, "vault", cleanDoc));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    const rawPayload =
+      typeof data?.payload === "string"
+        ? data.payload
+        : typeof data?.json === "string"
+          ? data.json
+          : "{}";
+    let payloadJson = rawPayload;
+    let updatedAtMs = Number(data?.updatedAt?.toMillis?.() || 0);
+    try {
+      const parsed = JSON.parse(rawPayload);
+      if (parsed && typeof parsed.data === "string") {
+        payloadJson = parsed.data;
+        if (typeof parsed.updatedAtMs === "number") {
+          updatedAtMs = parsed.updatedAtMs;
+        }
+      }
+    } catch {
+      /* treat rawPayload directly */
+    }
+    return { payloadJson, updatedAtMs };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
   }
 }
 

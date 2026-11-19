@@ -615,30 +615,18 @@ export function WorkspaceHub({ onHome }: { onHome: () => void }) {
 
       <div className="rounded-3xl border border-white/10 bg-ink-900/90 p-6 shadow-card">
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-rose-200">
-          VIP Cloud · Private Video · Love Letters
+          Workspace Tools · Private Video · Love Letters
         </p>
         <h1 className="mt-2 font-display text-3xl text-cream sm:text-4xl">
           Private Suite
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-mist">
-          Spin up private live video rooms, send midnight companion letters to your inbox, and back up your companion dossiers and gallery to your personal cloud drive.
+          Spin up private live video rooms, send midnight companion letters to your inbox, and back up your companion dossiers and gallery to your personal drive.
         </p>
 
         {needsAuth && (
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4">
-            <div>
-              <p className="text-sm font-medium text-cream">
-                Connect your Google account to unlock Private Suite features
-              </p>
-              <p className="mt-1 text-xs text-mist">
-                Your session token stays strictly in memory and syncs your companions and gallery across devices.
-              </p>
-            </div>
-            <GoogleSignInButton
-              onClick={handleLogin}
-              disabled={isLoggingIn}
-              label={isLoggingIn ? "Connecting…" : "Sign in with Google"}
-            />
+          <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-mist">
+            Use the <strong className="text-cream">Sign in with Google</strong> button in the header above to connect Workspace actions (your token stays strictly in memory).
           </div>
         )}
 

@@ -80,20 +80,31 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     if (Number.isFinite(mem) && mem > 0) ramGb = mem;
   }
 
+  let nativePorts: { koboldOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
   if (desktop && window.__TAURI_INTERNALS__?.invoke) {
     try {
-      specs = await window.__TAURI_INTERNALS__.invoke<SystemSpecs>("get_system_specs");
+      const [specsRes, portsRes] = await Promise.all([
+        window.__TAURI_INTERNALS__.invoke<SystemSpecs>("get_system_specs").catch(() => null),
+        window.__TAURI_INTERNALS__
+          .invoke<{ koboldOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
+          .catch(() => null),
+      ]);
+      specs = specsRes;
+      nativePorts = portsRes;
       if (specs?.totalRamGb) ramGb = Math.round(specs.totalRamGb);
     } catch {
       /* desktop specs optional */
     }
   }
 
-  const [koboldOnline, ollamaOnline, comfyOnline] = await Promise.all([
-    probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
-    probeEndpoint("http://127.0.0.1:11434/api/tags"),
-    probeEndpoint("http://127.0.0.1:8188/system_stats"),
+  const [koboldHttp, ollamaHttp, comfyHttp] = await Promise.all([
+    nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
+    nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
+    nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
   ]);
+  const koboldOnline = Boolean(nativePorts?.koboldOnline || koboldHttp);
+  const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp);
+  const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp);
 
   return {
     isDesktop: desktop,

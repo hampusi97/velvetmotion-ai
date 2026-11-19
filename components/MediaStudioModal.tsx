@@ -9,7 +9,7 @@ import { generateHordeImage } from '@/lib/aiHorde';
 import { remoteImageToStableDataUrl } from '@/lib/imageStore';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { generateLocalImage } from '@/lib/comfyClient';
-import { useLocalEngineStatus } from '@/lib/localEngineBridge';
+import { reportGenerationSpeed, useLocalEngineStatus } from '@/lib/localEngineBridge';
 import { addToGallery, loadChat, saveChat } from '@/lib/storage';
 import { saveGalleryDB } from '@/lib/db';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
@@ -121,6 +121,7 @@ export default function MediaStudioModal({
     setPhotoBusy(true);
     setErrorMsg(null);
     setStatusMsg(null);
+    const t0 = performance.now();
     const preset = SCENE_PRESETS.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
     const prompt = [
       companion.visualDna,
@@ -174,11 +175,13 @@ export default function MediaStudioModal({
         used = 'AI Horde Cloud Free';
       }
 
+      const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
+      reportGenerationSpeed({ imgSec: elapsedSec, lastEngine: used });
       setGeneratedPhoto(imageUrl);
       setPhotoRevealed(!wantsNsfw);
       setVideoSourceUrl(imageUrl);
       setEngineBadge(used);
-      setStatusMsg(`Rendered via ${used} (seed ${parsedSeed})`);
+      setStatusMsg(`Rendered via ${used} in ${elapsedSec}s (seed ${parsedSeed})`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
     } finally {

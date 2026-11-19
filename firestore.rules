@@ -152,6 +152,79 @@ service cloud.firestore {
         data.createdAt is int && data.createdAt >= 0;
     }
 
+    // Assumed Data Model: /users/{userId}/vault/{docId}
+    // Strictly owner-isolated sync state (Memory Vault, Relationship Levels & Streaks,
+    // Coin Balance snapshot, Collection metadata) for any authenticated Firebase user
+    // (Email/Password, Google Sign-In, Anonymous Guest Auth).
+    // Required: updatedAt (timestamp == request.time)
+    // Optional: uid/userId (string == request.auth.uid == userId, immutable),
+    //           id (string == docId), kind (enum), characterId (validId), schemaVersion (int 1..100),
+    //           createdAt (timestamp, immutable), payload/json (string <= 65536), summary (string <= 4000),
+    //           notes (string <= 8000), customPromptOverride (string <= 2000),
+    //           memories/facts/longMemory/midMemory (bounded string lists),
+    //           pinnedIds/vaultIds/matches/favorites/unlockedIds (bounded ID lists),
+    //           xp/level/intimacy/streak/streakDays/totalMinutes/sessions/maxIntensity (bounded ints),
+    //           rankTitle (string <= 80), lastActiveDate/lastClaimDate (string <= 40),
+    //           unlockedMilestones (bounded int list), coins/balance (int 0..10000000),
+    //           totalUsd (int 0..1000000), donationCount (int 0..10000), collectionCount (int 0..10000)
+    function isValidVaultDoc(data, userId, docId) {
+      return data is map &&
+        data.keys().size() >= 1 &&
+        data.keys().size() <= 25 &&
+        data.keys().hasAll(['updatedAt']) &&
+        data.keys().hasOnly([
+          'uid', 'userId', 'id', 'kind', 'characterId', 'schemaVersion',
+          'createdAt', 'updatedAt',
+          'payload', 'json', 'summary', 'notes', 'customPromptOverride',
+          'memories', 'facts', 'longMemory', 'midMemory',
+          'pinnedIds', 'vaultIds', 'matches', 'favorites', 'unlockedIds',
+          'xp', 'level', 'intimacy', 'streak', 'streakDays',
+          'totalMinutes', 'sessions', 'maxIntensity', 'rankTitle',
+          'lastActiveDate', 'lastClaimDate', 'unlockedMilestones',
+          'coins', 'balance', 'totalUsd', 'donationCount', 'collectionCount'
+        ]) &&
+        (!('uid' in data) || (isValidId(data.uid) && data.uid == request.auth.uid && data.uid == userId)) &&
+        (!('userId' in data) || (isValidId(data.userId) && data.userId == request.auth.uid && data.userId == userId)) &&
+        (!('id' in data) || (isValidId(data.id) && data.id == docId)) &&
+        (!('kind' in data) || (data.kind is string && data.kind in ['memory', 'memory_vault', 'relationship', 'progression', 'streaks', 'coins', 'wallet', 'collection', 'preferences', 'snapshot'])) &&
+        (!('characterId' in data) || isValidId(data.characterId)) &&
+        (!('schemaVersion' in data) || (data.schemaVersion is int && data.schemaVersion >= 1 && data.schemaVersion <= 100)) &&
+        (!('createdAt' in data) || data.createdAt is timestamp) &&
+        data.updatedAt is timestamp &&
+        data.updatedAt == request.time &&
+        (!('payload' in data) || (data.payload is string && data.payload.size() <= 65536)) &&
+        (!('json' in data) || (data.json is string && data.json.size() <= 65536)) &&
+        (!('summary' in data) || (data.summary is string && data.summary.size() <= 4000)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 8000)) &&
+        (!('customPromptOverride' in data) || (data.customPromptOverride is string && data.customPromptOverride.size() <= 2000)) &&
+        (!('memories' in data) || (data.memories is list && data.memories.size() <= 200 && (data.memories.size() == 0 || (data.memories[0] is string && data.memories[0].size() <= 1000)))) &&
+        (!('facts' in data) || (data.facts is list && data.facts.size() <= 100 && (data.facts.size() == 0 || (data.facts[0] is string && data.facts[0].size() <= 500)))) &&
+        (!('longMemory' in data) || (data.longMemory is list && data.longMemory.size() <= 50 && (data.longMemory.size() == 0 || (data.longMemory[0] is string && data.longMemory[0].size() <= 500)))) &&
+        (!('midMemory' in data) || (data.midMemory is list && data.midMemory.size() <= 60 && (data.midMemory.size() == 0 || (data.midMemory[0] is string && data.midMemory[0].size() <= 500)))) &&
+        (!('pinnedIds' in data) || (data.pinnedIds is list && data.pinnedIds.size() <= 200 && (data.pinnedIds.size() == 0 || isValidId(data.pinnedIds[0])))) &&
+        (!('vaultIds' in data) || (data.vaultIds is list && data.vaultIds.size() <= 200 && (data.vaultIds.size() == 0 || isValidId(data.vaultIds[0])))) &&
+        (!('matches' in data) || (data.matches is list && data.matches.size() <= 200 && (data.matches.size() == 0 || isValidId(data.matches[0])))) &&
+        (!('favorites' in data) || (data.favorites is list && data.favorites.size() <= 200 && (data.favorites.size() == 0 || isValidId(data.favorites[0])))) &&
+        (!('unlockedIds' in data) || (data.unlockedIds is list && data.unlockedIds.size() <= 200 && (data.unlockedIds.size() == 0 || isValidId(data.unlockedIds[0])))) &&
+        (!('xp' in data) || (data.xp is int && data.xp >= 0 && data.xp <= 10000000)) &&
+        (!('level' in data) || (data.level is int && data.level >= 1 && data.level <= 100)) &&
+        (!('intimacy' in data) || (data.intimacy is int && data.intimacy >= 0 && data.intimacy <= 100)) &&
+        (!('streak' in data) || (data.streak is int && data.streak >= 0 && data.streak <= 10000)) &&
+        (!('streakDays' in data) || (data.streakDays is int && data.streakDays >= 0 && data.streakDays <= 10000)) &&
+        (!('totalMinutes' in data) || (data.totalMinutes is int && data.totalMinutes >= 0 && data.totalMinutes <= 10000000)) &&
+        (!('sessions' in data) || (data.sessions is int && data.sessions >= 0 && data.sessions <= 1000000)) &&
+        (!('maxIntensity' in data) || (data.maxIntensity is int && data.maxIntensity >= 0 && data.maxIntensity <= 100)) &&
+        (!('rankTitle' in data) || (data.rankTitle is string && data.rankTitle.size() <= 80)) &&
+        (!('lastActiveDate' in data) || (data.lastActiveDate is string && data.lastActiveDate.size() <= 40)) &&
+        (!('lastClaimDate' in data) || (data.lastClaimDate is string && data.lastClaimDate.size() <= 40)) &&
+        (!('unlockedMilestones' in data) || (data.unlockedMilestones is list && data.unlockedMilestones.size() <= 50 && (data.unlockedMilestones.size() == 0 || (data.unlockedMilestones[0] is int && data.unlockedMilestones[0] >= 0 && data.unlockedMilestones[0] <= 100)))) &&
+        (!('coins' in data) || (data.coins is int && data.coins >= 0 && data.coins <= 10000000)) &&
+        (!('balance' in data) || (data.balance is int && data.balance >= 0 && data.balance <= 10000000)) &&
+        (!('totalUsd' in data) || (data.totalUsd is int && data.totalUsd >= 0 && data.totalUsd <= 1000000)) &&
+        (!('donationCount' in data) || (data.donationCount is int && data.donationCount >= 0 && data.donationCount <= 10000)) &&
+        (!('collectionCount' in data) || (data.collectionCount is int && data.collectionCount >= 0 && data.collectionCount <= 10000));
+    }
+
     // Root Collection: /users/{userId}
     match /users/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
@@ -248,6 +321,29 @@ service cloud.firestore {
 
         allow delete: if isVerifiedUser() && isValidId(userId) && isValidId(companionId) && isParentOwner(userId);
       }
+
+      // Per-user isolated sync vault for Memory Vault, Relationship Levels & Streaks,
+      // Coin Balance snapshot, and Collection metadata (supports Email/Password, Google, and Anonymous Guest Auth).
+      match /vault/{docId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(docId);
+        allow list: if isOwner(userId) && isValidId(userId);
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(docId) &&
+          isValidVaultDoc(incoming(), userId, docId) &&
+          (!('createdAt' in incoming()) || incoming().createdAt == request.time);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(docId) &&
+          isValidVaultDoc(incoming(), userId, docId) &&
+          (!('userId' in existing()) || ('userId' in incoming() && incoming().userId == existing().userId)) &&
+          (!('uid' in existing()) || ('uid' in incoming() && incoming().uid == existing().uid)) &&
+          (!('createdAt' in existing()) || ('createdAt' in incoming() && incoming().createdAt == existing().createdAt));
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(docId);
+      }
     }
 
     // Public lounge (Omegle-style) — signed-in users can read/write lobby messages
@@ -293,6 +389,18 @@ service cloud.firestore {
         incoming().votes == existing().votes + 1 &&
         incoming().votes <= 1000000;
       allow delete: if false;
+    }
+
+    // Root Collection: /catalog/{docId} — public read-only catalog
+    match /catalog/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Root Collection: /dailyDrops/{docId} — public read-only daily drops
+    match /dailyDrops/{docId} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

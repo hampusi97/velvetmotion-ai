@@ -94,6 +94,7 @@ export function saveCompanionProgression(prog: CompanionProgression) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(KEY_PREFIX + prog.characterId, JSON.stringify(prog));
+    window.dispatchEvent(new Event("vm:cloud-sync-request"));
   } catch {
     /* ignore */
   }

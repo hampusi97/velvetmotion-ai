@@ -8,6 +8,10 @@
         "supportEmail": "hampusi97@gmail.com",
         "authorizedRedirectUris": [
           "https://ivory-sunset-mxq1s.firebaseapp.com/__/auth/handler",
+          "https://velvetmotion-ai.hampusi97.workers.dev/__/auth/handler",
+          "https://velvetmotion-ai.hampusi97.workers.dev",
+          "http://tauri.localhost",
+          "https://tauri.localhost",
           "http://localhost:3000"
         ]
       }

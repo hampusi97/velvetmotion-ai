@@ -10,7 +10,8 @@ import { getUser, login, logout, type LocalUser } from "@/lib/auth";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
-import { emailPasswordSignIn, emailPasswordSignUp } from "@/lib/firebase";
+import { emailPasswordSignIn, emailPasswordSignUp, googleSignIn, initAuth, signInAnonymousGuest, auth } from "@/lib/firebase";
+import { emitVaultUpdated } from "@/lib/firebaseSync";
 
 const NAV_LINKS = [
   { href: "/", label: "Explore", id: "home" },
@@ -53,8 +54,32 @@ export function SiteHeader({
     setSoundOn(isUiSoundEnabled());
     const onSound = () => setSoundOn(isUiSoundEnabled());
     window.addEventListener("vm:ui-sound-changed", onSound);
-    return () => window.removeEventListener("vm:ui-sound-changed", onSound);
-  }, []);
+    const unsubAuth = initAuth((fbUser) => {
+      const nextUser: LocalUser = {
+        username:
+          fbUser.displayName ||
+          (fbUser.isAnonymous ? `cloud-${fbUser.uid.slice(0, 5)}` : fbUser.email?.split("@")[0]) ||
+          "VelvetMember",
+        joinedAt: Date.now(),
+        uid: fbUser.uid,
+        email: fbUser.email,
+        isFirebase: true,
+      };
+      try {
+        localStorage.setItem("vm-user", JSON.stringify(nextUser));
+      } catch {
+        /* ignore */
+      }
+      setUser(nextUser);
+      setLoginOpen(false);
+      onUserChange?.(nextUser);
+      emitVaultUpdated();
+    });
+    return () => {
+      window.removeEventListener("vm:ui-sound-changed", onSound);
+      unsubAuth();
+    };
+  }, [onUserChange]);
 
   // Close Auth modal or mobile menu cleanly on Escape
   useEffect(() => {
@@ -82,6 +107,30 @@ export function SiteHeader({
     }
   };
 
+  const applyFirebaseUser = (fbUser: { uid: string; displayName: string | null; email: string | null; isAnonymous: boolean }) => {
+    const nextUser: LocalUser = {
+      username:
+        fbUser.displayName ||
+        name.trim() ||
+        (fbUser.isAnonymous ? `cloud-${fbUser.uid.slice(0, 5)}` : fbUser.email?.split("@")[0]) ||
+        "VelvetMember",
+      joinedAt: Date.now(),
+      uid: fbUser.uid,
+      email: fbUser.email,
+      isFirebase: true,
+    };
+    try {
+      localStorage.setItem("vm-user", JSON.stringify(nextUser));
+    } catch {
+      /* ignore */
+    }
+    setUser(nextUser);
+    setLoginOpen(false);
+    setAuthError(null);
+    onUserChange?.(nextUser);
+    emitVaultUpdated();
+  };
+
   const doEmailAuth = async () => {
     setAuthError(null);
     const cleanEmail = email.trim();
@@ -94,23 +143,33 @@ export function SiteHeader({
         authMode === "signup"
           ? await emailPasswordSignUp(cleanEmail, password, name.trim() || undefined)
           : await emailPasswordSignIn(cleanEmail, password);
-      const nextUser: LocalUser = {
-        username: res.user.displayName || name.trim() || res.user.email?.split("@")[0] || "VelvetMember",
-        joinedAt: Date.now(),
-        uid: res.user.uid,
-        email: res.user.email,
-        isFirebase: true,
-      };
-      try {
-        localStorage.setItem("vm-user", JSON.stringify(nextUser));
-      } catch {
-        /* ignore */
-      }
-      setUser(nextUser);
-      setLoginOpen(false);
-      onUserChange?.(nextUser);
+      applyFirebaseUser(res.user);
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : "Authentication failed.");
+    }
+  };
+
+  const doGoogleAuth = async () => {
+    setAuthError(null);
+    try {
+      const res = await googleSignIn();
+      if (res?.user) {
+        applyFirebaseUser(res.user);
+      } else {
+        setAuthError("Redirecting to Google Sign-In...");
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Google Sign-In failed.");
+    }
+  };
+
+  const doAnonymousCloudSync = async () => {
+    setAuthError(null);
+    try {
+      const res = await signInAnonymousGuest();
+      applyFirebaseUser(res.user);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : "Anonymous Cloud Sync failed.");
     }
   };
 
@@ -159,7 +218,7 @@ export function SiteHeader({
               )}
             >
               {engine.anyLocalOnline
-                ? `⚡ Local Ultra · ${engine.metrics.tokPerSec ? `${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? `${engine.metrics.imgSec}s img` : `${engine.ramGb} GB RAM`}`
+                ? `⚡ Local Ultra (${engine.ramGb} GB RAM${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""})`
                 : `☁️ Cloud Free${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""}`}
             </Link>
 
@@ -193,16 +252,17 @@ export function SiteHeader({
                   setLoginOpen(true);
                 } else {
                   logout();
+                  void auth.signOut().catch(() => {});
                   const g = { username: `guest${Date.now().toString(36).slice(-4)}`, joinedAt: Date.now(), email: null };
                   setUser(g);
                   onUserChange?.(g);
                 }
               }}
-              className="inline-flex items-center gap-1.5 max-w-[8.5rem] truncate rounded-full border border-[#ff1e8e]/35 bg-[#0c0c16] px-3 py-1.5 text-xs font-semibold text-[#f7f7fc] hover:border-[#ff1e8e]"
-              title={isGuest ? "Click to open optional account modal" : "Signed in — click to switch back to guest"}
+              className="inline-flex items-center gap-1.5 max-w-[9.5rem] truncate rounded-full border border-[#ff1e8e]/35 bg-[#0c0c16] px-3 py-1.5 text-xs font-semibold text-[#f7f7fc] hover:border-[#ff1e8e]"
+              title={isGuest ? "Click to open optional Cloud Sync modal" : "Cloud Sync active — click to switch back to local guest"}
             >
               <span className={cn("h-2 w-2 rounded-full shrink-0", user?.isFirebase ? "bg-[#00ffa3]" : "bg-[#00f5ff]")} />
-              <span className="truncate">{displayHandle}</span>
+              <span className="truncate">{user?.isFirebase ? `☁️ ${displayHandle}` : displayHandle}</span>
             </button>
 
             {onOpenSettings && (
@@ -276,10 +336,27 @@ export function SiteHeader({
               <X className="h-4 w-4" />
             </button>
 
-            <h2 className="font-display text-xl font-extrabold text-[#f7f7fc] neon-text-glow">Local &amp; Optional Sync</h2>
+            <h2 className="font-display text-xl font-extrabold text-[#f7f7fc] neon-text-glow">Local-First &amp; Cloud Sync</h2>
             <p className="text-xs text-[#a6a6c4]">
-              VelvetMotion saves locally in IndexedDB by default—sign in only if you also want optional profile backup.
+              VelvetMotion runs offline/local in IndexedDB by default—sign in below only to sync Coins, Memory Vault, Streaks &amp; Custom Characters across Web &amp; Desktop.
             </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void doGoogleAuth()}
+                className="rounded-xl border border-white/20 bg-white/10 py-2 text-xs font-bold text-white hover:border-[#00f5ff] hover:bg-white/15"
+              >
+                Google Sign-In
+              </button>
+              <button
+                type="button"
+                onClick={() => void doAnonymousCloudSync()}
+                className="rounded-xl border border-[#00ffa3]/45 bg-[#00ffa3]/10 py-2 text-xs font-bold text-[#00ffa3] hover:bg-[#00ffa3]/20"
+              >
+                Anonymous Cloud Sync
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-[#05050a] p-1">
               <button
