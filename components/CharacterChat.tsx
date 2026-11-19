@@ -28,6 +28,7 @@ import {
 } from "@/lib/memoryMap";
 import { claimFreeWalletRefill } from "@/lib/wallet";
 import { pushShort, memoryPromptBlock, pinLong } from "@/lib/memoryTiers";
+import { toggleVaultItem } from "@/lib/vault";
 import { stageFromIntimacy, nextStage } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
 import {
@@ -64,6 +65,7 @@ type CharacterChatProps = {
   character: Character;
   romanceMode: boolean;
   onBack: () => void;
+  onOpen3D?: (character: Character) => void;
 };
 
 const NSFW_CHIPS = [
@@ -86,7 +88,7 @@ const SEQUENCE_LINES: Record<SequenceKind, string> = {
   bnwo: "*BNWO sequence.*\n\n“You’re mine for this. Stay on your knees for the camera.”",
 };
 
-export function CharacterChat({ character, romanceMode, onBack }: CharacterChatProps) {
+export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: CharacterChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -277,6 +279,14 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
       setActiveMedia({ url, type: mood, note });
       setIntimacy(bumpIntimacy(character.id, 5));
       if (voiceOn) speak(`I took this just for you.`, { ...character.voice });
+    } catch {
+      setMessages((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content: `Couldn't generate that ${label} right now. Tap the mood again or try another (lingerie / nude / explicit).`,
+        },
+      ]);
     } finally {
       setBusy(false);
     }
@@ -501,16 +511,8 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               ? splitInnerThoughtAndReply(m.content)
               : { innerThought: null, spokenReply: m.content };
           return (
-            <div key={i} className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              {m.role === "assistant" && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={characterMediaUrl(character, "beauty")}
-                  alt=""
-                  className="h-8 w-8 shrink-0 rounded-full border border-pink-500/40 object-cover object-top"
-                />
-              )}
-              <div className={`max-w-[82%] px-4 py-2.5 text-sm shadow-sm ${m.role === "user" ? "rounded-2xl rounded-br-md bg-gradient-to-br from-pink-600 to-fuchsia-600 text-white" : "rounded-2xl rounded-bl-md border border-white/10 bg-zinc-900/85"}`}>
+            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${m.role === "user" ? "bg-pink-600/90" : "bg-zinc-900/80 border border-white/10"}`}>
                 {parsed.innerThought && (
                   <div className="mb-2 rounded-xl border border-fuchsia-500/30 bg-fuchsia-950/40 px-3 py-1.5 text-xs italic text-fuchsia-200">
                     💭 <span className="font-semibold not-italic text-fuchsia-300">Inner Thought:</span> {parsed.innerThought}
@@ -541,7 +543,16 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             </div>
           );
         })}
-        {busy && <div className="text-xs text-zinc-500 animate-pulse">She is typing…</div>}
+        {busy && (
+          <div className="flex items-center gap-2 text-xs text-pink-300/90 animate-pulse py-1">
+            <span className="inline-flex gap-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: "120ms" }} />
+              <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: "240ms" }} />
+            </span>
+            She&apos;s thinking…
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -559,6 +570,10 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
             <button
               type="button"
               onClick={() => {
+                const id =
+                  (activeMedia as { galleryId?: string }).galleryId ||
+                  `media-${character.id}-${activeMedia.url.slice(-48)}`;
+                toggleVaultItem(id);
                 saveTribute({
                   characterId: character.id,
                   characterName: character.name,
@@ -571,8 +586,17 @@ export function CharacterChat({ character, romanceMode, onBack }: CharacterChatP
               }}
               className="px-2.5 py-1 rounded-lg bg-pink-600/90 text-xs font-medium text-white"
             >
-              {tributeSaved ? "Saved ✓" : "Save tribute"}
+              {tributeSaved ? "Pinned ✓" : "Pin vault"}
             </button>
+            {onOpen3D && (
+              <button
+                type="button"
+                onClick={() => onOpen3D(character)}
+                className="px-2.5 py-1 rounded-lg bg-violet-600/90 text-xs font-medium text-white"
+              >
+                Open in 3D
+              </button>
+            )}
             <button type="button" onClick={() => setActiveMedia(null)} className="px-2 py-1 rounded-lg bg-black/60 text-xs">Close</button>
           </div>
         </div>
