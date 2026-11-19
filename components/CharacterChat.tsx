@@ -20,6 +20,7 @@ import {
 } from "@/lib/audioEngine";
 import { fallbackReply, type Character } from "@/lib/characters";
 import { generateCompanionReply } from "@/lib/chatRouter";
+import { saveChatDB, loadChatDB, saveMemoryDB } from "@/lib/db";
 import { computeMoodState } from "@/lib/moodEngine";
 import {
   extractMemoriesFromMessage,
@@ -111,6 +112,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [speakingId, setSpeakingId] = useState<number | null>(null);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [joiPlaying, setJoiPlaying] = useState(false);
+  const [byokOpen, setByokOpen] = useState(false);
+  const [byokUrl, setByokUrl] = useState("");
   const [joiPace, setJoiPace] = useState(1);
   const [joiStep, setJoiStep] = useState(0);
   const [edgeLocked, setEdgeLocked] = useState(false);
@@ -163,31 +166,35 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const upcoming = nextStage(intimacy);
 
   useEffect(() => {
-    const loaded = loadChat(character.id);
-    const lastKey = `vm-last-visit-${character.id}`;
-    let greeting: ChatMessage | null = null;
-    try {
-      const last = localStorage.getItem(lastKey);
-      const now = Date.now();
-      if (last && now - Number(last) > 6 * 60 * 60 * 1000 && loaded.length > 0) {
-        greeting = { role: "assistant", content: `*She opens the chat first.*\n\n“Hey… missed you. Been thinking about last time. Want me to send something?”` };
-      }
-      localStorage.setItem(lastKey, String(now));
-    } catch {}
-    if (loaded.length > 0) setMessages(greeting ? [...loaded, greeting] : loaded);
-    else setMessages([{ role: "assistant", content: character.initialMessage }]);
-    setIntimacy(getIntimacy(character.id, character.intimacy));
-    setCoinsState(getCoins());
-    setGifts(getGiftsFor(character.id));
-    try {
-      const note = localStorage.getItem(`vm-vault-${character.id}`);
-      if (note) setVaultNote(note);
-    } catch {}
-    const t = setTimeout(() => {
-      const int = getIntimacy(character.id, character.intimacy);
-      if (int >= 35 && int < 80) setShowTributeNudge(true);
-    }, 8000);
-    return () => clearTimeout(t);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void (async () => {
+      const dbLoaded = await loadChatDB(character.id);
+      const loaded = (Array.isArray(dbLoaded) ? dbLoaded as ChatMessage[] : null) || loadChat(character.id);
+      const lastKey = `vm-last-visit-${character.id}`;
+      let greeting: ChatMessage | null = null;
+      try {
+        const last = localStorage.getItem(lastKey);
+        const now = Date.now();
+        if (last && now - Number(last) > 6 * 60 * 60 * 1000 && loaded.length > 0) {
+          greeting = { role: "assistant", content: `*She opens the chat first.*\n\n“Hey… missed you. Been thinking about last time. Want me to send something?”` };
+        }
+        localStorage.setItem(lastKey, String(now));
+      } catch {}
+      if (loaded.length > 0) setMessages(greeting ? [...loaded, greeting] : loaded);
+      else setMessages([{ role: "assistant", content: character.initialMessage }]);
+      setIntimacy(getIntimacy(character.id, character.intimacy));
+      setCoinsState(getCoins());
+      setGifts(getGiftsFor(character.id));
+      try {
+        const note = localStorage.getItem(`vm-vault-${character.id}`);
+        if (note) setVaultNote(note);
+      } catch {}
+      timer = setTimeout(() => {
+        const int = getIntimacy(character.id, character.intimacy);
+        if (int >= 35 && int < 80) setShowTributeNudge(true);
+      }, 8000);
+    })();
+    return () => { if (timer) clearTimeout(timer); };
   }, [character.id, character.initialMessage, character.intimacy]);
 
   // She sends first: after a short delay, drop a lingerie/nude pic if chat is fresh
@@ -222,6 +229,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
 
   const persist = (next: ChatMessage[]) => {
     setMessages(next);
+    void saveChatDB(character.id, next);
     saveChat(character.id, next);
     const last =
       next.filter((m) => m.role === "assistant").at(-1)?.content ||
@@ -353,7 +361,29 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
     setCoinsState(getCoins());
     setBusy(true);
     try {
-      const { url, note } = await resolveBestMediaUrl(character, mood, extra);
+      let url = characterMediaUrl(character, mood, extra);
+      let note = "static";
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const worker = process.env.NEXT_PUBLIC_IMAGE_WORKER_URL || "https://velvetmotion-image.hampusi97.workers.dev/generate";
+        const prompt = `${character.figure || character.name}, ${mood}, photoreal adult 21+, unique face`;
+        const res = await fetch(worker, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, nsfw: ["nude","explicit","sex","joi"].includes(mood) }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.imageUrl || data.url) { url = data.imageUrl || data.url; note = "worker"; }
+        }
+      } catch {}
+      if (!url) {
+        const resolved = await resolveBestMediaUrl(character, mood, extra);
+        url = resolved.url; note = resolved.note;
+      }
       addToGallery({ characterId: character.id, characterName: character.name, type: mood, url, prompt: `${character.name} ${mood}` });
       const mediaMsg: ChatMessage = {
         role: "assistant",
@@ -546,6 +576,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
           const blob = new Blob([JSON.stringify(card, null, 2)], { type: "application/json" });
           const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = character.id + ".json"; a.click();
         }} className="text-xs text-zinc-300 border border-white/15 rounded-full px-2 py-0.5">Export</button>
+        <button type="button" onClick={() => setByokOpen(true)} className="text-xs text-amber-200 border border-amber-500/30 rounded-full px-2 py-0.5">BYOK</button>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
@@ -596,6 +627,16 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
       {clipStatus && <div className="mt-2 text-[11px] text-zinc-400">{clipStatus}</div>}
 
       
+      
+      {byokOpen && (
+        <div className="mt-3 rounded-2xl border border-amber-500/30 bg-zinc-900/90 p-4 space-y-2">
+          <div className="flex items-center justify-between"><div className="text-sm text-amber-200">Bring your own model</div><button type="button" onClick={() => setByokOpen(false)} className="text-xs text-zinc-400">Close</button></div>
+          <p className="text-[11px] text-zinc-500">Paste an OpenAI-compatible URL (Ollama, KoboldCpp, OpenRouter). Saved locally.</p>
+          <input value={byokUrl} onChange={(e) => setByokUrl(e.target.value)} placeholder="https://your-tunnel/v1" className="w-full rounded-lg bg-zinc-800 border border-white/10 px-3 py-2 text-xs" />
+          <button type="button" onClick={() => { try { const cur = JSON.parse(localStorage.getItem("velvetmotion_llm_settings") || "{}"); localStorage.setItem("velvetmotion_llm_settings", JSON.stringify({ ...cur, customBaseUrl: byokUrl })); } catch {} setByokOpen(false); }} className="text-xs bg-amber-500/20 border border-amber-500/40 rounded-full px-3 py-1 text-amber-100">Save</button>
+        </div>
+      )}
+
       {memoryOpen && (
         <div className="mt-3 rounded-2xl border border-fuchsia-500/30 bg-zinc-900/90 p-4 space-y-2">
           <div className="flex items-center justify-between">

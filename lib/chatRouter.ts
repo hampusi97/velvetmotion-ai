@@ -43,8 +43,8 @@ async function callHorde(persona: CompanionPersona, history: RouterMessage[]): P
   if (!res.ok) throw new Error("horde submit");
   const { id } = await res.json();
   if (!id) throw new Error("no id");
-  for (let i = 0; i < 12; i++) {
-    await new Promise(r => setTimeout(r, 2000));
+  for (let i = 0; i < 6; i++) {
+    await new Promise(r => setTimeout(r, 1500));
     const s = await fetch(`https://aihorde.net/api/v2/generate/text/status/${id}`);
     if (!s.ok) continue;
     const st = await s.json();
@@ -77,6 +77,6 @@ export async function generateCompanionReply(history: RouterMessage[], persona: 
     const text = await callHorde(persona, history);
     return { text, providerUsed: "ai-horde" };
   } catch {
-    return { text: `${persona.name.split(" ")[0]} leans closer. Tell me more.`, providerUsed: "fallback" };
+    return { text: `${persona.name.split(" ")[0]} smiles. “Say that again — I want to hear it.”`, providerUsed: "fallback" };
   }
 }
