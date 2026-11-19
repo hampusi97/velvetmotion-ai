@@ -1,18 +1,23 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Download, BookmarkPlus, MessageSquare, Sparkles, Lock, Upload } from 'lucide-react';
+import { Download, BookmarkPlus, Film, MessageSquare, Sparkles, Lock, Upload } from 'lucide-react';
 import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
-import { MOTION_PRESETS, renderBrowserWebmClip } from '@/lib/browserClip';
-import { fetchWorkerImage } from '@/lib/imageWorker';
-import { generateHordeImage } from '@/lib/aiHorde';
-import { remoteImageToStableDataUrl } from '@/lib/imageStore';
+import {
+  generateStudioVideoClip,
+  VIDEO_DURATIONS,
+  VIDEO_MOTION_PRESETS,
+  VIDEO_SPEEDS,
+  type VideoMotionPreset,
+} from '@/lib/canvasVideoExporter';
+import { generateStudioPicture } from '@/lib/mediaGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
-import { generateLocalImage } from '@/lib/comfyClient';
-import { reportGenerationSpeed, useLocalEngineStatus } from '@/lib/localEngineBridge';
-import { addToGallery, loadChat, saveChat } from '@/lib/storage';
-import { saveGalleryDB } from '@/lib/db';
+import { useLocalEngineStatus } from '@/lib/localEngineBridge';
+import { addToGallery, getGallery, loadChat, saveChat } from '@/lib/storage';
+import { saveCustomCompanionDB, saveGalleryDB } from '@/lib/db';
+import { emitVaultUpdated } from '@/lib/firebaseSync';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
+import { SafeImage } from '@/components/SafeImage';
 
 interface MediaStudioModalProps {
   isOpen: boolean;
@@ -34,7 +39,18 @@ const SCENE_PRESETS = [
   { id: 'after-hours', label: 'After Hours', suffix: 'intimate candlelit boudoir photography, realistic skin texture, shallow DOF', nsfw: true },
 ] as const;
 
-const STUDIO_STYLES = ['Candid Flash', 'Neon Noir', 'Studio Glamour', 'Film Grain'] as const;
+const STUDIO_STYLES = ['Candid Flash', 'Neon Noir', 'Studio Glamour', 'Anime/3D'] as const;
+const QUICK_CHIPS = [
+  'silk evening dress',
+  'streetwear crop top',
+  'poolside bikini',
+  'cozy oversized hoodie',
+  'over-the-shoulder glance',
+  'bedroom mirror selfie',
+  'golden hour sunlight',
+  'cyberpunk magenta neon',
+  'candlelit bokeh',
+] as const;
 const ASPECT_RATIOS = [
   { id: '2:3', width: 640, height: 960, label: '2:3' },
   { id: '9:16', width: 576, height: 1024, label: '9:16' },
@@ -90,9 +106,12 @@ export default function MediaStudioModal({
   const [engineBadge, setEngineBadge] = useState<string | null>(null);
 
   const [videoSourceUrl, setVideoSourceUrl] = useState<string>(FLAGSHIP_COMPANIONS[0].portraitUrl);
-  const [motionId, setMotionId] = useState<string>(MOTION_PRESETS[0].id);
+  const [motionId, setMotionId] = useState<VideoMotionPreset['id']>(VIDEO_MOTION_PRESETS[0].id);
+  const [durationSec, setDurationSec] = useState<3 | 5 | 8>(5);
+  const [videoSpeed, setVideoSpeed] = useState<0.75 | 1 | 1.25>(1);
   const [videoBusy, setVideoBusy] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [videoEngineUsed, setVideoEngineUsed] = useState<string | null>(null);
 
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
   const [charName, setCharName] = useState('');
@@ -112,16 +131,6 @@ export default function MediaStudioModal({
   const aspect = ASPECT_RATIOS.find((a) => a.id === aspectId) ?? ASPECT_RATIOS[0];
 
   async function handleGeneratePhoto() {
-    const check = assertCompliance(`${companion.name} ${customPrompt} ${companion.visualDna}`);
-    if (!check.ok) {
-      setErrorMsg(check.reason);
-      return;
-    }
-
-    setPhotoBusy(true);
-    setErrorMsg(null);
-    setStatusMsg(null);
-    const t0 = performance.now();
     const preset = SCENE_PRESETS.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
     const prompt = [
       companion.visualDna,
@@ -133,55 +142,30 @@ export default function MediaStudioModal({
       .filter(Boolean)
       .join(', ');
     const parsedSeed = Number(seedLock) || Math.floor(Math.random() * 90000 + 1000);
+    const wantsNsfw = nsfwMode || preset.nsfw;
+
+    setPhotoBusy(true);
+    setErrorMsg(null);
+    setStatusMsg(null);
 
     try {
-      const wantsNsfw = nsfwMode || preset.nsfw;
-      let imageUrl: string | null = null;
-      let used = 'Cloud Free';
+      const result = await generateStudioPicture({
+        prompt,
+        seed: parsedSeed,
+        width: aspect.width,
+        height: aspect.height,
+        nsfw: wantsNsfw,
+        characterId: companion.id,
+        imageWorkerUrl,
+        localEngine,
+      });
 
-      // Dual-Engine Routing: Local Ultra (ComfyUI :8188 / KoboldCpp :5001) first when online
-      if (localEngine.comfyOnline) {
-        const localRes = await generateLocalImage({
-          prompt,
-          seed: parsedSeed,
-          width: aspect.width,
-          height: aspect.height,
-          characterId: companion.id,
-        });
-        if (localRes.ok && localRes.imageUrl) {
-          imageUrl = localRes.imageUrl;
-          used = 'Local Ultra ComfyUI';
-        }
-      }
-
-      if (!imageUrl && !wantsNsfw) {
-        const w = await fetchWorkerImage(prompt, { baseUrl: imageWorkerUrl, seed: parsedSeed });
-        if (w.ok) {
-          imageUrl = w.url;
-          used = 'Cloudflare Flux';
-        }
-      }
-
-      if (!imageUrl) {
-        const horde = await generateHordeImage({
-          prompt,
-          seed: parsedSeed,
-          nsfw: wantsNsfw,
-          width: aspect.width,
-          height: aspect.height,
-          steps: 25,
-        });
-        imageUrl = await remoteImageToStableDataUrl(horde.url).catch(() => horde.url);
-        used = 'AI Horde Cloud Free';
-      }
-
-      const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
-      reportGenerationSpeed({ imgSec: elapsedSec, lastEngine: used });
-      setGeneratedPhoto(imageUrl);
+      setGeneratedPhoto(result.imageUrl);
       setPhotoRevealed(!wantsNsfw);
-      setVideoSourceUrl(imageUrl);
-      setEngineBadge(used);
-      setStatusMsg(`Rendered via ${used} in ${elapsedSec}s (seed ${parsedSeed})`);
+      setVideoSourceUrl(result.imageUrl);
+      setEngineBadge(result.engine);
+      handleSaveToCollection(result.imageUrl, wantsNsfw ? 'selfie' : 'studio-photo');
+      setStatusMsg(`Rendered via ${result.engine} in ${result.elapsedSec}s (seed ${result.seed}) · Auto-saved to Photo Diary & Collection`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
     } finally {
@@ -190,38 +174,23 @@ export default function MediaStudioModal({
   }
 
   async function handleGenerateVideo() {
-    const check = assertCompliance(`${companion.name} ${customPrompt}`);
-    if (!check.ok) {
-      setErrorMsg(check.reason);
-      return;
-    }
-
     setVideoBusy(true);
     setErrorMsg(null);
     setStatusMsg(null);
-    const motion = MOTION_PRESETS.find((m) => m.id === motionId) ?? MOTION_PRESETS[0];
 
     try {
-      if (videoBackendUrl) {
-        const res = await fetch(videoBackendUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageUrl: videoSourceUrl, motion: motion.id }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { videoUrl?: string };
-          if (data.videoUrl) {
-            setGeneratedVideoUrl(data.videoUrl);
-            setStatusMsg('Rendered via Local/Remote Video Backend');
-            setVideoBusy(false);
-            return;
-          }
-        }
-      }
-
-      const webmUrl = await renderBrowserWebmClip(videoSourceUrl, motion);
-      setGeneratedVideoUrl(webmUrl);
-      setStatusMsg('Looping .webm clip rendered locally at 0 cost!');
+      const res = await generateStudioVideoClip({
+        imageUrl: videoSourceUrl,
+        motionId,
+        durationSec,
+        speed: videoSpeed,
+        prompt: `${companion.name} ${customPrompt}`,
+        comfyOnline: localEngine.comfyOnline,
+        videoBackendUrl,
+      });
+      setGeneratedVideoUrl(res.videoUrl);
+      setVideoEngineUsed(res.engine);
+      setStatusMsg(`Rendered ${durationSec}s @ ${videoSpeed}x via ${res.engine}!`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
     } finally {
@@ -333,9 +302,39 @@ export default function MediaStudioModal({
     try {
       const existing = JSON.parse(window.localStorage.getItem('velvetmotion_custom_companions') || '[]') as CompanionProfile[];
       window.localStorage.setItem('velvetmotion_custom_companions', JSON.stringify([created, ...existing]));
+      const rosterRaw = JSON.parse(window.localStorage.getItem('velvet-custom-girls') || '[]') as unknown[];
+      window.localStorage.setItem(
+        'velvet-custom-girls',
+        JSON.stringify([
+          {
+            id: created.id,
+            name: created.name,
+            age: created.age,
+            tagline: created.tagline,
+            category: created.category,
+            avatar: created.portraitUrl,
+            voiceIntro: created.voiceSampleLine,
+            initialMessage: created.greeting,
+            tags: ['Custom', created.category],
+            intimacy: 55,
+            voice: { label: created.voiceId, pitch: 1, rate: 0.96, style: created.personality },
+            voiceId: created.voiceId,
+            visualDna: created.visualDna,
+            personality: created.personality,
+            traits: ['Custom', 'Studio'],
+            background: created.backstory,
+            figure: created.visualDna,
+            kink: created.category,
+            reply: created.greeting,
+          },
+          ...rosterRaw,
+        ].slice(0, 40)),
+      );
     } catch {
       /* ignore */
     }
+    void saveCustomCompanionDB(created.id, created as unknown as Record<string, unknown>);
+    emitVaultUpdated();
 
     onCompanionCreated?.(created);
     setStatusMsg(`${created.name} added to your roster!`);
@@ -494,6 +493,19 @@ export default function MediaStudioModal({
             </div>
           </div>
 
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => setCustomPrompt((p) => (p.includes(chip) ? p : p.trim() ? `${p.trim()}, ${chip}` : chip))}
+                className="rounded-full border border-white/10 bg-[#141418] px-2.5 py-1 text-[10px] font-medium text-zinc-300 hover:border-[#ff5678]/60 hover:text-white"
+              >
+                + {chip}
+              </button>
+            ))}
+          </div>
+
           <textarea
             rows={2}
             value={customPrompt}
@@ -519,7 +531,7 @@ export default function MediaStudioModal({
           {generatedPhoto && (
             <div className="space-y-2.5 pt-2">
               <div className="relative mx-auto aspect-[2/3] w-56 overflow-hidden rounded-2xl border border-[#ff1e8e]/45 bg-black">
-                <img
+                <SafeImage
                   src={generatedPhoto}
                   alt="Generated studio photo"
                   onClick={() => setPhotoRevealed(true)}
@@ -555,6 +567,16 @@ export default function MediaStudioModal({
                 </button>
                 <button
                   type="button"
+                  onClick={() => {
+                    setVideoSourceUrl(generatedPhoto);
+                    setTab('video');
+                  }}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/50 bg-[#ff5678]/20 px-3 py-1.5 text-[11px] font-bold text-white"
+                >
+                  <Film className="h-3.5 w-3.5" /> Animate into Video
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleDropToChat(generatedPhoto)}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff1e8e]/50 bg-[#ff1e8e]/20 px-3 py-1.5 text-[11px] font-bold text-pink-100"
                 >
@@ -569,32 +591,101 @@ export default function MediaStudioModal({
       {tab === 'video' && (
         <div className="space-y-3 text-xs">
           <p className="text-[11px] text-[#a6a6c4]">
-            Render looping `.webm` motion Shorts at $0 in-browser—or automatically accelerate with FramePack / Wan 2.2 when Local Ultra is active.
+            Render looping `.webm` motion Shorts at $0 in-browser—or accelerate automatically with FramePack / Wan 2.2 / LTX-2 on ComfyUI (:8188).
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {MOTION_PRESETS.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => setMotionId(m.id)}
-                className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                  motionId === m.id ? 'border-[#00f5ff] bg-[#00f5ff]/15 text-[#00f5ff]' : 'border-white/10 bg-[#05050a] text-zinc-300'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
+
+          <div>
+            <label className="mb-1 block text-[11px] text-[#a6a6c4]">Source Image (Portrait or Generated Selfie)</label>
+            <select
+              value={videoSourceUrl}
+              onChange={(e) => setVideoSourceUrl(e.target.value)}
+              className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white outline-none focus:border-[#ff5678]"
+            >
+              {generatedPhoto && <option value={generatedPhoto}>Latest Studio Photo</option>}
+              {FLAGSHIP_COMPANIONS.map((c) => (
+                <option key={c.id} value={c.portraitUrl}>
+                  {c.name} — Flagship Portrait
+                </option>
+              ))}
+              {getGallery()
+                .filter((g) => g.url && !g.url.startsWith('blob:'))
+                .slice(0, 10)
+                .map((g) => (
+                  <option key={g.id} value={g.url}>
+                    Saved: {g.characterName} ({g.type})
+                  </option>
+                ))}
+            </select>
           </div>
+
+          <div className="space-y-1.5">
+            <span className="block text-[11px] text-[#a6a6c4]">Motion Preset</span>
+            <div className="flex flex-wrap gap-1.5">
+              {VIDEO_MOTION_PRESETS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMotionId(m.id)}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                    motionId === m.id ? 'border-[#ff5678] bg-[#2a1820] text-white' : 'border-white/10 bg-[#05050a] text-zinc-300'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="mb-1 block text-[11px] text-[#a6a6c4]">Duration</span>
+              <div className="flex gap-1">
+                {VIDEO_DURATIONS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDurationSec(d)}
+                    className={`flex-1 rounded-lg border py-1.5 text-[11px] font-bold ${
+                      durationSec === d ? 'border-[#ff5678] bg-[#2a1820] text-white' : 'border-white/10 bg-[#05050a] text-zinc-400'
+                    }`}
+                  >
+                    {d}s
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <span className="mb-1 block text-[11px] text-[#a6a6c4]">Speed</span>
+              <div className="flex gap-1">
+                {VIDEO_SPEEDS.map((sp) => (
+                  <button
+                    key={sp}
+                    type="button"
+                    onClick={() => setVideoSpeed(sp)}
+                    className={`flex-1 rounded-lg border py-1.5 text-[11px] font-bold ${
+                      videoSpeed === sp ? 'border-[#00f5ff] bg-[#00f5ff]/15 text-[#00f5ff]' : 'border-white/10 bg-[#05050a] text-zinc-400'
+                    }`}
+                  >
+                    {sp}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <button
             type="button"
             disabled={videoBusy}
             onClick={() => void handleGenerateVideo()}
             className="w-full rounded-full neon-btn-primary py-2.5 text-xs font-bold text-white disabled:opacity-50"
           >
-            {videoBusy ? 'Rendering looping .webm clip...' : 'Generate Looping Short (.webm)'}
+            {videoBusy ? `Rendering ${durationSec}s @ ${videoSpeed}x .webm clip...` : `Generate ${durationSec}s Video Clip (.webm)`}
           </button>
           {generatedVideoUrl && (
             <div className="space-y-2 pt-2 text-center">
+              {videoEngineUsed && (
+                <p className="text-[10px] font-bold text-[#00f5ff]">{videoEngineUsed}</p>
+              )}
               <video
                 src={generatedVideoUrl}
                 autoPlay
@@ -602,15 +693,24 @@ export default function MediaStudioModal({
                 muted
                 playsInline
                 controls
-                className="mx-auto aspect-[2/3] w-56 rounded-2xl border border-[#00f5ff]/40 object-cover"
+                className="mx-auto aspect-[2/3] w-56 rounded-2xl border border-[#ff5678]/40 object-cover"
               />
-              <a
-                href={generatedVideoUrl}
-                download={`velvetmotion-short-${Date.now()}.webm`}
-                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold text-white"
-              >
-                <Download className="h-3.5 w-3.5" /> Download .webm Clip
-              </a>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveToCollection(videoSourceUrl, 'shorts-video')}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/45 bg-[#2a1820] px-3.5 py-1.5 text-xs font-bold text-white"
+                >
+                  <BookmarkPlus className="h-3.5 w-3.5" /> Save to Shorts / Collection
+                </button>
+                <a
+                  href={generatedVideoUrl}
+                  download={`velvetmotion-short-${Date.now()}.webm`}
+                  className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold text-white"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download .webm
+                </a>
+              </div>
             </div>
           )}
         </div>
@@ -662,6 +762,19 @@ export default function MediaStudioModal({
               onChange={(e) => setCharAge(Number(e.target.value))}
               className="rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white focus:border-[#ff1e8e] focus:outline-none"
             />
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_CHIPS.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => setCustomPrompt((p) => (p.includes(chip) ? p : p.trim() ? `${p.trim()}, ${chip}` : chip))}
+                className="rounded-full border border-white/10 bg-[#141418] px-2.5 py-1 text-[10px] font-medium text-zinc-300 hover:border-[#ff5678]/60 hover:text-white"
+              >
+                + {chip}
+              </button>
+            ))}
           </div>
 
           <textarea

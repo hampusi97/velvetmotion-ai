@@ -7,9 +7,106 @@ import { CreatePostActions } from "@/components/CreatePostActions";
 import { SafeImage } from "@/components/SafeImage";
 import { validateCharacterCompliance } from "@/lib/complianceFilter";
 import { encodeSharedCharacterUrl } from "@/lib/shareCardUrl";
+import { exportCharacterToCardV2 } from "@/lib/characterCardV2";
 import { saveCustomCompanionDB } from "@/lib/db";
+import { emitVaultUpdated } from "@/lib/firebaseSync";
 import { characterMediaUrl, faceSeed, seedFromPhotoDataUrl } from "@/lib/media";
 import { setCharacterFaceSeed } from "@/lib/mediaSettings";
+
+interface ExtractedImageMood {
+  paletteLabel: string;
+  lightingMood: string;
+  suggestedStyle: "Realistic" | "Soft glam" | "Anime";
+  suggestedVibe: string;
+}
+
+async function compressUploadWebp(file: File): Promise<string> {
+  if (typeof document === "undefined" || typeof createImageBitmap === "undefined") {
+    return new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  }
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1024 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bmp.width * scale));
+  canvas.height = Math.max(1, Math.round(bmp.height * scale));
+  const ctx = canvas.getContext("2d");
+  ctx?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close?.();
+  return canvas.toDataURL("image/webp", 0.86);
+}
+
+async function extractPaletteMood(dataUrl: string): Promise<ExtractedImageMood> {
+  if (typeof document === "undefined") {
+    return {
+      paletteLabel: "warm rose & dark obsidian",
+      lightingMood: "moody evening glow",
+      suggestedStyle: "Realistic",
+      suggestedVibe: "cinematic evening glamour",
+    };
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("no 2d");
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const pixels = ctx.getImageData(0, 0, 16, 16).data;
+        let rSum = 0;
+        let gSum = 0;
+        let bSum = 0;
+        const n = pixels.length / 4;
+        for (let i = 0; i < pixels.length; i += 4) {
+          rSum += pixels[i];
+          gSum += pixels[i + 1];
+          bSum += pixels[i + 2];
+        }
+        const r = rSum / n;
+        const g = gSum / n;
+        const b = bSum / n;
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+        const isNeon = b > r * 1.05 || (r > 165 && b > 145 && g < 130);
+        const isWarm = r > b * 1.15;
+        const lightingMood =
+          luma < 85 ? "low-key midnight studio glow" : luma > 165 ? "bright sunlit portrait" : "golden-hour soft focus";
+        const paletteLabel = isNeon
+          ? "electric neon violet & magenta"
+          : isWarm
+            ? "warm amber, coral & bronze"
+            : "clean editorial monochrome";
+        resolve({
+          paletteLabel,
+          lightingMood,
+          suggestedStyle: isNeon ? "Soft glam" : "Realistic",
+          suggestedVibe: `${paletteLabel} tones with ${lightingMood}`,
+        });
+      } catch {
+        resolve({
+          paletteLabel: "warm rose & dark obsidian",
+          lightingMood: "moody evening glow",
+          suggestedStyle: "Realistic",
+          suggestedVibe: "cinematic evening glamour",
+        });
+      }
+    };
+    img.onerror = () =>
+      resolve({
+        paletteLabel: "warm rose & dark obsidian",
+        lightingMood: "moody evening glow",
+        suggestedStyle: "Realistic",
+        suggestedVibe: "cinematic evening glamour",
+      });
+    img.src = dataUrl;
+  });
+}
 
 /** Explicit verified Step 2 attribute -> matching local portrait lookup map */
 const ETHNICITY_PORTRAIT_MAP: Record<string, Record<string, string>> = {
@@ -145,6 +242,8 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
   const [kink, setKink] = useState("Teasing and slow undressing");
   const [bio, setBio] = useState("");
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [fictionalConfirmed, setFictionalConfirmed] = useState(false);
+  const [extractedMood, setExtractedMood] = useState<ExtractedImageMood | null>(null);
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<Character | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -175,22 +274,35 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
 
   const previewSrc = photoDataUrl || aiPreviewSrc;
 
-  const onFile = (file: File | null) => {
+  const onFile = async (file: File | null) => {
     if (!file || !file.type.startsWith("image/")) return;
     setPermHint(null);
-    const reader = new FileReader();
-    reader.onload = () => setPhotoDataUrl(String(reader.result));
-    reader.onerror = () => setPermHint("Could not read that image. Try another photo from your gallery.");
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressUploadWebp(file);
+      setPhotoDataUrl(compressed);
+      const mood = await extractPaletteMood(compressed);
+      setExtractedMood(mood);
+      setStyle(mood.suggestedStyle);
+      if (!bio.trim()) {
+        setBio(`Stepped right out of that ${mood.lightingMood} scene just to catch you alone. Tell me what caught your eye first.`);
+      }
+    } catch {
+      setPermHint("Could not read that image. Try another fictional image from your device.");
+    }
   };
 
   const clearPhoto = () => {
     setPhotoDataUrl(null);
+    setExtractedMood(null);
+    setFictionalConfirmed(false);
     setPermHint(null);
   };
 
   const buildCharacter = (finalId: string, avatarUrl: string): Character => {
-    const displayName = name.trim() || "Your Girl";
+    const autoNames = ["Lyra Vance", "Seren Vale", "Kiera Sol", "Nyx Monroe"];
+    const fallbackName = autoNames[Math.abs(draftId.length + finalId.length) % autoNames.length];
+    const displayName = name.trim() || fallbackName;
+    const moodContext = extractedMood ? `${extractedMood.paletteLabel}, ${extractedMood.lightingMood}` : figure;
     const category =
       personality.includes("Dominant") || personality === "Queen"
         ? "Dominant"
@@ -216,8 +328,8 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
       voiceIntro: `Hey… it's ${displayName}.`,
       initialMessage:
         bio.trim() ||
-        `I saw your message. I'm ${displayName} — ${personality.toLowerCase()}. Tell me what kind of night you want.`,
-      tags: [personality, relationship, style, "Custom", "AI-generated"],
+        `Just leaned back against the balcony railing (${extractedMood?.lightingMood || "late-night glow"}) waiting on your text. How are you spending tonight?`,
+      tags: [personality, relationship, style, "Custom", "Fictional 18+"],
       intimacy: 55,
       voice: {
         label: personality.includes("Dominant") ? "Low command" : "Warm",
@@ -225,22 +337,28 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
         rate: 0.95,
         style: `${personality} energy. Speaks like a real adult partner.`,
       },
+      voiceId: personality.includes("Dominant") ? "bf_emma" : personality.includes("Shy") ? "af_sarah" : "af_heart",
+      visualDna: `${figure}, ${moodContext}, 6-scene consistent fictional 18+ persona`,
       personality,
       traits: [personality, relationship, style],
-      background: `Original fictional adult created by the user. ${figure}.`,
-      figure,
+      background: `Original fictional adult created by the user. Visual mood: ${moodContext}. Backstory: lives independently in the city with a soft spot for late-night voice notes and private ${personality.toLowerCase()} chemistry.`,
+      figure: `${figure}, ${moodContext}`,
       kink,
       reply: `She smiles. “I'm ${displayName}. Your move.”`,
     };
   };
 
   const finish = async () => {
+    if (photoDataUrl && !fictionalConfirmed) {
+      setPermHint("Please confirm this uploaded artwork depicts a fictional/AI-generated 18+ character before creating.");
+      return;
+    }
     const check = validateCharacterCompliance({
-      name,
+      name: name || "Lyra Vance",
       age: 24,
       personality,
       tagline: kink,
-      figure,
+      figure: `${figure} ${extractedMood?.suggestedVibe || ""}`,
       kink,
     });
     if (!check.ok) {
@@ -260,6 +378,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
     const character = buildCharacter(finalId, avatarUrl);
 
     void saveCustomCompanionDB(character.id, character as unknown as Record<string, unknown>);
+    emitVaultUpdated();
 
     // Face seed: photo wins; otherwise lock from figure so moods stay consistent
     try {
@@ -347,6 +466,20 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
           >
             {shareCopied ? "Share Link Copied ✓" : "🔗 Copy Share Link"}
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              const card = exportCharacterToCardV2(created);
+              const blob = new Blob([JSON.stringify(card, null, 2)], { type: "application/json" });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `${created.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-v2.json`;
+              a.click();
+            }}
+            className="w-full py-3.5 rounded-2xl border border-white/15 bg-white/5 text-white font-semibold hover:border-[#ff5678]/60"
+          >
+            📦 Export Character Card V2 (.json)
+          </button>
           {onOpen3D && (
             <button
               type="button"
@@ -420,8 +553,75 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
       )}
 
       {step === 0 && (
-        <div className="space-y-3">
-          <p className="text-sm text-mist">Art style — AI will generate her face & body to match</p>
+        <div
+          className="space-y-4"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            void onFile(e.dataTransfer.files?.[0] || null);
+          }}
+          onPaste={(e) => {
+            const item = Array.from(e.clipboardData.items).find((it) => it.type.startsWith("image/"));
+            const f = item?.getAsFile() || null;
+            if (f) void onFile(f);
+          }}
+        >
+          {/* Step 1: Upload Fictional Character Art / Reference */}
+          <div className="rounded-2xl border border-dashed border-[#ff5678]/45 bg-[#1a1a20] p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-extrabold text-white">Upload Fictional Character Art / Reference (Optional)</p>
+                <p className="text-[11px] text-zinc-400">
+                  Drag &amp; drop, browse, or paste (Ctrl/Cmd+V). Extracts palette/lighting mood &amp; builds full companion.
+                </p>
+              </div>
+              <label className="shrink-0 cursor-pointer rounded-full neon-btn-primary px-3.5 py-1.5 text-[11px] font-bold text-white">
+                Choose Image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => void onFile(e.target.files?.[0] || null)}
+                />
+              </label>
+            </div>
+
+            {photoDataUrl && (
+              <div className="space-y-2.5 pt-1">
+                <div className="flex items-center gap-3">
+                  <SafeImage
+                    src={photoDataUrl}
+                    alt="Uploaded art preview"
+                    className="h-20 w-16 rounded-xl object-cover border border-[#ff5678]/50 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1 text-[11px] space-y-1">
+                    {extractedMood && (
+                      <p className="text-[#ff8aa1] font-semibold">
+                        Detected mood: {extractedMood.paletteLabel} · {extractedMood.lightingMood}
+                      </p>
+                    )}
+                    <button type="button" onClick={clearPhoto} className="text-zinc-400 underline hover:text-white">
+                      Remove uploaded art
+                    </button>
+                  </div>
+                </div>
+                <label className="flex items-start gap-2 text-[11px] text-zinc-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={fictionalConfirmed}
+                    onChange={(e) => setFictionalConfirmed(e.target.checked)}
+                    className="mt-0.5 accent-[#ff5678]"
+                  />
+                  <span>
+                    I confirm this is a fictional/AI-generated 18+ character or my own authorized artwork — NOT a real third-party person.
+                  </span>
+                </label>
+              </div>
+            )}
+            {permHint && <p className="text-xs text-rose-300">{permHint}</p>}
+          </div>
+
+          <p className="text-sm text-mist">Art style — AI adapts her face &amp; scenes to match</p>
           <div className="grid grid-cols-3 gap-2">
             {STYLES.map((s) => (
               <button
@@ -598,7 +798,21 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
               {photoDataUrl ? "Using your photo + AI for later moods" : "No photo — AI generates her completely"}
             </p>
           </div>
-          {genNote && <p className="text-xs text-pink-300 animate-pulse">{genNote}</p>}
+              {photoDataUrl && (
+                <label className="flex items-start gap-2 text-[11px] text-zinc-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={fictionalConfirmed}
+                    onChange={(e) => setFictionalConfirmed(e.target.checked)}
+                    className="mt-0.5 accent-[#ff5678]"
+                  />
+                  <span>
+                    I confirm this is a fictional/AI-generated 18+ character or my own authorized artwork — NOT a real third-party person.
+                  </span>
+                </label>
+              )}
+              {genNote && <p className="text-xs text-pink-300 animate-pulse">{genNote}</p>}
+              {permHint && <p className="text-xs text-rose-300">{permHint}</p>}
         </div>
       )}
 
