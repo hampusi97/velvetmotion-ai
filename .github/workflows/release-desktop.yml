@@ -128,7 +128,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MIRROR_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          TARGET_REPO: ${{ vars.PUBLIC_RELEASES_REPO || secrets.PUBLIC_RELEASES_REPO }}
+          TARGET_REPO: ${{ vars.PUBLIC_RELEASES_REPO || secrets.PUBLIC_RELEASES_REPO || 'hampusi97/velvetmotion-releases' }}
           TAG: ${{ needs.prepare.outputs.tag }}
           R2_BUCKET_URL: ${{ vars.R2_BUCKET_URL || secrets.R2_BUCKET_URL }}
         run: |

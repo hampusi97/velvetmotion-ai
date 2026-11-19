@@ -21,10 +21,10 @@ function detectOs(): DetectedOs {
   return "windows";
 }
 
-const RELEASE_REPO = process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim() || "hampusi97/velvetmotion-ai";
+const RELEASE_REPO = process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim() || "hampusi97/velvetmotion-releases";
 const RELEASES_INDEX = `https://github.com/${RELEASE_REPO}/releases`;
 const RELEASE_API = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
-const FALLBACK_RELEASE_API = "https://api.github.com/repos/hampusi97/velvetmotion-releases/releases/latest";
+const FALLBACK_RELEASE_API = "https://api.github.com/repos/hampusi97/velvetmotion-ai/releases/latest";
 
 interface GithubReleaseAsset {
   name: string;

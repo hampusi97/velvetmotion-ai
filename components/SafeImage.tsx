@@ -3,7 +3,7 @@
 import { useEffect, useState, type ImgHTMLAttributes } from "react";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 
-const DEFAULT_SAFE_FALLBACK = "/portraits/chloe-parker.webp";
+const DEFAULT_SAFE_FALLBACK = "/portraits/nova.jpg";
 
 export function SafeImage({
   src,
@@ -19,11 +19,11 @@ export function SafeImage({
   fallbackId?: string;
 }) {
   const effectiveFallback = fallbackSrc || (fallbackId ? staticPortraitUrl(fallbackId) : DEFAULT_SAFE_FALLBACK);
-  const [resolvedSrc, setResolvedSrc] = useState(src || effectiveFallback);
+  const [resolvedSrc, setResolvedSrc] = useState(src || effectiveFallback || DEFAULT_SAFE_FALLBACK);
   const [fallbackApplied, setFallbackApplied] = useState(false);
 
   useEffect(() => {
-    setResolvedSrc(src || effectiveFallback);
+    setResolvedSrc(src || effectiveFallback || DEFAULT_SAFE_FALLBACK);
     setFallbackApplied(false);
   }, [src, effectiveFallback]);
 
@@ -37,6 +37,9 @@ export function SafeImage({
         if (!fallbackApplied && resolvedSrc !== effectiveFallback) {
           setFallbackApplied(true);
           setResolvedSrc(effectiveFallback);
+        } else if (resolvedSrc !== DEFAULT_SAFE_FALLBACK) {
+          setFallbackApplied(true);
+          setResolvedSrc(DEFAULT_SAFE_FALLBACK);
         }
         onError?.(e);
       }}

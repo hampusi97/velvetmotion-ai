@@ -15,7 +15,22 @@ import { execFileSync } from "node:child_process";
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.join(ROOT, "public");
-const MIN_IMAGE_BYTES = 1024;
+const MIN_IMAGE_BYTES = 2048;
+
+function hasValidImageMagicBytes(diskPath) {
+  const fd = fs.openSync(diskPath, "r");
+  try {
+    const buf = Buffer.alloc(12);
+    const bytesRead = fs.readSync(fd, buf, 0, 12, 0);
+    if (bytesRead < 12) return false;
+    const isJpg = buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+    const isWebp = buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP";
+    const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+    return isJpg || isWebp || isPng;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 
 function fail(msg) {
   console.error(`❌ [audit-companions] ${msg}`);
@@ -33,8 +48,12 @@ function verifyPublicImage(label, assetPath) {
     return;
   }
   const stat = fs.statSync(diskPath);
-  if (!stat.isFile() || stat.size < MIN_IMAGE_BYTES) {
-    fail(`${label}: corrupt or stub image in public/ (${stat.size} bytes < ${MIN_IMAGE_BYTES}) -> ${assetPath}`);
+  if (!stat.isFile() || stat.size <= MIN_IMAGE_BYTES) {
+    fail(`${label}: corrupt or stub image in public/ (${stat.size} bytes <= ${MIN_IMAGE_BYTES}) -> ${assetPath}`);
+    return;
+  }
+  if (!hasValidImageMagicBytes(diskPath)) {
+    fail(`${label}: invalid JPEG/WebP/PNG header -> ${assetPath}`);
   }
 }
 
