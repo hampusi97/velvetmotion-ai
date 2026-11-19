@@ -49,7 +49,7 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
 /** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult, max heat */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "professional photography, 85mm f/1.4, soft window light with gentle motion, realistic skin pores freckles, detailed hair strands, bright catchlights, natural makeup, slight smile or playful expression, looking at camera, shallow DOF bokeh, candy.ai quality, photorealistic, 8k, sharp face, lively energy",
+    "professional photography, 85mm f/1.4 lens, soft natural window light, realistic skin texture with pores and subtle freckles, detailed individual hair strands, bright catchlights in eyes, natural makeup, soft smile, looking at camera, shallow depth of field, bokeh background, candy.ai quality, photorealistic, 8k uhd, sharp focus on face, natural proportions, cinematic lighting",
   seductive:
     "seductive bedroom mirror selfie, heavy-lidded eyes, soft neon + warm lamp, parted glossy lips, intimate atmosphere, slight head tilt, photoreal influencer, adult sensual heat, dynamic pose",
   lingerie:
