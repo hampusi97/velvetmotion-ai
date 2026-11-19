@@ -1,0 +1,6 @@
+name = "velvetmotion-image"
+compatibility_date = "2026-11-18"
+main = "worker.js"
+
+[ai]
+binding = "AI"
