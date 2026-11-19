@@ -167,7 +167,7 @@ export function UserLounge({ onHome }: { onHome: () => void }) {
           onClick={() => setShowDeployHelp((v) => !v)}
           className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] text-zinc-300 hover:text-pink-200"
         >
-          {showDeployHelp ? "Hide Firebase Setup" : "Firebase Rules / CLI"}
+          {showDeployHelp ? "Hide setup" : "Setup help"}
         </button>
       </div>
       <p className="text-sm text-mist">

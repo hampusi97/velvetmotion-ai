@@ -148,7 +148,7 @@ export function VoiceCall({
         </button>
       </div>
       <p className="mt-4 text-[11px] text-zinc-500 text-center max-w-xs">
-        Hold mic to speak (Chrome recommended). She replies with browser TTS. Full video calls need WebRTC — coming next.
+        Hold the mic to speak. She replies with voice.
       </p>
     </div>
   );

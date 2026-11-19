@@ -378,7 +378,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
             </button>
           )}
           <p className="text-[10px] text-zinc-600">
-            Browser voice only (Web Speech). Chrome/Edge recommended. Not true WebRTC video.
+            Voice chat. Tap the mic to talk.
           </p>
         </div>
       </div>
