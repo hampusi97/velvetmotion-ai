@@ -7,7 +7,9 @@ import type { Character } from "./charactersTypes";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 
-const CF_IMAGE_WORKER = "https://velvetmotion-image.hampusi97.workers.dev/generate";
+const CF_IMAGE_WORKER =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_IMAGE_WORKER_URL) ||
+  "https://velvetmotion-image.hampusi97.workers.dev/generate";
 
 export type MediaMood = "beauty" | "lingerie" | "nude" | "explicit" | "sex" | "seductive" | "aftercare" | "dual" | "sph" | "bnwo" | "joi" | "joi-finish";
 
