@@ -40,15 +40,15 @@ export function SupporterBanner({ onOpenWallet }: { onOpenWallet: () => void }) 
   return (
     <aside
       aria-label="Optional $3 Supporter Banner"
-      className="mb-5 rounded-2xl border border-[#ff1e8e]/35 bg-gradient-to-r from-[#ff1e8e]/12 via-[#0c0c16] to-[#00f5ff]/10 px-4 py-3 shadow-[0_0_24px_rgba(255,30,142,0.14)]"
+      className="mb-5 rounded-2xl border border-[#ff5678]/30 bg-gradient-to-r from-[#ff5678]/10 via-[#18181c] to-amber-500/10 px-4 py-3 shadow-lg"
     >
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-2.5 pr-4">
-          <Heart className="mt-0.5 h-4 w-4 shrink-0 text-[#ff1e8e] fill-current" />
-          <p className="text-xs leading-relaxed text-[#d4d4eb]">
-            <strong className="text-white">VelvetMotion AI is 100% free — no message caps, no paywalled memory.</strong>{" "}
+          <Heart className="mt-0.5 h-4 w-4 shrink-0 text-[#ff5678] fill-current" />
+          <p className="text-xs leading-relaxed text-zinc-300">
+            <strong className="text-white">VelvetMotion.ai is 100% free — no message caps, no paywalled memory.</strong>{" "}
             If you love the app and want to help cover our custom domain &amp; daily updates, you can drop a{" "}
-            <strong className="text-[#00ffa3]">$3 tip</strong> to keep the neon lights on.
+            <strong className="text-[#ff8aa1]">$3 tip</strong> to keep the servers running.
           </p>
         </div>
 
@@ -68,7 +68,7 @@ export function SupporterBanner({ onOpenWallet }: { onOpenWallet: () => void }) 
               href={subscribeStarUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/10 px-3 py-1.5 text-[11px] font-semibold text-[#00f5ff] hover:bg-[#00f5ff]/20"
+              className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#1f1f25] px-3 py-1.5 text-[11px] font-semibold text-white hover:border-[#ff5678]/50"
             >
               SubscribeStar
             </a>
@@ -76,7 +76,7 @@ export function SupporterBanner({ onOpenWallet }: { onOpenWallet: () => void }) 
           <button
             type="button"
             onClick={onOpenWallet}
-            className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/45 bg-amber-500/15 px-3.5 py-1.5 text-[11px] font-bold text-amber-200 hover:bg-amber-500/25"
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/15 px-3.5 py-1.5 text-[11px] font-bold text-amber-200 hover:bg-amber-500/25"
           >
             {kofiUrl ? "Crypto Tip / Wallet" : "☕ Support Dev ($3)"}
           </button>
@@ -85,7 +85,7 @@ export function SupporterBanner({ onOpenWallet }: { onOpenWallet: () => void }) 
             onClick={dismissForSevenDays}
             aria-label="Dismiss supporter banner for 7 days"
             title="Hide for 7 days"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-white/5 text-[#a6a6c4] hover:text-white"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/5 text-zinc-400 hover:text-white"
           >
             <X className="h-3.5 w-3.5" />
           </button>

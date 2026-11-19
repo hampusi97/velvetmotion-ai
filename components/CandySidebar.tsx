@@ -2,6 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  Film,
+  Heart,
+  Home,
+  Image as ImageIcon,
+  Laptop,
+  Lock,
+  MessageCircle,
+  Settings,
+  Sparkles,
+  Users,
+  Wand2,
+} from "lucide-react";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { cn } from "@/lib/cn";
 
@@ -9,21 +22,21 @@ type NavItem = {
   id: string;
   href: string;
   label: string;
-  emoji: string;
   badge?: string;
+  Icon: typeof Home;
 };
 
 const ITEMS: NavItem[] = [
-  { id: "home", href: "/", label: "Home / Explore", emoji: "🏠" },
-  { id: "discover", href: "/discover/", label: "Discover", emoji: "🔥" },
-  { id: "chat", href: "/chat/", label: "Chat", emoji: "💬" },
-  { id: "group", href: "/group/", label: "Group chat", emoji: "👥" },
-  { id: "shorts", href: "/shorts/", label: "Shorts", emoji: "🎬" },
-  { id: "collection", href: "/collection/", label: "Collection", emoji: "🖼️" },
-  { id: "private", href: "/private/", label: "Private Content", emoji: "🔒" },
-  { id: "create", href: "/create/", label: "Create Character", emoji: "✨" },
-  { id: "studio", href: "/studio/", label: "Media Studio", emoji: "🎨" },
-  { id: "download", href: "/download/", label: "Desktop App", emoji: "💻", badge: "⚡ ULTRA" },
+  { id: "home", href: "/", label: "Home", Icon: Home },
+  { id: "shorts", href: "/shorts/", label: "Shorts", Icon: Film },
+  { id: "chat", href: "/chat/", label: "Chat", Icon: MessageCircle },
+  { id: "collection", href: "/collection/", label: "Collection", Icon: ImageIcon },
+  { id: "create", href: "/create/", label: "Create Character", Icon: Wand2 },
+  { id: "discover", href: "/discover/", label: "Discover", Icon: Heart },
+  { id: "private", href: "/private/", label: "Private Content", Icon: Lock },
+  { id: "group", href: "/group/", label: "Group Chat", Icon: Users },
+  { id: "studio", href: "/studio/", label: "Media Studio", Icon: Sparkles },
+  { id: "download", href: "/download/", label: "Desktop App", badge: "ULTRA", Icon: Laptop },
 ];
 
 function isRouteActive(pathname: string, active: string | undefined, item: NavItem): boolean {
@@ -48,26 +61,27 @@ export function CandySidebar({
   const { coins } = useCoinsStore();
 
   return (
-    <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-white/10 bg-[#05050a]/90 backdrop-blur-xl py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
-      <nav aria-label="Sidebar Navigation" className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-1 pr-1">
+    <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/[0.08] bg-[#141418] py-3.5 px-3 sticky top-14 h-[calc(100dvh-3.5rem)]">
+      <nav aria-label="Sidebar Navigation" className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-1.5 pr-0.5">
         {ITEMS.map((item) => {
           const isActive = isRouteActive(pathname, active, item);
+          const { Icon } = item;
           return (
             <Link
               key={item.id}
               href={item.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-left transition border",
+                "flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium text-left transition border",
                 isActive
-                  ? "border-[#ff1e8e]/70 bg-[#ff1e8e]/15 text-white shadow-[0_0_16px_rgba(255,30,142,0.28)]"
-                  : "border-transparent text-[#a6a6c4] hover:bg-white/5 hover:text-white",
+                  ? "border-[#ff5678]/65 bg-[#26171f] text-white shadow-[0_0_14px_rgba(255,86,120,0.16)]"
+                  : "border-white/[0.07] bg-[#1b1b20] text-[#b4b4c0] hover:border-white/20 hover:text-white",
               )}
             >
-              <span className="text-base w-5 text-center">{item.emoji}</span>
-              <span className="font-semibold truncate">{item.label}</span>
+              <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-[#ff5678]" : "text-zinc-400")} />
+              <span className="truncate">{item.label}</span>
               {item.badge && (
-                <span className="ml-auto shrink-0 rounded-full border border-[#00f5ff]/50 bg-[#00f5ff]/15 px-2 py-0.5 text-[9px] font-black text-[#00f5ff]">
+                <span className="ml-auto shrink-0 rounded-full bg-[#ff5678] px-2 py-0.5 text-[9px] font-extrabold text-white">
                   {item.badge}
                 </span>
               )}
@@ -75,59 +89,46 @@ export function CandySidebar({
           );
         })}
 
-        <div className="my-2 border-t border-white/10 pt-2 space-y-1">
-          <Link
-            href="/?view=blindfold"
-            onClick={() => onNavigate?.("blindfold")}
-            className="flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-[#a6a6c4] hover:bg-white/5 hover:text-white"
-          >
-            <span className="w-5 text-center">🎧</span>
-            <span>Blindfold JOI</span>
-          </Link>
-          <Link
-            href="/?view=lounge"
-            onClick={() => onNavigate?.("lounge")}
-            className="flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-[#a6a6c4] hover:bg-white/5 hover:text-white"
-          >
-            <span className="w-5 text-center">👋</span>
-            <span>User Lounge</span>
-          </Link>
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-[#a6a6c4] hover:bg-white/5 hover:text-white"
-            >
-              <span className="w-5 text-center">⚙️</span>
-              <span>Settings &amp; Backup</span>
-            </button>
-          )}
-        </div>
+        <Link
+          href="/?view=wallet"
+          onClick={() => onNavigate?.("wallet")}
+          className="mt-1 flex items-center justify-between rounded-xl border border-amber-400/25 bg-gradient-to-r from-[#ff5678]/15 via-[#1b1b20] to-amber-500/10 px-3 py-2 text-[13px] font-semibold text-amber-200 hover:border-[#ff5678]/50 transition"
+        >
+          <span className="flex items-center gap-2 truncate">
+            <span>💖</span> Support Dev
+          </span>
+          <span className="shrink-0 rounded-full bg-[#ff5678] px-2 py-0.5 text-[9px] font-extrabold text-white">
+            $3
+          </span>
+        </Link>
       </nav>
 
-      <div className="mt-auto pt-3 border-t border-white/10 space-y-2">
+      <div className="mt-auto pt-3 border-t border-white/[0.08] space-y-1.5">
         <Link
           href="/?view=wallet"
           onClick={() => onNavigate?.("wallet")}
-          className="w-full flex items-center justify-between text-xs text-amber-200 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 transition tabular-nums"
+          className="w-full flex items-center justify-between text-xs text-amber-200 px-3 py-2 rounded-xl bg-[#1b1b20] border border-white/[0.08] hover:border-amber-400/40 transition tabular-nums"
         >
-          <span>🪙 {coins.toLocaleString()} coins</span>
-          <span className="text-[10px] text-amber-300">Wallet →</span>
+          <span>🪙 {coins.toLocaleString()}</span>
+          <span className="text-[10px] text-amber-300 font-semibold">Wallet →</span>
         </Link>
-        <Link
-          href="/?view=wallet"
-          onClick={() => onNavigate?.("wallet")}
-          className="w-full flex items-center justify-between text-xs text-pink-200 px-3 py-2 rounded-xl bg-[#ff1e8e]/10 border border-[#ff1e8e]/30 hover:bg-[#ff1e8e]/20 transition"
-        >
-          <span>💖 Support Dev ($3)</span>
-          <span className="text-[10px] text-[#00ffa3]">0% fee</span>
-        </Link>
-        <Link
-          href="/download/"
-          className="block text-center w-full rounded-xl neon-btn-primary py-2.5 text-xs font-extrabold text-white"
-        >
-          ⚡ Get Desktop Ultra App
-        </Link>
+        {onOpenSettings && (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="w-full flex items-center gap-2.5 rounded-xl border border-white/[0.08] bg-[#1b1b20] px-3 py-2 text-xs font-medium text-zinc-300 hover:border-white/20 hover:text-white"
+          >
+            <Settings className="h-3.5 w-3.5 text-zinc-400" />
+            <span>Settings &amp; Backup</span>
+          </button>
+        )}
+        <div className="flex items-center justify-center gap-2 pt-1 text-[10px] text-zinc-500">
+          <Link href="/terms/" className="hover:text-zinc-300">Legal Terms</Link>
+          <span>·</span>
+          <Link href="/privacy/" className="hover:text-zinc-300">Privacy</Link>
+          <span>·</span>
+          <Link href="/policy/" className="hover:text-zinc-300">18+</Link>
+        </div>
       </div>
     </aside>
   );

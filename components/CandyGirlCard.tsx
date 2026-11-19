@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Sparkles } from "lucide-react";
+import { BadgeCheck, Film, Lock, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/characters";
 import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
 
@@ -19,35 +19,53 @@ export function CandyGirlCard({
       type="button"
       onClick={() => onSelect(character)}
       aria-label={`Open ${character.name}`}
-      className="girl-card group relative aspect-[2/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left transition-all duration-300 hover:-translate-y-1.5 hover:border-pink-500/50 hover:shadow-xl hover:shadow-pink-500/20"
+      className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-white/[0.08] bg-[#1a1a1f] text-left transition-all duration-300 hover:-translate-y-1 hover:border-[#ff5678]/60 hover:shadow-[0_12px_28px_rgba(0,0,0,0.55),0_0_20px_rgba(255,86,120,0.2)]"
     >
       <img
         src={staticPortraitUrl(character.id)}
         alt={character.name}
         loading="lazy"
         onError={onPortraitError}
-        className="absolute inset-0 h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.08] group-hover:brightness-105"
+        className="absolute inset-0 h-full w-full object-cover object-top transition duration-500 group-hover:scale-[1.06]"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/30 to-transparent opacity-85 group-hover:opacity-95 transition duration-300" />
+
+      {/* Crisp bottom vignette scrim letting photography breathe */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-90" />
+
+      {/* Top-left flush NEW coral-rose ribbon matching candy.ai */}
       {isNew && (
-        <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-md shadow-pink-500/40">
-          <Sparkles className="h-2.5 w-2.5" /> NEW
+        <span className="absolute left-0 top-0 inline-flex items-center gap-1 rounded-br-xl bg-gradient-to-r from-[#ff4a76] to-[#ff6b8d] px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md shadow-[#ff4a76]/30">
+          <Sparkles className="h-2.5 w-2.5 fill-current" /> NEW
         </span>
       )}
-      <div className="absolute right-2.5 top-2.5 flex flex-col gap-1 items-end">
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white backdrop-blur-sm">
-          <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" /> Online
+
+      {/* Top-right compact circular dark translucent icon badges */}
+      <div className="absolute right-2 top-2 flex flex-col gap-1.5 items-end">
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 backdrop-blur-md text-white/90"
+          title="Voice & Video Ready"
+        >
+          <Film className="h-3 w-3" />
         </span>
-        <span className="rounded-full bg-black/50 backdrop-blur-sm p-1 text-white/80" title="Video">▶</span>
-        <span className="rounded-full bg-black/50 backdrop-blur-sm p-1 text-pink-300" title="Private">🔒</span>
+        <span
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-white/15 bg-black/55 backdrop-blur-md text-white/85"
+          title="Private Gallery Set"
+        >
+          <Lock className="h-2.5 w-2.5" />
+        </span>
       </div>
-      <div className="absolute inset-x-0 bottom-0 p-3.5 bg-gradient-to-t from-black via-black/70 to-transparent">
+
+      {/* Bottom Name + Age + Verified Badge */}
+      <div className="absolute inset-x-0 bottom-0 px-3 pb-3 pt-8 bg-gradient-to-t from-black/95 via-black/55 to-transparent">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-sm font-semibold text-white tracking-tight">{character.name}</span>
-          <span className="text-xs text-zinc-300 tabular-nums">{character.age}</span>
-          <BadgeCheck className="h-3.5 w-3.5 text-pink-400 shrink-0" />
+          <span className="truncate text-[14px] font-bold text-white tracking-tight">
+            {character.name}
+          </span>
+          <span className="text-xs font-medium text-zinc-300 tabular-nums shrink-0">
+            {character.age}
+          </span>
+          <BadgeCheck className="h-4 w-4 text-[#ff5678] fill-[#ff5678]/20 shrink-0" />
         </div>
-        <p className="mt-0.5 line-clamp-1 text-[10px] text-zinc-400 leading-tight">{character.category || character.tagline?.slice(0, 42)}</p>
       </div>
     </button>
   );

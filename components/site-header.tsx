@@ -45,9 +45,17 @@ export function SiteHeader({
   const [password, setPassword] = useState("");
   const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [authError, setAuthError] = useState<string | null>(null);
+  const [styleTab, setStyleTab] = useState<"girls" | "anime" | "all">("girls");
   const { coins } = useCoinsStore();
   const engine = useLocalEngineStatus();
   const [soundOn, setSoundOn] = useState(true);
+
+  const selectStyleTab = (tab: "girls" | "anime" | "all") => {
+    setStyleTab(tab);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("vm:style-tab", { detail: tab }));
+    }
+  };
 
   useEffect(() => {
     setUser(getUser());
@@ -178,43 +186,53 @@ export function SiteHeader({
 
   return (
     <div className="sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
-      <header className="border-b border-white/10 bg-[#05050a]/90 backdrop-blur-xl">
-        <div className={cn(containerClass, "flex h-16 items-center gap-2 sm:gap-3")}>
-          <Link href="/" className="inline-flex shrink-0 items-center gap-2 pr-1">
-            <Mark className="h-8 w-8" />
-            <span className="font-display text-lg font-extrabold tracking-tight text-[#f7f7fc] neon-text-glow hidden xs:inline">
-              VelvetMotion
+      <header className="border-b border-white/[0.08] bg-[#141418]/95 backdrop-blur-xl">
+        <div className={cn(containerClass, "flex h-14 items-center gap-3")}>
+          <Link href="/" className="inline-flex shrink-0 items-center gap-2 pr-2">
+            <Mark className="h-7 w-7" />
+            <span className="font-display text-lg font-extrabold tracking-tight text-white hidden xs:inline">
+              VelvetMotion<span className="text-[#ff5678]">.ai</span>
             </span>
           </Link>
 
-          <nav aria-label="Top Navigation" className="hidden md:flex flex-1 items-center gap-1 overflow-x-auto no-scrollbar">
-            {NAV_LINKS.map((item) => {
-              const active = view === item.id;
+          {/* candy.ai-style Girls / Anime / All top style underline tabs */}
+          <div className="hidden md:flex items-stretch h-14 gap-1 border-l border-white/[0.08] pl-3">
+            {(
+              [
+                ["girls", "♀ Girls"],
+                ["anime", "🌀 Anime"],
+                ["all", "✨ All Modes"],
+              ] as const
+            ).map(([id, label]) => {
+              const active = styleTab === id && (!view || view === "home");
               return (
                 <Link
-                  key={item.id}
-                  href={item.href}
+                  key={id}
+                  href="/"
+                  onClick={() => selectStyleTab(id)}
                   className={cn(
-                    "shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                    active ? "neon-btn-primary text-white" : "text-[#a6a6c4] hover:bg-white/5 hover:text-white",
+                    "inline-flex items-center px-3 text-xs font-semibold border-b-2 transition",
+                    active
+                      ? "border-[#ff5678] text-white"
+                      : "border-transparent text-zinc-400 hover:text-white",
                   )}
                 >
-                  {item.label}
+                  {label}
                 </Link>
               );
             })}
-          </nav>
+          </div>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            {/* Phase 5 & 8 Live Speed HUD Pill */}
+            {/* Live Speed HUD Pill */}
             <Link
               href="/download/"
               title={engine.anyLocalOnline ? "Local GPU/RAM Engine Connected" : "Running on Cloud Free Inference"}
               className={cn(
                 "hidden sm:inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition tabular-nums",
                 engine.anyLocalOnline
-                  ? "border-[#00f5ff]/60 bg-[#00f5ff]/15 text-[#00f5ff] shadow-[0_0_12px_rgba(0,245,255,0.28)]"
-                  : "border-white/15 bg-white/5 text-[#a6a6c4] hover:border-[#00f5ff]/45",
+                  ? "border-[#22d3ee]/60 bg-[#22d3ee]/10 text-[#22d3ee]"
+                  : "border-white/10 bg-[#1c1c22] text-zinc-300 hover:border-[#ff5678]/50",
               )}
             >
               {engine.anyLocalOnline
@@ -225,26 +243,33 @@ export function SiteHeader({
             <button
               type="button"
               aria-label={soundOn ? "Mute UI sounds" : "Enable UI sounds"}
-              title={soundOn ? "Neon UI SFX On" : "Neon UI SFX Muted"}
+              title={soundOn ? "UI SFX On" : "UI SFX Muted"}
               onClick={() => {
                 const next = !soundOn;
                 setSoundOn(next);
                 setUiSoundEnabled(next);
               }}
-              className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-[#0c0c16] text-[#a6a6c4] hover:border-[#00f5ff] hover:text-[#00f5ff]"
+              className="hidden sm:inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-zinc-300 hover:border-[#ff5678] hover:text-white"
             >
-              {soundOn ? <Volume2 className="h-3.5 w-3.5 text-[#00f5ff]" /> : <VolumeX className="h-3.5 w-3.5" />}
+              {soundOn ? <Volume2 className="h-3.5 w-3.5 text-[#ff5678]" /> : <VolumeX className="h-3.5 w-3.5" />}
             </button>
 
             <Link
               href="/?view=wallet"
               onClick={() => onNavigate?.("wallet" as ViewId)}
-              className="inline-flex items-center gap-1 rounded-full border border-amber-400/35 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-200 tabular-nums hover:bg-amber-500/20"
+              className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-200 tabular-nums hover:bg-amber-500/20"
             >
               🪙 {coins}
             </Link>
 
-            {/* Bug #1: guest* pill opens non-blocking dismissible Auth Modal */}
+            <Link
+              href="/create/"
+              className="hidden lg:inline-flex items-center rounded-full neon-btn-primary px-3.5 py-1.5 text-xs font-bold text-white"
+            >
+              Create
+            </Link>
+
+            {/* guest* pill opens non-blocking dismissible Auth Modal */}
             <button
               type="button"
               onClick={() => {
@@ -258,10 +283,10 @@ export function SiteHeader({
                   onUserChange?.(g);
                 }
               }}
-              className="inline-flex items-center gap-1.5 max-w-[9.5rem] truncate rounded-full border border-[#ff1e8e]/35 bg-[#0c0c16] px-3 py-1.5 text-xs font-semibold text-[#f7f7fc] hover:border-[#ff1e8e]"
+              className="inline-flex items-center gap-1.5 max-w-[9.5rem] truncate rounded-full border border-white/15 bg-[#1c1c22] px-3 py-1.5 text-xs font-semibold text-white hover:border-[#ff5678]"
               title={isGuest ? "Click to open optional Cloud Sync modal" : "Cloud Sync active — click to switch back to local guest"}
             >
-              <span className={cn("h-2 w-2 rounded-full shrink-0", user?.isFirebase ? "bg-[#00ffa3]" : "bg-[#00f5ff]")} />
+              <span className={cn("h-2 w-2 rounded-full shrink-0", user?.isFirebase ? "bg-[#10b981]" : "bg-[#ff5678]")} />
               <span className="truncate">{user?.isFirebase ? `☁️ ${displayHandle}` : displayHandle}</span>
             </button>
 
@@ -270,7 +295,7 @@ export function SiteHeader({
                 type="button"
                 aria-label="Open Settings & Backup"
                 onClick={onOpenSettings}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#0c0c16] text-[#a6a6c4] hover:border-[#00f5ff] hover:text-white"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#1c1c22] text-zinc-300 hover:border-[#ff5678] hover:text-white"
               >
                 <Settings className="h-4 w-4" />
               </button>
@@ -278,7 +303,7 @@ export function SiteHeader({
 
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-white md:hidden"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-white md:hidden"
               aria-expanded={menuOpen}
               onClick={onToggleMenu}
             >

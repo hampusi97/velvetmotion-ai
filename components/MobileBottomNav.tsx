@@ -24,7 +24,7 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-white/10 bg-[#05050a]/95 backdrop-blur-xl pb-[max(0.4rem,env(safe-area-inset-bottom))]"
+      className="fixed bottom-0 inset-x-0 z-40 lg:hidden border-t border-white/[0.08] bg-[#141418]/95 backdrop-blur-xl pb-[max(0.4rem,env(safe-area-inset-bottom))]"
     >
       <div className="flex items-stretch justify-around max-w-lg mx-auto px-1">
         {TABS.map((tab) => {
@@ -39,13 +39,13 @@ export function MobileBottomNav({
               aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[56px] py-1.5 text-[10px] font-semibold transition active:scale-95",
-                isActive ? "text-[#ff1e8e]" : "text-[#a6a6c4]",
+                isActive ? "text-[#ff5678]" : "text-zinc-400",
               )}
             >
               <span className="text-[1.25rem] leading-none">{tab.icon}</span>
               <span className="leading-none">{tab.label}</span>
               {isActive && (
-                <span className="h-0.5 w-6 rounded-full bg-gradient-to-r from-[#ff1e8e] to-[#00f5ff] shadow-[0_0_10px_rgba(255,30,142,0.8)] mt-0.5" />
+                <span className="h-0.5 w-6 rounded-full bg-[#ff5678] mt-0.5" />
               )}
             </Link>
           );

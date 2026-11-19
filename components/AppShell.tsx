@@ -348,7 +348,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           aria-hidden={menuOpen || undefined}
           className={containerClass + (suppressFooter ? " flex-1 py-2 min-w-0" : " flex-1 py-6 min-w-0")}
         >
-          {!suppressFooter && <SupporterBanner onOpenWallet={() => navigate("wallet")} />}
           {view === "home" && (
             <HomeView
               onNavigate={navigate}
@@ -513,15 +512,20 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
             ))}
 
           {!suppressFooter && (
-            <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[#a6a6c4]">
-              <span>VelvetMotion AI · Hyper-Neon Noir · Fictional adults 18+ only · Local-First</span>
-              <div className="flex flex-wrap gap-4">
-                <Link href="/download/" className="text-[#00f5ff] font-semibold hover:underline">Desktop App</Link>
-                <Link href="/terms/" className="hover:text-[#ff1e8e]">Terms</Link>
-                <Link href="/privacy/" className="hover:text-[#ff1e8e]">Privacy</Link>
-                <Link href="/policy/" className="hover:text-[#ff1e8e]">Safety &amp; 18+</Link>
+            <>
+              <div className="mt-10">
+                <SupporterBanner onOpenWallet={() => navigate("wallet")} />
               </div>
-            </footer>
+              <footer className="mt-6 border-t border-white/[0.08] pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
+                <span>VelvetMotion.ai · 100% Free Companion Studio · Fictional adults 18+ only · Local-First</span>
+                <div className="flex flex-wrap gap-4">
+                  <Link href="/download/" className="text-[#ff5678] font-semibold hover:underline">Desktop App</Link>
+                  <Link href="/terms/" className="hover:text-[#ff5678]">Terms</Link>
+                  <Link href="/privacy/" className="hover:text-[#ff5678]">Privacy</Link>
+                  <Link href="/policy/" className="hover:text-[#ff5678]">Safety &amp; 18+</Link>
+                </div>
+              </footer>
+            </>
           )}
         </main>
       </div>
