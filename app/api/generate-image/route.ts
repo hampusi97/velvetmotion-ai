@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCharacter } from "@/lib/characters";
+import { checkContentSafety } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,10 @@ export async function POST(req: Request) {
     const type = typeof body.type === "string" ? body.type : "portrait";
     const pose = typeof body.pose === "string" ? body.pose : "looking at viewer, seductive";
     const extra = typeof body.extra === "string" ? body.extra : "";
+    const safety = checkContentSafety(extra);
+    if (!safety.allowed) {
+      return NextResponse.json({ ok: false, error: safety.reason }, { status: 400 });
+    }
     const character = getCharacter(characterId);
 
     const look = character?.figure || "beautiful adult woman, proportionate figure";
