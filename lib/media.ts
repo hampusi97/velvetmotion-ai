@@ -56,7 +56,7 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
   explicit:
     "explicit nude selfie, aroused expression, detailed anatomy, glistening skin, intense eye contact, highly detailed erotic photography, uncensored photoreal adult 21+, wet look, high resolution, cinematic lighting",
   sex:
-    "explicit intimate sex scene, passionate motion blur, detailed anatomy, realistic skin sweat, intimate POV, erotic cinematography, uncensored photoreal adult, climax energy",
+    "explicit sex scene, any position, blowjob doggy cowgirl missionary standing, moaning dirty talk, detailed anatomy, sweaty skin, uncensored photoreal adult, intense, cinematic",
   aftercare:
     "post-sex aftercare portrait, soft sheets, satisfied smile, gentle embrace energy, warm morning light, photoreal intimate, messy hair",
   dual:
