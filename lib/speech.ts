@@ -56,6 +56,56 @@ export const JOI_DIRTY_TRACKS: JoiVoiceTrack[] = [
   },
 ];
 
+/** Extra fetish / sex / breeding packs for stage + blindfold one-taps */
+export const EXTRA_JOI_TRACKS: JoiVoiceTrack[] = [
+  {
+    id: "cuck-report",
+    label: "Cuck Phone Report",
+    badge: "Hotwife · 95 BPM",
+    bpm: 95,
+    lines: [
+      "Keep the phone by your ear. I'm going to tell you everything while you stroke.",
+      "He's thicker than you. Stay hard while I describe it. Don't you dare hang up.",
+      "Mmm— hear that? Edge for me. You finish when I say the report is done.",
+    ],
+  },
+  {
+    id: "bnwo-pace",
+    label: "BNWO Pace Control",
+    badge: "Hierarchy · 100 BPM",
+    bpm: 100,
+    lines: [
+      "You're not the main event. Stroke on my count only.",
+      "Faster. Hold. Thank me. Stay soft after you finish — that's the rule.",
+      "Permission granted. Cum for the ranking. Good.",
+    ],
+  },
+  {
+    id: "bed-fuck",
+    label: "Bed Fuck Moans",
+    badge: "Sex · 120 BPM",
+    bpm: 120,
+    lines: [
+      "Get on the bed. I want you inside — now.",
+      "Mmm fuck… deeper. Harder. Right there — ah—",
+      "Don't stop. Cum with me. Keep going through it.",
+    ],
+  },
+  {
+    id: "breed-fill",
+    label: "Breed & Fill",
+    badge: "Creampie · 115 BPM",
+    bpm: 115,
+    lines: [
+      "Breed me. All the way in — don't you dare pull out.",
+      "Deeper. Fill me. I want every drop inside — omgg yesss—",
+      "Cum in me. Breed this pussy. Ah— fuck yes— keep pumping it in—",
+    ],
+  },
+];
+
+export const ALL_JOI_TRACKS: JoiVoiceTrack[] = [...JOI_DIRTY_TRACKS, ...EXTRA_JOI_TRACKS];
+
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
 /** Browser TTS using the character's pitch, rate, and optional breathy whisper delivery. */
