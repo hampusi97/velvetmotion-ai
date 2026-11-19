@@ -41,6 +41,22 @@ export const FACE_SEEDS: Record<string, string> = {
   "wren": "unique face seed wren-v2: East Asian woman 26, neat black bob, clear rectangular glasses, soft closed-mouth smile, ink stain on one fingertip vibe, photoreal identity lock",
   "yuki": "unique face seed yuki-v2: Japanese woman 22, soft features, long dark hair, gentle downturned eyes, hoodie coziness, photoreal identity lock",
   "zara": "unique face seed zara-v2: Middle Eastern woman 29, sharp cheekbones, dark wavy hair, deep brown eyes, tailored elegance, photoreal identity lock",
+  "briony": "unique face seed briony-v2: Compact strong woman 23, short dark messy hair, freckled nose, ink on ribs visible at neck, strong arms, photoreal brat energy identity lock",
+  "calla": "unique face seed calla-v2: Lean-muscled woman 27, long dark straight hair, soft brown eyes, flexible athletic face, warm studio glow, photoreal sensual identity lock",
+  "dalia-r": "unique face seed dalia-v2: Middle Eastern woman 29, dark wavy hair, almond eyes, elegant bone structure, soft gold jewelry, photoreal identity lock",
+  "delilah-v": "unique face seed delilah-v2: Blonde bombshell 26, long platinum waves, blue eyes, full lips, glamorous high-cheekbones, photoreal identity lock",
+  "diana-m": "unique face seed diana-v2: Mature elegant woman 38, silver-streaked dark hair, sharp intelligent eyes, refined features, photoreal identity lock",
+  "isolde": "unique face seed isolde-v2: Full-figured French woman 41, silver-streaked brown hair soft updo, warm brown eyes, soft stomach energy in face, photoreal romantic identity lock",
+  "liora": "unique face seed liora-v2: Soft-featured woman 26, light freckles, warm brown eyes, auburn hair loose, ink-stained gentle look, photoreal identity lock",
+  "lisa-k": "unique face seed lisa-v2: Asian-American woman 24, sleek black bob, dark almond eyes, petite features, soft smile, photoreal identity lock",
+  "livia-n": "unique face seed livia-v2: Italian woman 30, dark curls, olive skin, expressive brown eyes, warm full lips, photoreal identity lock",
+  "maren": "unique face seed maren-v2: Tall Scandinavian-American 34, silver streak at temple, sharp jaw, cool grey eyes, sophisticated dominant posture, photoreal identity lock",
+  "mila-s": "unique face seed mila-s-v2: Eastern European 27, light brown messy bun, soft gray-green eyes, tired-kind smile, photoreal identity lock",
+  "nadine": "unique face seed nadine-v2: Tall dark-skinned Black woman 32, sculptural features, short natural or sleek bun, minimal gold, sharp elegant dominant, photoreal identity lock",
+  "nova-p": "unique face seed nova-p-v2: Athletic Latina 24, long dark ponytail, sharp smile, warm brown eyes, sporty freckles, photoreal identity lock",
+  "suzu-m": "unique face seed suzu-v2: Japanese woman 23, soft oval face, dark eyes, straight black hair with subtle bangs, delicate features, photoreal identity lock",
+  "tess": "unique face seed tess-v2: Lanky woman 29, cropped auburn hair, crooked grin, green eyes, studio headphones energy, photoreal identity lock",
+  "vesper": "unique face seed vesper-v2: Soft-curved woman 26, dark hair low twist, deep red lipstick, brown eyes, hostess elegance, photoreal identity lock",
 };
 
 export function applyFaceSeed<T extends { id: string; figure?: string }>(c: T): T {
