@@ -587,7 +587,16 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
                     ▶ Voice note
                   </button>
                 )}
-                {m.videoUrl && <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />}
+                {m.videoUrl ? (
+                  <video src={m.videoUrl} controls playsInline className="mt-2 w-full max-h-80 rounded-xl bg-black" />
+                ) : m.frames && m.frames.length > 1 ? (
+                  <div className="mt-2 relative w-full max-h-80 rounded-xl overflow-hidden bg-black">
+                    {m.frames.map((f, i) => (
+                      <img key={i} src={f} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ animation: `seqFade 4s infinite ${i * 1.3}s`, opacity: 0 }} />
+                    ))}
+                    <style>{`@keyframes seqFade { 0%,20% { opacity: 1; } 25%,100% { opacity: 0; } }`}</style>
+                  </div>
+                ) : null}
                 {m.imageUrl && !m.videoUrl && (
                   <div className="mt-2 rounded-xl overflow-hidden">
                     {m.frames && m.frames.length > 1 ? (
