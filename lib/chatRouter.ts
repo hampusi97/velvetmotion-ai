@@ -57,6 +57,19 @@ async function callHorde(persona: CompanionPersona, history: RouterMessage[]): P
   throw new Error("horde timeout");
 }
 
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error(label + " timeout")), ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
+
 export async function generateCompanionReply(history: RouterMessage[], persona: CompanionPersona): Promise<{ text: string; providerUsed: string }> {
   const settings = loadRouterSettings();
   if (settings.customBaseUrl) {

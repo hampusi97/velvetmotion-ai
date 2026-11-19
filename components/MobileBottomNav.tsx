@@ -8,7 +8,7 @@ const TABS = [
   { id: "tinder", label: "Explore", icon: "🔥" },
   { id: "create", label: "Create", icon: "✨" },
   { id: "girls", label: "Chats", icon: "💬" },
-  { id: "joi3d", label: "3D", icon: "🎬" },
+  { id: "shorts", label: "Shorts", icon: "🎬" },
 ] as const;
 
 export function MobileBottomNav({
@@ -24,7 +24,7 @@ export function MobileBottomNav({
       : active === "gallery" || active === "tribute" || active === "my-girls" || active === "vault"
         ? "girls"
         : active === "shorts" || active === "blindfold" || active === "room"
-          ? "joi3d"
+          ? "shorts"
           : active;
 
   return (
@@ -37,7 +37,7 @@ export function MobileBottomNav({
               key={tab.id}
               type="button"
               onClick={() => onNavigate(tab.id)}
-              className={cn(
+              className={cn("min-h-[48px] text-sm ", 
                 "flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[56px] py-2 text-[10px] font-medium transition active:scale-95",
                 isActive ? "text-pink-300" : "text-zinc-500",
               )}
