@@ -105,11 +105,11 @@ export default function Home() {
     const existingUser = getUser();
     setUser(existingUser);
     setCoins(getCoins());
-    const coinTimer = setInterval(() => setCoins(getCoins()), 1500);
-    return () => clearInterval(coinTimer);
     setAuthReady(true);
     registerServiceWorker();
     if (existingUser && shouldShowSupportPromptOnLogin()) { const d = Number(localStorage.getItem("vm-support-dismissed") || 0); if (Date.now() - d > 7 * 86400000) setSupportModalOpen(true); }
+    const coinTimer = setInterval(() => setCoins(getCoins()), 1500);
+    return () => clearInterval(coinTimer);
   }, []);
 
   useEffect(() => {
