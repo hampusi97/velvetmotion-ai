@@ -153,6 +153,9 @@ export function sanitizeCompanionReply(raw: string, companionName: string): stri
     'i',
   );
 
+  const typingStageRx =
+    /(?:^|\s)[\(\[]\s*(?:(?:she(?:'|\u2019)?s|she\s+is)\s+)?(?:typing|pause)\s*(?:\.{1,3}|…)?\s*[\)\]]|(?:^|\s)\*\s*(?:(?:she(?:'|\u2019)?s|she\s+is)\s+)?(?:typing|pause)\s*(?:\.{1,3}|…)?\s*\*/gi;
+
   const text = raw
     .replace(/<think>[\s\S]*?<\/think>/gi, '')
     .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
@@ -160,9 +163,12 @@ export function sanitizeCompanionReply(raw: string, companionName: string): stri
     .replace(/<(?:think|reasoning)>[\s\S]*$/gi, '')
     .trim()
     .replace(prefixRx, '')
+    .replace(typingStageRx, ' ')
     .split('\n')
-    .filter((line) => !/^(?:User|System|Context|Bio)\s*:/i.test(line.trim()))
+    .map((line) => line.replace(typingStageRx, ' ').replace(/\s{2,}/g, ' ').trim())
+    .filter((line) => line.length > 0 && !/^(?:User|System|Context|Bio)\s*:/i.test(line))
     .join('\n')
+    .replace(prefixRx, '')
     .trim();
 
   if (!text || text.length < 2) return '';

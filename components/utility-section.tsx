@@ -863,7 +863,7 @@ export function UtilitySection({
                           src={item.url}
                           alt={item.type}
                           onError={(e) => {
-                            e.currentTarget.src = `/avatars/maren.svg`;
+                            e.currentTarget.src = `/portraits/maren.jpg`;
                           }}
                           className="w-full aspect-[3/4] object-cover"
                         />

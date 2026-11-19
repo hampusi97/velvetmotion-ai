@@ -12,7 +12,7 @@ const FREE_VIDEO_TOOLS = [
 
 export function MotionSequencePlayer({
   frames,
-  fallbackSrc = "/avatars/maren.svg",
+  fallbackSrc = "/portraits/maren.jpg",
   compact = false,
   alt,
 }: {

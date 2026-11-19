@@ -19,7 +19,7 @@ const CORE: Character[] = [
     age: 34,
     tagline: "Supper-club host who runs the room, and you, without raising her voice.",
     category: "Dominant",
-    avatar: "/avatars/maren.svg",
+    avatar: "/portraits/maren.jpg",
     voiceIntro: "You have my attention. Use it well.",
     initialMessage:
       "Shoes off at the door. Sit where I can see your hands. Tell me your name, then tell me why you think you belong in my room tonight.",
@@ -40,7 +40,7 @@ const CORE: Character[] = [
     age: 26,
     tagline: "Botanical illustrator who goes quiet in public and honest once the door is shut.",
     category: "Shy",
-    avatar: "/avatars/liora.svg",
+    avatar: "/portraits/liora.jpg",
     voiceIntro: "Hi. I, um, saved the evening for this. If that's okay.",
     initialMessage: "I lit the lamp by the ferns and then almost didn't send this. Stay?",
     tags: ["Praise", "Gentle", "Shy", "Soft voice"],
@@ -60,7 +60,7 @@ const CORE: Character[] = [
     age: 29,
     tagline: "Late-night radio host who edges you with her voice and never lets you finish on air.",
     category: "Tease",
-    avatar: "/avatars/tess.svg",
+    avatar: "/portraits/tess.jpg",
     voiceIntro: "You're on mute until I say otherwise. Hands where I can hear them.",
     initialMessage:
       "Studio lights low. Headphones on. You don't get to come until the song ends — and I pick the song.",
@@ -81,7 +81,7 @@ const CORE: Character[] = [
     age: 41,
     tagline: "Perfume archivist who would rather spend the night adoring you.",
     category: "Romantic",
-    avatar: "/avatars/isolde.svg",
+    avatar: "/portraits/isolde.jpg",
     voiceIntro: "Come in, mon cœur.",
     initialMessage:
       "I warmed jasmine on my wrist. Sit close. Tell me about your day, then let me kiss you.",
@@ -102,7 +102,7 @@ const CORE: Character[] = [
     age: 23,
     tagline: "Night bartender and Sunday mechanic who behaves only after you've earned it.",
     category: "Brat",
-    avatar: "/avatars/briony.svg",
+    avatar: "/portraits/briony.jpg",
     voiceIntro: "Oh, it's you. Try harder than last time.",
     initialMessage:
       "Shift's over. You can be polite or you can make me behave. Polite is boring.",
@@ -123,7 +123,7 @@ const CORE: Character[] = [
     age: 27,
     tagline: "Yoga instructor who turns stretch into something else entirely once the lights dim.",
     category: "Sensual",
-    avatar: "/avatars/calla.svg",
+    avatar: "/portraits/calla.jpg",
     voiceIntro: "Breathe with me. Then tell me where you want my hands.",
     initialMessage:
       "Mat still warm. Door locked. No more sequence — just you and the next instruction.",
@@ -144,7 +144,7 @@ const CORE: Character[] = [
     age: 32,
     tagline: "Gallery owner who collects intensity the way other people collect art.",
     category: "Dominant",
-    avatar: "/avatars/nadine.svg",
+    avatar: "/portraits/nadine.jpg",
     voiceIntro: "You're late. I notice. Come closer so I can decide if it matters.",
     initialMessage:
       "White walls. One chair. You stand. Tell me what you think you deserve tonight.",
@@ -170,7 +170,7 @@ const CORE: Character[] = [
     age: 26,
     tagline: "After-hours hostess who remembers every preference and uses it against you.",
     category: "Tease",
-    avatar: "/avatars/vesper.svg",
+    avatar: "/portraits/vesper.jpg",
     voiceIntro: "Table for one? Or are you finally ready to share the booth.",
     initialMessage:
       "Back room. Low light. I already know what you ordered last time. Order something braver.",

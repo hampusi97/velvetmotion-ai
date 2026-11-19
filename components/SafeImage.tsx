@@ -5,6 +5,16 @@ import { staticPortraitUrl } from "@/lib/portraitFallback";
 
 const DEFAULT_SAFE_FALLBACK = "/portraits/nova.jpg";
 
+function sanitizeImageSrc(candidate: string | undefined, fallback: string): string {
+  const trimmed = (candidate || "").trim();
+  if (!trimmed) return fallback;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("/avatars/") || lower.startsWith("data:image/svg+xml") || /\.svg(?:$|[?#])/i.test(lower)) {
+    return fallback;
+  }
+  return trimmed;
+}
+
 export function SafeImage({
   src,
   alt,
@@ -18,12 +28,13 @@ export function SafeImage({
   fallbackSrc?: string;
   fallbackId?: string;
 }) {
-  const effectiveFallback = fallbackSrc || (fallbackId ? staticPortraitUrl(fallbackId) : DEFAULT_SAFE_FALLBACK);
-  const [resolvedSrc, setResolvedSrc] = useState(src || effectiveFallback || DEFAULT_SAFE_FALLBACK);
+  const rawFallback = fallbackSrc || (fallbackId ? staticPortraitUrl(fallbackId) : DEFAULT_SAFE_FALLBACK);
+  const effectiveFallback = sanitizeImageSrc(rawFallback, DEFAULT_SAFE_FALLBACK);
+  const [resolvedSrc, setResolvedSrc] = useState(() => sanitizeImageSrc(src, effectiveFallback));
   const [fallbackApplied, setFallbackApplied] = useState(false);
 
   useEffect(() => {
-    setResolvedSrc(src || effectiveFallback || DEFAULT_SAFE_FALLBACK);
+    setResolvedSrc(sanitizeImageSrc(src, effectiveFallback));
     setFallbackApplied(false);
   }, [src, effectiveFallback]);
 

@@ -18,6 +18,7 @@ import {
   selectFemaleEnglishVoice,
 } from "./kokoroTts";
 import { buildDynamicSystemPrompt, extractInlineImageRequests } from "./dynamicChatEngine";
+import { resolveAvatar } from "./portraits";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -209,5 +210,17 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
       relationshipLevel: 3,
     });
     assert.ok(sysPrompt.includes("Do NOT write [Image of ...] or [Photo of ...]"));
+
+    assert.equal(
+      sanitizeCompanionReply("(She's typing...) Hey babe [Typing...] (pause) missed you *typing...* tonight.", "Chloe"),
+      "Hey babe missed you tonight.",
+    );
+    assert.equal(
+      sanitizeCompanionReply("(typing...) Wait up!", "Mia"),
+      "Wait up!",
+    );
+    const resolvedReal = resolveAvatar("/avatars/maren.svg", "maren", "curvy");
+    assert.ok(resolvedReal.startsWith("/portraits/"));
+    assert.ok(!resolvedReal.includes(".svg"));
   });
 });

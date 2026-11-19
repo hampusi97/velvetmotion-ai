@@ -130,11 +130,13 @@ test("Portrait URLs stay within Firestore 2000-char limit", async () => {
   const maxUrlLen = blueprint.entities.SavedMedia.properties.url.maxLength!;
 
   const builtIn = characterPortraitUrl("maren", "curvy figure");
-  assert.ok(builtIn.startsWith("data:image/svg+xml;utf8,"));
+  assert.ok(builtIn.startsWith("/portraits/"));
+  assert.ok(!builtIn.includes(".svg"));
   assert.ok(builtIn.length <= maxUrlLen);
 
   const customPortrait = resolveAvatar("/avatars/maren.svg", "maren", "curvy figure");
-  assert.ok(customPortrait.startsWith("data:image/svg+xml;utf8,"));
+  assert.ok(customPortrait.startsWith("/portraits/"));
+  assert.ok(!customPortrait.includes(".svg"));
   assert.ok(customPortrait.length <= maxUrlLen);
 });
 
