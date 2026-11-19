@@ -9,7 +9,7 @@ import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 
 /** Cloudflare Workers AI image endpoint — free tier ~173/day, no 45s limit. */
-const CF_IMAGE_WORKER = "https://velvetmotion-image.velvetmotion-ai.workers.dev/generate";
+const CF_IMAGE_WORKER = "https://velvetmotion-image.hampusi97.workers.dev/generate";
 
 export type MediaMood =
   | "beauty"
