@@ -13,7 +13,6 @@ import { canClaimDaily, claimDaily, getCoins } from "@/lib/storage";
 import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
-import { CandyGirlCard } from "./CandyGirlCard";
 
 const EXPERIENCES = [
   {
@@ -229,7 +228,7 @@ export function HomeView({
                 key={exp.id}
                 type="button"
                 onClick={() => onNavigate(exp.id)}
-                className="group relative aspect-[4/5] overflow-hidden rounded-3xl border border-white/10 text-left transition hover:border-pink-500/50 hover:shadow-[0_0_40px_rgba(236,72,153,0.25)]"
+                className="group relative aspect-[4/5] overflow-hidden rounded-3xl border border-white/10 text-left transition hover:border-pink-500/50 hover:shadow-[0_0_40px_rgba(236,72,153,0.25)] girl-card animate-card-in"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -321,13 +320,42 @@ export function HomeView({
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {featured.map((c, i) => (
-              <CandyGirlCard
+              <button
                 key={c.id}
-                character={c}
-                mood={i % 3 === 0 ? "lingerie" : "beauty"}
-                isNew={i < 3}
-                onSelect={(ch) => onOpenGirl(ch.id)}
-              />
+                type="button"
+                onClick={() => onOpenGirl(c.id)}
+                className="girl-card relative aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-zinc-950 group hover:border-pink-500/60 transition text-left"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={characterMediaUrl(c, i % 3 === 0 ? "lingerie" : "beauty")}
+                  alt={c.name}
+                  className="absolute inset-0 w-full h-full object-cover object-top group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                />
+                {i < 3 && (
+                  <span className="absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white shadow">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    NEW
+                  </span>
+                )}
+                <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-zinc-100 backdrop-blur-sm">
+                    <ImageIcon className="h-3 w-3" />
+                  </span>
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-pink-200 backdrop-blur-sm">
+                    <Mic className="h-3 w-3" />
+                  </span>
+                </div>
+                <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/65 to-transparent">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-sm text-white truncate">{c.name}</span>
+                    <span className="text-xs text-zinc-300 shrink-0">{c.age}</span>
+                    <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-pink-400" />
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-pink-200/90 truncate">{c.category}</div>
+                </div>
+              </button>
             ))}
           </div>
         </motion.section>
