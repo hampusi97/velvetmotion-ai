@@ -60,7 +60,6 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Native Phone & Tablet (iOS / iPadOS / Android) Safe-Area & Standalone App Polish */
 @supports (padding: max(0px)) {
   .safe-bottom {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
@@ -108,7 +107,6 @@ body {
   transform: scale(0.98);
 }
 
-/* Neon glass card — Candy-style */
 .glass-card {
   background: linear-gradient(165deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
   border: 1px solid rgba(255, 77, 154, 0.28);
@@ -127,9 +125,12 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-/* Candy-style card lift */
 .girl-card {
   transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(12, 10, 16, 0.9);
 }
 .girl-card:hover {
   transform: translateY(-6px);
@@ -147,13 +148,8 @@ body {
 }
 
 @keyframes neon-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 20px rgba(255, 45, 149, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 36px rgba(255, 45, 149, 0.35), 0 0 60px rgba(232, 121, 249, 0.15);
-  }
+  0%, 100% { box-shadow: 0 0 20px rgba(255, 45, 149, 0.15); }
+  50% { box-shadow: 0 0 36px rgba(255, 45, 149, 0.35), 0 0 60px rgba(232, 121, 249, 0.15); }
 }
 
 .neon-pulse {
@@ -166,7 +162,6 @@ body {
     border-color: rgba(248, 201, 216, 0.5);
     box-shadow: 0 12px 40px rgba(255, 77, 154, 0.18);
   }
-
   .feature-card:hover:active {
     transform: translateY(-2px) scale(0.985);
   }
@@ -182,40 +177,73 @@ body {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: #120e16;
 }
-
 ::-webkit-scrollbar-thumb {
   background: #ff4d9a;
   border-radius: 999px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
-  *,
-  *::before,
-  *::after {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
 
-  [data-motion],
-  .feature-card,
-  .feature-card:hover,
-  .feature-card:active,
-  .feature-card:hover:active,
-  .press:active,
-  .girl-card:hover,
-  .neon-pulse {
-    opacity: 1 !important;
-    transform: none !important;
-    animation: none !important;
-  }
+.vm-panel {
+  @apply rounded-3xl border border-white/10 bg-zinc-950/70 backdrop-blur-md;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.vm-chip {
+  @apply rounded-full border border-pink-500/30 bg-pink-500/10 px-3 py-1.5 text-xs text-pink-100 transition;
+}
+.vm-chip:hover {
+  @apply border-pink-400/50 bg-pink-500/20;
+}
+.vm-chip-active {
+  @apply border-pink-400 bg-pink-500/25 text-white shadow-[0_0_20px_rgba(255,77,154,0.25)];
+}
+.vm-cta {
+  @apply rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold text-white shadow-lg shadow-pink-500/30 transition active:scale-[0.98];
+}
+.vm-cta:hover {
+  filter: brightness(1.06);
+}
+.vm-media-frame {
+  @apply relative overflow-hidden rounded-2xl border border-pink-500/40 bg-black;
+  box-shadow: 0 12px 40px rgba(236, 72, 153, 0.15);
+}
+
+.candy-hero {
+  background: linear-gradient(160deg, rgba(255, 45, 149, 0.12) 0%, rgba(7, 6, 10, 0.4) 50%, rgba(154, 35, 79, 0.15) 100%);
+  border: 1px solid rgba(255, 77, 154, 0.25);
+  border-radius: 1.75rem;
+  box-shadow: 0 20px 60px rgba(255, 45, 149, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.candy-cta {
+  background: linear-gradient(135deg, #ff4d9a 0%, #e879f9 100%);
+  color: white;
+  font-weight: 600;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(255, 77, 154, 0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.candy-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgba(255, 77, 154, 0.5);
+}
+.candy-cta:active { transform: scale(0.98); }
+.girl-card-overlay {
+  background: linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 40%, transparent 100%);
+}
+.chip-active {
+  background: linear-gradient(135deg, #ff4d9a, #e879f9);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(255, 77, 154, 0.35);
 }
