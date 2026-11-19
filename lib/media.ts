@@ -9,6 +9,7 @@ import type { Character } from "./charactersTypes";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { loadRouterSettings } from "./chatRouter";
+import { generateComfySfwPortrait, probeComfyUi } from "./comfyBridge";
 import { generateLocalImage } from "./comfyClient";
 import { generateHordeImage } from "./aiHorde";
 import { fetchWorkerImage } from "./imageWorker";
@@ -163,8 +164,35 @@ export async function resolveBestMediaUrl(
   };
 
   if (typeof window !== "undefined") {
-    // Priority 1: Local RTX 5060 ComfyUI (:8188 / custom) or Home Engine (:8787 / Tunnel) — 100% Uncensored
+    // Priority 1A: Local ComfyUI Bridge (:8188 SFW creative outfit/scene portraits) when online
     const comfyBase = (settings?.localImageBase || "http://127.0.0.1:8188").trim();
+    const comfyProbe = await probeComfyUi(comfyBase);
+    if (comfyProbe.online && !NSFW_MOODS.has(mood)) {
+      try {
+        const blobUrl = await generateComfySfwPortrait({
+          comfyUrl: comfyBase,
+          prompt,
+          checkpointName: comfyProbe.checkpoints[0],
+          width: IMAGE_WIDTH,
+          height: IMAGE_HEIGHT,
+          seed,
+        });
+        const stableUrl = await remoteImageToStableDataUrl(blobUrl).catch(() => blobUrl);
+        reportImg("comfyui-bridge");
+        return {
+          url: stableUrl,
+          note: `Local ComfyUI (${comfyProbe.checkpoints[0] || "SDXL/FLUX"})`,
+          seed,
+          engine: "comfyui-bridge",
+        };
+      } catch (e) {
+        if (e instanceof Error && !/offline/i.test(e.message)) {
+          errors.push(e.message);
+        }
+      }
+    }
+
+    // Priority 1B: Local RTX / ComfyUI direct uncensored or Home Engine (:8787 / Tunnel)
     const localRes = await generateLocalImage(
       { prompt, seed, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, characterId: character.id },
       comfyBase,

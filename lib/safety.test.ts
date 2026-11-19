@@ -19,6 +19,7 @@ import {
 } from "./kokoroTts";
 import { buildDynamicSystemPrompt, extractInlineImageRequests } from "./dynamicChatEngine";
 import { resolveAvatar } from "./portraits";
+import { buildSfwPortraitWorkflow, probeComfyUi, sanitizeCreativeSfwPrompt } from "./comfyBridge";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -222,5 +223,32 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
     const resolvedReal = resolveAvatar("/avatars/maren.svg", "maren", "curvy");
     assert.ok(resolvedReal.startsWith("/portraits/"));
     assert.ok(!resolvedReal.includes(".svg"));
+  });
+
+  it("validates ComfyUI SFW creative workflows and probes installed checkpoints", async () => {
+    assert.throws(() => sanitizeCreativeSfwPrompt("explicit nude scene"), /SFW/);
+    const graph = buildSfwPortraitWorkflow({ prompt: "silk evening dress neon balcony", checkpointName: "juggernautXL.safetensors", seed: 42 });
+    const ksampler = graph["3"] as { inputs: Record<string, unknown> };
+    const ckpt = graph["4"] as { inputs: Record<string, unknown> };
+    assert.equal(ksampler.inputs.seed, 42);
+    assert.equal(ckpt.inputs.ckpt_name, "juggernautXL.safetensors");
+
+    const origFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async () =>
+        new Response(
+          JSON.stringify({
+            CheckpointLoaderSimple: {
+              input: { required: { ckpt_name: [["sd_xl_base_1.0.safetensors", "flux1-dev.safetensors"]] } },
+            },
+          }),
+          { status: 200 },
+        )) as typeof fetch;
+      const probe = await probeComfyUi("http://127.0.0.1:8188");
+      assert.equal(probe.online, true);
+      assert.deepEqual(probe.checkpoints, ["sd_xl_base_1.0.safetensors", "flux1-dev.safetensors"]);
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Download, BookmarkPlus, Film, MessageSquare, Sparkles, Lock, Upload } from 'lucide-react';
 import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
 import {
@@ -10,6 +10,7 @@ import {
   VIDEO_SPEEDS,
   type VideoMotionPreset,
 } from '@/lib/canvasVideoExporter';
+import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { useLocalEngineStatus } from '@/lib/localEngineBridge';
@@ -124,6 +125,20 @@ export default function MediaStudioModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const localEngine = useLocalEngineStatus();
+  const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!isOpen && !standalone) return;
+    let active = true;
+    void probeComfyUi().then((info) => {
+      if (active && info.online) {
+        setComfyCheckpoints(info.checkpoints);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, standalone]);
 
   if (!isOpen && !standalone) return null;
 
@@ -149,6 +164,34 @@ export default function MediaStudioModal({
     setStatusMsg(null);
 
     try {
+      if (!wantsNsfw) {
+        const comfyInfo = await probeComfyUi();
+        if (comfyInfo.online) {
+          setComfyCheckpoints(comfyInfo.checkpoints);
+          try {
+            const t0 = performance.now();
+            const blobUrl = await generateComfySfwPortrait({
+              prompt,
+              checkpointName: comfyInfo.checkpoints[0],
+              width: aspect.width,
+              height: aspect.height,
+              seed: parsedSeed,
+            });
+            const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
+            const engineLabel = `ComfyUI (${comfyInfo.checkpoints[0] || 'Local :8188'})`;
+            setGeneratedPhoto(blobUrl);
+            setPhotoRevealed(true);
+            setVideoSourceUrl(blobUrl);
+            setEngineBadge(engineLabel);
+            handleSaveToCollection(blobUrl, 'studio-photo');
+            setStatusMsg(`Rendered via ${engineLabel} in ${elapsedSec}s (seed ${parsedSeed}) · Auto-saved to Photo Diary & Collection`);
+            return;
+          } catch {
+            /* Fall back seamlessly to studio pipeline / Cloudflare Image Worker GET /generate */
+          }
+        }
+      }
+
       const result = await generateStudioPicture({
         prompt,
         seed: parsedSeed,
@@ -527,6 +570,12 @@ export default function MediaStudioModal({
           >
             {photoBusy ? 'Generating Neon Portrait...' : 'Generate Photo'}
           </button>
+
+          {comfyCheckpoints.length > 0 && (
+            <p className="text-[10px] text-[#00ffa3] text-center font-mono">
+              ● Priority 1 Local ComfyUI :8188 ready ({comfyCheckpoints[0]})
+            </p>
+          )}
 
           {generatedPhoto && (
             <div className="space-y-2.5 pt-2">
