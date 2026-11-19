@@ -418,12 +418,7 @@ export default function Home() {
           {view === "my-girls" && (
             <MyGirlsHub
               onHome={() => setView("home")}
-              onChat={openChatById}
-              onOpen3D={(id) => {
-                setStageGirlId(id);
-                setStageFromMatch(false);
-                setView("joi3d");
-              }}
+              onOpenChat={(c) => openChatById(c.id)}
             />
           )}
           {view === "wallet" && <CoinWallet onHome={() => setView("home")} onCoinsChanged={setCoins} />}
