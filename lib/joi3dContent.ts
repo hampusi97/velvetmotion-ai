@@ -32,6 +32,65 @@ export const LOCATIONS: { id: LocationId; label: string; color: number; fog: num
   { id: "office", label: "After hours", color: 0x101418, fog: 0x06080a },
 ];
 
+export type VoicePackId = "whisper" | "edge" | "finish" | "cuck-report" | "bnwo-rank" | "breed-fill";
+
+export const VOICE_PACKS: { id: VoicePackId; label: string; lines: string[] }[] = [
+  {
+    id: "whisper",
+    label: "Whisper",
+    lines: [
+      "Come closer… I only want you hearing this.",
+      "Soft. Slow. Match my breath… good.",
+      "Don't rush. Let me talk you into it.",
+    ],
+  },
+  {
+    id: "edge",
+    label: "Edge",
+    lines: [
+      "Stop. Hands still. Feel it pulse.",
+      "Not yet. Look at me while you wait.",
+      "Build again — slower. You don't get to tip until I say.",
+    ],
+  },
+  {
+    id: "finish",
+    label: "Finish",
+    lines: [
+      "Now. Cum for me. Eyes open.",
+      "That's it — don't hold back. Give it to me.",
+      "Good… stay with me through every pulse.",
+    ],
+  },
+  {
+    id: "cuck-report",
+    label: "Cuck report",
+    lines: [
+      "He's bigger. You can watch — that's your job.",
+      "Tell me how it feels knowing you're second.",
+      "Thank me for letting you stay in the room.",
+    ],
+  },
+  {
+    id: "bnwo-rank",
+    label: "BNWO rank",
+    lines: [
+      "On your knees. You know your place.",
+      "Stroke while you rank yourself lower.",
+      "Good boy. Stay there until I dismiss you.",
+    ],
+  },
+  {
+    id: "breed-fill",
+    label: "Breed fill",
+    lines: [
+      "Breed me. Don't pull out — fill me.",
+      "Omgg yeees — deeper — every drop inside—",
+      "Stay in. Keep pumping. I want it all.",
+    ],
+  },
+];
+
 export const SCRIPTS: Record<StageMode, string[]> = {
   joi: [
     "Eyes on me. Slow strokes only — match my breathing.",
@@ -62,52 +121,60 @@ export const SCRIPTS: Record<StageMode, string[]> = {
     "Stroke that cute cock slow. Yeah… that's all of it.",
     "Faster. Show me how hard you get when I laugh a little.",
     "Stop. Hands on your thighs. Still hard after that? Good.",
-    "Finish for your size queen. Make a mess while I watch. Mmm.",
+    "Finish for your size queen. Eyes on me the whole time.",
+    "Messy. Perfect. Thank me.",
   ],
   bnwo: [
-    "You're not the main event tonight. Stroke on my pace.",
-    "Watch. Stay hard. Hierarchy is not optional.",
-    "Edge. Hold. Thank me out loud if you want the finish.",
-    "Permission granted. Cum for the ranking. Stay soft after.",
+    "On your knees. You know the ranking.",
+    "Stroke while you watch. Stay smaller. Stay grateful.",
+    "Faster. Say it — who owns this moment.",
+    "Good. Hold the edge. You don't finish without permission.",
+    "Now. Cum as the lesser man. Eyes open.",
+    "Stay down. Breathe. That's your place tonight.",
   ],
   cuck: [
-    "Phone up. You're going to listen while I tell you everything.",
-    "He's thicker. I'm not being cruel — just honest. Keep stroking.",
-    "Mmm— hear that? That's me enjoying it. Don't stop your hand.",
-    "You're going to thank me for the report. Edge. Hold.",
-    "Finish now. Messy. While you picture the rest.",
+    "You can watch. That's the deal.",
+    "Tell me how it feels knowing he's inside me.",
+    "Stroke while he takes me. Don't you dare finish first.",
+    "Louder. I want you hearing us.",
+    "Cum when I say — not when he does.",
+    "Good boy. Clean-up is optional. Watching isn't.",
   ],
   cheat: [
-    "Lock the door. If anyone asks, we were just talking.",
-    "Clothes off. We don't have long. Fuck me like you mean it.",
-    "Quiet. Hands over my mouth if I get too loud — ah—",
-    "Harder. I shouldn't want this. Don't stop.",
-    "Cum in me. Quick. Then we put the mask back on.",
+    "We shouldn't… lock the door.",
+    "Faster before anyone notices.",
+    "Quiet. Don't make me scream yet.",
+    "Harder. I needed this — needed you.",
+    "Cum in me. We'll fix our faces after.",
+    "One more kiss. Then we pretend.",
   ],
   tease: [
-    "I put this body in the room just for you. Slow down.",
-    "Imagine my hand instead of yours. Match the sway.",
-    "Almost… not yet. Beg once, then I'll let you go.",
-    "Finish. Look at the stage while you do. Good boy.",
+    "Not yet. Look, don't touch.",
+    "Closer. Still no hands.",
+    "Beg a little. I like that.",
+    "Maybe now… maybe not.",
+    "Okay. Touch. Slow.",
+    "Stop. We're not done teasing.",
   ],
   worship: [
-    "On your knees for me — even if it's just in your head.",
-    "Look at every curve. Tell me what you'd kiss first.",
-    "Stroke only when I move. Match the breath.",
-    "You're allowed to ache. You're not allowed to finish yet.",
-    "Good. Now take it. All of it. For me. Mmm.",
+    "On your knees. Kiss.",
+    "Tell me what you love.",
+    "Slower. Worship, don't rush.",
+    "Eyes up. Thank me.",
+    "Good. Earn the next step.",
+    "You can finish — after you praise me once more.",
   ],
 };
 
 export const POSE_LABELS: Record<Pose, string> = {
   idle: "Idle",
-  lean: "Lean in",
+  lean: "Lean",
   closer: "Closer",
   missionary: "Missionary",
   doggy: "Doggy",
   cowgirl: "Cowgirl",
-  blowjob: "On knees",
-  "against-wall": "Against wall",
+  blowjob: "BJ",
+  "against-wall": "Wall",
   spoon: "Spoon",
 };
 
