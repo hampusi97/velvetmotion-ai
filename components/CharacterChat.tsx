@@ -69,9 +69,14 @@ type CharacterChatProps = {
 };
 
 const NSFW_CHIPS = [
-  { id: "lingerie", label: "Lingerie", mood: "lingerie" as MediaMood, cost: GEN_COST.lingerie },
-  { id: "nude", label: "Nude", mood: "nude" as MediaMood, cost: GEN_COST.nude },
-  { id: "explicit", label: "Explicit", mood: "explicit" as MediaMood, cost: GEN_COST.explicit },
+  { id: "lingerie", label: "Lingerie", mood: "lingerie" as MediaMood, cost: GEN_COST.lingerie, min: 0 },
+  { id: "nude", label: "Nude", mood: "nude" as MediaMood, cost: GEN_COST.nude, min: 30 },
+  { id: "explicit", label: "Explicit", mood: "explicit" as MediaMood, cost: GEN_COST.explicit, min: 50 },
+  { id: "blowjob", label: "Blowjob", mood: "explicit" as MediaMood, cost: GEN_COST.explicit, min: 55 },
+  { id: "doggy", label: "Doggy", mood: "sex" as MediaMood, cost: GEN_COST.explicit, min: 60 },
+  { id: "cowgirl", label: "Cowgirl", mood: "sex" as MediaMood, cost: GEN_COST.explicit, min: 60 },
+  { id: "shower", label: "Shower", mood: "explicit" as MediaMood, cost: GEN_COST.explicit, min: 45 },
+  { id: "breeding", label: "Breed", mood: "sex" as MediaMood, cost: GEN_COST.explicit, min: 70 },
 ];
 
 const VIDEO_CHIPS: { id: SequenceKind; label: string }[] = [
@@ -140,6 +145,30 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
     }, 8000);
     return () => clearTimeout(t);
   }, [character.id, character.initialMessage, character.intimacy]);
+
+  // She sends first: after a short delay, drop a lingerie/nude pic if chat is fresh
+  useEffect(() => {
+    if (messages.length > 2) return;
+    const key = `vm-sent-first-${character.id}`;
+    try {
+      if (localStorage.getItem(key)) return;
+    } catch {}
+    const t = setTimeout(() => {
+      const mood = intimacy >= 40 ? "nude" : "lingerie";
+      const url = characterMediaUrl(character, mood as MediaMood);
+      const msg = {
+        role: "assistant" as const,
+        content: intimacy >= 40
+          ? `*She sends a nude without asking.*\n\n“Couldn’t wait. Tell me what you think.”`
+          : `*She sends a lingerie shot.*\n\n“Just took this. Your move.”`,
+        mediaUrl: url,
+      };
+      setMessages((m) => [...m, msg]);
+      try { localStorage.setItem(key, "1"); } catch {}
+    }, 2200);
+    return () => clearTimeout(t);
+  }, [character.id]);
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -642,7 +671,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
 
       <div className="flex flex-wrap gap-2 pb-2">
         {NSFW_CHIPS.map((chip) => (
-          <button key={chip.id} type="button" disabled={busy} onClick={() => generate(chip.mood, chip.label, chip.cost)} className="px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs text-pink-100 disabled:opacity-50">
+          <button key={chip.id} type="button" disabled={busy} onClick={() => generate(chip.mood, chip.label, chip.cost)} className="px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs text-pink-100 disabled:opacity-50 btn-candy">
             <ImageIcon className="inline h-3.5 w-3.5" /> {chip.label}
           </button>
         ))}
