@@ -146,7 +146,8 @@ for (const scenario of JOI_PRESETS) {
     seenPhases.add(step.phase);
     walkText(`${scenario.id}/${step.id}`, step.instruction);
   }
-  for (const phase of Object.keys(phaseOrder) as JoiPhase[]) {
+  const required: JoiPhase[] = ["warm-up", "build", "edge", "finish"];
+  for (const phase of required) {
     if (!seenPhases.has(phase)) fail(`${scenario.id} missing phase ${phase}`);
   }
   walkText(scenario.id, `${scenario.label}\n${scenario.summary}\n${scenario.persona.summary}`);
