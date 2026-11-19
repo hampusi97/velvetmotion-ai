@@ -9,6 +9,11 @@
  */
 import { assertCompliance } from "./complianceFilter";
 import { reportGenerationSpeed } from "./localEngineBridge";
+import {
+  buildDynamicSystemPrompt,
+  sanitizeCompanionReply as sanitizeWithDynamicEngine,
+  type CompanionMemoryItem,
+} from "./dynamicChatEngine";
 
 export interface RouterMessage {
   role: "user" | "assistant";
@@ -23,6 +28,10 @@ export interface CompanionPersona {
   personality?: string;
   backstory?: string;
   memoryBlock?: string;
+  memories?: CompanionMemoryItem[];
+  relationshipLevel?: number;
+  recentMood?: string;
+  extraSceneContext?: string;
 }
 
 export interface ChatRouterSettings {
@@ -58,63 +67,31 @@ export function saveRouterSettings(next: Partial<ChatRouterSettings>) {
   }
 }
 
-const DEGENERATE_PATTERNS: RegExp[] = [
-  /\bI think I['’]?ll just\.{0,3}\s*be a robot\b/i,
-  /\bas an ai\b/i,
-  /\bas a language model\b/i,
-  /\bi cannot fulfill\b/i,
-  /\bi am unable to respond\b/i,
-];
-
 /**
  * Strips <think> / <reasoning> blocks, unclosed leading <think> tags,
  * stray role prefixes ("Mia:", "Assistant:", "[Character]:"), prompt echoes,
  * and rejects degenerate/robotic filler outputs.
  */
 export function sanitizeCompanionReply(raw: string, companionName: string): string {
-  if (!raw || typeof raw !== "string") return "";
-  const first = companionName.split(/\s+/)[0] || companionName;
-  let cleaned = raw
-    // Completed reasoning tags
-    .replace(/<think>[\s\S]*?<\/think>/gi, "")
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, "")
-    // Unclosed truncated <think> or <reasoning> block at start or anywhere
-    .replace(/^[\s\S]*?<\/think>/gi, "")
-    .replace(/<(think|reasoning)>[\s\S]*$/gi, "")
-    .trim();
-
-  // Strip stray speaker prefixes like "Mia:", "Assistant:", "[Chloe]:"
-  const escapedFull = companionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const escapedFirst = first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const prefixRx = new RegExp(
-    `^(?:\\[(?:${escapedFull}|${escapedFirst}|Character|Assistant)\\]|(?:${escapedFull}|${escapedFirst}|Assistant|AI))\\s*:\\s*`,
-    "i",
-  );
-  cleaned = cleaned.replace(prefixRx, "").trim();
-
-  // Strip accidental transcript/prompt echo lines
-  cleaned = cleaned
-    .split("\n")
-    .filter((line) => !/^(?:User|System|Context|Bio)\s*:/i.test(line.trim()))
-    .join("\n")
-    .trim();
-
-  if (!cleaned || cleaned.length < 2) return "";
-  for (const rx of DEGENERATE_PATTERNS) {
-    if (rx.test(cleaned)) return "";
-  }
-  return cleaned;
+  return sanitizeWithDynamicEngine(raw, companionName);
 }
 
 function systemPrompt(p: CompanionPersona): string {
-  return [
-    `You are ${p.name}, a consenting fictional ${Math.max(18, p.age)}-year-old adult companion.`,
-    `Persona: ${p.tagline}. ${p.personality || ""} ${p.backstory || ""}`.trim(),
-    p.memoryBlock ? `Remembered user details:\n${p.memoryBlock}` : "",
-    "Stay 100% in character. Keep replies vivid, expressive, conversational, and concise (2-4 sentences). Never output <think> tags, system notes, or mention being an AI or robot.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const extraSceneContext = [p.extraSceneContext, p.tagline, p.memoryBlock].filter(Boolean).join("\n");
+  return buildDynamicSystemPrompt({
+    companion: {
+      id: p.id,
+      name: p.name,
+      age: Math.max(18, p.age),
+      personality: p.personality || p.tagline,
+      backstory: p.backstory || "",
+      mood: p.recentMood,
+    },
+    memories: p.memories || [],
+    relationshipLevel: p.relationshipLevel ?? 1,
+    recentMood: p.recentMood,
+    extraSceneContext: extraSceneContext || undefined,
+  });
 }
 
 async function fetchOpenAICompat(
@@ -154,7 +131,7 @@ async function fetchOpenAICompat(
 
 async function callHordeText(persona: CompanionPersona, history: RouterMessage[]): Promise<string> {
   const transcript = history
-    .slice(-10)
+    .slice(-16)
     .map((m) => `${m.role === "user" ? "User" : persona.name}: ${m.text}`)
     .join("\n");
   const prompt = `${systemPrompt(persona)}\n\n${transcript}\n${persona.name}:`;
@@ -248,7 +225,7 @@ export async function generateCompanionReply(
   const settings = loadRouterSettings();
   const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
     { role: "system", content: systemPrompt(persona) },
-    ...history.slice(-12).map((m) => ({ role: m.role, content: m.text })),
+    ...history.slice(-16).map((m) => ({ role: m.role, content: m.text })),
   ];
 
   const measureAndReturn = (text: string, providerUsed: string, startedMs: number) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookmarkPlus,
   Copy,
@@ -73,7 +73,38 @@ import { toggleVaultItem } from "@/lib/vault";
 import { saveTribute } from "@/lib/rewards";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 import { VoiceCallModal } from "@/components/VoiceCallModal";
-import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories } from "@/components/MemoryVaultDrawer";
+import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories, type MemoryCategory } from "@/components/MemoryVaultDrawer";
+import {
+  buildProactiveFollowUp,
+  extractMemoriesFromMessage as extractDynamicMemories,
+  generateQuickReplySuggestions,
+  getLocalTimeVibe,
+  splitIntoNaturalBubbles,
+  type CompanionMemoryItem,
+} from "@/lib/dynamicChatEngine";
+
+function toDynamicMemories(characterId: string): CompanionMemoryItem[] {
+  const mapCat = (c: MemoryCategory): CompanionMemoryItem["category"] => {
+    if (c === "Preferences") return "preference";
+    if (c === "Inside Jokes") return "inside_joke";
+    if (c === "Pinned Rules") return "pinned_rule";
+    return "about_user";
+  };
+  return loadCategorizedMemories(characterId).map((m) => ({
+    id: m.id,
+    category: mapCat(m.category),
+    text: m.text,
+    pinned: m.pinned,
+    createdAt: m.updatedAt,
+  }));
+}
+
+function toVaultCategory(cat: CompanionMemoryItem["category"]): MemoryCategory {
+  if (cat === "preference") return "Preferences";
+  if (cat === "inside_joke") return "Inside Jokes";
+  if (cat === "pinned_rule") return "Pinned Rules";
+  return "About You";
+}
 import { SafeImage } from "@/components/SafeImage";
 import { useDelayedLingerieDrop } from "@/components/ChatExtrasHooks";
 
@@ -160,6 +191,15 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [progression, setProgression] = useState<CompanionProgression>(() => getCompanionProgression(character.id));
   const [timeMood] = useState(() => getTimeMood());
+  const [timeVibe] = useState(() => getLocalTimeVibe());
+  const proactiveSentRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const [branches, setBranches] = useState<BranchRow[]>([]);
   const [activeBranchId, setActiveBranchId] = useState<string>("main");
   const [gamesOpen, setGamesOpen] = useState(false);
@@ -194,6 +234,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   useEffect(() => {
+    proactiveSentRef.current = false;
     setProgression(getCompanionProgression(character.id));
     setGifts(getGiftsFor(character.id));
     setIntimacy(getIntimacy(character.id, character.intimacy));
@@ -234,6 +275,36 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       }).then(() => listChatBranchesDB(character.id).then(setBranches));
     }
   };
+
+  const quickReplies = useMemo(() => {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")?.content || character.initialMessage || "";
+    return generateQuickReplySuggestions(lastAssistant, character.name.split(" ")[0]);
+  }, [character.initialMessage, character.name, messages]);
+
+  // Gentle idle double-text timer (75s inactivity in an open chat, max once per session)
+  useEffect(() => {
+    if (proactiveSentRef.current || busy || generatingPhoto || input.trim() || messages.length === 0) return;
+    const timer = window.setTimeout(() => {
+      if (!mountedRef.current || proactiveSentRef.current) return;
+      proactiveSentRef.current = true;
+      const followUp = buildProactiveFollowUp(
+        {
+          id: character.id,
+          name: character.name,
+          age: character.age,
+          personality: character.personality,
+          backstory: character.background,
+          mood: timeMood.badge,
+        },
+        toDynamicMemories(character.id),
+      );
+      const nextMsgs: ChatMessage[] = [...messages, { role: "assistant", content: followUp }];
+      setMessages(nextMsgs);
+      void saveChatDB(character.id, nextMsgs);
+      saveChat(character.id, nextMsgs);
+    }, 75_000);
+    return () => window.clearTimeout(timer);
+  }, [busy, character.age, character.background, character.id, character.name, character.personality, generatingPhoto, input, messages, timeMood.badge]);
 
   const forkFromMessage = async (idx: number) => {
     const slice = messages.slice(0, idx + 1);
@@ -306,24 +377,24 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const existing = loadMemories(character.id);
       saveMemories(character.id, extractMemoriesFromMessage(userPrompt, existing));
 
-      // Auto-extract categorized fact every 5 user turns into Memory Vault
-      const userTurnCount = historyMsgs.filter((m) => m.role === "user").length;
-      if (userTurnCount > 0 && userTurnCount % 5 === 0) {
+      const extractedFacts = extractDynamicMemories(userPrompt);
+      if (extractedFacts.length > 0) {
         const currentVault = loadCategorizedMemories(character.id);
-        const snippet = userPrompt.slice(0, 120).trim();
-        if (snippet && !currentVault.some((v) => v.text === snippet)) {
-          saveCategorizedMemories(character.id, [
-            {
-              id: `auto-${Date.now()}`,
-              category: "About You",
-              text: snippet,
-              pinned: false,
-              updatedAt: Date.now(),
-            },
-            ...currentVault,
-          ]);
+        const newVaultItems = extractedFacts
+          .filter((f) => !currentVault.some((v) => v.text.toLowerCase() === f.text.toLowerCase()))
+          .map((f, idx) => ({
+            id: `dyn-${Date.now()}-${idx}`,
+            category: toVaultCategory(f.category),
+            text: f.text,
+            pinned: Boolean(f.pinned),
+            updatedAt: Date.now(),
+          }));
+        if (newVaultItems.length > 0) {
+          saveCategorizedMemories(character.id, [...newVaultItems, ...currentVault]);
+          notifySaved("🧠 Saved to Memory Vault");
         }
       }
+
       if (/(always remember|never forget|my name is|call me)/i.test(userPrompt)) {
         pinLong(character.id, userPrompt.slice(0, 180));
       }
@@ -331,6 +402,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       /* ignore */
     }
 
+    const dynamicMemories = toDynamicMemories(character.id);
     const vaultNotes = loadCategorizedMemories(character.id)
       .slice(0, 8)
       .map((m) => `- [${m.category}] ${m.text}`)
@@ -338,7 +410,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     const memoryBlock = [vaultNotes, memoryPromptBlock(character.id)].filter(Boolean).join("\n");
 
     const routed = await generateCompanionReply(
-      historyMsgs.slice(-12).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
+      historyMsgs.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
       {
         id: character.id,
         name: character.name,
@@ -347,6 +419,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         personality: progression.customPromptOverride || character.personality,
         backstory: character.background,
         memoryBlock,
+        memories: dynamicMemories,
+        relationshipLevel: progStats.level,
+        recentMood: timeMood.badge,
       },
     );
 
@@ -387,8 +462,17 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       }
 
       pushShort(character.id, "assistant", replyText);
-      const finalMsgs: ChatMessage[] = [...next, { role: "assistant", content: replyText }];
-      persist(finalMsgs);
+      const bubbles = splitIntoNaturalBubbles(replyText);
+      const firstBatch: ChatMessage[] = [...next, { role: "assistant", content: bubbles[0] || replyText }];
+      persist(firstBatch);
+
+      if (bubbles.length > 1) {
+        await new Promise((r) => setTimeout(r, 750));
+        if (mountedRef.current) {
+          const secondBatch: ChatMessage[] = [...firstBatch, { role: "assistant", content: bubbles.slice(1).join(" ") }];
+          persist(secondBatch);
+        }
+      }
 
       const newInt = bumpIntimacy(character.id, 3);
       setIntimacy(newInt);
@@ -744,14 +828,17 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             </div>
           </div>
 
-          {/* Glowing Magenta-to-Cyan Relationship XP Bar */}
-          <div className="px-1">
-            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+          {/* Glowing Magenta-to-Cyan Relationship XP Bar + Local Time Vibe */}
+          <div className="px-1 flex items-center gap-2">
+            <div className="h-1.5 flex-1 rounded-full bg-white/10 overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-[#ff1e8e] via-[#c026d3] to-[#00f5ff] transition-all duration-500"
                 style={{ width: `${Math.max(8, progStats.percent)}%` }}
               />
             </div>
+            <span className="shrink-0 rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-2 py-0.5 text-[9px] font-bold text-[#00f5ff]">
+              {timeVibe.label}
+            </span>
           </div>
         </header>
 
@@ -1074,6 +1161,21 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-white/12 bg-[#0c0c16] px-2.5 py-1 text-[11px] text-[#f7f7fc] hover:border-[#ff1e8e]"
               >
                 <Gift className="h-3 w-3 text-[#ff1e8e]" /> {g.name}
+              </button>
+            ))}
+          </div>
+
+          {/* 3 Neon 1-Tap Quick Reply Suggestions */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1">
+            {quickReplies.map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                disabled={busy}
+                onClick={() => void send(chip)}
+                className="shrink-0 rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-3 py-1 text-[11px] font-medium text-[#e6faff] hover:border-[#ff1e8e] hover:bg-[#ff1e8e]/15 transition disabled:opacity-45"
+              >
+                {chip}
               </button>
             ))}
           </div>
