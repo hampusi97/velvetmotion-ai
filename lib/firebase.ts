@@ -248,6 +248,12 @@ export async function googleSignIn(): Promise<{ user: User; accessToken: string 
       throw popupErr;
     }
   } catch (error) {
+    const code = (error as { code?: string })?.code || "";
+    if (code === "auth/unauthorized-domain" && typeof window !== "undefined") {
+      throw new Error(
+        `Google Sign-In is disabled on preview host "${window.location.hostname}". Use Email / Guest Sync here, or add "${window.location.hostname}" under Firebase Authentication → Authorized domains.`,
+      );
+    }
     console.error("Sign in error:", error);
     throw error;
   } finally {

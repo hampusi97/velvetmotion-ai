@@ -36,5 +36,6 @@ else
   echo "[2/3] Python 3 not found; skipping local media CORS proxy."
 fi
 
-echo "[3/3] Starting VelvetMotion AI on http://localhost:3000 ..."
-npm run dev
+DEV_PORT="${PORT:-3000}"
+echo "[3/3] Starting VelvetMotion AI on http://0.0.0.0:${DEV_PORT} ..."
+PORT="$DEV_PORT" exec node scripts/run-cloud-dev.mjs
