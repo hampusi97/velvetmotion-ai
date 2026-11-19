@@ -9,11 +9,11 @@ const STYLES: Record<string, string> = {
   lingerie:
     "wearing luxurious sheer lingerie, bedroom ambient light, seductive pose, photorealistic, detailed lace fabric, intimate atmosphere, cleavage, arched back",
   nude:
-    "fully nude, naked body, bare breasts, visible nipples, natural skin detail, erotic photography, uncensored nsfw, soft shadows, highly detailed anatomy",
+    "fully nude, completely naked, bare breasts, visible nipples, detailed skin pores, erotic photography, uncensored nsfw, soft cinematic lighting, highly detailed anatomy, looking at camera, aroused expression, photorealistic",
   explicit:
     "explicit nude, sexual pose, detailed genitals, wet skin, uncensored nsfw, photorealistic, studio quality lighting, sharp focus, aroused expression, legs spread or arched back",
   sex:
-    "explicit heterosexual sex scene, penetration, intimate couple on bed, sweaty skin, uncensored nsfw, photorealistic, passionate, cinematic lighting",
+    "explicit heterosexual sex scene, penetration, intimate couple on bed, sweaty glistening skin, uncensored nsfw, photorealistic, passionate motion, cinematic lighting, detailed anatomy, intense eye contact",
   doggy:
     "explicit sex from behind, doggy style, arched back, uncensored nsfw, photorealistic, bedroom",
   cowgirl:
@@ -80,6 +80,7 @@ export async function POST(req: Request) {
       }
     }
 
+    // Character-biased seed + small jitter so she stays recognizable across gens
     const seed = seedFromId(characterId || name) + Math.floor(Math.random() * 40);
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
       prompt
