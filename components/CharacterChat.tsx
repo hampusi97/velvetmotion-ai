@@ -40,6 +40,7 @@ import {
   saveChat,
   bumpIntimacy,
   getIntimacy,
+  getKinks,
   type StoredMessage,
 } from "@/lib/storage";
 import { GIFTS, getGiftsFor, addGift } from "@/lib/gifts";
