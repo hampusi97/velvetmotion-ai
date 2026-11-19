@@ -56,8 +56,9 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
       - name: Install frontend dependencies & build out/
+        shell: bash
         run: |
-          npm ci
+          npm ci --no-audit --no-fund || npm ci --no-audit --no-fund
           npm run audit:companions
           npm run build
 

@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
-    "build": "NODE_ENV=production next build",
-    "start": "NODE_ENV=production next start",
+    "build": "next build",
+    "start": "next start",
     "lint": "next lint",
     "audit:companions": "node scripts/audit-companions.mjs",
     "test": "tsx --test firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts lib/safety.test.ts lib/apiRoutes.test.ts && tsx scripts/validate-content.ts && node scripts/smoke-test.mjs && python3 -B -m unittest workers/test_workers.py",
