@@ -88,14 +88,15 @@ function pollinationsUncensoredUrl(character: Pick<Character, "id" | "name" | "f
 
 const STATIC_PORTRAITS = new Set(["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper","livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p","valentina","lana-rho","lena-plug","dalia-x","riley-re"]);
 
-export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood = "beauty", extra = "", opts?: { seedOverride?: number; preferStatic?: boolean }): string {
-  if (mood === "beauty" && opts?.preferStatic && STATIC_PORTRAITS.has(character.id)) {
-    return `/portraits/${character.id}.jpg`;
-  }
-  if (NSFW_MOODS.has(mood)) {
-    return pollinationsUncensoredUrl(character, mood, extra, opts);
-  }
-  return workerUrl(character, mood, extra, opts);
+export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, _mood: MediaMood = "beauty", _extra = "", _opts?: { seedOverride?: number; preferStatic?: boolean }): string {
+  // Static local portrait only — no Pollinations. Generation uses resolveBestMediaUrl.
+  const known = ["chloe","elena","aria","sienna","raven","yuki","scarlett","mia","genevieve","briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper"];
+  const id = character.id || "";
+  if (known.includes(id)) return `/portraits/${id}.jpg`;
+  // hash to a known file
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return `/portraits/${known[Math.abs(h) % known.length]}.jpg`;
 }
 
 export async function resolveBestMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood = "beauty", extra = ""): Promise<{ url: string; note: string }> {
@@ -150,9 +151,12 @@ export function resolveCharacterAvatar(character: Character): string {
   return characterMediaUrl(character, "beauty");
 }
 
-export function freeformImageUrl(prompt: string, character?: Pick<Character, "id" | "figure" | "name">, seedExtra = ""): string {
-  const base = character ? `${character.figure || character.name}, same face, ` : "";
-  const full = `${base}${prompt}. ${PHOTO_BASE}`;
-  const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
-  return `${POLLINATIONS_BASE}/${encodeURIComponent(full)}?width=${IMAGE_WIDTH}&height=${IMAGE_HEIGHT}&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
+export function freeformImageUrl(_prompt: string, character?: Pick<Character, "id" | "figure" | "name">, _seedExtra = ""): string {
+  // No Pollinations. Return a local portrait.
+  const id = character?.id || "chloe";
+  const known = ["chloe","elena","aria","sienna","raven","yuki","scarlett","mia","genevieve","briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper"];
+  if (known.includes(id)) return `/portraits/${id}.jpg`;
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return `/portraits/${known[Math.abs(h) % known.length]}.jpg`;
 }

@@ -443,7 +443,7 @@ export default function Home() {
             />
           )}
           <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
-            <span>VelvetMotion AI · Match → chat → 3D · Fictional adults 21+ only · Free</span>
+            <span>VelvetMotion AI · Match → chat → 3D · Fictional adults 18+ only · Free</span>
             <div className="flex flex-wrap gap-4">
               <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
                 Coin Wallet

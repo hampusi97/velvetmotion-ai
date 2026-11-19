@@ -137,6 +137,11 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
           </div>
           {searchOpen && <input type="search" value={homeQuery} onChange={(e) => setHomeQuery(e.target.value)} placeholder="Search…" className="mb-4 w-full rounded-xl border border-white/15 bg-zinc-900/90 px-4 py-2 text-sm outline-none focus:border-pink-500" autoFocus />}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+            {featured.length === 0 && (
+              <div className="col-span-2 rounded-2xl border border-white/10 bg-zinc-900/60 p-8 text-center text-sm text-zinc-400">
+                No girls match “{homeQuery}”. Try another name or clear the search.
+              </div>
+            )}
             {featured.map((c, i) => (
               <CandyGirlCard key={c.id} character={c} onSelect={() => onOpenGirl(c.id)} isNew={i < 4} />
             ))}

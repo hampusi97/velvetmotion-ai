@@ -219,15 +219,7 @@ export function SiteHeader({
           </nav>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <GoonStreakWidget />
-            <button
-              type="button"
-              onClick={() => onNavigate("install-app" as ViewId)}
-              title="Install VelvetMotion App for Android, iPhone & iPad"
-              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20 transition"
-            >
-              <span aria-hidden>📱</span>
-              <span className="hidden xs:inline">App</span>
-            </button>
+            {/* install button removed — dead route */}
             <button
               type="button"
               onClick={() => onNavigate("wallet" as ViewId)}

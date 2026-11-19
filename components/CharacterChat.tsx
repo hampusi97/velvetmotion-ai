@@ -107,6 +107,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [coins, setCoinsState] = useState(600);
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [speakingId, setSpeakingId] = useState<number | null>(null);
   const [edgeLocked, setEdgeLocked] = useState(false);
   const [freeformPrompt, setFreeformPrompt] = useState("");
   const [freeformVideo, setFreeformVideo] = useState("");
@@ -512,6 +513,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
 
       <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
         <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Back</button>
+        <button type="button" onClick={() => { persist([{ role: "assistant", content: character.initialMessage }]); setMessages([{ role: "assistant", content: character.initialMessage }]); }} className="text-xs text-zinc-400 border border-white/15 rounded-full px-2 py-0.5 hover:text-pink-300">Reset chat</button>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
@@ -588,9 +590,18 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
                   <button
                     type="button"
                     className="mt-1 text-[10px] text-pink-400/80 hover:text-pink-300"
-                    onClick={() => speak(parsed.spokenReply.slice(0, 280), { ...character.voice })}
+                    onClick={() => {
+                      if (speakingId === i) {
+                        try { window.speechSynthesis?.cancel(); } catch {}
+                        setSpeakingId(null);
+                        return;
+                      }
+                      setSpeakingId(i);
+                      speak(parsed.spokenReply.slice(0, 280), { ...character.voice });
+                      setTimeout(() => setSpeakingId(null), 4000);
+                    }}
                   >
-                    ▶ Voice note
+                    {speakingId === i ? "■ Stop" : "▶ Voice note"}
                   </button>
                 )}
                 {m.videoUrl ? (

@@ -47,7 +47,7 @@ export function ShortsFeed({
   };
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-md pt-16">
       <div className="flex items-center justify-between mb-3">
         <button type="button" onClick={onHome} className="text-pink-400 text-sm">
           ← Home
