@@ -38,6 +38,7 @@ import { VaultPanel } from "@/components/VaultPanel";
 import { MyGirlsHub } from "@/components/MyGirlsHub";
 import { LegalPages } from "@/components/LegalPages";
 import { CoinWallet } from "@/components/CoinWallet";
+import MediaStudioModal from "@/components/MediaStudioModal";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { SupportModal } from "@/components/SupportModal";
 import { shouldShowSupportPromptOnLogin } from "@/lib/wallet";
@@ -79,6 +80,7 @@ export default function Home() {
   const [stageGirlId, setStageGirlId] = useState<string | null>(null);
   const [stageFromMatch, setStageFromMatch] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -461,6 +463,7 @@ export default function Home() {
       </div>
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
       <InstallPrompt />
+      <MediaStudioModal isOpen={studioOpen} onClose={() => setStudioOpen(false)} />
       {supportModalOpen && (
         <SupportModal
           onClose={() => {
