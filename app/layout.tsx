@@ -10,6 +10,7 @@ const DESC =
   "Free NSFW AI girlfriends — Discover swipe, chat, nudes, JOI, vault, and a live 3D stage. Fictional 21+ characters only.";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://velvetmotion-ai.hampusi97.workers.dev"),
   title: {
     default: TITLE,
     template: `%s · ${TITLE}`,
