@@ -44,7 +44,7 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
 
 function buildPrompt(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood, extra = ""): string {
   const figure = character.figure || "beautiful adult woman with unique distinctive face, natural features";
-  return [figure, `adult woman ${character.age || 24} years old, 21+`, `${character.name}, same face every shot`, MOOD_PROMPTS[mood], extra, "looking at viewer, sharp focused eyes, natural proportions"].filter(Boolean).join(". ");
+  return [figure, `adult woman ${character.age || 24} years old, 21+`, `${character.name}, same face every shot, consistent identity`, MOOD_PROMPTS[mood], extra, "looking at viewer, sharp focused eyes, natural proportions, high detail skin texture"].filter(Boolean).join(". ");
 }
 
 function pollinationsUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood, extra = "", opts?: { seedOverride?: number }): string {
