@@ -119,7 +119,7 @@ function pollinationsUrl(
   // enhance=true + flux for sharper Candy-like results
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(
     prompt,
-  )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true&quality=100`;
+  )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true&quality=100&private=true`;
 }
 
 const STATIC_PORTRAITS = new Set(["briony","calla","isolde","liora","maren","nadine","tess","vesper"]);
@@ -251,5 +251,5 @@ export function freeformImageUrl(
   const full = `${base}${prompt}, uncensored nsfw, sharp focus, cinematic`;
   const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
   const enc = encodeURIComponent(full);
-  return `https://image.pollinations.ai/prompt/${enc}?width=768&height=1024&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
+  return `https://image.pollinations.ai/prompt/${enc}?width=1024&height=1536&nologo=true&model=flux&seed=${seed % 100000}&enhance=true&quality=100&private=true`;
 }
