@@ -20,7 +20,7 @@ const OWN: Record<string, string> = {
   briony: "briony", calla: "calla", freya: "freya", isolde: "isolde",
   liora: "liora", maren: "maren", nadine: "nadine", nova: "nova",
   tess: "tess", vesper: "vesper",
-  "nova-g": "nova-g", "suzu-m": "suzu-m", "mila-s": "mila-s", "elena-a": "elena-a", "delilah-v": "delilah-v", "briony": "briony", "nadine": "nadine",
+  "nova-g": "nova-g", "suzu-m": "suzu-m", "mila-s": "mila-s", "elena-a": "elena-a", "delilah-v": "delilah-v", "briony": "briony",
 };
 
 function hash(s: string): number {
