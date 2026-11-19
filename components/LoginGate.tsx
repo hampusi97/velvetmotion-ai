@@ -87,7 +87,8 @@ export function LoginGate({ onLoggedIn }: { onLoggedIn: (u: LocalUser) => void }
   };
 
   const doLocal = () => {
-    const u = login(name || email.split("@")[0] || "");
+    const fallback = name || email.split("@")[0] || `guest${Date.now().toString(36).slice(-4)}`;
+    const u = login(fallback);
     if (!u) {
       setError("Pick a username (at least 2 characters).");
       return;
@@ -247,7 +248,7 @@ export function LoginGate({ onLoggedIn }: { onLoggedIn: (u: LocalUser) => void }
           <button
             type="button"
             onClick={doLocal}
-            disabled={(name || email.split("@")[0] || "").trim().length < 2}
+            disabled={false}
             className="rounded-xl border border-pink-500/40 bg-pink-500/15 px-3.5 py-2 text-xs font-semibold text-pink-100 hover:bg-pink-500/25 disabled:opacity-40"
           >
             Guest Enter
