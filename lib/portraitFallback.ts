@@ -1,6 +1,6 @@
 /**
  * Portrait fallback so home cards never show a broken image.
- * Prefer /public/portraits when available; otherwise a reliable generated URL.
+ * Prefer /public/portraits when available; otherwise a known-good static.
  */
 
 const STATIC_IDS = new Set([
@@ -8,6 +8,8 @@ const STATIC_IDS = new Set([
   "livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p",
   "valentina","lana-rho","lena-plug","dalia-x","riley-re",
 ]);
+
+const FALLBACK = "/portraits/briony.jpg";
 
 export function staticPortraitUrl(id: string): string | null {
   if (STATIC_IDS.has(id)) return `/portraits/${id}.jpg`;
@@ -22,10 +24,10 @@ export function onPortraitError(e: React.SyntheticEvent<HTMLImageElement>, fallb
   const img = e.currentTarget;
   if (fallbackId) {
     const s = staticPortraitUrl(fallbackId);
-    if (s && img.src !== s) {
+    if (s && !img.src.endsWith(s)) {
       img.src = s;
       return;
     }
   }
-  img.src = "/portraits/chloe.jpg";
+  if (!img.src.endsWith(FALLBACK)) img.src = FALLBACK;
 }
