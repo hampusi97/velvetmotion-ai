@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { BadgeCheck, Sparkles } from "lucide-react";
 import { filterCharacters, type Character } from "@/lib/characters";
-import { characterMediaUrl } from "@/lib/media";
-import { getCachedPortrait, setCachedPortrait } from "@/lib/portraitCache";
+import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -56,31 +55,27 @@ export function CharacterRoster({
         <p className="text-zinc-500 text-sm">No one matches that filter.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
-          {visible.map((character, i) => {
-            const src = getCachedPortrait(character.id) || characterMediaUrl(character, "beauty");
-            return (
-              <button key={character.id} onClick={() => onSelect(character)} className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-left">
-                <img
-                  src={src}
-                  alt={character.name}
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover object-top group-hover:scale-[1.04] transition duration-500"
-                  onLoad={() => setCachedPortrait(character.id, src)}
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                />
-                {i < 4 && <span className="absolute top-2 left-2 inline-flex items-center gap-0.5 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><Sparkles className="h-2 w-2" />NEW</span>}
-                <span className="absolute top-2 right-2 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white">Online</span>
-                <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/95 via-black/55 to-transparent">
-                  <div className="flex items-center gap-1">
-                    <span className="truncate text-xs font-semibold text-white">{character.name}</span>
-                    <span className="text-[10px] text-zinc-400">{character.age}</span>
-                    <BadgeCheck className="h-3 w-3 text-pink-400" />
-                  </div>
-                  <p className="mt-0.5 line-clamp-1 text-[9px] text-zinc-400">{character.category}</p>
+          {visible.map((character, i) => (
+            <button key={character.id} onClick={() => onSelect(character)} className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-left">
+              <img
+                src={staticPortraitUrl(character.id)}
+                alt={character.name}
+                loading="lazy"
+                onError={onPortraitError}
+                className="absolute inset-0 h-full w-full object-cover object-top group-hover:scale-[1.04] transition duration-500"
+              />
+              {i < 4 && <span className="absolute top-2 left-2 inline-flex items-center gap-0.5 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><Sparkles className="h-2 w-2" />NEW</span>}
+              <span className="absolute top-2 right-2 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white">Online</span>
+              <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/95 via-black/55 to-transparent">
+                <div className="flex items-center gap-1">
+                  <span className="truncate text-xs font-semibold text-white">{character.name}</span>
+                  <span className="text-[10px] text-zinc-400">{character.age}</span>
+                  <BadgeCheck className="h-3 w-3 text-pink-400" />
                 </div>
-              </button>
-            );
-          })}
+                <p className="mt-0.5 line-clamp-1 text-[9px] text-zinc-400">{character.category}</p>
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>
