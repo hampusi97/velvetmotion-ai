@@ -129,7 +129,7 @@ export function LoginGate({ onLoggedIn }: { onLoggedIn: (u: LocalUser) => void }
           VelvetMotion
         </h1>
         <p className="text-sm text-zinc-400 text-center mt-2 leading-relaxed">
-          Sign in with Email/Password or Google to sync your companions, Coin Wallet, and Firestore vault. Fictional adults 21+ only.
+          Sign in with Email/Password or Google to sync your companions, Coin Wallet, and Firestore vault. Fictional adults 18+ only.
         </p>
 
         {/* Email / Password Tabs */}

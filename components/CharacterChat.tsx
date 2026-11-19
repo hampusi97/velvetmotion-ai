@@ -110,6 +110,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [voiceOn, setVoiceOn] = useState(true);
   const [speakingId, setSpeakingId] = useState<number | null>(null);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
+  const [joiPlaying, setJoiPlaying] = useState(false);
+  const [joiPace, setJoiPace] = useState(1);
+  const [joiStep, setJoiStep] = useState(0);
   const [edgeLocked, setEdgeLocked] = useState(false);
   const [freeformPrompt, setFreeformPrompt] = useState("");
   const [freeformVideo, setFreeformVideo] = useState("");
@@ -534,10 +537,15 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
     <div className="flex flex-col h-[calc(100vh-5rem)] max-w-2xl mx-auto">
       {callOpen && <VoiceCallUI character={character} onClose={() => setCallOpen(false)} />}
 
-      <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
+      <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex flex-wrap items-center gap-2 pb-3 border-b border-white/10 shrink-0 px-1">
         <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Back</button>
         <button type="button" onClick={() => { persist([{ role: "assistant", content: character.initialMessage }]); setMessages([{ role: "assistant", content: character.initialMessage }]); }} className="text-xs text-zinc-400 border border-white/15 rounded-full px-2 py-0.5 hover:text-pink-300">Reset chat</button>
         <button type="button" onClick={() => { try { const raw = localStorage.getItem("velvetmotion_memory_" + character.id); setMemoryFacts(raw ? JSON.parse(raw) : []); } catch {} setMemoryOpen(true); }} className="text-xs text-fuchsia-300 border border-fuchsia-500/30 rounded-full px-2 py-0.5">Memory</button>
+        <button type="button" onClick={() => {
+          const card = { spec: "chara_card_v2", spec_version: "2.0", data: { name: character.name, description: character.tagline, personality: character.personality, scenario: character.background, first_mes: character.initialMessage, tags: character.tags } };
+          const blob = new Blob([JSON.stringify(card, null, 2)], { type: "application/json" });
+          const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = character.id + ".json"; a.click();
+        }} className="text-xs text-zinc-300 border border-white/15 rounded-full px-2 py-0.5">Export</button>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
@@ -562,8 +570,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
             <div className="w-full mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden">
               <div className="h-full bg-gradient-to-r from-pink-500 to-fuchsia-500 transition-all" style={{ width: `${Math.min(100, intimacy)}%` }} />
             </div>
-            <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5">
-              <span>New</span><span>Flirting</span><span>Crush</span><span>Close</span><span>Obsessed</span>
+            <div className="flex justify-between text-[9px] text-zinc-500 mt-0.5 gap-1">
+              <span>New</span><span>Flirt</span><span>Crush</span><span>Close</span><span>Obsessed</span>
             </div>
           </div>
         </div>
@@ -768,7 +776,28 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         ))}
       </div>
 
-      <div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Live Action</div>
+      
+      <div className="mb-2 rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/5 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[10px] uppercase tracking-wide text-fuchsia-300">Guided JOI</div>
+          <div className="flex gap-1">
+            {[0.75, 1, 1.5].map((p) => (
+              <button key={p} type="button" onClick={() => setJoiPace(p)} className={`text-[10px] rounded-full px-2 py-0.5 border ${joiPace === p ? "border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-100" : "border-white/15 text-zinc-400"}`}>{p}x</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setJoiPlaying((v) => !v)} className="w-9 h-9 rounded-full bg-fuchsia-600 text-white text-sm">{joiPlaying ? "⏸" : "▶"}</button>
+          <div className="flex-1">
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-fuchsia-500 to-pink-500 transition-all" style={{ width: `${(joiStep % 5 + 1) * 20}%` }} />
+            </div>
+            <div className="text-[10px] text-zinc-500 mt-1">Step {(joiStep % 5) + 1}/5 · {joiPlaying ? "playing" : "paused"}</div>
+          </div>
+          <button type="button" onClick={() => { setJoiStep((s) => s + 1); if (voiceOn) speak(["Slow", "Faster", "Hold", "Almost", "Finish"][joiStep % 5], { ...character.voice }); }} className="text-xs text-pink-300 border border-pink-500/30 rounded-full px-2 py-1">Next cue</button>
+        </div>
+      </div>
+<div className="text-[10px] uppercase tracking-wide text-zinc-500 px-1 pb-1">Live Action</div>
       <div className="flex flex-wrap gap-1.5 pb-2">
         {LIVE_ACTION_PRESETS.map((p) => (
           <button
