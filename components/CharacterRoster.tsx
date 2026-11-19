@@ -126,6 +126,7 @@ export function CharacterRoster({
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover object-top group-hover:scale-[1.06] transition duration-500"
                     loading="lazy"
+                    onLoad={() => setCachedPortrait(character.id, src)}
                   />
                   <span className="absolute top-2.5 left-2.5 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[9px] font-bold text-white shadow">ONLINE</span>
                   {isNew && (
