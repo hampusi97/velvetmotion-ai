@@ -15,6 +15,13 @@ npm run dev
 
 http://localhost:3000 → age gate → **Log in** → Girls / Discover / Goon Room / Create / Roulette / Blindfold.
 
+## Deploy (Cloudflare Pages)
+
+1. Cloudflare dashboard → Workers & Pages → **velvetmotion-ai** → Settings → Builds
+2. Connect to Git → select `hampusi97/velvetmotion-ai` → branch `main`
+3. Build command: `npm run build` · Output: `.next`
+4. Every push to `main` updates https://velvetmotion-ai.pages.dev
+
 ## Deploy (Vercel)
 
 Import this repo on [vercel.com/new](https://vercel.com/new). Zero env vars required for the free experience.
