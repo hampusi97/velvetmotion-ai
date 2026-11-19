@@ -9,9 +9,9 @@ const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-di
 
 const TITLE = "VelvetMotion AI";
 const TAGLINE =
-  "Match → chat → 3D. Private uncensored companions. Fictional adults 21+ only.";
+  "Match → chat → studio. Private uncensored companions. Fictional adults 18+ only.";
 const DESC =
-  "Free NSFW AI girlfriends — Discover swipe, chat, nudes, JOI, vault, and a live 3D stage. Fictional 21+ characters only.";
+  "Free NSFW AI companions — Discover swipe, neural voice calls, Pro Media Studio, and local GPU acceleration. Fictional 18+ characters only.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://velvetmotion-ai.hampusi97.workers.dev"),
@@ -23,11 +23,11 @@ export const metadata: Metadata = {
   applicationName: "VelvetMotion",
   manifest: "/manifest.json",
   keywords: [
-    "AI girlfriend",
+    "AI companion",
     "NSFW chat",
     "virtual companion",
-    "JOI",
-    "3D companion",
+    "local AI",
+    "voice companion",
     "uncensored AI",
   ],
   authors: [{ name: "VelvetMotion" }],
@@ -66,8 +66,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#db2777",
+  themeColor: "#05050a",
 };
+
+const cfAnalyticsToken = process.env.NEXT_PUBLIC_CF_ANALYTICS_TOKEN || "";
 
 export default function RootLayout({
   children,
@@ -75,19 +77,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${plusJakarta.variable}`} suppressHydrationWarning>
+    <html
+      lang="en"
+      data-neon="hyper"
+      className={`${inter.variable} ${plusJakarta.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#db2777" />
+        <meta name="theme-color" content="#05050a" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(()=>{});});}`,
+            __html: `try{var n=localStorage.getItem('vm-neon-intensity');if(n==='subtle'||n==='hyper'){document.documentElement.setAttribute('data-neon',n);}if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}}catch(e){}`,
           }}
         />
       </head>
-      <body suppressHydrationWarning className="min-h-dvh bg-ink-950 font-sans text-cream antialiased">
-        {children}
+      <body suppressHydrationWarning className="relative min-h-dvh bg-[#05050a] font-sans text-[#f7f7fc] antialiased">
+        <div className="vm-ambient-mesh" aria-hidden="true" />
+        <div className="relative z-10">{children}</div>
+        {cfAnalyticsToken ? (
+          <script
+            defer
+            src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={JSON.stringify({ token: cfAnalyticsToken })}
+          />
+        ) : null}
       </body>
     </html>
   );

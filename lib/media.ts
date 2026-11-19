@@ -10,6 +10,9 @@ import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 import { generateHordeImage } from "./aiHorde";
+import { fetchWorkerImage } from "./imageWorker";
+import { remoteImageToStableDataUrl } from "./imageStore";
+import { checkContentSafety } from "./safety";
 import { QUALITY_PROMPT, IMAGE_STEPS, IMAGE_WIDTH, IMAGE_HEIGHT } from "./quality";
 
 const CF_IMAGE_WORKER =
@@ -95,28 +98,49 @@ export function characterMediaUrl(character: Pick<Character, "id" | "name" | "fi
 }
 
 export async function resolveBestMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood = "beauty", extra = ""): Promise<{ url: string; note: string }> {
+  const safety = checkContentSafety(`${character.name} ${character.figure || ""} ${extra}`);
+  if (!safety.allowed) {
+    return { url: staticPortraitUrl(character.id || "chloe"), note: safety.reason || "Blocked by safety policy" };
+  }
+
+  const prompt = buildPrompt(character, mood, extra);
+  const seed = (faceSeed(character) * 97 + (mediaSeed(character.id, mood, extra) % 17)) % 100000;
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
+
   if (settings?.preferLocal && settings.localImageBase) {
-    const prompt = buildPrompt(character, mood, extra);
-    const seed = (faceSeed(character) * 97 + (mediaSeed(character.id, mood, extra) % 17)) % 100000;
     const localRes = await generateLocalImage({ prompt, seed, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, characterId: character.id });
     if (localRes.ok && localRes.imageUrl) return { url: localRes.imageUrl, note: localRes.note };
   }
 
-  if (NSFW_MOODS.has(mood) && typeof window !== "undefined") {
+  if (typeof window !== "undefined") {
+    const isNsfw = NSFW_MOODS.has(mood);
+
+    if (!isNsfw) {
+      const worker = await fetchWorkerImage(prompt, { steps: 6, seed });
+      if (worker.ok) return { url: worker.url, note: "Cloudflare Flux" };
+    }
+
     try {
-      const prompt = buildPrompt(character, mood, extra);
-      const seed = (faceSeed(character) * 97 + mediaSeed(character.id, mood, extra)) % 100000;
-      const horde = await generateHordeImage({ prompt, seed, nsfw: true, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, steps: IMAGE_STEPS });
-      return horde;
+      const horde = await generateHordeImage({
+        prompt,
+        seed,
+        nsfw: isNsfw,
+        width: IMAGE_WIDTH,
+        height: IMAGE_HEIGHT,
+        steps: IMAGE_STEPS,
+      });
+      try {
+        const stableUrl = await remoteImageToStableDataUrl(horde.url);
+        return { url: stableUrl, note: horde.note };
+      } catch {
+        return horde;
+      }
     } catch {
-      return { url: staticPortraitUrl(character.id || "chloe"), note: "Local portrait" };
+      return { url: staticPortraitUrl(character.id || "chloe"), note: "Local portrait fallback" };
     }
   }
 
-  const url = characterMediaUrl(character, mood, extra);
-  const note = NSFW_MOODS.has(mood) ? "Pollinations Flux" : "Cloudflare Flux";
-  return { url, note };
+  return { url: characterMediaUrl(character, mood, extra), note: "Local portrait" };
 }
 
 export function joiSequenceFrames(c: Pick<Character, "id" | "name" | "figure" | "age">): string[] {

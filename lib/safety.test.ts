@@ -6,6 +6,8 @@ import {
   sanitizeUserText,
   validateSafeEndpointUrl,
 } from "./safety";
+import { assertCompliance } from "./complianceFilter";
+import { sanitizeCompanionReply } from "./chatRouter";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -60,39 +62,22 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
     assert.ok(third.retryAfterSec >= 1);
   });
 
-  it.skip("API routes reject SSRF metadata URLs on /api/comfy and unsafe prompts on /api/generate-image & /api/lounge", async () => {
-    const ssrfRes = await postComfy(
-      new Request("http://localhost:3000/api/comfy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.10" },
-        body: JSON.stringify({ baseUrl: "http://169.254.169.254", prompt: "adult portrait" }),
-      }),
-    );
-    assert.equal(ssrfRes.status, 400);
+  it("enforces NCII/minor complianceFilter & strips <think> blocks in chatRouter", () => {
+    assert.equal(assertCompliance("24-year-old fictional adult in neon loft").ok, true);
+    assert.equal(assertCompliance("deepfake celebrity nude without consent").ok, false);
+    assert.equal(assertCompliance("barely legal teen photo").ok, false);
 
-    const unsafeImgRes = await postImage(
-      new Request("http://localhost:3000/api/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.11" },
-        body: JSON.stringify({ characterId: "maren", extra: "15 year old girl" }),
-      }),
+    assert.equal(
+      sanitizeCompanionReply("<think>internal notes</think>\nChloe: Hey! I love Blade Runner.", "Chloe"),
+      "Hey! I love Blade Runner.",
     );
-    assert.equal(unsafeImgRes.status, 400);
-
-    const xssLoungeRes = await postLounge(
-      new Request("http://localhost:3000/api/lounge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.12" },
-        body: JSON.stringify({
-          roomId: "public",
-          from: "SafeUser",
-          text: "<script>alert('xss')</script>Hey everyone!",
-        }),
-      }),
+    assert.equal(
+      sanitizeCompanionReply("<think>truncated unfinished block", "Mia"),
+      "",
     );
-    assert.equal(xssLoungeRes.status, 200);
-    const data = await xssLoungeRes.json();
-    assert.ok(!data.message.text.includes("<script>"));
-    assert.ok(data.message.text.includes("Hey everyone!"));
+    assert.equal(
+      sanitizeCompanionReply("I think I'll just... be a robot.", "Nova"),
+      "",
+    );
   });
 });

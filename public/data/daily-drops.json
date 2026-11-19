@@ -1,0 +1,65 @@
+[
+  {
+    "day": 0,
+    "companionId": "chloe-parker",
+    "companionName": "Chloe Parker",
+    "title": "Rainstorm Hoodies & Late-Night Confessions",
+    "scenario": "Thunder shakes the windows at 1 AM while Chloe steals your oversized hoodie and pulls out vinyl records.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  },
+  {
+    "day": 1,
+    "companionId": "maya-solis",
+    "companionName": "Maya Solis",
+    "title": "Empty Rooftop Infinity Pool After Midnight",
+    "scenario": "The rooftop hotel closed ten minutes ago, but Maya already unlocked the glass gate and dares you to dive in.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  },
+  {
+    "day": 2,
+    "companionId": "nova-park",
+    "companionName": "Nova Park",
+    "title": "Neon Balcony Overlook · Cyber Noir",
+    "scenario": "Neon rain streaks across the window while Nova shuts down her stream early just to spend the hour with you.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  },
+  {
+    "day": 3,
+    "companionId": "sloane-kensington",
+    "companionName": "Sloane Kensington",
+    "title": "Penthouse Keycard · Private Cocktail Hour",
+    "scenario": "Sloane pours two glasses overlooking the skyline and locks the private elevator from her phone.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  },
+  {
+    "day": 4,
+    "companionId": "sora-takahashi",
+    "companionName": "Sora Takahashi",
+    "title": "RGB Late-Night Co-Op Bet",
+    "scenario": "Winner picks the outfit in Scene Selfies—and Sora has been waiting all week to lose on purpose.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  },
+  {
+    "day": 5,
+    "companionId": "aria-velasco",
+    "companionName": "Aria Velasco",
+    "title": "After-Hours Velvet Lounge Booth",
+    "scenario": "Last call ended twenty minutes ago. Aria flips the Closed sign and slides across the crimson booth toward you.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  },
+  {
+    "day": 6,
+    "companionId": "raven-vance",
+    "companionName": "Raven Vance",
+    "title": "Analog Synth Room · Ultraviolet Glow",
+    "scenario": "Raven dims the studio LEDs to violet and invites you to record a late-night whisper track.",
+    "challengeLabel": "+25 Free Coins · Claim Daily Drop",
+    "bonusCoins": 25
+  }
+]

@@ -1,27 +1,28 @@
 /**
  * Image-to-video adapter.
- * Default: Pollinations video URL (may require key / rate limits).
- * Optional: user-pasted img2vid endpoint from Advanced settings.
- * Fallback: labeled multi-frame sequence (honest “not real MP4”).
+ * 1. Custom local/remote img2vid endpoint (ComfyUI Wan 2.2 / FramePack / LTX-Video).
+ * 2. Zero-GPU browser WebM motion clip via Canvas + MediaRecorder (works 100% free & offline).
+ * 3. Honest multi-frame sequence fallback if MediaRecorder is unavailable.
  */
 
 import { getMediaSettings } from "./mediaSettings";
+import { canRenderBrowserClip, MOTION_PRESETS, renderBrowserWebmClip } from "./browserClip";
+import { fetchWorkerImage } from "./imageWorker";
 
-
-/** Generate free frame sequence using image worker for animation. */
+/** Generate verified frame sequence using the image worker (stops cleanly on quota). */
 export async function generateFreeFrames(
   baseImageUrl: string,
   motionPrompt: string,
   count = 4,
 ): Promise<string[]> {
   const frames: string[] = [];
-  const worker = "https://velvetmotion-image.hampusi97.workers.dev/generate";
   for (let i = 0; i < count; i++) {
-    const prompt = `${motionPrompt}, frame ${i + 1} of sequence, slight variation, photorealistic`;
-    const url = `${worker}?prompt=${encodeURIComponent(prompt.slice(0, 800))}&seed=${Date.now() % 100000 + i}`;
-    frames.push(url);
+    const prompt = `${motionPrompt}, frame ${i + 1} of sequence, slight natural movement, photorealistic`;
+    const res = await fetchWorkerImage(prompt, { steps: 6, seed: (Date.now() % 100000) + i });
+    if (!res.ok) break;
+    frames.push(res.url);
   }
-  return frames;
+  return frames.length > 0 ? frames : baseImageUrl ? [baseImageUrl] : [];
 }
 
 export type VideoClipResult = {
@@ -30,11 +31,11 @@ export type VideoClipResult = {
   /** Always available still frames */
   frames: string[];
   /** Honest label for UI */
-  mode: "mp4" | "sequence";
+  mode: "mp4" | "webm" | "sequence";
   note: string;
 };
 
-/** Build a Pollinations-style video GET URL from a still + motion prompt. */
+/** Build a Pollinations-style video GET URL when the user supplies an explicit Pollinations key. */
 export function buildPollinationsVideoUrl(
   imageUrl: string,
   motionPrompt: string,
@@ -53,11 +54,10 @@ export function buildPollinationsVideoUrl(
     image: imageUrl,
   });
   if (settings.pollinationsKey) params.set("key", settings.pollinationsKey);
-  // gen.pollinations.ai/video/{prompt}?...
   return `https://gen.pollinations.ai/video/${prompt}?${params.toString()}`;
 }
 
-/** Call custom img2vid if configured; otherwise build Pollinations URL or null. */
+/** Call custom img2vid if configured; otherwise render a browser WebM motion clip or return sequence frames. */
 export async function requestImg2Vid(
   imageUrl: string,
   motionPrompt: string,
@@ -97,29 +97,30 @@ export async function requestImg2Vid(
     }
   }
 
-  // Free path: generate frame sequence from image worker
-  try {
-    const freeFrames = await generateFreeFrames(imageUrl, motionPrompt, 4);
-    if (freeFrames.length > 1) {
-      return {
-        videoUrl: null,
-        frames: freeFrames,
-        mode: "sequence",
-        note: "Free animated sequence from image worker",
-      };
+  // Zero-GPU WebM motion clip in the browser (reliable, free, never returns 401/502)
+  const sourceStill = imageUrl || frames[0] || "";
+  if (sourceStill && canRenderBrowserClip()) {
+    try {
+      const preset = /pan|side|walk|turn/i.test(motionPrompt)
+        ? MOTION_PRESETS[1]
+        : /up|reveal|rise|body/i.test(motionPrompt)
+          ? MOTION_PRESETS[2]
+          : MOTION_PRESETS[0];
+      const webmUrl = await renderBrowserWebmClip(sourceStill, preset, 3000);
+      if (webmUrl) {
+        return {
+          videoUrl: webmUrl,
+          frames,
+          mode: "webm",
+          note: "Live WebM motion clip rendered locally (free, no GPU server needed)",
+        };
+      }
+    } catch {
+      /* fall through to sequence */
     }
-  } catch {
-    /* fall through */
   }
 
-  // Fallback: Pollinations video URL (may require key)
-  const videoUrl = buildPollinationsVideoUrl(imageUrl, motionPrompt);
-  return {
-    videoUrl,
-    frames,
-    mode: "mp4",
-    note: "Attempting video URL. Sequence frames available as fallback.",
-  };
+  return sequenceOnlyResult(frames);
 }
 
 export function sequenceOnlyResult(frames: string[]): VideoClipResult {

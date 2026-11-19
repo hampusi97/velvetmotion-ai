@@ -7,6 +7,7 @@
     "build": "NODE_ENV=production next build",
     "start": "NODE_ENV=production next start",
     "lint": "next lint",
+    "audit:companions": "node scripts/audit-companions.mjs",
     "test": "tsx --test firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts lib/safety.test.ts lib/apiRoutes.test.ts && tsx scripts/validate-content.ts && node scripts/smoke-test.mjs && python3 -B -m unittest workers/test_workers.py",
     "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project ivory-sunset-mxq1s",
     "deploy:auth": "npx -y firebase-tools@latest deploy --only auth --project ivory-sunset-mxq1s",

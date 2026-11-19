@@ -58,8 +58,22 @@ export function spendCoins(cost: number): boolean {
   return true;
 }
 
-export function addCoins(amount: number) {
-  setCoins(getCoins() + amount);
+export function addCoins(amount: number): number {
+  const next = getCoins() + amount;
+  setCoins(next);
+  return next;
+}
+
+export function saveMatch(characterId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem("velvetmotion_matches");
+    const prev: string[] = raw ? JSON.parse(raw) : [];
+    const next = Array.from(new Set([...prev, characterId]));
+    localStorage.setItem("velvetmotion_matches", JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Once per calendar day — free retention loop. */
@@ -128,6 +142,16 @@ export function addToGallery(item: Omit<GalleryItem, "id" | "createdAt">) {
     )
     .catch(() => {});
   return full;
+}
+
+export function removeGalleryItem(id: string) {
+  if (typeof window === "undefined") return;
+  const next = getGallery().filter((item) => item.id !== id);
+  try {
+    localStorage.setItem(GALLERY_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearGallery() {

@@ -4,8 +4,63 @@ import { useMemo, useState } from "react";
 import type { Character } from "@/lib/characters";
 import { saveCustomCompanionToFirestore } from "@/lib/firebase";
 import { CreatePostActions } from "@/components/CreatePostActions";
+import { SafeImage } from "@/components/SafeImage";
+import { validateCharacterCompliance } from "@/lib/complianceFilter";
+import { saveCustomCompanionDB } from "@/lib/db";
 import { characterMediaUrl, faceSeed, seedFromPhotoDataUrl } from "@/lib/media";
 import { setCharacterFaceSeed } from "@/lib/mediaSettings";
+
+/** Explicit verified Step 2 attribute -> matching local portrait lookup map */
+const ETHNICITY_PORTRAIT_MAP: Record<string, Record<string, string>> = {
+  "East Asian": {
+    Anime: "/portraits/anime-yumi.jpg".includes("anime") ? "/portraits/yumi-chen.webp" : "/portraits/yumi-chen.webp",
+    "Black bob": "/portraits/nova-park.webp",
+    Silver: "/portraits/nova-park.webp",
+    "Pink tips": "/portraits/yumi-chen.webp",
+    default: "/portraits/sora-takahashi.webp",
+  },
+  Caucasian: {
+    "Blonde waves": "/portraits/lena-brooks.webp",
+    Redhead: "/portraits/claire-bennett.webp",
+    "Black bob": "/portraits/raven-vance.webp",
+    default: "/portraits/chloe-parker.webp",
+  },
+  Latina: {
+    "Long dark": "/portraits/maya-solis.webp",
+    "Messy bun": "/portraits/aria-velasco.webp",
+    default: "/portraits/maya-solis.webp",
+  },
+  "Black / Afro": {
+    Braids: "/portraits/nadine-okoye.webp",
+    default: "/portraits/nadine-okoye.webp",
+  },
+  "South Asian": {
+    default: "/portraits/priya-v.jpg",
+  },
+  "Middle Eastern": {
+    default: "/portraits/dalia-moreau.webp",
+  },
+  Mixed: {
+    "Blonde waves": "/portraits/lola.jpg",
+    default: "/portraits/aria-velasco.webp",
+  },
+};
+
+function resolveAttributePreviewUrl(
+  ethnicity: string,
+  hair: string,
+  style: string,
+  personality: string,
+): string {
+  const byEth = ETHNICITY_PORTRAIT_MAP[ethnicity] || ETHNICITY_PORTRAIT_MAP.Caucasian;
+  if (byEth[hair]) return byEth[hair];
+  if (style === "Anime" && ethnicity === "East Asian") return "/portraits/yumi-chen.webp";
+  if (style === "Soft glam" && ethnicity === "Caucasian") return "/portraits/lena-brooks.webp";
+  if ((personality === "Dominant" || personality === "Queen") && ethnicity === "Caucasian") {
+    return "/portraits/sloane-kensington.webp";
+  }
+  return byEth.default;
+}
 
 const STYLES = ["Realistic", "Soft glam", "Anime"] as const;
 const ETHNICITIES = [
@@ -110,16 +165,11 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
 
   const figure = useMemo(() => buildFigure(style, look), [style, look]);
 
-  /** AI preview from Pollinations (no photo required) */
-  const aiPreviewSrc = useMemo(() => {
-    const draft = {
-      id: draftId,
-      name: name.trim() || "preview",
-      figure,
-      age: 24,
-    };
-    return characterMediaUrl(draft, "beauty", `${style} portrait`);
-  }, [draftId, figure, name, style]);
+  /** Matched portrait preview from explicit attribute lookup (Bug #7 fix) */
+  const aiPreviewSrc = useMemo(
+    () => resolveAttributePreviewUrl(ethnicity, hair, style, personality),
+    [ethnicity, hair, style, personality],
+  );
 
   const previewSrc = photoDataUrl || aiPreviewSrc;
 
@@ -183,23 +233,31 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
   };
 
   const finish = async () => {
+    const check = validateCharacterCompliance({
+      name,
+      age: 24,
+      personality,
+      tagline: kink,
+      figure,
+      kink,
+    });
+    if (!check.ok) {
+      setPermHint(check.reason);
+      return;
+    }
+
     setBusy(true);
-    setGenNote(photoDataUrl ? "Locking face from your photo…" : "Generating her with AI from your look…");
+    setGenNote(photoDataUrl ? "Locking face from your photo…" : "Locking her Hyper-Neon profile & preview…");
 
     const finalId = `custom-${Date.now()}`;
     const displayName = name.trim() || "Your Girl";
 
-    // Always produce an AI portrait so chat/gallery stay photoreal even without upload
-    const aiChar = {
-      id: finalId,
-      name: displayName,
-      figure,
-      age: 24,
-    };
-    const generatedAvatar = characterMediaUrl(aiChar, "beauty", `${style} beauty portrait`);
+    const generatedAvatar = aiPreviewSrc || characterMediaUrl({ id: finalId, name: displayName, figure, age: 24 }, "beauty", `${style} beauty portrait`);
     const avatarUrl = photoDataUrl || generatedAvatar;
 
     const character = buildCharacter(finalId, avatarUrl);
+
+    void saveCustomCompanionDB(character.id, character as unknown as Record<string, unknown>);
 
     // Face seed: photo wins; otherwise lock from figure so moods stay consistent
     try {
@@ -325,10 +383,15 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
 
       {/* Live AI preview while designing */}
       {step >= 1 && step < 5 && (
-        <div className="mb-6 flex items-center gap-4 rounded-2xl border border-pink-500/25 bg-zinc-900/60 p-3 glass-card">
-          <div className="h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-800 border border-white/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewSrc} alt="" className="h-full w-full object-cover" />
+        <div className="mb-6 flex items-center gap-4 rounded-2xl neon-glass p-3">
+          <div className="h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-900 border border-[#ff1e8e]/30">
+            <SafeImage
+              key={previewSrc}
+              src={previewSrc}
+              fallbackId={draftId}
+              alt={`${ethnicity} preview`}
+              className="h-full w-full object-cover object-top transition-opacity duration-300"
+            />
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-cream">{name.trim() || "Your Girl"}</div>

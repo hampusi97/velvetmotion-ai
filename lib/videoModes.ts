@@ -59,7 +59,7 @@ export async function enhanceSequenceWithVideo(
   character: Character,
   kind: SequenceKind,
   frames: string[],
-): Promise<{ videoUrl: string | null; note: string; mode: "mp4" | "sequence" }> {
+): Promise<{ videoUrl: string | null; note: string; mode: "mp4" | "webm" | "sequence" }> {
   if (!frames.length) return sequenceOnlyResult([]);
   const motion = MOTION_PROMPTS[kind] || MOTION_PROMPTS.default;
   try {

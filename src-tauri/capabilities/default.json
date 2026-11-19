@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default VelvetMotion Desktop capabilities",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "updater:default",
+    "http:default",
+    "shell:allow-open",
+    "os:default",
+    "process:default",
+    "global-shortcut:default",
+    "notification:default"
+  ]
+}

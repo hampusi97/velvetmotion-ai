@@ -7,6 +7,8 @@ import { HOT_CAST } from "./hotCast";
 import { applyFaceSeed } from "./faceSeeds";
 import { ROLE_CHARACTERS } from "./charactersRoles";
 import { CANDY_CAST } from "./candyCast";
+import { FLAGSHIP_COMPANIONS } from "@/data/companions";
+import { PORTRAIT_BY_ID } from "./portraitFallback";
 
 export type { Character, CharacterVoice };
 
@@ -190,13 +192,52 @@ const CORE: Character[] = [
   },
 ];
 
-export const CHARACTERS: Character[] = [...CANDY_CAST, ...CORE];
-for (const c of [...HOT_CAST, ...EXTRA_CHARACTERS, ...ROLE_CHARACTERS]) {
-  if (!CHARACTERS.some((x) => x.id === c.id)) CHARACTERS.push(applyFaceSeed(c));
+const FLAGSHIP_AS_CHARACTERS: Character[] = FLAGSHIP_COMPANIONS.map((f) => ({
+  id: f.id,
+  name: f.name,
+  age: f.age,
+  tagline: f.tagline,
+  category: f.category,
+  avatar: f.portraitUrl,
+  voiceIntro: f.voiceSampleLine,
+  initialMessage: f.greeting,
+  tags: [f.category, f.archetype, ...(f.isNew ? ["NEW"] : [])],
+  intimacy: 65,
+  voice: { label: f.voiceId, pitch: 1, rate: 0.96, style: f.personality },
+  personality: f.personality,
+  traits: [f.archetype, f.category],
+  background: f.backstory,
+  figure: f.visualDna,
+  visualDna: f.visualDna,
+  voiceId: f.voiceId,
+  kink: f.archetype,
+  reply: f.greeting,
+}));
+
+const LEGACY_POOL: Character[] = [...CANDY_CAST, ...CORE, ...HOT_CAST, ...EXTRA_CHARACTERS, ...ROLE_CHARACTERS];
+
+export const CHARACTERS: Character[] = [...FLAGSHIP_AS_CHARACTERS];
+for (const c of LEGACY_POOL) {
+  if (!PORTRAIT_BY_ID[c.id]) continue;
+  if (!CHARACTERS.some((x) => x.id === c.id)) {
+    const seeded = applyFaceSeed(c);
+    CHARACTERS.push({
+      ...seeded,
+      avatar: PORTRAIT_BY_ID[c.id],
+      voiceId: seeded.voiceId || (seeded.voice.pitch < 0.95 ? "bf_emma" : "af_heart"),
+      visualDna: seeded.visualDna || seeded.figure || seeded.tagline,
+    });
+  }
 }
-// Lock unique faces on core/candy casts too
+// Lock unique faces & visual metadata on flagship casts too
 for (let i = 0; i < CHARACTERS.length; i++) {
-  CHARACTERS[i] = applyFaceSeed(CHARACTERS[i]);
+  const c = applyFaceSeed(CHARACTERS[i]);
+  CHARACTERS[i] = {
+    ...c,
+    avatar: PORTRAIT_BY_ID[c.id] || c.avatar,
+    voiceId: c.voiceId || "af_heart",
+    visualDna: c.visualDna || c.figure || c.tagline,
+  };
 }
 
 function loadClientCustomCharacters(): Character[] {

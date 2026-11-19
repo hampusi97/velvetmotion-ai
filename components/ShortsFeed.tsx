@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Heart, MessageCircle, Pause, Play, Volume2 } from "lucide-react";
 import { CHARACTERS } from "@/lib/characters";
-import { characterMediaUrl, joiSequenceFrames, sexSequenceFrames } from "@/lib/media";
-import { SHORTS_SERIES, SHORTS_GENRES } from "@/lib/shortsCatalog";
-import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
+import { SHORTS_GENRES, SHORTS_SERIES } from "@/lib/shortsCatalog";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { speakWithNeuralVoice } from "@/lib/kokoroTts";
 
-const kenburns = `@keyframes kenburns { 0% { transform: scale(1) translate(0,0); } 50% { transform: scale(1.12) translate(-2%,-1%); } 100% { transform: scale(1) translate(0,0); } } .animate-kenburns { animation: kenburns 12s ease-in-out infinite; }`;
+const kenburns = `@keyframes kenburns { 0% { transform: scale(1) translate(0,0); } 50% { transform: scale(1.1) translate(-1.5%,-1%); } 100% { transform: scale(1) translate(0,0); } } .animate-kenburns { animation: kenburns 11s ease-in-out infinite; }`;
 
 export function ShortsFeed({
   onHome,
@@ -15,76 +16,49 @@ export function ShortsFeed({
   onHome: () => void;
   onChat: (id: string) => void;
 }) {
-  const [genre, setGenre] = useState<string | "All">("All");
-  const [seriesIdx, setSeriesIdx] = useState(0);
-  const [epIdx, setEpIdx] = useState(0);
+  const [genre, setGenre] = useState<string>("All");
   const [paused, setPaused] = useState(false);
-  const [pace, setPace] = useState(1);
+  const [pace, setPace] = useState<1 | 1.5>(1);
+  const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
 
-  const filtered = useMemo(
-    () => (genre === "All" ? SHORTS_SERIES : SHORTS_SERIES.filter((s) => s.genre === genre)),
-    [genre],
-  );
-  const series = filtered[seriesIdx % Math.max(1, filtered.length)] || SHORTS_SERIES[0];
-  const ep = series.episodes[epIdx % series.episodes.length];
+  const items = useMemo(() => {
+    const filtered = genre === "All" ? SHORTS_SERIES : SHORTS_SERIES.filter((s) => s.genre === genre);
+    return filtered.map((series, idx) => {
+      const hint = series.characterHint.toLowerCase();
+      const character =
+        CHARACTERS.find((c) => c.tags.some((t) => t.toLowerCase().includes(hint.split("-")[0]))) ||
+        CHARACTERS[idx % CHARACTERS.length];
+      const ep = series.episodes[0];
+      return { series, ep, character, portrait: staticPortraitUrl(character.id) };
+    });
+  }, [genre]);
 
-  const character = useMemo(() => {
-    const hint = series.characterHint.toLowerCase();
-    const found =
-      CHARACTERS.find((c) => c.tags.some((t) => t.toLowerCase().includes(hint.split("-")[0]))) ||
-      CHARACTERS.find((c) => c.kink.toLowerCase().includes("joi") && series.genre === "JOI") ||
-      CHARACTERS[seriesIdx % CHARACTERS.length];
-    return found;
-  }, [series, seriesIdx]);
-
-  const frames = useMemo(() => {
-    if (ep.spicy) return sexSequenceFrames(character);
-    return joiSequenceFrames(character);
-  }, [character, ep.spicy]);
-
-  const nextEp = () => {
-    if (epIdx + 1 < series.episodes.length) setEpIdx(epIdx + 1);
-    else {
-      setSeriesIdx((s) => s + 1);
-      setEpIdx(0);
-    }
+  const toggleLike = (id: string) => {
+    setLikedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
-    <div className="mx-auto max-w-md pt-16"><style>{kenburns}</style>
-      <div className="flex items-center justify-between mb-3">
-        <button type="button" onClick={onHome} className="text-pink-400 text-sm">
+    <div className="mx-auto max-w-md space-y-3 pb-20">
+      <style>{kenburns}</style>
+
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={onHome} className="text-xs text-[#00f5ff] hover:underline">
           ← Home
         </button>
-        <h1 className="font-display text-xl text-cream">Velvet Shorts</h1>
-        <span className="text-xs text-zinc-500">{series.genre}</span>
+        <h1 className="font-display text-xl font-extrabold text-[#f7f7fc] neon-text-glow">Velvet Shorts 2.0</h1>
+        <span className="rounded-full border border-[#ff1e8e]/35 bg-[#ff1e8e]/10 px-2.5 py-0.5 text-[10px] font-bold text-pink-200">
+          {items.length} clips
+        </span>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-2">
-        <button
-          type="button"
-          onClick={() => {
-            setGenre("All");
-            setSeriesIdx(0);
-            setEpIdx(0);
-          }}
-          className={`shrink-0 rounded-full px-3 py-1 text-xs border ${
-            genre === "All" ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/15 text-zinc-400"
-          }`}
-        >
-          All
-        </button>
-        {SHORTS_GENRES.map((g) => (
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+        {["All", ...SHORTS_GENRES].map((g) => (
           <button
             key={g}
             type="button"
-            onClick={() => {
-              setGenre(g);
-              setSeriesIdx(0);
-              setEpIdx(0);
-            }}
-            className={`shrink-0 rounded-full px-3 py-1 text-xs border ${
-              genre === g ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-white/15 text-zinc-400"
+            onClick={() => setGenre(g)}
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold border transition ${
+              genre === g ? "chip-active" : "border-white/15 text-[#a6a6c4] hover:border-[#ff1e8e]/50"
             }`}
           >
             {g}
@@ -92,75 +66,100 @@ export function ShortsFeed({
         ))}
       </div>
 
-      <div className="relative aspect-[9/16] max-h-[70vh] rounded-3xl overflow-hidden border border-pink-500/40 bg-zinc-950 shadow-[0_0_50px_rgba(236,72,153,0.2)]">
-        {/* Ken Burns fallback so the stage is never black */}
-        <img
-          src={characterMediaUrl(character, "beauty")}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover animate-kenburns"
-          onError={(e) => { (e.target as HTMLImageElement).src = "/portraits/chloe.jpg"; }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-        {/* Right-side TikTok-style rail */}
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
-          <button type="button" onClick={() => setPaused(p => !p)} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur text-white text-xs">{paused ? "▶" : "⏸"}</button>
-          <button type="button" onClick={() => setPace(p => p === 0.75 ? 1 : p === 1 ? 1.5 : 0.75)} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur text-white text-[10px]">{pace}x</button>
-          <button type="button" onClick={nextEp} className="w-10 h-10 rounded-full bg-black/50 backdrop-blur text-white text-xs">⏭</button>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent z-10">
-          <div className="flex gap-2 mb-2">
-            {ep.spicy && (
-              <span className="rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white">SPICY</span>
-            )}
-            {ep.free ? (
-              <span className="rounded-full bg-emerald-600/80 px-2 py-0.5 text-[10px] font-bold text-white">FREE</span>
-            ) : (
-              <span className="rounded-full bg-zinc-700 px-2 py-0.5 text-[10px] text-zinc-300">EP {epIdx + 1}</span>
-            )}
-          </div>
-          <div className="text-xs uppercase tracking-widest text-pink-300">{series.title}</div>
-          <div className="text-lg font-semibold text-white mt-1">{ep.title}</div>
-          <p className="text-sm text-zinc-300 mt-1">{series.blurb}</p>
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              onClick={() => onChat(character.id)}
-              className="flex-1 rounded-full bg-pink-600 py-2.5 text-sm font-semibold"
-            >
-              Chat with {character.name.split(" ")[0]}
-            </button>
-            <button type="button" onClick={nextEp} className="rounded-full border border-white/20 px-4 py-2.5 text-sm">
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-        {filtered.map((s, i) => {
-          const c =
-            CHARACTERS.find((x) =>
-              x.tags.some((t) => t.toLowerCase().includes(s.characterHint.split("-")[0])),
-            ) || CHARACTERS[i % CHARACTERS.length];
+      {/* Full-height CSS snap-y snap-mandatory vertical feed */}
+      <div className="h-[76dvh] snap-y snap-mandatory overflow-y-auto no-scrollbar space-y-4 rounded-3xl">
+        {items.map(({ series, ep, character, portrait }, idx) => {
+          const liked = Boolean(likedIds[series.id]);
+          const animDur = pace === 1.5 ? "7s" : "11s";
           return (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => {
-                setSeriesIdx(i);
-                setEpIdx(0);
-              }}
-              className={`shrink-0 w-24 rounded-xl overflow-hidden border text-left ${
-                i === seriesIdx % filtered.length ? "border-pink-500" : "border-white/10"
-              }`}
+            <section
+              key={series.id}
+              className="relative h-[74dvh] snap-start snap-always rounded-3xl overflow-hidden neon-border-sweep"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={characterMediaUrl(c, "beauty")} alt="" className="aspect-[3/4] w-full object-cover" />
-              <div className="text-[9px] p-1.5 text-zinc-300 leading-tight">
-                <div className="font-medium truncate">{s.title}</div>
-                <div className="text-zinc-500">{s.genre}</div>
+              <div className="neon-sweep-inner relative h-full w-full overflow-hidden bg-[#05050a]">
+                <img
+                  src={portrait}
+                  alt={character.name}
+                  loading={idx <= 1 ? "eager" : "lazy"}
+                  style={{
+                    animationDuration: animDur,
+                    animationPlayState: paused ? "paused" : "running",
+                  }}
+                  className="absolute inset-0 h-full w-full object-cover object-top animate-kenburns"
+                />
+                {/* Preload next clip portrait */}
+                {items[idx + 1] && <link rel="preload" as="image" href={items[idx + 1].portrait} />}
+
+                <div className="absolute inset-0 bg-gradient-to-t from-[#05050a] via-black/25 to-black/30" />
+
+                {/* Neon Glass Right-Side Action Rail */}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    aria-label="Like Short"
+                    onClick={() => toggleLike(series.id)}
+                    className={`flex h-11 w-11 items-center justify-center rounded-full neon-glass transition ${
+                      liked ? "text-[#ff1e8e] border-[#ff1e8e]" : "text-white"
+                    }`}
+                  >
+                    <Heart className={`h-5 w-5 ${liked ? "fill-current" : ""}`} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Chat in Scene"
+                    onClick={() => onChat(character.id)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full neon-glass text-[#00f5ff]"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Play Audio"
+                    onClick={() => void speakWithNeuralVoice(`${ep.title}. ${series.blurb}`, { voiceId: character.voiceId })}
+                    className="flex h-11 w-11 items-center justify-center rounded-full neon-glass text-pink-200"
+                  >
+                    <Volume2 className="h-5 w-5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPace((p) => (p === 1 ? 1.5 : 1))}
+                    className="flex h-11 w-11 items-center justify-center rounded-full neon-glass text-[11px] font-bold text-[#00f5ff]"
+                  >
+                    {pace}x
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={paused ? "Play" : "Pause"}
+                    onClick={() => setPaused((p) => !p)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full neon-glass text-white"
+                  >
+                    {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                {/* Bottom Overlay Info */}
+                <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-[#05050a] via-black/80 to-transparent z-10 pr-16">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    {ep.spicy && (
+                      <span className="rounded-full bg-[#ff1e8e] px-2 py-0.5 text-[10px] font-bold text-white">18+ SPICY</span>
+                    )}
+                    <span className="rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/15 px-2 py-0.5 text-[10px] font-bold text-[#00f5ff]">
+                      {series.genre}
+                    </span>
+                  </div>
+                  <div className="text-xs font-semibold text-pink-300">{character.name} · {series.title}</div>
+                  <div className="text-base font-extrabold text-white mt-0.5">{ep.title}</div>
+                  <p className="text-xs text-[#a6a6c4] mt-1 line-clamp-2">{series.blurb}</p>
+                  <button
+                    type="button"
+                    onClick={() => onChat(character.id)}
+                    className="mt-3 w-full rounded-full neon-btn-primary py-2.5 text-xs font-bold text-white"
+                  >
+                    💬 Chat in Scene with {character.name.split(" ")[0]}
+                  </button>
+                </div>
               </div>
-            </button>
+            </section>
           );
         })}
       </div>

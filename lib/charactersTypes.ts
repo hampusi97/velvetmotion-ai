@@ -29,6 +29,8 @@ export interface Character {
   figure: string;
   kink: string;
   reply: string;
+  voiceId?: string;
+  visualDna?: string;
   kinkSettings?: KinkSettings;
 }
 

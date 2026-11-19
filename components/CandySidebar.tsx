@@ -1,93 +1,125 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useCoinsStore } from "@/lib/coinsStore";
 import { cn } from "@/lib/cn";
 
 type NavItem = {
   id: string;
+  href: string;
   label: string;
-  emoji?: string;
+  emoji: string;
   badge?: string;
 };
 
 const ITEMS: NavItem[] = [
-  { id: "home", label: "Home", emoji: "🏠" },
-  { id: "shorts", label: "Shorts", emoji: "🎬" },
-  { id: "my-girls", label: "My Girls", emoji: "💗" },
-  { id: "girls", label: "Chat", emoji: "💬" },
-  { id: "gallery", label: "Collection", emoji: "🖼️" },
-  { id: "create", label: "Create Character", emoji: "✨" },
-  { id: "import", label: "Import card", emoji: "🃏" },
-  { id: "tinder", label: "Discover", emoji: "🔥" },
-  { id: "lounge", label: "Lounge", emoji: "👋" },
-  { id: "group", label: "Group chat", emoji: "👥" },
-  { id: "tribute", label: "Private Content", emoji: "🔒" },
-  { id: "vault", label: "Private Vault", emoji: "🔐" },
-  { id: "wallet", label: "Coin Wallet & Support", emoji: "🪙", badge: "$5 ❤" },
-  { id: "roadmap", label: "Roadmap & Ideas", emoji: "💡" },
-  { id: "install-app", label: "Android & Apple App", emoji: "📱", badge: "APP" },
-  { id: "advanced", label: "Advanced media", emoji: "⚙️" },
-  { id: "safety", label: "Legal & Safety", emoji: "📋" },
+  { id: "home", href: "/", label: "Home / Explore", emoji: "🏠" },
+  { id: "discover", href: "/discover/", label: "Discover", emoji: "🔥" },
+  { id: "chat", href: "/chat/", label: "Chat", emoji: "💬" },
+  { id: "group", href: "/group/", label: "Group chat", emoji: "👥" },
+  { id: "shorts", href: "/shorts/", label: "Shorts", emoji: "🎬" },
+  { id: "collection", href: "/collection/", label: "Collection", emoji: "🖼️" },
+  { id: "private", href: "/private/", label: "Private Content", emoji: "🔒" },
+  { id: "create", href: "/create/", label: "Create Character", emoji: "✨" },
+  { id: "studio", href: "/studio/", label: "Media Studio", emoji: "🎨" },
+  { id: "download", href: "/download/", label: "Desktop App", emoji: "💻", badge: "⚡ ULTRA" },
 ];
+
+function isRouteActive(pathname: string, active: string | undefined, item: NavItem): boolean {
+  const clean = pathname === "/" ? "/" : `${pathname.replace(/\/+$/, "")}/`;
+  if (item.href === "/") {
+    return clean === "/" && (!active || active === "home");
+  }
+  return clean.startsWith(item.href) || active === item.id;
+}
 
 export function CandySidebar({
   active,
   onNavigate,
-  coins,
+  onOpenSettings,
 }: {
-  active: string;
-  onNavigate: (id: string) => void;
+  active?: string;
+  onNavigate?: (id: string) => void;
   coins?: number;
+  onOpenSettings?: () => void;
 }) {
+  const pathname = usePathname() || "/";
+  const { coins } = useCoinsStore();
+
   return (
-    <aside className="hidden lg:flex w-56 shrink-0 flex-col border-r border-white/10 bg-zinc-950/80 py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
-      <nav className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 pr-1">
+    <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-white/10 bg-[#05050a]/90 backdrop-blur-xl py-4 px-3 sticky top-16 h-[calc(100dvh-4rem)]">
+      <nav aria-label="Sidebar Navigation" className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-1 pr-1">
         {ITEMS.map((item) => {
-          const isActive =
-            active === item.id ||
-            (item.id === "girls" && active === "chat") ||
-            (item.id === "safety" &&
-              (active === "terms" || active === "privacy" || active === "safety" || active === "legal"));
+          const isActive = isRouteActive(pathname, active, item);
           return (
-            <button
+            <Link
               key={item.id}
-              type="button"
-              onClick={() => onNavigate(item.id)}
+              href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-left transition",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-left transition border",
                 isActive
-                  ? "bg-zinc-800 text-white border border-pink-500/30"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-white",
+                  ? "border-[#ff1e8e]/70 bg-[#ff1e8e]/15 text-white shadow-[0_0_16px_rgba(255,30,142,0.28)]"
+                  : "border-transparent text-[#a6a6c4] hover:bg-white/5 hover:text-white",
               )}
             >
               <span className="text-base w-5 text-center">{item.emoji}</span>
-              <span className="font-medium">{item.label}</span>
+              <span className="font-semibold truncate">{item.label}</span>
               {item.badge && (
-                <span className="ml-auto text-[10px] rounded-full bg-pink-600 px-1.5 py-0.5 text-white">
+                <span className="ml-auto shrink-0 rounded-full border border-[#00f5ff]/50 bg-[#00f5ff]/15 px-2 py-0.5 text-[9px] font-black text-[#00f5ff]">
                   {item.badge}
                 </span>
               )}
-            </button>
+            </Link>
           );
         })}
-      </nav>
-      <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
-        {typeof coins === "number" && (
-          <button
-            type="button"
-            onClick={() => onNavigate("wallet")}
-            className="w-full flex items-center justify-between text-xs text-amber-200 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition"
+
+        <div className="my-2 border-t border-white/10 pt-2 space-y-1">
+          <Link
+            href="/?view=blindfold"
+            onClick={() => onNavigate?.("blindfold")}
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-[#a6a6c4] hover:bg-white/5 hover:text-white"
           >
-            <span>🪙 {coins.toLocaleString()} coins</span>
-            <span className="text-[10px] text-amber-300/80">Wallet →</span>
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => onNavigate("wallet")}
-          className="w-full rounded-xl bg-gradient-to-r from-amber-500 via-pink-600 to-fuchsia-600 py-2.5 text-sm font-semibold text-white shadow-lg shadow-pink-500/20 hover:opacity-95 transition"
+            <span className="w-5 text-center">🎧</span>
+            <span>Blindfold JOI</span>
+          </Link>
+          <Link
+            href="/?view=lounge"
+            onClick={() => onNavigate?.("lounge")}
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-[#a6a6c4] hover:bg-white/5 hover:text-white"
+          >
+            <span className="w-5 text-center">👋</span>
+            <span>User Lounge</span>
+          </Link>
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="w-full flex items-center gap-3 rounded-xl px-3 py-2 text-xs text-[#a6a6c4] hover:bg-white/5 hover:text-white"
+            >
+              <span className="w-5 text-center">⚙️</span>
+              <span>Settings &amp; Backup</span>
+            </button>
+          )}
+        </div>
+      </nav>
+
+      <div className="mt-auto pt-3 border-t border-white/10 space-y-2">
+        <Link
+          href="/?view=wallet"
+          onClick={() => onNavigate?.("wallet")}
+          className="w-full flex items-center justify-between text-xs text-amber-200 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 hover:bg-amber-500/20 transition tabular-nums"
         >
-          💝 Support Dev ($5)
-        </button>
+          <span>🪙 {coins.toLocaleString()} coins</span>
+          <span className="text-[10px] text-amber-300">Wallet →</span>
+        </Link>
+        <Link
+          href="/download/"
+          className="block text-center w-full rounded-xl neon-btn-primary py-2.5 text-xs font-extrabold text-white"
+        >
+          ⚡ Get Desktop Ultra App
+        </Link>
       </div>
     </aside>
   );

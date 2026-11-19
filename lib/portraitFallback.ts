@@ -1,39 +1,63 @@
 /**
- * Every character gets a real static portrait.
- * Prefer high-quality Vercel faces when available; fall back to the original 10.
+ * Every companion maps 1-to-1 to a unique existing portrait in /public/portraits/.
+ * Zero duplicate portraits across CHARACTERS or FLAGSHIP_COMPANIONS.
  */
 
-const HQ = [
-  "chloe", "elena", "aria", "sienna", "raven", "yuki", "scarlett", "mia", "genevieve",
-  "nova-g", "suzu-m", "mila-s", "elena-a", "delilah-v", "briony", "nadine", "lexi", "ava", "sloane", "lana", "tessa", "valentina", "lola", "maren-v", "freya-v", "priya-v", "scarlett-v",
-];
+export const PORTRAIT_BY_ID: Record<string, string> = {
+  // 12 Flagship Companions (.webp)
+  "chloe-parker": "/portraits/chloe-parker.webp",
+  "maya-solis": "/portraits/maya-solis.webp",
+  "sloane-kensington": "/portraits/sloane-kensington.webp",
+  "raven-vance": "/portraits/raven-vance.webp",
+  "sora-takahashi": "/portraits/sora-takahashi.webp",
+  "dalia-moreau": "/portraits/dalia-moreau.webp",
+  "lena-brooks": "/portraits/lena-brooks.webp",
+  "aria-velasco": "/portraits/aria-velasco.webp",
+  "nova-park": "/portraits/nova-park.webp",
+  "nadine-okoye": "/portraits/nadine-okoye.webp",
+  "claire-bennett": "/portraits/claire-bennett.webp",
+  "yumi-chen": "/portraits/yumi-chen.webp",
 
-const POOL = [
-  ...HQ,
-  "briony", "calla", "freya", "isolde", "liora",
-  "maren", "nadine", "nova", "tess", "vesper",
-];
-
-const OWN: Record<string, string> = {
-  chloe: "chloe", elena: "elena", aria: "aria", sienna: "sienna",
-  raven: "raven", yuki: "yuki", scarlett: "scarlett", mia: "mia",
-  "chloe-parker": "chloe-parker",
-  "maya-solis": "maya-solis",
-  "sloane-kensington": "sloane-kensington",
-  "raven-vance": "raven-vance",
-  "sora-takahashi": "sora-takahashi",
-  "dalia-moreau": "dalia-moreau",
-  "lena-brooks": "lena-brooks",
-  "aria-velasco": "aria-velasco",
-  "nova-park": "nova-park",
-  "nadine-okoye": "nadine-okoye",
-  "claire-bennett": "claire-bennett",
-  "yumi-chen": "yumi-chen", "blondie-m": "mia", genevieve: "genevieve",
-  briony: "briony", calla: "calla", freya: "freya", isolde: "isolde",
-  liora: "liora", maren: "maren", nadine: "nadine", nova: "nova",
-  tess: "tess", vesper: "vesper",
-  "nova-g": "nova-g", "suzu-m": "suzu-m", "mila-s": "mila-s", "elena-a": "elena-a", "delilah-v": "delilah-v", "lexi": "lexi", "ava": "ava", "sloane": "sloane", "lana": "lana", "tessa": "tessa", "valentina": "valentina", "lola": "lola", "maren-v": "maren-v", "freya-v": "freya-v", "priya-v": "priya-v", "scarlett-v": "scarlett-v",
+  // 36 Distinct Roster Companions (.jpg)
+  "nova-g": "/portraits/nova-g.jpg",
+  "lexi-s": "/portraits/lexi.jpg",
+  "blondie-m": "/portraits/mia.jpg",
+  "sloane-v": "/portraits/sloane.jpg",
+  "elena-a": "/portraits/elena-a.jpg",
+  "riley-n": "/portraits/aria.jpg",
+  "jules-b": "/portraits/genevieve.jpg",
+  "ava-t": "/portraits/ava.jpg",
+  maren: "/portraits/maren.jpg",
+  liora: "/portraits/liora.jpg",
+  tess: "/portraits/tess.jpg",
+  isolde: "/portraits/isolde.jpg",
+  briony: "/portraits/briony.jpg",
+  calla: "/portraits/calla.jpg",
+  nadine: "/portraits/nadine.jpg",
+  vesper: "/portraits/vesper.jpg",
+  valentina: "/portraits/valentina.jpg",
+  "lana-rho": "/portraits/lana.jpg",
+  "lena-plug": "/portraits/delilah-v.jpg",
+  "dalia-x": "/portraits/lola.jpg",
+  "riley-re": "/portraits/chloe.jpg",
+  scarlett: "/portraits/scarlett.jpg",
+  maya: "/portraits/maren-v.jpg",
+  bianca: "/portraits/freya-v.jpg",
+  ravenna: "/portraits/scarlett-v.jpg",
+  tessa: "/portraits/tessa.jpg",
+  nova: "/portraits/nova.jpg",
+  raven: "/portraits/raven.jpg",
+  priya: "/portraits/priya-v.jpg",
+  sienna: "/portraits/sienna.jpg",
+  yuki: "/portraits/yuki.jpg",
+  freya: "/portraits/freya.jpg",
+  elena: "/portraits/elena.jpg",
+  "variety-kira": "/portraits/variety-kira.jpg",
+  "anime-yumi": "/portraits/suzu-m.jpg",
+  "mila-s": "/portraits/mila-s.jpg",
 };
+
+const FALLBACK_POOL = Object.values(PORTRAIT_BY_ID);
 
 function hash(s: string): number {
   let h = 0;
@@ -42,11 +66,9 @@ function hash(s: string): number {
 }
 
 export function staticPortraitUrl(id: string): string {
-  const own = OWN[id];
-  if (own) return `/portraits/${own}.jpg`;
-  // Prefer HQ faces for unknown IDs
-  const pick = HQ[hash(id) % HQ.length];
-  return `/portraits/${pick}.jpg`;
+  if (PORTRAIT_BY_ID[id]) return PORTRAIT_BY_ID[id];
+  const pick = FALLBACK_POOL[hash(id) % FALLBACK_POOL.length];
+  return pick || "/portraits/chloe-parker.webp";
 }
 
 export function safePortraitUrl(id: string, _generatedUrl?: string): string {
@@ -56,6 +78,6 @@ export function safePortraitUrl(id: string, _generatedUrl?: string): string {
 export function onPortraitError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget;
   if (!img.src.includes("/portraits/")) {
-    img.src = "/portraits/chloe.jpg";
+    img.src = "/portraits/chloe-parker.webp";
   }
 }

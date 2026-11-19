@@ -136,14 +136,40 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
       ]
     : null;
 
+  const [beatTempo, setBeatTempo] = useState<"slow" | "steady" | "edge" | "off">("off");
+  const beatBars = beatTempo === "edge" ? [92, 60, 96, 70, 98, 65, 90] : beatTempo === "steady" ? [65, 45, 72, 48, 68, 42, 64] : beatTempo === "slow" ? [38, 22, 44, 24, 40, 26, 36] : [14, 10, 16, 12, 18, 11, 14];
+
+  const applyTempo = (nextTempo: "slow" | "steady" | "edge" | "off") => {
+    setBeatTempo(nextTempo);
+    if (nextTempo === "off") {
+      stopJoiBeat();
+      setBeatActive(false);
+    } else {
+      const bpm = nextTempo === "slow" ? 56 : nextTempo === "steady" ? 96 : 142;
+      startJoiBeat(bpm);
+      setBeatActive(true);
+    }
+  };
+
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <button type="button" onClick={onHome} className="text-pink-400 text-sm">
-        ← Home
-      </button>
-      <h1 className="font-display text-3xl text-cream">Blindfold JOI Studio</h1>
-      <p className="text-sm text-mist">
-        Whispery voice + stroke beats + JOI / SPH / BNWO. Reveal at intimacy ≥ {REVEAL_AT}%.
+    <div className="mx-auto max-w-2xl space-y-3 pb-8">
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={onHome} className="text-[#00f5ff] text-sm hover:underline">
+          ← Home
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#ff1e8e]/45 bg-[#0c0c16] px-3 py-1 text-xs font-semibold text-pink-200">
+            {revealed ? <Eye className="h-3.5 w-3.5 text-[#00f5ff]" /> : <EyeOff className="h-3.5 w-3.5 text-[#ff1e8e]" />}
+            {girl.name.split(" ")[0]} · {mode.toUpperCase()}
+          </span>
+          <span className="rounded-full border border-white/15 bg-[#0c0c16] px-3 py-1 text-xs font-bold text-[#ff1e8e] tabular-nums">
+            ♥ {Math.min(4, Math.floor((step + 1) / 2))}/4
+          </span>
+        </div>
+      </div>
+      <h1 className="font-display text-2xl sm:text-3xl text-[#f7f7fc] neon-text-glow">Blindfold JOI Studio</h1>
+      <p className="text-xs sm:text-sm text-[#a6a6c4]">
+        Whispery voice + reactive neon beat visualizer + JOI / SPH. Reveal at intimacy ≥ {REVEAL_AT}%.
       </p>
 
       <div className="flex flex-wrap gap-2">
@@ -151,7 +177,7 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
           type="button"
           onClick={() => { setMode("joi"); setStep(0); }}
           className={`px-4 py-2 rounded-xl text-sm font-medium ${
-            mode === "joi" ? "bg-pink-600 text-white" : "border border-white/15 text-zinc-300"
+            mode === "joi" ? "neon-btn-primary text-white" : "border border-white/15 text-zinc-300"
           }`}
         >
           Classic JOI
@@ -167,24 +193,15 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
         </button>
         <button
           type="button"
-          onClick={() => { setMode("bnwo"); setStep(0); }}
-          className={`px-4 py-2 rounded-xl text-sm font-medium ${
-            mode === "bnwo" ? "bg-amber-600 text-white" : "border border-white/15 text-zinc-300"
-          }`}
-        >
-          BNWO
-        </button>
-        <button
-          type="button"
           onClick={() => setShowPicker((s) => !s)}
-          className="ml-auto px-3 py-2 rounded-xl border border-white/15 text-xs text-zinc-300"
+          className="ml-auto px-3 py-2 rounded-xl border border-white/15 text-xs text-zinc-300 hover:border-[#00f5ff]/50"
         >
           {showPicker ? "Hide girls" : "Choose girl"}
         </button>
       </div>
 
       {showPicker && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto rounded-2xl border border-white/10 p-2 bg-zinc-950/60">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-56 overflow-y-auto rounded-2xl neon-glass p-2">
           {CHARACTERS.slice(0, 40).map((c) => {
             const int = getIntimacy(c.id, c.intimacy);
             const selected = c.id === girlId;
@@ -200,11 +217,11 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
                   setShowPicker(false);
                 }}
                 className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 transition ${
-                  selected ? "border-pink-500 shadow-lg shadow-pink-500/30" : "border-transparent opacity-80 hover:opacity-100"
+                  selected ? "border-[#ff1e8e] shadow-neonPink" : "border-transparent opacity-80 hover:opacity-100"
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={characterMediaUrl(c, "beauty")} alt={c.name} className="h-full w-full object-cover" />
+                <img src={characterMediaUrl(c, "beauty")} alt={c.name} className="h-full w-full object-cover object-top" />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-1.5">
                   <div className="text-[10px] font-medium text-white truncate">{c.name.split(" ")[0]}</div>
                   <div className="text-[9px] text-pink-300">{int}%</div>
@@ -215,7 +232,7 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
         </div>
       )}
 
-      <div className="relative aspect-[3/4] max-w-sm mx-auto rounded-3xl overflow-hidden border border-pink-500/30 bg-black">
+      <div className="relative aspect-[4/4.2] max-w-sm mx-auto rounded-3xl overflow-hidden border border-[#ff1e8e]/35 bg-[#05050a] shadow-[0_0_32px_rgba(255,30,142,0.18)]">
         {revealed && sequenceFrames ? (
           <MotionSequencePlayer frames={sequenceFrames} alt={girl.name} />
         ) : revealed ? (
@@ -226,25 +243,59 @@ export function BlindfoldJoi({ onHome, onChat }: { onHome: () => void; onChat: (
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950">
-            <EyeOff className="h-12 w-12 text-zinc-600" />
-            <p className="text-sm text-zinc-400 px-6 text-center">
-              Blindfold on. Chat with her until intimacy hits {REVEAL_AT}% to reveal the sequence.
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-5 bg-[radial-gradient(circle_at_50%_30%,rgba(255,30,142,0.16),rgba(5,5,10,0.98)_70%)]">
+            <EyeOff className="h-10 w-10 text-[#ff1e8e]" />
+            <p className="text-sm text-[#f7f7fc] text-center max-w-xs">
+              Blindfold on. Follow the neon beat cues—unlock reveals at {REVEAL_AT}% intimacy ({intimacy}% now).
             </p>
-            <p className="text-pink-300 text-xs">Current: {intimacy}%</p>
+            {/* Reactive Neon Beat Visualizer */}
+            <div className="flex h-16 items-end justify-center gap-2 py-2" aria-label="Neon beat visualizer">
+              {beatBars.map((h, i) => (
+                <span
+                  key={i}
+                  className={`w-2.5 rounded-full transition-all duration-300 ${
+                    beatTempo === "off"
+                      ? "bg-white/15"
+                      : i % 2 === 0
+                        ? "bg-[#ff1e8e] shadow-[0_0_12px_rgba(255,30,142,0.85)] animate-pulse"
+                        : "bg-[#00f5ff] shadow-[0_0_12px_rgba(0,245,255,0.8)] animate-pulse"
+                  }`}
+                  style={{ height: `${h}%`, animationDelay: `${i * 90}ms` }}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {(
+                [
+                  ["slow", "Slow Tease"],
+                  ["steady", "Steady"],
+                  ["edge", "Edge"],
+                  ["off", "Stop Beat"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyTempo(key)}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold border transition ${
+                    beatTempo === key
+                      ? "border-[#00f5ff] bg-[#00f5ff]/20 text-[#00f5ff]"
+                      : "border-white/15 bg-black/50 text-zinc-300 hover:border-[#ff1e8e]/50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() => onChat(girl.id)}
-              className="mt-2 px-4 py-2 rounded-xl bg-pink-600 text-sm font-medium"
+              className="mt-1 px-4 py-2 rounded-xl neon-btn-primary text-xs font-semibold"
             >
               Raise intimacy in chat
             </button>
           </div>
         )}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs text-pink-200">
-          {revealed ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-          {girl.name.split(" ")[0]} · {mode.toUpperCase()}
-        </div>
       </div>
 
       <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-4 space-y-3">

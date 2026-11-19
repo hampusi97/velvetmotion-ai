@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 
 interface LegalPageProps {
   page: 'terms' | 'privacy' | 'policy';
@@ -16,14 +17,14 @@ export default function LegalPage({
   contactEmail = 'abuse@velvetmotion.ai',
 }: LegalPageProps) {
   return (
-    <main className="min-h-screen bg-[#0b0b0f] px-4 py-12 text-zinc-200">
-      <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border border-white/10 bg-[#14131c] p-6 sm:p-8">
-        <a
+    <main className="min-h-screen bg-[#05050a] px-4 py-12 text-[#f7f7fc]">
+      <div className="mx-auto max-w-2xl space-y-6 rounded-3xl neon-glass p-6 sm:p-8">
+        <Link
           href="/"
           className="inline-block rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white"
         >
           &larr; Back to VelvetMotion
-        </a>
+        </Link>
 
         {page === 'terms' && (
           <>

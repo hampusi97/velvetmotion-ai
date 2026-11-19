@@ -59,11 +59,13 @@ assert.equal(firebaserc.projects?.default, "ivory-sunset-mxq1s", ".firebaserc pr
 assert.ok(fs.existsSync("./public/icon-192.png"), "Missing public/icon-192.png");
 assert.ok(fs.existsSync("./public/icon-512.png"), "Missing public/icon-512.png");
 
-// 5. Verify HTTP Security Headers in next.config.ts & scan for corrupted stub files
+// 5. Verify Static Export Config & HTTP Security Headers in public/_headers
 const nextConfigText = fs.readFileSync("./next.config.ts", "utf8");
-assert.ok(nextConfigText.includes("X-Content-Type-Options"), "next.config.ts missing X-Content-Type-Options header");
-assert.ok(nextConfigText.includes("Strict-Transport-Security"), "next.config.ts missing HSTS header");
-assert.ok(nextConfigText.includes("Cross-Origin-Opener-Policy"), "next.config.ts missing COOP header");
+assert.ok(nextConfigText.includes('output: "export"') || nextConfigText.includes("output: 'export'"), "next.config.ts missing static export output");
+const headersText = fs.readFileSync("./public/_headers", "utf8");
+assert.ok(headersText.includes("X-Content-Type-Options"), "public/_headers missing X-Content-Type-Options header");
+assert.ok(headersText.includes("Strict-Transport-Security"), "public/_headers missing HSTS header");
+assert.ok(headersText.includes("Cross-Origin-Opener-Policy"), "public/_headers missing COOP header");
 
 for (const dir of ["./app", "./components", "./lib"]) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
