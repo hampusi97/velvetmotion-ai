@@ -35,7 +35,7 @@ function mediaSeed(id: string, mood: string, extra = ""): number {
 export function faceSeed(character: Pick<Character, "id" | "figure" | "name">): number {
   const stored = getCharacterFaceSeed(character.id);
   if (stored != null) return stored;
-  return Math.abs(hashCode(character.id + "|face|" + (character.figure || "").slice(0, 80))) % 100000;
+  return Math.abs(hashCode(character.id + "|face|" + (character.figure || "").slice(0, 160))) % 100000;
 }
 
 export function seedFromPhotoDataUrl(dataUrl: string): number {
@@ -43,7 +43,6 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
-/** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult, max heat */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
     "ultra photoreal beauty portrait, 85mm, soft glam, natural skin pores, candid influencer selfie, catchlights, candy.ai aesthetic, stunning adult woman, seductive half-smile, sharp unique face",
@@ -222,7 +221,6 @@ export function characterGallery(character: Character): {
   }));
 }
 
-/** Always prefer live AI portrait over static SVG placeholders */
 export function resolveCharacterAvatar(character: Character): string {
   if (character.avatar?.startsWith("http") || character.avatar?.startsWith("data:")) {
     return character.avatar;
