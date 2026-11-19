@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { BadgeCheck, Sparkles } from "lucide-react";
 import { filterCharacters, type Character } from "@/lib/characters";
+import { FLAGSHIP_COMPANIONS } from "@/data/companions";
 import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
 
 interface CharacterRosterProps {
