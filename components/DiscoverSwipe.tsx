@@ -377,7 +377,7 @@ export function DiscoverSwipe({
         )}
 
         <div
-          className="relative aspect-[3/4] rounded-3xl overflow-hidden border border-pink-500/30 shadow-[0_0_50px_rgba(236,72,153,0.25)] touch-none select-none cursor-grab active:cursor-grabbing z-10 transition-transform duration-200 ease-out"
+          className="relative aspect-[3/4] rounded-3xl overflow-hidden border border-pink-500/30 shadow-[0_0_50px_rgba(236,72,153,0.25)] touch-none select-none cursor-grab active:cursor-grabbing z-10 transition-transform duration-200 ease-out animate-card-in animate-glow"
           style={{
             transform: `translateX(${dragX}px) rotate(${rot}deg)`,
             transition: dragging ? "none" : "transform 0.22s ease",
