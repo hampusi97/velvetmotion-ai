@@ -62,6 +62,9 @@ export const FACE_SEEDS: Record<string, string> = {
   "breed-ophelia": "unique face seed ophelia-v2: Soft blonde 25, blue eyes, full lips, flushed cheeks, long wavy hair, photoreal identity lock",
   "cheat-maren": "unique face seed maren-c-v2: Athletic brunette 28, sharp jaw, green eyes, messy bun, photoreal identity lock",
   "step-fantasy-lena": "unique face seed lena-s-v2: Elegant woman 32, dark hair, sharp brows, full lips, photoreal identity lock",
+  "variety-nova": "unique face seed nova-v-v2: Athletic Latina 24, long dark ponytail, sharp smile, warm brown eyes, sporty freckles, photoreal identity lock",
+  "variety-kira": "unique face seed kira-v-v2: East Asian woman 26, undercut with longer top, sleeve tattoos, sharp cat eyes, nose stud, photoreal identity lock",
+  "variety-delilah": "unique face seed delilah-v-v2: Elegant woman 31, dark hair, sharp brows, full lips, confident gaze, photoreal identity lock",
 };
 
 export function applyFaceSeed<T extends { id: string; figure?: string }>(c: T): T {
