@@ -74,11 +74,16 @@ function saveMatchIds(ids: string[]) {
   }
 }
 
-function matchChance(race: RacePref): number {
-  if (race === "black") return 0.8;
-  if (race === "white") return 0.3;
-  if (race === "other") return 0.55;
-  return 1;
+function matchChance(race: RacePref, gender?: string): number {
+  // Base from race pref
+  let base = 1;
+  if (race === "black") base = 0.8;
+  else if (race === "white") base = 0.3;
+  else if (race === "other") base = 0.55;
+  // Gender: girls match easily, guys match less (dating-app style)
+  if (gender === "woman") return Math.min(1, base + 0.35);
+  if (gender === "man") return Math.max(0.15, base * 0.45);
+  return base;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -215,7 +220,7 @@ export function DiscoverSwipe({
   };
 
   const like = (isSuper = false) => {
-    const chance = isSuper ? 1 : matchChance(race);
+    const chance = isSuper ? 1 : matchChance(race, profile.gender);
     const hits = Math.random() < chance;
     if (!hits) {
       setHistory((h) => [...h, { idx, action: "reject", id: current.id }]);
