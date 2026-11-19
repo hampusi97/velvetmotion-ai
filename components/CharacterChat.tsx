@@ -100,6 +100,23 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
   const [coins, setCoinsState] = useState(600);
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
+  const [edgeLocked, setEdgeLocked] = useState(false);
+  // Daily heat: streak changes default mood
+  useEffect(() => {
+    try {
+      const s = parseInt(localStorage.getItem("vm-edge-streak") || "0", 10);
+      const mood = s >= 7 ? "explicit" : s >= 3 ? "nude" : "lingerie";
+      localStorage.setItem("vm-daily-heat", mood);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      const until = parseInt(localStorage.getItem("vm-edge-lock") || "0", 10);
+      setEdgeLocked(Date.now() < until);
+    } catch {}
+  }, []);
+
   const [callOpen, setCallOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
   const [vaultNote, setVaultNote] = useState("");
@@ -671,7 +688,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
 
       <div className="flex flex-wrap gap-2 pb-2">
         {NSFW_CHIPS.map((chip) => (
-          <button key={chip.id} type="button" disabled={busy} onClick={() => generate(chip.mood, chip.label, chip.cost)} className="px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs text-pink-100 disabled:opacity-50 btn-candy">
+          <button key={chip.id} type="button" disabled={busy} onClick={() => { if (edgeLocked && (chip.id === "explicit" || chip.id === "breeding")) { alert("Edge lock — wait 60s"); return; } generate(chip.mood, chip.label, chip.cost); }} className="px-3 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-xs text-pink-100 disabled:opacity-50 btn-candy">
             <ImageIcon className="inline h-3.5 w-3.5" /> {chip.label}
           </button>
         ))}
