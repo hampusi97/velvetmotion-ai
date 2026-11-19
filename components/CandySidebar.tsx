@@ -23,6 +23,8 @@ const ITEMS: NavItem[] = [
   { id: "tribute", label: "Private Content", emoji: "🔒" },
   { id: "vault", label: "Private Vault", emoji: "🔐" },
   { id: "wallet", label: "Coin Wallet & Support", emoji: "🪙", badge: "$5 ❤" },
+  { id: "roadmap", label: "Roadmap & Ideas", emoji: "💡" },
+  { id: "install-app", label: "Android & Apple App", emoji: "📱", badge: "APP" },
   { id: "advanced", label: "Advanced media", emoji: "⚙️" },
   { id: "safety", label: "Legal & Safety", emoji: "📋" },
 ];

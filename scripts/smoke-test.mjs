@@ -13,8 +13,21 @@ assert.ok(fragShader.includes("gl_FragColor"), "Fragment shader missing gl_FragC
 
 // 2. Verify Shell Launcher Syntax
 execSync("bash -n ./scripts/start-local.sh");
+execSync("bash -n ./scripts/build-mobile.sh");
 
-// 3. Verify Windows Batch Launcher & Docker Stack
+// 3. Verify Windows Batch Launcher, Mobile Apps (Android Kotlin & Apple SwiftUI), & Docker Stack
+const androidManifest = fs.readFileSync("./mobile/android/app/src/main/AndroidManifest.xml", "utf8");
+assert.ok(androidManifest.includes("android:xlargeScreens=\"true\""), "AndroidManifest missing tablet xlargeScreens support");
+const mainActivityKt = fs.readFileSync("./mobile/android/app/src/main/java/ai/velvetmotion/app/MainActivity.kt", "utf8");
+assert.ok(mainActivityKt.includes("class MainActivity"), "Android MainActivity.kt missing MainActivity class");
+const iosPlist = fs.readFileSync("./mobile/ios/VelvetMotionApp/Info.plist", "utf8");
+assert.ok(iosPlist.includes("<integer>2</integer>"), "iOS Info.plist missing iPad UIDeviceFamily (2)");
+const iosAppSwift = fs.readFileSync("./mobile/ios/VelvetMotionApp/VelvetMotionApp.swift", "utf8");
+assert.ok(iosAppSwift.includes("struct VelvetMotionApp: App"), "iOS VelvetMotionApp.swift missing SwiftUI App entry");
+const capConfig = fs.readFileSync("./capacitor.config.ts", "utf8");
+assert.ok(capConfig.includes("ai.velvetmotion.app"), "capacitor.config.ts missing appId");
+const pwaManifest = JSON.parse(fs.readFileSync("./public/manifest.json", "utf8"));
+assert.equal(pwaManifest.orientation, "any", "manifest.json should support phone & tablet rotation");
 const winCmd = fs.readFileSync("./scripts/start-windows.cmd", "utf8");
 assert.ok(winCmd.includes("workers\\local_media_proxy.py"), "Windows launcher missing proxy startup");
 const dockerfile = fs.readFileSync("./Dockerfile", "utf8");

@@ -57,6 +57,30 @@ body::before {
 
 button {
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Native Phone & Tablet (iOS / iPadOS / Android) Safe-Area & Standalone App Polish */
+@supports (padding: max(0px)) {
+  .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .safe-top {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+}
+
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  input,
+  textarea {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 .font-display {

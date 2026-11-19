@@ -59,6 +59,12 @@ export async function GET() {
       xssInputSanitization: true,
       apiRateLimiting: true,
     },
+    mobileApps: {
+      android: "mobile/android (Kotlin Phones & Tablets)",
+      ios: "mobile/ios (SwiftUI Universal iPhone & iPad)",
+      capacitor: "capacitor.config.ts",
+      pwa: "standalone-v2-network-first",
+    },
     catalog: {
       companions: CHARACTERS.length,
       storyPacks: STORY_PACKS.length,

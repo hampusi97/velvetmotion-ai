@@ -39,6 +39,8 @@ import { MyGirlsHub } from "@/components/MyGirlsHub";
 import { LegalPages } from "@/components/LegalPages";
 import { CoinWallet } from "@/components/CoinWallet";
 import { SupportModal } from "@/components/SupportModal";
+import { InstallAppModal } from "@/components/InstallAppModal";
+import { SuggestionsHub } from "@/components/SuggestionsHub";
 import { shouldShowSupportPromptOnLogin } from "@/lib/wallet";
 import { getUser, type LocalUser } from "@/lib/auth";
 import { getCoins, loadChat, saveChat } from "@/lib/storage";
@@ -78,6 +80,7 @@ type HomeView =
   | "vault"
   | "my-girls"
   | "wallet"
+  | "roadmap"
   | "terms"
   | "privacy"
   | "safety";
@@ -103,6 +106,7 @@ export default function Home() {
   const [activeJoiId, setActiveJoiId] = useState<string | null>(null);
   const [dualPair, setDualPair] = useState<{ a: string; b: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
+  const [installAppOpen, setInstallAppOpen] = useState(false);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -244,6 +248,10 @@ export default function Home() {
 
   const navigate = (next: string) => {
     setMenuOpen(false);
+    if (next === "install-app") {
+      setInstallAppOpen(true);
+      return;
+    }
     if (next === "girls" || next === "romance") openRoster(next === "romance");
     else setView(next as View);
     window.scrollTo({ top: 0 });
@@ -382,6 +390,8 @@ export default function Home() {
           view === "vault" ||
           view === "my-girls" ||
           view === "wallet" ||
+          view === "roadmap" ||
+          view === "joi3d" ||
           view === "terms" ||
           view === "privacy" ||
           view === "safety"
@@ -569,6 +579,7 @@ export default function Home() {
               onCoinsChanged={setCoins}
             />
           )}
+          {view === "roadmap" && <SuggestionsHub onHome={() => setView("home")} />}
           {view === "my-girls" && (
             <MyGirlsHub
               onHome={() => setView("home")}
@@ -596,6 +607,12 @@ export default function Home() {
           <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
             <span>VelvetMotion AI · Fictional adults 21+ only · 100% Free</span>
             <div className="flex flex-wrap gap-4">
+              <button type="button" onClick={() => setInstallAppOpen(true)} className="text-emerald-300 hover:text-emerald-200 font-medium">
+                📱 Android &amp; Apple App
+              </button>
+              <button type="button" onClick={() => navigate("roadmap")} className="text-pink-300 hover:text-pink-200 font-medium">
+                💡 Roadmap &amp; Ideas
+              </button>
               <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
                 🪙 Coin Wallet ($5 Support)
               </button>
@@ -623,6 +640,7 @@ export default function Home() {
           onCoinsChanged={setCoins}
         />
       )}
+      {installAppOpen && <InstallAppModal onClose={() => setInstallAppOpen(false)} />}
       {proactive && (
         <ProactiveToast
           ping={proactive}

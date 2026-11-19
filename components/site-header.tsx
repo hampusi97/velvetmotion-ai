@@ -221,6 +221,15 @@ export function SiteHeader({
             <GoonStreakWidget />
             <button
               type="button"
+              onClick={() => onNavigate("install-app" as ViewId)}
+              title="Install VelvetMotion App for Android, iPhone & iPad"
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20 transition"
+            >
+              <span aria-hidden>📱</span>
+              <span className="hidden xs:inline">App</span>
+            </button>
+            <button
+              type="button"
               onClick={() => onNavigate("wallet" as ViewId)}
               title="Open Coin Wallet & Support ($5 optional)"
               className="hidden sm:flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-200 hover:bg-amber-500/20 transition"

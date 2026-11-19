@@ -1,12 +1,15 @@
 {
+  "id": "/",
   "name": "VelvetMotion AI",
   "short_name": "VelvetMotion",
-  "description": "Adult AI companions — chat, JOI, tributes. 21+ only.",
+  "description": "Adult AI companions — chat, 3D JOI stage, tributes, live lounge & voice. 21+ only.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#07050c",
   "theme_color": "#db2777",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -21,6 +24,32 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["entertainment", "lifestyle"],
+  "shortcuts": [
+    {
+      "name": "Chat with Companions",
+      "short_name": "Chat",
+      "url": "/?view=girls",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "3D JOI Stage",
+      "short_name": "3D JOI",
+      "url": "/?view=joi3d",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Lounge",
+      "short_name": "Lounge",
+      "url": "/?view=lounge",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Coin Wallet & Leaderboard",
+      "short_name": "Wallet",
+      "url": "/?view=wallet",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["entertainment", "lifestyle", "social"],
   "lang": "en"
 }

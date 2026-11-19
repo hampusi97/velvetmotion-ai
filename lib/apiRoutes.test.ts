@@ -12,6 +12,7 @@ import { buildComfyWorkflowGraph } from "./comfyClient";
 import { GET as getPipeline, POST as postPipeline } from "../app/api/pipeline/route";
 import { GET as getWallet, POST as postWallet } from "../app/api/wallet/route";
 import { GET as getLounge, POST as postLounge } from "../app/api/lounge/route";
+import { GET as getSuggestions, POST as postSuggestions } from "../app/api/suggestions/route";
 
 describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
   it("GET /api/health reports active engines and catalog counts", async () => {
@@ -266,5 +267,42 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     assert.equal(postOut.ok, true);
     assert.equal(postOut.roomId, "nsfw");
     assert.equal(postOut.message.from, "VelvetTester");
+  });
+
+  it("GET & POST /api/suggestions handles roadmap listing, community submissions, and upvoting", async () => {
+    const sGet = await getSuggestions();
+    assert.equal(sGet.status, 200);
+    const sData = await sGet.json();
+    assert.equal(sData.ok, true);
+    assert.ok(Array.isArray(sData.suggestions) && sData.suggestions.length >= 5);
+
+    const sPost = await postSuggestions(
+      new Request("http://localhost:3000/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.77" },
+        body: JSON.stringify({
+          action: "submit",
+          title: "iPad Split-View 3D Penthouse Companion Dock",
+          detail: "Let iPad users keep 3D Penthouse on the left and live chat on the right.",
+          category: "Mobile & Tablet",
+          author: "TabletTester",
+        }),
+      }),
+    );
+    assert.equal(sPost.status, 200);
+    const created = await sPost.json();
+    assert.equal(created.ok, true);
+    assert.equal(created.suggestion.category, "Mobile & Tablet");
+
+    const upRes = await postSuggestions(
+      new Request("http://localhost:3000/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.77" },
+        body: JSON.stringify({ action: "upvote", id: created.suggestion.id }),
+      }),
+    );
+    assert.equal(upRes.status, 200);
+    const upData = await upRes.json();
+    assert.equal(upData.suggestion.votes, 2);
   });
 });
