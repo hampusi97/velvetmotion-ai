@@ -46,6 +46,74 @@ COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
 
 TUNNEL_URL = None
 
+ANTI_SLOP_BAN_PHRASES = [
+    "shivers down my spine",
+    "shiver down my spine",
+    "a testament to",
+    "couldn't help but",
+    "eyes widened",
+    "a mixture of",
+    "tapestry of",
+    "symphony of",
+    "unspoken promise",
+    "as an ai",
+    "how can i assist you",
+    "how can i help you today",
+]
+
+DAVIDAU_SAMPLER_PRESETS = {
+    "roleplay-balanced": {
+        "standard": {"temperature": 0.82, "top_p": 0.95, "max_tokens": 260, "presence_penalty": 0.0, "frequency_penalty": 0.0},
+        "localExtended": {"min_p": 0.05, "top_k": 40, "repeat_penalty": 1.08, "repeat_last_n": 64},
+    },
+    "creative-dry-class3": {
+        "standard": {"temperature": 0.95, "top_p": 0.95, "max_tokens": 280, "presence_penalty": 0.1, "frequency_penalty": 0.25},
+        "localExtended": {
+            "min_p": 0.05, "top_k": 60, "repeat_penalty": 1.1, "repeat_last_n": 64,
+            "dry_multiplier": 0.8, "dry_allowed_length": 2, "dry_base": 1.0,
+            "smoothing_factor": 1.5, "smoothing_curve": 1.0,
+        },
+    },
+    "ultra-prose-class4": {
+        "standard": {"temperature": 1.25, "top_p": 0.95, "max_tokens": 300, "presence_penalty": 0.2, "frequency_penalty": 0.5},
+        "localExtended": {
+            "min_p": 0.05, "top_k": 80, "repeat_penalty": 1.12, "repeat_last_n": 64,
+            "dry_multiplier": 1.0, "dry_allowed_length": 2, "dry_base": 1.5,
+            "smoothing_factor": 3.5, "smoothing_curve": 1.75,
+            "dynatemp_range": 0.5, "dynatemp_exponent": 1.0,
+        },
+    },
+}
+
+
+def build_home_sampler_payload(provider, body):
+    preset_id = body.get("samplerPreset") or "roleplay-balanced"
+    preset = DAVIDAU_SAMPLER_PRESETS.get(preset_id, DAVIDAU_SAMPLER_PRESETS["roleplay-balanced"])
+    std = dict(preset["standard"])
+    ext = dict(preset["localExtended"])
+    for key in std:
+        if key in body and body[key] is not None:
+            std[key] = body[key]
+    for key in ext:
+        if key in body and body[key] is not None:
+            ext[key] = body[key]
+    if provider == "koboldcpp":
+        out = {**std, **ext}
+        out["banned_tokens"] = body.get("banned_tokens") or ANTI_SLOP_BAN_PHRASES
+        return out
+    return {
+        **std,
+        "options": {
+            "temperature": std["temperature"],
+            "top_p": std["top_p"],
+            "min_p": ext["min_p"],
+            "top_k": ext["top_k"],
+            "repeat_penalty": ext["repeat_penalty"],
+            "repeat_last_n": ext["repeat_last_n"],
+            "num_predict": std["max_tokens"],
+        },
+    }
+
 
 def get_ram_gb():
     """Returns (total_gb, available_gb) using stdlib only (no pip installs required)."""
@@ -186,8 +254,6 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_chat(self, body):
         messages = body.get("messages", [])
-        temperature = body.get("temperature", 0.82)
-        max_tokens = body.get("max_tokens", 280)
 
         targets = []
         if probe(f"{KOBOLD_URL}/api/v1/model"):
@@ -197,11 +263,11 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
 
         for provider, endpoint, model in targets:
             try:
+                sampler_fields = build_home_sampler_payload(provider, body)
                 payload = json.dumps({
                     "model": model,
                     "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
+                    **sampler_fields,
                 }).encode("utf-8")
                 req = urllib.request.Request(
                     endpoint,

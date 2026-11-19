@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Cloud, Copy, Cpu, Download, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
+import { Check, Cloud, Copy, Cpu, Download, ExternalLink, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
 import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
 import { loadRouterSettings, saveRouterSettings } from "@/lib/chatRouter";
 import { checkDesktopUpdate, triggerBossKey, useLocalEngineStatus } from "@/lib/localEngineBridge";
@@ -10,6 +10,12 @@ import { useFirebaseCloudSync } from "@/lib/firebaseSync";
 import { googleSignIn, signInAnonymousGuest } from "@/lib/firebase";
 import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
 import { getPreferredVoiceEngine, setPreferredVoiceEngine, type VoiceEngineId } from "@/lib/kokoroTts";
+import {
+  DAVIDAU_RECOMMENDED_GGUFS,
+  DAVIDAU_SAMPLER_PRESETS,
+  SAMPLER_PRESET_LIST,
+  type SamplerPresetId,
+} from "@/lib/samplerPresets";
 
 export function SettingsAndBackupDrawer({
   open,
@@ -39,6 +45,9 @@ export function SettingsAndBackupDrawer({
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [uiSound, setUiSound] = useState(() => isUiSoundEnabled());
   const [voiceEngine, setVoiceEngine] = useState<VoiceEngineId>(() => getPreferredVoiceEngine());
+  const [samplerPreset, setSamplerPreset] = useState<SamplerPresetId>(
+    () => initialRouter.samplerPreset || "roleplay-balanced",
+  );
   const engine = useLocalEngineStatus();
   const { status: cloudStatus, syncNow } = useFirebaseCloudSync();
   const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
@@ -78,6 +87,7 @@ export function SettingsAndBackupDrawer({
       customBaseUrl: customUrl.trim() || undefined,
       homeEngineUrl: homeEngineUrl.trim() || undefined,
       ollamaModel: ollamaModel.trim() || "llama3.1:8b",
+      samplerPreset,
     });
     try {
       localStorage.setItem("vm-stealth-notif", String(stealthNotif));
@@ -326,6 +336,99 @@ export function SettingsAndBackupDrawer({
             <p className="text-[10px] text-[#a6a6c4]">
               {VOICE_ENGINE_OPTIONS.find((v) => v.id === voiceEngine)?.description}
             </p>
+          </div>
+
+          {/* Chat Quality · DavidAU Class 1–4 Sampler Preset */}
+          <div className="rounded-xl border border-white/10 bg-[#05050a] p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[11px] font-bold text-white" htmlFor="vm-sampler-preset-select">
+                Chat Quality · Roleplay Sampler Preset
+              </label>
+              <span className="rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2 py-0.5 text-[9px] font-bold text-[#00f5ff]">
+                {DAVIDAU_SAMPLER_PRESETS[samplerPreset].badge}
+              </span>
+            </div>
+            <select
+              id="vm-sampler-preset-select"
+              value={samplerPreset}
+              onChange={(e) => {
+                const next = e.target.value as SamplerPresetId;
+                setSamplerPreset(next);
+                saveRouterSettings({ samplerPreset: next });
+                setStatusMsg(`Chat sampler switched to ${DAVIDAU_SAMPLER_PRESETS[next].label}.`);
+              }}
+              className="w-full rounded-lg border border-white/15 bg-[#0c0c16] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#00f5ff]"
+            >
+              {SAMPLER_PRESET_LIST.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-[10px] text-[#a6a6c4] leading-snug">
+              {DAVIDAU_SAMPLER_PRESETS[samplerPreset].description}
+            </p>
+            <div className="flex flex-wrap gap-1.5 pt-0.5 text-[9px] font-mono text-zinc-300">
+              <span className="rounded border border-white/10 bg-black/50 px-1.5 py-0.5">
+                temp {DAVIDAU_SAMPLER_PRESETS[samplerPreset].standard.temperature}
+              </span>
+              <span className="rounded border border-white/10 bg-black/50 px-1.5 py-0.5">
+                min_p {DAVIDAU_SAMPLER_PRESETS[samplerPreset].localExtended.min_p}
+              </span>
+              <span className="rounded border border-white/10 bg-black/50 px-1.5 py-0.5">
+                repeat_last_n {DAVIDAU_SAMPLER_PRESETS[samplerPreset].localExtended.repeat_last_n}
+              </span>
+              <span className="rounded border border-white/10 bg-black/50 px-1.5 py-0.5">
+                max_tokens {DAVIDAU_SAMPLER_PRESETS[samplerPreset].standard.max_tokens}
+              </span>
+              {DAVIDAU_SAMPLER_PRESETS[samplerPreset].localExtended.dry_multiplier && (
+                <span className="rounded border border-[#ff1e8e]/40 bg-[#ff1e8e]/10 px-1.5 py-0.5 text-[#ff8aa1]">
+                  DRY {DAVIDAU_SAMPLER_PRESETS[samplerPreset].localExtended.dry_multiplier}
+                </span>
+              )}
+              {DAVIDAU_SAMPLER_PRESETS[samplerPreset].localExtended.dynatemp_range && (
+                <span className="rounded border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-1.5 py-0.5 text-[#00f5ff]">
+                  DynaTemp ±{DAVIDAU_SAMPLER_PRESETS[samplerPreset].localExtended.dynatemp_range}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop Model Manager — DavidAU Recommended Hugging Face GGUFs */}
+          <div className="space-y-1.5 pt-1">
+            <p className="text-[11px] font-bold text-white">Desktop Model Manager · DavidAU NEO GGUFs</p>
+            {DAVIDAU_RECOMMENDED_GGUFS.map((gguf) => (
+              <div key={gguf.id} className="rounded-xl border border-white/10 bg-[#05050a] p-2.5 space-y-1">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-white truncate">{gguf.name}</span>
+                  <span className="shrink-0 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2 py-0.5 text-[9px] font-bold text-[#00f5ff]">
+                    {gguf.ramLabel}
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#a6a6c4] leading-snug">{gguf.note}</p>
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSamplerPreset(gguf.recommendedPreset);
+                      saveRouterSettings({ samplerPreset: gguf.recommendedPreset });
+                      setStatusMsg(`Applied ${DAVIDAU_SAMPLER_PRESETS[gguf.recommendedPreset].label} for ${gguf.name}.`);
+                    }}
+                    className="rounded-md border border-white/15 bg-black/50 px-2 py-0.5 text-[10px] font-semibold text-zinc-200 hover:border-[#ff5678]"
+                  >
+                    Use {DAVIDAU_SAMPLER_PRESETS[gguf.recommendedPreset].label}
+                  </button>
+                  <a
+                    href={gguf.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-md border border-[#ff1e8e]/45 bg-[#ff1e8e]/15 px-2.5 py-0.5 text-[10px] font-bold text-[#ff8aa1] hover:bg-[#ff1e8e]/25"
+                  >
+                    <Download className="h-3 w-3" /> Download GGUF <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-wrap gap-2 pt-1">

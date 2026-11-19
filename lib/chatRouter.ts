@@ -14,6 +14,7 @@ import {
   sanitizeCompanionReply as sanitizeWithDynamicEngine,
   type CompanionMemoryItem,
 } from "./dynamicChatEngine";
+import { buildSamplerPayload, type SamplerPresetId } from "./samplerPresets";
 
 export interface RouterMessage {
   role: "user" | "assistant";
@@ -44,19 +45,20 @@ export interface ChatRouterSettings {
   ollamaModel?: string;
   homeEngineUrl?: string;
   aiHordeApiKey?: string;
+  samplerPreset?: SamplerPresetId;
 }
 
 const KEY = "velvetmotion_llm_settings";
 
 export function loadRouterSettings(): ChatRouterSettings {
-  if (typeof window === "undefined") return { provider: "auto" };
+  if (typeof window === "undefined") return { provider: "auto", samplerPreset: "roleplay-balanced" };
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { provider: "auto", ...JSON.parse(raw) };
+    if (raw) return { provider: "auto", samplerPreset: "roleplay-balanced", ...JSON.parse(raw) };
   } catch {
     /* ignore */
   }
-  return { provider: "auto", aiHordeApiKey: "0000000000" };
+  return { provider: "auto", samplerPreset: "roleplay-balanced", aiHordeApiKey: "0000000000" };
 }
 
 export function saveRouterSettings(next: Partial<ChatRouterSettings>) {
@@ -98,7 +100,13 @@ function systemPrompt(p: CompanionPersona): string {
 async function fetchOpenAICompat(
   endpoint: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-  opts: { apiKey?: string; model?: string; timeoutMs?: number; headers?: Record<string, string> } = {},
+  opts: {
+    apiKey?: string;
+    model?: string;
+    timeoutMs?: number;
+    headers?: Record<string, string>;
+    samplerPayload?: Record<string, unknown>;
+  } = {},
 ): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 6000);
@@ -113,8 +121,7 @@ async function fetchOpenAICompat(
       body: JSON.stringify({
         model: opts.model || "local-model",
         messages,
-        max_tokens: 220,
-        temperature: 0.86,
+        ...(opts.samplerPayload || { max_tokens: 260, temperature: 0.82 }),
       }),
       signal: ctrl.signal,
     });
@@ -218,6 +225,7 @@ async function tryOpenAIChatTiers(
   companionName: string,
 ): Promise<{ text: string; providerUsed: string } | null> {
   const settings = loadRouterSettings();
+  const presetId: SamplerPresetId = settings.samplerPreset || "roleplay-balanced";
   const measure = (text: string, providerUsed: string, startedMs: number) => {
     const elapsedSec = Math.max(0.15, (Date.now() - startedMs) / 1000);
     const estTokens = Math.max(6, Math.round(text.split(/\s+/).length * 1.35));
@@ -231,6 +239,7 @@ async function tryOpenAIChatTiers(
     const koboldRaw = await fetchOpenAICompat("http://127.0.0.1:5001/v1/chat/completions", chatMessages, {
       model: "koboldcpp",
       timeoutMs: 2500,
+      samplerPayload: buildSamplerPayload("koboldcpp", presetId),
     });
     const koboldClean = sanitizeCompanionReply(koboldRaw, companionName);
     if (koboldClean) return measure(koboldClean, "koboldcpp-local", t0);
@@ -243,6 +252,7 @@ async function tryOpenAIChatTiers(
     const ollamaRaw = await fetchOpenAICompat(`${ollamaBase}/v1/chat/completions`, chatMessages, {
       model: settings.ollamaModel || "llama3.1:8b",
       timeoutMs: 3200,
+      samplerPayload: buildSamplerPayload("ollama", presetId),
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, companionName);
     if (ollamaClean) return measure(ollamaClean, "ollama-local", t0);
@@ -261,8 +271,8 @@ async function tryOpenAIChatTiers(
         body: JSON.stringify({
           model: settings.ollamaModel || "llama3.1:8b",
           messages: chatMessages,
-          temperature: 0.86,
-          max_tokens: 220,
+          samplerPreset: presetId,
+          ...buildSamplerPayload("koboldcpp", presetId),
         }),
         signal: ctrl.signal,
       });
@@ -285,6 +295,7 @@ async function tryOpenAIChatTiers(
       apiKey: settings.customApiKey,
       model: settings.customModel || "local",
       timeoutMs: 8000,
+      samplerPayload: buildSamplerPayload("custom", presetId),
     });
     const customClean = sanitizeCompanionReply(customRaw, companionName);
     if (customClean) return measure(customClean, "byok-custom", t0);
@@ -299,6 +310,7 @@ async function tryOpenAIChatTiers(
         "HTTP-Referer": "https://velvetmotion-ai.hampusi97.workers.dev",
         "X-Title": "VelvetMotion AI",
       },
+      samplerPayload: buildSamplerPayload("openrouter", presetId),
     });
     const orClean = sanitizeCompanionReply(orRaw, companionName);
     if (orClean) return { text: orClean, providerUsed: "openrouter-byok" };

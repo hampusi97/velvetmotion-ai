@@ -8,6 +8,7 @@ import {
 } from "./safety";
 import { assertCompliance } from "./complianceFilter";
 import { sanitizeCompanionReply } from "./chatRouter";
+import { buildSamplerPayload, DAVIDAU_RECOMMENDED_GGUFS } from "./samplerPresets";
 
 describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => {
   it("allows consenting fictional adult 21+ prompts while blocking underage, non-consensual, and self-harm prompts", () => {
@@ -79,5 +80,31 @@ describe("Security, SSRF Protection, Rate Limiting & 21+ Content Safety", () => 
       sanitizeCompanionReply("I think I'll just... be a robot.", "Nova"),
       "",
     );
+  });
+
+  it("builds DavidAU Class 1-4 sampler payloads for KoboldCpp, Ollama, and OpenRouter", () => {
+    const k = buildSamplerPayload("koboldcpp", "creative-dry-class3");
+    assert.equal(k.min_p, 0.05);
+    assert.equal(k.repeat_last_n, 64);
+    assert.equal(k.dry_multiplier, 0.8);
+    assert.equal(k.max_tokens, 280);
+
+    const kUltra = buildSamplerPayload("koboldcpp", "ultra-prose-class4");
+    assert.equal(kUltra.dynatemp_range, 0.5);
+    assert.equal(kUltra.max_tokens, 300);
+
+    const o = buildSamplerPayload("ollama", "roleplay-balanced") as {
+      max_tokens: number;
+      options: { min_p: number; repeat_last_n: number; num_predict: number };
+    };
+    assert.equal(o.max_tokens, 260);
+    assert.equal(o.options.min_p, 0.05);
+    assert.equal(o.options.repeat_last_n, 64);
+    assert.equal(o.options.num_predict, 260);
+
+    const or = buildSamplerPayload("openrouter", "creative-dry-class3");
+    assert.equal(or.max_tokens, 280);
+    assert.equal(or.dry_multiplier, undefined);
+    assert.ok(DAVIDAU_RECOMMENDED_GGUFS.every((g) => g.url.startsWith("https://huggingface.co/")));
   });
 });

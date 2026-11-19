@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, Cpu, Download, Laptop, RefreshCw, Shield, Smartphone, Sparkles, Volume2 } from "lucide-react";
+import { Check, Copy, Cpu, Download, ExternalLink, Laptop, RefreshCw, Shield, Smartphone, Sparkles, Volume2 } from "lucide-react";
 import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
+import {
+  DAVIDAU_RECOMMENDED_GGUFS,
+  DAVIDAU_RESOURCES,
+  DAVIDAU_SAMPLER_PRESETS,
+} from "@/lib/samplerPresets";
 import { SafeImage } from "@/components/SafeImage";
 
 type DetectedOs = "mac-arm" | "mac-intel" | "windows" | "linux" | "mobile";
@@ -384,6 +389,54 @@ export function DownloadDesktopView() {
         </div>
 
         {probeToast && <p className="text-xs font-semibold text-emerald-300">{probeToast}</p>}
+
+        {/* Desktop Model Manager · DavidAU NEO GGUFs with Direct Hugging Face Downloads */}
+        <div className="pt-2 space-y-3 border-t border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-extrabold text-white">
+                Desktop Model Manager · DavidAU Roleplay GGUFs
+              </h3>
+              <p className="text-[11px] text-[#a6a6c4]">
+                Direct Hugging Face GGUF downloads pre-paired with Class 1–4 roleplay samplers (min_p 0.05, repeat_last_n 64, DRY).
+              </p>
+            </div>
+            <a
+              href={DAVIDAU_RESOURCES.samplersGuide}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-3 py-1 text-[11px] font-bold text-[#00f5ff] hover:bg-[#00f5ff]/20"
+            >
+              DavidAU Samplers Guide <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {DAVIDAU_RECOMMENDED_GGUFS.map((gguf) => (
+              <div key={gguf.id} className="rounded-2xl border border-[#ff1e8e]/30 bg-[#141418] p-4 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-white">{gguf.name}</span>
+                  <span className="shrink-0 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2.5 py-0.5 text-[10px] font-bold text-[#00f5ff]">
+                    {gguf.ramLabel}
+                  </span>
+                </div>
+                <p className="text-xs text-[#a6a6c4] leading-relaxed">{gguf.note}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <span className="rounded-full border border-white/10 bg-[#0d0d11] px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
+                    Sampler: {DAVIDAU_SAMPLER_PRESETS[gguf.recommendedPreset].label}
+                  </span>
+                  <a
+                    href={gguf.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full neon-btn-primary px-3.5 py-1.5 text-xs font-bold text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Hugging Face GGUF <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* Self-Hosted Home Server & RAM/GPU Supplement Engine */}
