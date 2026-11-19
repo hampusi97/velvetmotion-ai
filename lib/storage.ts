@@ -212,3 +212,18 @@ export function togglePin(id: string): string[] {
   try { localStorage.setItem(PIN_KEY, JSON.stringify(next.slice(0, 20))); } catch {}
   return next;
 }
+
+
+const KINK_KEY = "vm-kink-memory";
+export function rememberKink(id: string, kink: string) {
+  try {
+    const all = JSON.parse(localStorage.getItem(KINK_KEY) || "{}");
+    const list = all[id] || [];
+    if (!list.includes(kink)) list.push(kink);
+    all[id] = list.slice(-8);
+    localStorage.setItem(KINK_KEY, JSON.stringify(all));
+  } catch {}
+}
+export function getKinks(id: string): string[] {
+  try { return JSON.parse(localStorage.getItem(KINK_KEY) || "{}")[id] || []; } catch { return []; }
+}
