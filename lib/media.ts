@@ -32,19 +32,21 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
+const PHOTO_BASE = "Shot on Sony A7R V, 85mm f/1.4 GM lens, soft natural window light, subtle fill. Realistic skin with visible pores, fine peach fuzz, natural freckles or subtle imperfections. Individual hair strands with flyaways, soft catchlights in eyes. Kodak Portra 400 warmth, shallow depth of field, razor sharp eyes, photoreal editorial quality, no plastic skin, no oversmoothing, no AI artifacts.";
+
 const MOOD_PROMPTS: Record<MediaMood, string> = {
-  beauty: "Shot on Sony A7R V, 85mm f/1.2 GM, soft north window light, subtle fill. Realistic skin with visible pores, fine peach fuzz, natural freckles or subtle imperfections. Individual hair strands with flyaways, soft catchlights, natural makeup, gentle closed-mouth smile, looking at camera. Kodak Portra 400 warmth, shallow DOF, razor sharp eyes, photoreal influencer editorial quality, no plastic, no oversmoothing.",
-  seductive: "Intimate close-up, 50mm f/1.4, warm bedside lamp + soft rim. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores, photoreal adult, high detail, cinematic.",
-  lingerie: "Mirror selfie, sheer lace lingerie slightly off shoulder, soft window light from side. Looking over shoulder, natural skin texture, soft bokeh background, candid influencer aesthetic, photoreal, authentic body.",
-  nude: "Fully nude, soft morning window light from the side, natural skin texture with pores and subtle stretch marks or freckles if fitting. Soft shadows defining form, looking at camera with soft expression. Unretouched photoreal adult, editorial nude.",
-  explicit: "Explicit nude, intense eye contact, flushed cheeks, slightly parted lips. Detailed natural anatomy, glistening skin with visible pores and fine texture. Soft directional key light, high detail, uncensored photoreal adult.",
-  sex: "Explicit intimate scene, sweaty realistic skin texture with pores, moaning or pleasure expression, detailed anatomy. Cinematic practical lighting, uncensored photoreal, natural proportions.",
-  aftercare: "Post-intimacy, soft morning light through sheer curtains. Soft smile, messy hair, warm skin tones, realistic pores and glow. Intimate, tender, photoreal, gentle.",
-  dual: "Two adult women together, soft shared warm lighting, both looking at viewer. Natural skin texture on both, warm bedroom atmosphere, photoreal, intimate.",
-  sph: "Dominant woman looking down from above, low angle. Amused or commanding smile, pointing or gesturing. Natural skin texture, soft overhead light, sharp eyes, photoreal.",
-  bnwo: "Dominant Black woman, confident direct gaze, natural skin sheen with pores, gold jewelry. Warm directional light, photoreal adult, powerful presence.",
-  joi: "Woman giving JOI, pointing at camera, intense eye contact. Seductive pose in lingerie or nude. Soft bedroom light, realistic skin, sharp face, photoreal.",
-  "joi-finish": "Close-up face and upper body, open mouth, intense eye contact. Nude or open lingerie. Soft flash or warm light, wet lips, realistic skin texture, photoreal.",
+  beauty: PHOTO_BASE + " Natural makeup, gentle closed-mouth smile, looking at camera. Soft ambient light, influencer editorial portrait.",
+  seductive: PHOTO_BASE + " Intimate close-up, 50mm f/1.4, warm bedside lamp + soft rim light. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores.",
+  lingerie: PHOTO_BASE + " Mirror selfie, sheer lace lingerie slightly off shoulder, soft side window light. Looking over shoulder, natural skin texture, soft bokeh background, candid influencer aesthetic, authentic body.",
+  nude: PHOTO_BASE + " Fully nude, soft morning window light from the side. Natural skin texture with pores and subtle stretch marks or freckles if fitting. Soft shadows defining form, looking at camera with soft expression. Unretouched photoreal adult, editorial nude.",
+  explicit: PHOTO_BASE + " Explicit nude, intense eye contact, flushed cheeks, slightly parted lips. Detailed natural anatomy, glistening skin with visible pores and fine texture. Soft directional key light, high detail, uncensored photoreal adult.",
+  sex: PHOTO_BASE + " Explicit intimate scene, sweaty realistic skin texture with pores, moaning or pleasure expression, detailed anatomy. Cinematic practical lighting, uncensored photoreal, natural proportions.",
+  aftercare: PHOTO_BASE + " Post-intimacy, soft morning light through sheer curtains. Soft smile, messy hair, warm skin tones, realistic pores and glow. Intimate, tender, photoreal, gentle.",
+  dual: PHOTO_BASE + " Two adult women together, soft shared warm lighting, both looking at viewer. Natural skin texture on both, warm bedroom atmosphere, photoreal, intimate.",
+  sph: PHOTO_BASE + " Dominant woman looking down from above, low angle. Amused or commanding smile, pointing or gesturing. Natural skin texture, soft overhead light, sharp eyes.",
+  bnwo: PHOTO_BASE + " Dominant Black woman, confident direct gaze, natural skin sheen with pores, gold jewelry. Warm directional light, photoreal adult, powerful presence.",
+  joi: PHOTO_BASE + " Woman giving JOI, pointing at camera, intense eye contact. Seductive pose in lingerie or nude. Soft bedroom light, realistic skin, sharp face.",
+  "joi-finish": PHOTO_BASE + " Close-up face and upper body, open mouth, intense eye contact. Nude or open lingerie. Soft flash or warm light, wet lips, realistic skin texture.",
 };
 
 function buildPrompt(character: Pick<Character, "id" | "name" | "figure" | "age">, mood: MediaMood, extra = ""): string {
@@ -113,7 +115,7 @@ export function resolveCharacterAvatar(character: Character): string {
 
 export function freeformImageUrl(prompt: string, character?: Pick<Character, "id" | "figure" | "name">, seedExtra = ""): string {
   const base = character ? `${character.figure || character.name}, same face, ` : "";
-  const full = `${base}${prompt}. Shot on 85mm, soft window light, realistic skin pores, sharp eyes, photoreal, no artifacts.`;
+  const full = `${base}${prompt}. ${PHOTO_BASE}`;
   const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(full)}?width=1024&height=1536&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
 }
