@@ -16,7 +16,7 @@ import { dismissProactive, startProactiveWatcher, type ProactivePing } from "@/l
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
-import { HomeView } from "@/components/home-view";
+import VelvetExploreShowcase from "@/components/VelvetExploreShowcase";
 import { CharacterRoster } from "@/components/CharacterRoster";
 import { CharacterProfile } from "@/components/CharacterProfile";
 import { CharacterChat } from "@/components/CharacterChat";
@@ -198,8 +198,11 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       }
       const qView = params.get("view") as ShellRouteView | null;
       if (qView && pathname === "/") setView(qView);
-      const qId = params.get("id");
-      if (qId) setSelectedId(qId);
+      const qId = params.get("companion") || params.get("id");
+      if (qId) {
+        const resolved = getCharacter(qId);
+        setSelectedId(resolved ? resolved.id : qId);
+      }
 
       // Phase 8 #8: Auto-open import preview modal if URL hash contains #import=<compressed>
       if (window.location.hash && window.location.hash.includes("import=")) {
@@ -287,7 +290,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       lastSearchRef.current = searchStr;
       const params = new URLSearchParams(searchStr);
       const qView = params.get("view") as ShellRouteView | null;
-      const qId = params.get("id");
+      const qId = params.get("companion") || params.get("id");
       if (window.location.pathname === "/") {
         if (qView) {
           hadQueryViewRef.current = true;
@@ -297,7 +300,10 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           setView("home");
         }
       }
-      if (qId) setSelectedId(qId);
+      if (qId) {
+        const resolved = getCharacter(qId);
+        setSelectedId(resolved ? resolved.id : qId);
+      }
     };
 
     const origPush = window.history.pushState.bind(window.history);
@@ -376,7 +382,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     view === "group";
 
   return (
-    <div className="min-h-screen bg-[#05050a] text-[#f7f7fc] pb-16 lg:pb-0">
+    <div className="min-h-screen bg-[#08080e] text-[#f7f7fc] pb-16 lg:pb-0">
       <SiteHeader
         view={view}
         menuOpen={menuOpen}
@@ -392,24 +398,13 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
         <main
           id="main"
           aria-hidden={menuOpen || undefined}
-          className={containerClass + (suppressFooter ? " flex-1 py-2 min-w-0" : " flex-1 py-6 min-w-0")}
+          className={
+            view === "home"
+              ? "flex-1 min-w-0"
+              : containerClass + (suppressFooter ? " flex-1 py-2 min-w-0" : " flex-1 py-6 min-w-0")
+          }
         >
-          {view === "home" && (
-            <HomeView
-              onNavigate={navigate}
-              onOpenGirl={(id, note) => openChatById(id, undefined, note)}
-              onOpenCustomCharacter={(charObj) => {
-                setCustomCharacter(charObj);
-                setSelectedId(charObj.id);
-                setRomanceMode(false);
-                setView("chat");
-              }}
-              onOpenDual={(a, b) => {
-                setDualPair({ a, b });
-                setView("dual");
-              }}
-            />
-          )}
+          {view === "home" && <VelvetExploreShowcase />}
 
           {(view === "girls" || view === "romance") && (
             <CharacterRoster
@@ -558,8 +553,8 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
             ))}
 
           {!suppressFooter && (
-            <>
-              <div className="mt-10">
+            <div className={view === "home" ? "mx-auto max-w-[1440px] px-4 sm:px-6 pb-8" : ""}>
+              <div className={view === "home" ? "mt-2" : "mt-10"}>
                 <SupporterBanner onOpenWallet={() => navigate("wallet")} />
               </div>
               <footer className="mt-6 border-t border-white/[0.08] pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
@@ -571,7 +566,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
                   <Link href="/policy/" className="hover:text-[#ff5678]">Safety &amp; 18+</Link>
                 </div>
               </footer>
-            </>
+            </div>
           )}
         </main>
       </div>

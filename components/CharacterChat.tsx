@@ -135,6 +135,16 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [showActions, setShowActions] = useState(false);
   const [freeformPrompt, setFreeformPrompt] = useState("");
   const [callOpen, setCallOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (new URLSearchParams(window.location.search).get("call") === "1") {
+        setCallOpen(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [memoryDrawerOpen, setMemoryDrawerOpen] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [activeMedia, setActiveMedia] = useState<{

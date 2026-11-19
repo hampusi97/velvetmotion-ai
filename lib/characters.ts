@@ -277,7 +277,15 @@ function allCharacters(): Character[] {
 }
 
 export function getCharacter(id: string): Character | undefined {
-  return allCharacters().find((c) => c.id === id);
+  const list = allCharacters();
+  const exact = list.find((c) => c.id === id);
+  if (exact) return exact;
+  const slug = id.trim().toLowerCase();
+  return list.find(
+    (c) =>
+      c.id.toLowerCase().startsWith(`${slug}-`) ||
+      c.name.toLowerCase().split(" ")[0] === slug,
+  );
 }
 
 export function getCharactersByCategory(category: string): Character[] {
