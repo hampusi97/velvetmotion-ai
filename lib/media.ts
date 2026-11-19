@@ -27,6 +27,11 @@ export function faceSeed(character: Pick<Character, "id" | "figure" | "name">): 
   return Math.abs(hashCode(character.id + "|face|" + (character.figure || "").slice(0, 160))) % 100000;
 }
 
+export function seedFromPhotoDataUrl(dataUrl: string): number {
+  const slice = dataUrl.slice(0, 400) + dataUrl.slice(-200);
+  return Math.abs(hashCode(slice)) % 100000;
+}
+
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty: "Shot on Sony A7IV, 85mm f/1.4, soft window light from the left. Realistic skin with visible pores and natural freckles. Individual hair strands, soft catchlights in eyes. Natural makeup, soft smile, looking at camera. Kodak Portra warmth, shallow depth of field, sharp focus on eyes.",
   seductive: "Intimate close-up, 50mm f/1.8, warm bedside lamp mixed with soft rim light. Heavy-lidded eyes, parted lips, slight head tilt. Soft shadows, realistic skin sheen, photoreal adult.",
