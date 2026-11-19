@@ -1,0 +1,12 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Connect this repo to Vercel or Netlify for auto-deploy on push to main."
+      - run: echo "Or use: vercel --prod  /  npx netlify deploy --prod --site=velvetmotionai"
