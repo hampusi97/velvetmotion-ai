@@ -113,7 +113,7 @@ export function CharacterRoster({
               <button
                 key={character.id}
                 onClick={() => onSelect(character)}
-                className="girl-card group text-left rounded-2xl border border-white/10 bg-zinc-900/50 overflow-hidden hover:border-pink-500/60 transition"
+                className="girl-card group text-left overflow-hidden transition hover:-translate-y-0.5"
               >
                 <div className="relative aspect-[3/4] bg-gradient-to-b from-pink-950/40 to-zinc-950">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -121,11 +121,11 @@ export function CharacterRoster({
                     src={src}
                     alt={character.name}
                     referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover object-top group-hover:scale-105 transition duration-500"
+                    className="w-full h-full object-cover object-top group-hover:scale-[1.06] transition duration-500"
                     loading="lazy"
                   />
                   {isNew && (
-                    <div className="absolute top-2.5 left-2.5 rounded-full bg-pink-600 px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1 shadow">
+                    <div className="absolute top-2.5 left-2.5 rounded-full bg-gradient-to-r from-pink-600 to-fuchsia-600 px-2 py-0.5 text-[10px] font-bold text-white flex items-center gap-1 shadow-lg shadow-pink-500/40">
                       <Sparkles className="h-2.5 w-2.5" />
                       NEW
                     </div>
@@ -133,20 +133,20 @@ export function CharacterRoster({
                   <div className="absolute top-2.5 right-2.5 flex items-center gap-1">
                     <span
                       title="Photo gallery"
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-zinc-100 backdrop-blur-sm"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-zinc-100 backdrop-blur-md border border-white/10"
                     >
                       <ImageIcon className="h-3 w-3" />
                     </span>
                     <span
                       title={`Voice: ${character.voice.label}`}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-pink-200 backdrop-blur-sm"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-pink-200 backdrop-blur-md border border-pink-500/20"
                     >
                       <Mic className="h-3 w-3" />
                     </span>
                   </div>
-                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/95 via-black/65 to-transparent">
+                  <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black via-black/75 to-transparent">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-sm text-white truncate">{character.name}</span>
+                      <span className="font-semibold text-sm text-white truncate drop-shadow">{character.name}</span>
                       <span className="text-xs text-zinc-300 shrink-0 tabular-nums">{character.age}</span>
                       <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-pink-400" aria-hidden="true" />
                     </div>
