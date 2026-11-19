@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCharacter } from "@/lib/characters";
-import { checkContentSafety, checkRateLimit } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 
@@ -31,22 +30,11 @@ function seedFromId(id: string): number {
 
 export async function POST(req: Request) {
   try {
-    const rl = checkRateLimit("api-generate-image", req, 40, 60_000);
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Try again shortly." },
-        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
-      );
-    }
     const body = await req.json();
     const characterId = typeof body.characterId === "string" ? body.characterId : "";
     const type = typeof body.type === "string" ? body.type : "portrait";
-    const pose = typeof body.pose === "string" ? body.pose.slice(0, 400) : "looking at viewer, seductive";
-    const extra = typeof body.extra === "string" ? body.extra.slice(0, 500) : "";
-    const safety = checkContentSafety(`${pose} ${extra}`);
-    if (!safety.allowed) {
-      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
-    }
+    const pose = typeof body.pose === "string" ? body.pose : "looking at viewer, seductive";
+    const extra = typeof body.extra === "string" ? body.extra : "";
     const character = getCharacter(characterId);
 
     const look = character?.figure || "beautiful adult woman, proportionate figure";
@@ -92,7 +80,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Character-biased seed + small jitter so she stays recognizable across gens
     const seed = seedFromId(characterId || name) + Math.floor(Math.random() * 40);
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(
       prompt
