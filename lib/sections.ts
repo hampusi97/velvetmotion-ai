@@ -166,3 +166,8 @@ export const sections: Section[] = [
   },
 
 ];
+
+
+export function findSection(id: string): Section | undefined {
+  return sections.find((s) => s.id === id);
+}
