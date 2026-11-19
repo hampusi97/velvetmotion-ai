@@ -46,7 +46,7 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
 /** Candy.ai–leaning mood prompts — photoreal influencer / explicit adult, max heat */
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty:
-    "ultra photoreal beauty portrait, 85mm, soft glam, natural skin pores, candid influencer selfie, catchlights, candy.ai aesthetic, stunning adult woman, seductive half-smile, sharp unique face",
+    "ultra photoreal beauty portrait, 85mm lens, soft glam lighting, natural skin pores and texture, candid influencer selfie, bright catchlights, candy.ai aesthetic, stunning adult woman 21+, seductive half-smile, sharp unique face identity, high detail, 8k quality",
   seductive:
     "seductive bedroom mirror selfie, heavy-lidded eyes, soft neon + warm lamp, parted glossy lips, intimate atmosphere, photoreal influencer, adult sensual heat",
   lingerie:
@@ -54,7 +54,7 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
   nude:
     "artistic fully nude selfie, beautiful adult body, soft window light, detailed skin pores, tasteful yet explicit, looking at camera, photorealistic, aroused flush",
   explicit:
-    "explicit nude selfie, aroused expression, detailed anatomy, glistening skin, intense eye contact, highly detailed erotic photography, uncensored photoreal adult, wet look",
+    "explicit nude selfie, aroused expression, detailed anatomy, glistening skin, intense eye contact, highly detailed erotic photography, uncensored photoreal adult 21+, wet look, high resolution, cinematic lighting",
   sex:
     "explicit intimate sex scene, passionate motion blur, detailed anatomy, realistic skin sweat, intimate POV, erotic cinematography, uncensored photoreal adult, climax energy",
   aftercare:
