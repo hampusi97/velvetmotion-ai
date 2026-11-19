@@ -104,6 +104,8 @@ export default function Home() {
     const existingUser = getUser();
     setUser(existingUser);
     setCoins(getCoins());
+    const coinTimer = setInterval(() => setCoins(getCoins()), 1500);
+    return () => clearInterval(coinTimer);
     setAuthReady(true);
     registerServiceWorker();
     if (existingUser && shouldShowSupportPromptOnLogin()) setSupportModalOpen(true);

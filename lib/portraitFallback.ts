@@ -5,6 +5,7 @@
 
 const HQ = [
   "chloe", "elena", "aria", "sienna", "raven", "yuki", "scarlett", "mia", "genevieve",
+  "nova-g", "suzu-m", "mila-s", "elena-a", "delilah-v",
 ];
 
 const POOL = [
@@ -19,6 +20,7 @@ const OWN: Record<string, string> = {
   briony: "briony", calla: "calla", freya: "freya", isolde: "isolde",
   liora: "liora", maren: "maren", nadine: "nadine", nova: "nova",
   tess: "tess", vesper: "vesper",
+  "nova-g": "nova-g", "suzu-m": "suzu-m", "mila-s": "mila-s", "elena-a": "elena-a", "delilah-v": "delilah-v",
 };
 
 function hash(s: string): number {
