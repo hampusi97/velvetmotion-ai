@@ -1,33 +1,39 @@
 /**
- * Portrait fallback so home cards never show a broken image.
- * Prefer /public/portraits when available; otherwise a known-good static.
+ * Every character gets a real static portrait.
+ * Girls without their own file cycle through the 10 that exist.
  */
 
-const STATIC_IDS = new Set([
-  "briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper",
-  "livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p",
-  "valentina","lana-rho","lena-plug","dalia-x","riley-re",
-]);
+const POOL = [
+  "briony", "calla", "freya", "isolde", "liora",
+  "maren", "nadine", "nova", "tess", "vesper",
+];
 
-const FALLBACK = "/portraits/briony.jpg";
+const OWN: Record<string, string> = {
+  briony: "briony", calla: "calla", freya: "freya", isolde: "isolde",
+  liora: "liora", maren: "maren", nadine: "nadine", nova: "nova",
+  tess: "tess", vesper: "vesper",
+};
 
-export function staticPortraitUrl(id: string): string | null {
-  if (STATIC_IDS.has(id)) return `/portraits/${id}.jpg`;
-  return null;
+function hash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
 }
 
-export function safePortraitUrl(id: string, generatedUrl: string): string {
-  return staticPortraitUrl(id) || generatedUrl;
+export function staticPortraitUrl(id: string): string {
+  const own = OWN[id];
+  if (own) return `/portraits/${own}.jpg`;
+  const pick = POOL[hash(id) % POOL.length];
+  return `/portraits/${pick}.jpg`;
 }
 
-export function onPortraitError(e: React.SyntheticEvent<HTMLImageElement>, fallbackId?: string) {
+export function safePortraitUrl(id: string, _generatedUrl?: string): string {
+  return staticPortraitUrl(id);
+}
+
+export function onPortraitError(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget;
-  if (fallbackId) {
-    const s = staticPortraitUrl(fallbackId);
-    if (s && !img.src.endsWith(s)) {
-      img.src = s;
-      return;
-    }
+  if (!img.src.includes("/portraits/")) {
+    img.src = "/portraits/briony.jpg";
   }
-  if (!img.src.endsWith(FALLBACK)) img.src = FALLBACK;
 }
