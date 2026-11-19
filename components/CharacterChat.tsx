@@ -34,6 +34,10 @@ import { pushShort, memoryPromptBlock, pinLong } from "@/lib/memoryTiers";
 import { toggleVaultItem } from "@/lib/vault";
 import { stageFromIntimacy, nextStage } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
+function stripStage(text: string): string {
+  return text.replace(/\*[^*]+\*/g, "").replace(/\([^)]+\)/g, "").replace(/\s+/g, " ").trim();
+}
+
 import {
   getCoins,
   spendCoins,
@@ -343,7 +347,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
       ]);
       const newInt = bumpIntimacy(character.id, 3);
       setIntimacy(newInt);
-      if (voiceOn) speak(replyText.slice(0, 280), { ...character.voice });
+      if (voiceOn) speak(stripStage(replyText).slice(0, 280), { ...character.voice });
       updateIntimacyAudioIntensity?.(Math.min(100, newInt));
     } catch {
       const fallback = fallbackReply(character, text, romanceMode);
@@ -530,7 +534,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         setIntimacy(nextInt);
         setClipStatus(`Pipeline complete: ${(data.stages || []).join(" → ")}`);
         if (voiceOn && data.dialogue) {
-          speak(String(data.dialogue).slice(0, 260), { ...character.voice });
+          speak(stripStage(String(data.dialogue)).slice(0, 260), { ...character.voice });
         }
       }
     } catch {
@@ -713,7 +717,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
                         return;
                       }
                       setSpeakingId(i);
-                      setTimeout(() => speak(parsed.spokenReply.slice(0, 280), { ...character.voice }), 100);
+                      setTimeout(() => speak(stripStage(parsed.spokenReply).slice(0, 280), { ...character.voice }), 100);
                       setTimeout(() => setSpeakingId(null), 4500);
                     }}
                   >

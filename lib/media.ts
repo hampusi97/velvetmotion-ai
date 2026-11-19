@@ -110,7 +110,7 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
       const horde = await generateHordeImage({ prompt, seed, nsfw: true, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, steps: IMAGE_STEPS });
       return horde;
     } catch {
-      return { url: pollinationsUncensoredUrl(character, mood, extra), note: "Pollinations fallback" };
+      return { url: staticPortraitUrl(character.id || "chloe"), note: "Local portrait" };
     }
   }
 
