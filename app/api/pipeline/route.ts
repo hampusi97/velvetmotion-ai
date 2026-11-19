@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { executeCompanionPipeline, type PipelineTurnInput } from "@/lib/pipeline";
 import { SCENE_LIBRARY } from "@/lib/consistentPrompts";
 import { SEQUENCE_LABELS } from "@/lib/videoModes";
+import { checkContentSafety, checkRateLimit, sanitizeUserText } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,21 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const rl = checkRateLimit("api-pipeline", req, 40, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
     const body = (await req.json()) as Partial<PipelineTurnInput>;
-    const userMessage = typeof body.userMessage === "string" ? body.userMessage.trim() : "";
+    const userMessage = sanitizeUserText(typeof body.userMessage === "string" ? body.userMessage : "", 2000);
     if (!userMessage) {
       return NextResponse.json({ error: "userMessage is required" }, { status: 400 });
+    }
+    const safety = checkContentSafety(userMessage);
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
     }
     const result = executeCompanionPipeline({
       characterId: typeof body.characterId === "string" ? body.characterId : "maren",

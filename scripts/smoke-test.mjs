@@ -42,13 +42,18 @@ assert.equal(firebaserc.projects?.default, "ivory-sunset-mxq1s", ".firebaserc pr
 assert.ok(fs.existsSync("./public/icon-192.png"), "Missing public/icon-192.png");
 assert.ok(fs.existsSync("./public/icon-512.png"), "Missing public/icon-512.png");
 
-// 5. Verify no corrupted placeholder/stub source files exist
+// 5. Verify HTTP Security Headers in next.config.ts & scan for corrupted stub files
+const nextConfigText = fs.readFileSync("./next.config.ts", "utf8");
+assert.ok(nextConfigText.includes("X-Content-Type-Options"), "next.config.ts missing X-Content-Type-Options header");
+assert.ok(nextConfigText.includes("Strict-Transport-Security"), "next.config.ts missing HSTS header");
+assert.ok(nextConfigText.includes("Cross-Origin-Opener-Policy"), "next.config.ts missing COOP header");
+
 for (const dir of ["./app", "./components", "./lib"]) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
       const content = fs.readFileSync(`${dir}/${entry.name}`, "utf8").trim();
       assert.ok(
-        !/^(see_file_local|see local|PLACEHOLDER)/i.test(content),
+        !/^(see_file_local|see local|see \/tmp\/|PLACEHOLDER)/i.test(content) && !content.includes("WILL REPLACE"),
         `Corrupted placeholder file detected: ${dir}/${entry.name}`,
       );
     }

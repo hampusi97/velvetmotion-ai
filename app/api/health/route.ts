@@ -52,6 +52,13 @@ export async function GET() {
       ownerPrizesCount: OWNER_PRIZES.length,
       leaderboardActive: true,
     },
+    security: {
+      httpSecurityHeaders: true,
+      ssrfProtection: true,
+      adult21SafetyGuardrail: true,
+      xssInputSanitization: true,
+      apiRateLimiting: true,
+    },
     catalog: {
       companions: CHARACTERS.length,
       storyPacks: STORY_PACKS.length,

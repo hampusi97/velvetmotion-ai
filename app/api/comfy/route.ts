@@ -1,24 +1,46 @@
 import { NextResponse } from "next/server";
 import { buildComfyWorkflowGraph } from "@/lib/comfyClient";
+import { checkContentSafety, checkRateLimit, validateSafeEndpointUrl } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const DEFAULT_NEG =
-  "low quality, blurry, deformed, extra fingers, watermark, text, logo, underage, child";
+  "low quality, blurry, deformed, extra fingers, watermark, text, logo, underage, minor, child";
 
 export async function POST(req: Request) {
   try {
+    const rl = checkRateLimit("api-comfy", req, 20, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Rate limit exceeded. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
+
     const body = await req.json();
-    const base = String(body.baseUrl || process.env.COMFY_URL || "http://127.0.0.1:8188")
+    const rawBase = String(body.baseUrl || process.env.COMFY_URL || "http://127.0.0.1:8188")
       .trim()
       .replace(/\/$/, "");
+    const allowLoopback = !body.baseUrl || process.env.VERCEL !== "1";
+    const urlCheck = validateSafeEndpointUrl(rawBase, { allowLoopback });
+    if (!urlCheck.ok || !urlCheck.url) {
+      return NextResponse.json(
+        { ok: false, error: urlCheck.reason || "Blocked endpoint URL" },
+        { status: 400 },
+      );
+    }
+    const base = urlCheck.url;
     const mode = body.mode === "forge" ? "forge" : "comfy";
-    const prompt = String(body.prompt || "beautiful adult woman portrait");
-    const negativePrompt = String(body.negative || DEFAULT_NEG);
+    const prompt = String(body.prompt || "beautiful adult woman portrait").slice(0, 1500);
+    const safety = checkContentSafety(prompt);
+    if (!safety.allowed) {
+      return NextResponse.json({ ok: false, error: safety.reason }, { status: 400 });
+    }
+    const negativePrompt = `${String(body.negative || DEFAULT_NEG).slice(0, 800)}, underage, minor, child`;
     const seed = Number(body.seed) || Math.floor(Math.random() * 1000000);
-    const width = Number(body.width) || 768;
-    const height = Number(body.height) || 1152;
+    const width = Math.min(1536, Math.max(256, Math.floor(Number(body.width) || 768)));
+    const height = Math.min(1536, Math.max(256, Math.floor(Number(body.height) || 1152)));
     const referenceImageBase64 =
       typeof body.referenceImageBase64 === "string" ? body.referenceImageBase64 : undefined;
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCharacter } from "@/lib/characters";
+import { checkContentSafety, checkRateLimit } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -13,10 +14,21 @@ function seedFromId(id: string): number {
 
 export async function POST(req: Request) {
   try {
+    const rl = checkRateLimit("api-generate-video", req, 30, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
     const body = await req.json();
-    const promptIn = typeof body.prompt === "string" ? body.prompt : "";
+    const promptIn = typeof body.prompt === "string" ? body.prompt.slice(0, 800) : "";
     const characterId = typeof body.characterId === "string" ? body.characterId : "";
-    const pose = typeof body.pose === "string" ? body.pose : "intimate cinematic scene";
+    const pose = typeof body.pose === "string" ? body.pose.slice(0, 400) : "intimate cinematic scene";
+    const safety = checkContentSafety(`${promptIn} ${pose}`);
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
+    }
     const character = getCharacter(characterId);
 
     const look = character?.figure || "beautiful adult woman 25 years old";

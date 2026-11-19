@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkContentSafety, checkRateLimit, sanitizeUserText } from "@/lib/safety";
 import {
   CRYPTO_WALLETS,
   DEFAULT_LEADERBOARD,
@@ -35,6 +36,13 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const rl = checkRateLimit("api-wallet", req, 20, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Try again shortly." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
     const body = await req.json();
     const action = typeof body.action === "string" ? body.action : "pledge";
     const tierId = typeof body.tierId === "string" ? body.tierId : "dev-boost-5";
@@ -50,15 +58,19 @@ export async function POST(req: Request) {
     }
 
     const username =
-      typeof body.username === "string" && body.username.trim().length > 0
-        ? body.username.trim().slice(0, 32)
-        : "VelvetSupporter";
-    const contactHandle =
-      typeof body.contactHandle === "string" ? body.contactHandle.trim().slice(0, 64) : "";
+      sanitizeUserText(typeof body.username === "string" ? body.username : "", 32) ||
+      "VelvetSupporter";
+    const contactHandle = sanitizeUserText(
+      typeof body.contactHandle === "string" ? body.contactHandle : "",
+      64,
+    );
     const favoriteGirl =
-      typeof body.favoriteGirl === "string" && body.favoriteGirl.trim().length > 0
-        ? body.favoriteGirl.trim().slice(0, 32)
-        : "Maren";
+      sanitizeUserText(typeof body.favoriteGirl === "string" ? body.favoriteGirl : "", 32) ||
+      "Maren";
+    const safety = checkContentSafety(`${username} ${contactHandle} ${favoriteGirl}`);
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
+    }
 
     const idx = serverLeaderboardEntries.findIndex(
       (e) => e.username.toLowerCase() === username.toLowerCase(),

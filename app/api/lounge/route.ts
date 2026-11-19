@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkContentSafety, checkRateLimit, sanitizeUserText } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 
@@ -71,17 +72,28 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const rl = checkRateLimit("api-lounge", req, 30, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Lounge rate limit exceeded. Wait a few seconds." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
     const body = await req.json();
     const roomId = sanitizeRoomId(body.roomId);
-    const from = typeof body.from === "string" ? body.from.trim().slice(0, 60) : "Anon";
-    const text = typeof body.text === "string" ? body.text.trim().slice(0, 1000) : "";
+    const from = sanitizeUserText(typeof body.from === "string" ? body.from : "Anon", 60) || "Anon";
+    const text = sanitizeUserText(typeof body.text === "string" ? body.text : "", 1000);
     const shareCode =
       typeof body.shareCode === "string" && body.shareCode.trim().length > 0
-        ? body.shareCode.trim().slice(0, 4000)
+        ? sanitizeUserText(body.shareCode, 4000)
         : undefined;
 
     if (!from || !text) {
       return NextResponse.json({ error: "Both 'from' and 'text' are required." }, { status: 400 });
+    }
+    const safety = checkContentSafety(`${from} ${text}`);
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
     }
 
     const msg: ServerLoungeMessage = {

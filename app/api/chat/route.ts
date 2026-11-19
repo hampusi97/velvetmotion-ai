@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { buildSystemPrompt, fallbackReply, getCharacter, type Character } from "@/lib/characters";
 import { computeMoodState, type MoodState } from "@/lib/moodEngine";
 import { buildInnerMonologue, splitInnerThoughtAndReply } from "@/lib/memoryMap";
+import { checkContentSafety, checkRateLimit, validateSafeEndpointUrl } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -30,8 +31,12 @@ async function callOllama(
   overrideUrl?: string,
   overrideModel?: string,
 ): Promise<{ text: string; modelUsed: string } | null> {
-  const base = (overrideUrl || process.env.OLLAMA_URL || "").trim().replace(/\/$/, "");
-  if (!base) return null;
+  const rawBase = (overrideUrl || process.env.OLLAMA_URL || "").trim().replace(/\/$/, "");
+  if (!rawBase) return null;
+  const allowLoopback = !overrideUrl || process.env.VERCEL !== "1";
+  const checked = validateSafeEndpointUrl(rawBase, { allowLoopback });
+  if (!checked.ok || !checked.url) return null;
+  const base = checked.url;
   const model = (overrideModel || process.env.OLLAMA_MODEL || "llama3.2").trim();
   try {
     const ollamaMessages = [
@@ -233,6 +238,18 @@ export async function POST(req: Request) {
 
     const lastUser = [...messages].reverse().find((m: { role?: string }) => m.role === "user");
     const userText = typeof lastUser?.content === "string" ? lastUser.content : "";
+
+    const rl = checkRateLimit("api-chat", req, 60, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Slow down a second and retry." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
+      );
+    }
+    const safety = checkContentSafety(`${userText} ${directorNote}`);
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
+    }
 
     const computedMood: MoodState | undefined = character
       ? computeMoodState({

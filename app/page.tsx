@@ -58,10 +58,10 @@ type HomeView =
   | "bnwo"
   | "tinder"
   | "joi"
+  | "joi3d"
   | "room"
   | "roulette"
   | "blindfold"
-  | "joi3d"
   | "scenario"
   | "suggest"
   | "gallery"
@@ -134,6 +134,7 @@ export default function Home() {
     if (existingUser && shouldShowSupportPromptOnLogin()) {
       setSupportModalOpen(true);
     }
+
     const onPopState = () => {
       try {
         const params = new URLSearchParams(window.location.search);
@@ -186,6 +187,60 @@ export default function Home() {
       (ping) => setProactive(ping),
     );
   }, [authReady, user, selectedId, customCharacter]);
+
+  useEffect(() => {
+    if (!authReady || !user?.isFirebase || !user?.uid) return;
+    let unsubGallery = () => {};
+    let unsubCompanions = () => {};
+    void import("@/lib/firebase")
+      .then((fb) => {
+        unsubGallery = fb.subscribeUserGallery(user.uid!, (cloudItems) => {
+          if (!cloudItems.length) return;
+          try {
+            const raw = localStorage.getItem("vm-gallery");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const item of [...cloudItems, ...(Array.isArray(local) ? local : [])]) {
+              if (item && typeof item.id === "string" && !map.has(item.id)) {
+                map.set(item.id, item);
+              }
+            }
+            localStorage.setItem("vm-gallery", JSON.stringify(Array.from(map.values()).slice(0, 200)));
+          } catch {
+            /* ignore */
+          }
+        });
+        unsubCompanions = fb.subscribeUserCompanions(user.uid!, (cloudGirls) => {
+          if (!cloudGirls.length) return;
+          try {
+            const raw = localStorage.getItem("vm-custom-girls");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const g of Array.isArray(local) ? local : []) {
+              if (g && typeof g.id === "string") map.set(g.id, g);
+            }
+            for (const cg of cloudGirls) {
+              if (!map.has(cg.id)) {
+                map.set(cg.id, {
+                  ...CHARACTERS[0],
+                  ...cg,
+                  traits: ["Custom", cg.personality],
+                  initialMessage: `Hey baby… I'm ${cg.name}. ${cg.tagline}`,
+                });
+              }
+            }
+            localStorage.setItem("vm-custom-girls", JSON.stringify(Array.from(map.values())));
+          } catch {
+            /* ignore */
+          }
+        });
+      })
+      .catch(() => {});
+    return () => {
+      unsubGallery();
+      unsubCompanions();
+    };
+  }, [authReady, user?.isFirebase, user?.uid]);
 
   const navigate = (next: string) => {
     setMenuOpen(false);
@@ -436,7 +491,6 @@ export default function Home() {
           )}
           {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
           {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
-          {view === "joi3d" && <Joi3DStage onHome={() => setView("home")} onChat={openChatById} />}
           {view === "scenario" && (
             <SpicyScenarioSimulator
               onHome={() => setView("home")}
@@ -461,21 +515,12 @@ export default function Home() {
               <JoiBrowser initialScenarioId={activeJoiId} />
             </>
           )}
-          {view === "tinder" && (
-            <DiscoverSwipe onMatch={(c) => openChatById(c.id)} onHome={() => setView("home")} />
+          {view === "joi3d" && (
+            <Joi3DStage onHome={() => setView("home")} onChat={openChatById} />
           )}
-          {view === "wallet" && <CoinWallet onHome={() => setView("home")} onCoinsChanged={setCoins} />}
-          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
-          {view === "my-girls" && (
-            <MyGirlsHub onHome={() => setView("home")} onChat={openChatById} />
-          )}
-          {(view === "terms" || view === "privacy" || view === "safety") && (
-            <LegalPages page={view} onHome={() => setView("home")} />
-          )}
-          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
           {["suggest", "gallery"].includes(view) && (
             <UtilitySection
-              view={view as "suggest" | "gallery"}
+              view={view}
               onHome={() => setView("home")}
               onOpenCustom={(name) => {
                 const character: Character = {
@@ -488,13 +533,86 @@ export default function Home() {
                   traits: ["Custom"],
                   background: "An original fictional adult character.",
                   figure: "Photoreal fictional adult woman, influencer aesthetic",
+                  kink: "Not specified",
+                  reply: "I'm listening.",
+                  category: "Custom",
                 };
                 setCustomCharacter(character);
                 setSelectedId(character.id);
+                setRomanceMode(false);
                 setView("chat");
               }}
             />
           )}
+          {view === "bnwo" && (
+            <SectionView
+              section={findSection(view)}
+              onHome={() => setView("home")}
+              onNavigate={navigate as (v: ViewId) => void}
+              onOpenGirl={openChatById}
+              onOpenPack={(packId) => {
+                setActivePackId(packId);
+                setView("packs");
+              }}
+              onOpenJoi={(scenarioId) => {
+                setActiveJoiId(scenarioId);
+                setView("joi");
+              }}
+            />
+          )}
+          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
+          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
+          {view === "wallet" && (
+            <CoinWallet
+              onHome={() => setView("home")}
+              onPreviewLoginModal={() => setSupportModalOpen(true)}
+              onCoinsChanged={setCoins}
+            />
+          )}
+          {view === "my-girls" && (
+            <MyGirlsHub
+              onHome={() => setView("home")}
+              onCreate={() => setView("create")}
+              onOpenChat={(character) => {
+                if (character.id.startsWith("custom-")) setCustomCharacter(character);
+                openChatById(character.id);
+              }}
+            />
+          )}
+          {(view === "terms" || view === "privacy" || view === "safety") && (
+            <LegalPages page={view} onHome={() => setView("home")} />
+          )}
+          {view === "tinder" && (
+            <DiscoverSwipe
+              onHome={() => setView("home")}
+              onMatch={(c) => {
+                if (c.id.startsWith("custom-")) setCustomCharacter(c);
+                setSelectedId(c.id);
+                setRomanceMode(false);
+                setView("profile");
+              }}
+            />
+          )}
+          <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
+            <span>VelvetMotion AI · Fictional adults 21+ only · 100% Free</span>
+            <div className="flex flex-wrap gap-4">
+              <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
+                🪙 Coin Wallet ($5 Support)
+              </button>
+              <button type="button" onClick={() => navigate("my-girls")} className="hover:text-pink-300">
+                My Girls
+              </button>
+              <button type="button" onClick={() => navigate("terms")} className="hover:text-pink-300">
+                Terms
+              </button>
+              <button type="button" onClick={() => navigate("privacy")} className="hover:text-pink-300">
+                Privacy
+              </button>
+              <button type="button" onClick={() => navigate("safety")} className="hover:text-pink-300">
+                Safety &amp; 18+ Policy
+              </button>
+            </div>
+          </footer>
         </div>
       </div>
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
