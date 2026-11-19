@@ -52,7 +52,7 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
   lingerie:
     "sexy sheer lingerie mirror selfie, lace bra half off, panties, bedroom, soft rim light, arched back, detailed fabric, candy-style adult, looking at viewer, hot",
   nude:
-    "artistic fully nude selfie, beautiful adult body, soft window light, detailed skin pores, tasteful yet explicit, looking at camera, photorealistic, aroused flush",
+    "fully nude selfie, completely naked adult body, bare breasts, detailed skin pores, soft window light, looking at camera, photorealistic, aroused flush, high detail, uncensored",
   explicit:
     "explicit nude selfie, aroused expression, detailed anatomy, glistening skin, intense eye contact, highly detailed erotic photography, uncensored photoreal adult 21+, wet look, high resolution, cinematic lighting",
   sex:
