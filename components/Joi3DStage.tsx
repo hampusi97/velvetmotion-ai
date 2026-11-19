@@ -127,6 +127,8 @@ export function Joi3DStage({
   };
 
   const startScene = (m: "sex" | "breed") => {
+    // auto voice on breed/cuck
+    if (m === "breed") setAutoVoice(true);
     setMode(m);
     setPose("missionary");
     setFucking(true);
