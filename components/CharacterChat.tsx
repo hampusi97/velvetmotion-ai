@@ -19,6 +19,7 @@ import {
   updateIntimacyAudioIntensity,
 } from "@/lib/audioEngine";
 import { fallbackReply, type Character } from "@/lib/characters";
+import { generateCompanionReply } from "@/lib/chatRouter";
 import { computeMoodState } from "@/lib/moodEngine";
 import {
   extractMemoriesFromMessage,
@@ -129,6 +130,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
 
   const [callOpen, setCallOpen] = useState(false);
   const [vaultOpen, setVaultOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [memoryFacts, setMemoryFacts] = useState<string[]>([]);
   const [vaultNote, setVaultNote] = useState("");
   const [activeMedia, setActiveMedia] = useState<{
     url: string;
@@ -262,6 +265,15 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
       if (res.ok) {
         const data = await res.json();
         replyText = data.reply || data.message || "";
+      }
+      if (!replyText) {
+        try {
+          const routed = await generateCompanionReply(
+            next.slice(-12).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
+            { id: character.id, name: character.name, age: character.age, tagline: character.tagline, personality: character.personality }
+          );
+          replyText = routed.text;
+        } catch {}
       }
       if (!replyText) {
         const mood = computeMoodState?.({
@@ -514,6 +526,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
       <div className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur-md flex items-center gap-3 pb-3 border-b border-white/10 shrink-0">
         <button type="button" onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Back</button>
         <button type="button" onClick={() => { persist([{ role: "assistant", content: character.initialMessage }]); setMessages([{ role: "assistant", content: character.initialMessage }]); }} className="text-xs text-zinc-400 border border-white/15 rounded-full px-2 py-0.5 hover:text-pink-300">Reset chat</button>
+        <button type="button" onClick={() => { try { const raw = localStorage.getItem("velvetmotion_memory_" + character.id); setMemoryFacts(raw ? JSON.parse(raw) : []); } catch {} setMemoryOpen(true); }} className="text-xs text-fuchsia-300 border border-fuchsia-500/30 rounded-full px-2 py-0.5">Memory</button>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
@@ -562,6 +575,25 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         </div>
       )}
       {clipStatus && <div className="mt-2 text-[11px] text-zinc-400">{clipStatus}</div>}
+
+      
+      {memoryOpen && (
+        <div className="mt-3 rounded-2xl border border-fuchsia-500/30 bg-zinc-900/90 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-fuchsia-200">Memory Journal</div>
+            <button type="button" onClick={() => setMemoryOpen(false)} className="text-xs text-zinc-400">Close</button>
+          </div>
+          <p className="text-[11px] text-zinc-500">Facts she remembers. Edit or delete. Injected into every reply.</p>
+          {memoryFacts.length === 0 && <p className="text-xs text-zinc-500">No facts yet — chat and she will pick them up.</p>}
+          {memoryFacts.map((f, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <input value={f} onChange={(e) => { const next = [...memoryFacts]; next[i] = e.target.value; setMemoryFacts(next); try { localStorage.setItem("velvetmotion_memory_" + character.id, JSON.stringify(next)); } catch {} }} className="flex-1 rounded-lg bg-zinc-800 border border-white/10 px-2 py-1 text-xs" />
+              <button type="button" onClick={() => { const next = memoryFacts.filter((_, j) => j !== i); setMemoryFacts(next); try { localStorage.setItem("velvetmotion_memory_" + character.id, JSON.stringify(next)); } catch {} }} className="text-xs text-red-400">✕</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => { const next = [...memoryFacts, "New fact"]; setMemoryFacts(next); try { localStorage.setItem("velvetmotion_memory_" + character.id, JSON.stringify(next)); } catch {} }} className="text-xs text-pink-300">+ Add fact</button>
+        </div>
+      )}
 
       {vaultOpen && (
         <div className="mt-3 rounded-2xl border border-pink-500/30 bg-zinc-900/80 p-4 space-y-2">
