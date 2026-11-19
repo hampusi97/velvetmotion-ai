@@ -38,6 +38,14 @@ const STYLES: Record<string, string> = {
     "BNWO fantasy, ranking, ownership, uncensored nsfw, photorealistic",
   breeding:
     "breeding creampie, filled, moaning, uncensored nsfw, photorealistic, intense",
+  "reverse-cowgirl":
+    "reverse cowgirl, woman facing away, explicit, uncensored nsfw, photorealistic",
+  spooning:
+    "spooning sex, side by side, intimate, uncensored nsfw, photorealistic",
+  "against-wall":
+    "sex against wall, standing, legs up, uncensored nsfw, photorealistic",
+  shower:
+    "shower sex, wet skin, steam, uncensored nsfw, photorealistic",
   video:
     "cinematic still from adult film, explicit sex scene, dramatic rim light, shallow depth of field, film grain, 35mm, intense, uncensored",
 };
