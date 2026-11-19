@@ -3,6 +3,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInAnonymously,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
@@ -22,6 +23,8 @@ import {
   collection,
   query,
   where,
+  orderBy,
+  limit,
   onSnapshot,
   serverTimestamp,
   type Unsubscribe,
@@ -500,6 +503,7 @@ export function subscribeUserGallery(
   );
 }
 
+
 export async function deleteCustomCompanionFromFirestore(companionId: string): Promise<void> {
   const user = auth.currentUser;
   if (!user || !user.emailVerified) return;
@@ -552,4 +556,207 @@ export function subscribeUserCompanions(
     },
   );
 }
+
+async function ensureSignedInForCommunity(): Promise<User | null> {
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const cred = await signInAnonymously(auth);
+    return cred.user;
+  } catch {
+    return null;
+  }
+}
+
+export interface FirestoreLeaderboardRecord {
+  uid: string;
+  username: string;
+  contactHandle?: string;
+  totalUsd: number;
+  donationCount: number;
+  favoriteGirl: string;
+  tierTitle: string;
+  prizeStatus: string;
+  lastDonatedAt: number;
+  verifiedTxid?: string;
+}
+
+export async function syncDonatorLeaderboardToFirestore(params: {
+  username: string;
+  contactHandle?: string;
+  totalUsd: number;
+  donationCount: number;
+  favoriteGirl: string;
+  tierTitle: string;
+  prizeStatus: string;
+  verifiedTxid?: string;
+}): Promise<boolean> {
+  const user = await ensureSignedInForCommunity();
+  if (!user) return false;
+  const entryId = sanitizeId(user.uid);
+  if (entryId !== user.uid) return false;
+  const path = `donatorLeaderboard/${entryId}`;
+  const ref = doc(db, "donatorLeaderboard", entryId);
+  try {
+    const existing = await getDoc(ref);
+    const prev = existing.exists() ? existing.data() : null;
+    const totalUsd = Math.min(
+      1000000,
+      Math.max(Math.floor(params.totalUsd), typeof prev?.totalUsd === "number" ? prev.totalUsd : 0),
+    );
+    const donationCount = Math.min(
+      10000,
+      Math.max(
+        Math.floor(params.donationCount),
+        typeof prev?.donationCount === "number" ? prev.donationCount : 0,
+      ),
+    );
+    const payload: Record<string, unknown> = {
+      uid: user.uid,
+      username: (params.username || "VelvetSupporter").trim().slice(0, 40) || "VelvetSupporter",
+      totalUsd,
+      donationCount,
+      favoriteGirl: (params.favoriteGirl || "Maren").trim().slice(0, 40) || "Maren",
+      tierTitle: (params.tierTitle || "Supporter").trim().slice(0, 80) || "Supporter",
+      prizeStatus: (params.prizeStatus || "Entered Prize Pool").trim().slice(0, 120) || "Entered Prize Pool",
+      lastDonatedAt: Math.floor(Date.now()),
+    };
+    // Never publish private contactHandle PII to the shared leaderboard collection
+    if (params.verifiedTxid && params.verifiedTxid.trim()) {
+      payload.verifiedTxid = params.verifiedTxid.trim().slice(0, 80);
+    }
+    await setDoc(ref, payload, { merge: false });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+    return false;
+  }
+}
+
+export async function subscribeDonatorLeaderboardFromFirestore(
+  onEntries: (entries: FirestoreLeaderboardRecord[]) => void,
+): Promise<Unsubscribe> {
+  const user = await ensureSignedInForCommunity();
+  if (!user) return () => {};
+  const path = "donatorLeaderboard";
+  try {
+    const q = query(collection(db, "donatorLeaderboard"), orderBy("totalUsd", "desc"), limit(30));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list: FirestoreLeaderboardRecord[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            uid: String(data.uid || d.id),
+            username: String(data.username || "Supporter"),
+            contactHandle: data.contactHandle ? String(data.contactHandle) : undefined,
+            totalUsd: typeof data.totalUsd === "number" ? data.totalUsd : 0,
+            donationCount: typeof data.donationCount === "number" ? data.donationCount : 0,
+            favoriteGirl: String(data.favoriteGirl || "Maren"),
+            tierTitle: String(data.tierTitle || "Supporter"),
+            prizeStatus: String(data.prizeStatus || "Entered Prize Pool"),
+            lastDonatedAt: typeof data.lastDonatedAt === "number" ? data.lastDonatedAt : Date.now(),
+            verifiedTxid: data.verifiedTxid ? String(data.verifiedTxid) : undefined,
+          };
+        });
+        onEntries(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, path);
+      },
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+export interface FirestoreSuggestionRecord {
+  id: string;
+  title: string;
+  detail: string;
+  category: "Mobile & Tablet" | "AI & Video" | "Frontend" | "Backend" | "Companions";
+  status: "Live" | "In Progress" | "Planned";
+  votes: number;
+  author: string;
+  createdAt: number;
+}
+
+export async function submitSuggestionToFirestore(
+  item: FirestoreSuggestionRecord,
+): Promise<boolean> {
+  const user = await ensureSignedInForCommunity();
+  if (!user) return false;
+  const cleanId = sanitizeId(item.id);
+  const path = `suggestions/${cleanId}`;
+  try {
+    await setDoc(doc(db, "suggestions", cleanId), {
+      id: cleanId,
+      title: item.title.trim().slice(0, 120),
+      detail: item.detail.trim().slice(0, 400),
+      category: item.category,
+      status: item.status,
+      votes: 1,
+      author: (item.author || "Community").trim().slice(0, 40) || "Community",
+      createdAt: Math.floor(item.createdAt || Date.now()),
+    });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+    return false;
+  }
+}
+
+export async function upvoteSuggestionInFirestore(
+  suggestionId: string,
+  nextVotes: number,
+): Promise<boolean> {
+  const user = await ensureSignedInForCommunity();
+  if (!user) return false;
+  const cleanId = sanitizeId(suggestionId);
+  const path = `suggestions/${cleanId}`;
+  try {
+    await updateDoc(doc(db, "suggestions", cleanId), {
+      votes: Math.min(1000000, Math.max(1, Math.floor(nextVotes))),
+    });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+    return false;
+  }
+}
+
+export async function subscribeSuggestionsFromFirestore(
+  onItems: (items: FirestoreSuggestionRecord[]) => void,
+): Promise<Unsubscribe> {
+  const user = await ensureSignedInForCommunity();
+  if (!user) return () => {};
+  const path = "suggestions";
+  try {
+    const q = query(collection(db, "suggestions"), orderBy("votes", "desc"), limit(50));
+    return onSnapshot(
+      q,
+      (snap) => {
+        const list: FirestoreSuggestionRecord[] = snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: String(data.title || "Community Suggestion"),
+            detail: String(data.detail || ""),
+            category: (data.category || "Frontend") as FirestoreSuggestionRecord["category"],
+            status: (data.status || "Planned") as FirestoreSuggestionRecord["status"],
+            votes: typeof data.votes === "number" ? data.votes : 1,
+            author: String(data.author || "Community"),
+            createdAt: typeof data.createdAt === "number" ? data.createdAt : Date.now(),
+          };
+        });
+        onItems(list);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, path);
+      },
+    );
+  } catch {
+    return () => {};
+  }
+}
+
 

@@ -1,0 +1,27 @@
+# One-click Render Docker deployment for VelvetMotion AI (alternative to Vercel Hobby rate limits)
+services:
+  - type: web
+    name: velvetmotion-ai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: oregon
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: HOSTNAME
+        value: "0.0.0.0"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_IMAGE_ENDPOINT
+        sync: false
+      - key: AI_VIDEO_ENDPOINT
+        sync: false
+      - key: COMFY_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false

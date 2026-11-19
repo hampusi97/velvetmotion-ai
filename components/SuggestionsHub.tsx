@@ -35,6 +35,29 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
     } catch {
       /* ignore */
     }
+
+    let unsubFirestore = () => {};
+    void import("@/lib/firebase")
+      .then((fb) =>
+        fb.subscribeSuggestionsFromFirestore((cloudItems) => {
+          if (!cloudItems.length) return;
+          setItems((prev) => {
+            const map = new Map<string, FeatureSuggestion>();
+            for (const item of [...INITIAL_SUGGESTIONS, ...prev, ...cloudItems]) {
+              const existing = map.get(item.id);
+              if (!existing || item.votes >= existing.votes) {
+                map.set(item.id, item);
+              }
+            }
+            return Array.from(map.values()).sort((a, b) => b.votes - a.votes);
+          });
+        }),
+      )
+      .then((u) => {
+        unsubFirestore = u;
+      })
+      .catch(() => {});
+
     void fetch("/api/suggestions", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -43,10 +66,16 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
         }
       })
       .catch(() => {});
+
+    return () => {
+      unsubFirestore();
+    };
   }, []);
 
   const upvote = async (id: string) => {
     if (upvotedIds.includes(id)) return;
+    const currentItem = items.find((s) => s.id === id);
+    const nextVotes = (currentItem?.votes ?? 1) + 1;
     const nextUpvoted = [...upvotedIds, id];
     setUpvotedIds(nextUpvoted);
     try {
@@ -56,9 +85,12 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
     }
     setItems((prev) =>
       prev
-        .map((s) => (s.id === id ? { ...s, votes: s.votes + 1 } : s))
+        .map((s) => (s.id === id ? { ...s, votes: nextVotes } : s))
         .sort((a, b) => b.votes - a.votes),
     );
+    void import("@/lib/firebase")
+      .then((fb) => fb.upvoteSuggestionInFirestore(id, nextVotes))
+      .catch(() => {});
     try {
       const res = await fetch("/api/suggestions", {
         method: "POST",
@@ -95,10 +127,15 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
       if (!res.ok) {
         setNotice(data.error || "Could not submit suggestion.");
       } else {
+        if (data.suggestion) {
+          void import("@/lib/firebase")
+            .then((fb) => fb.submitSuggestionToFirestore(data.suggestion))
+            .catch(() => {});
+        }
         if (Array.isArray(data.suggestions)) setItems(data.suggestions);
         setTitle("");
         setDetail("");
-        setNotice("Feature suggestion added to the live roadmap!");
+        setNotice("Feature suggestion added to the live roadmap & synced to Firestore!");
       }
     } catch {
       setNotice("Network error — try again.");

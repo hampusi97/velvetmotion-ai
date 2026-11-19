@@ -448,7 +448,10 @@ export function claimFreeWalletRefill(amount = 500): { balance: number; tx: Wall
  * Claim thank-you bonus coins, increment Top Donators Leaderboard rank & streak,
  * and unlock Owner Prizes when supporting the project.
  */
-export function claimSupporterBonus(tierId = "dev-boost-5"): {
+export function claimSupporterBonus(
+  tierId = "dev-boost-5",
+  verifiedTxid?: string,
+): {
   balance: number;
   tier: DonationTier;
   tx: WalletTransaction;
@@ -511,7 +514,7 @@ export function claimSupporterBonus(tierId = "dev-boost-5"): {
     } catch {
       /* ignore */
     }
-    // Sync donation asynchronously to server `/api/wallet` leaderboard
+    // Sync donation asynchronously to server `/api/wallet` leaderboard AND Firestore `donatorLeaderboard`
     if (typeof fetch !== "undefined") {
       void fetch("/api/wallet", {
         method: "POST",
@@ -525,6 +528,20 @@ export function claimSupporterBonus(tierId = "dev-boost-5"): {
         }),
       }).catch(() => {});
     }
+    void import("./firebase")
+      .then((fb) =>
+        fb.syncDonatorLeaderboardToFirestore({
+          username: nextStats.username,
+          contactHandle: nextStats.contactHandle,
+          totalUsd: nextStats.totalUsd,
+          donationCount: nextStats.donationCount,
+          favoriteGirl: nextStats.favoriteGirl,
+          tierTitle: computeTierTitle(nextStats.totalUsd, nextStats.donationCount),
+          prizeStatus: computePrizeStatus(nextStats.totalUsd, nextStats.donationCount),
+          verifiedTxid,
+        }),
+      )
+      .catch(() => {});
   }
 
   return {

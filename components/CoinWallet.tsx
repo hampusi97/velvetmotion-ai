@@ -16,9 +16,11 @@ import {
 import { canClaimDaily, claimDaily, getCoins } from "@/lib/storage";
 import {
   CRYPTO_WALLETS,
+  DEFAULT_LEADERBOARD,
   DONATION_TIERS,
   OWNER_PRIZES,
   PRIMARY_BTC_WALLET,
+  buildRankedLeaderboard,
   claimFreeWalletRefill,
   claimSupporterBonus,
   getDonationUrl,
@@ -75,7 +77,7 @@ export function CoinWallet({
         setNotice(data.error || "Could not verify Bitcoin transaction.");
       } else {
         const tierId = data.satsReceived >= 15000 ? "gpu-patron-15" : "dev-boost-5";
-        const { balance, leaderboard: nextBoard } = claimSupporterBonus(tierId);
+        const { balance, leaderboard: nextBoard } = claimSupporterBonus(tierId, clean);
         const rank = nextBoard.find((e) => e.isCurrentUser)?.rank ?? 1;
         setNotice(`✓ ${data.note} You are Rank #${rank} on the Top Donators Leaderboard!`);
         setBtcTxid("");
@@ -107,15 +109,36 @@ export function CoinWallet({
 
   useEffect(() => {
     refresh();
+    // Subscribe to persistent Firestore Top Donators Leaderboard (`donatorLeaderboard`)
+    let unsubFirestore = () => {};
+    void import("@/lib/firebase")
+      .then((fb) =>
+        fb.subscribeDonatorLeaderboardFromFirestore((cloudRows) => {
+          if (!cloudRows.length) return;
+          const merged = buildRankedLeaderboard(
+            [...DEFAULT_LEADERBOARD, ...cloudRows],
+            getMyDonationStats(),
+          );
+          setLeaderboard(merged);
+        }),
+      )
+      .then((u) => {
+        unsubFirestore = u;
+      })
+      .catch(() => {});
+
     // Also fetch server leaderboard snapshot
     void fetch("/api/wallet", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (Array.isArray(data?.leaderboard) && data.leaderboard.length > 0) {
-          setLeaderboard(loadLeaderboard());
+          setLeaderboard((prev) => (prev.length > 0 ? prev : loadLeaderboard()));
         }
       })
       .catch(() => {});
+    return () => {
+      unsubFirestore();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

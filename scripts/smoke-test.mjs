@@ -44,6 +44,10 @@ assert.ok(
   "firestore.rules missing loungeRooms collection match",
 );
 assert.ok(rules.includes("isValidLoungeMessage"), "firestore.rules missing isValidLoungeMessage");
+assert.ok(rules.includes("match /donatorLeaderboard/{entryId}"), "firestore.rules missing donatorLeaderboard match");
+assert.ok(rules.includes("match /suggestions/{suggestionId}"), "firestore.rules missing suggestions match");
+assert.ok(fs.existsSync("./render.yaml"), "Missing render.yaml deployment blueprint");
+assert.ok(fs.existsSync("./fly.toml"), "Missing fly.toml deployment config");
 const firebaseJson = JSON.parse(fs.readFileSync("./firebase.json", "utf8"));
 assert.ok(Array.isArray(firebaseJson.firestore) && firebaseJson.firestore.length === 2, "firebase.json missing firestore targets");
 assert.equal(firebaseJson.auth?.providers?.emailPassword, true, "firebase.json missing emailPassword auth provider");

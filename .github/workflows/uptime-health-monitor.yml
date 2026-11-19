@@ -1,0 +1,26 @@
+name: Production Uptime & Health Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  health-check:
+    name: Probe Live /api/health & Security Headers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production endpoints
+        run: |
+          for URL in "https://velvetmotion-ai.vercel.app" "https://velvetmotionai.vercel.app"; do
+            echo "==> Probing ${URL}/api/health"
+            STATUS=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 15 "${URL}/api/health" || echo "000")
+            echo "HTTP Status: ${STATUS}"
+            if [ "${STATUS}" = "200" ]; then
+              cat /tmp/health.json | head -c 500
+              echo ""
+              curl -sI --max-time 15 "${URL}/" | grep -iE "x-content-type-options|strict-transport-security|cross-origin-opener-policy|x-frame-options" || true
+            else
+              echo "Notice: ${URL}/api/health returned HTTP ${STATUS} (may still be deploying or waiting on Vercel Hobby window)."
+            fi
+          done

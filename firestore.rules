@@ -115,6 +115,43 @@ service cloud.firestore {
         (!('shareCode' in data) || (data.shareCode is string && data.shareCode.size() <= 4000));
     }
 
+    // Assumed Data Model: /donatorLeaderboard/{entryId} (entryId == request.auth.uid)
+    // Required: uid (string, immutable), username (string 1..40), totalUsd (int 0..1000000, monotonic),
+    //           donationCount (int 0..10000, monotonic), favoriteGirl (string 1..40),
+    //           tierTitle (string 1..80), prizeStatus (string 1..120), lastDonatedAt (int >= 0)
+    // Optional: contactHandle (string <= 80), verifiedTxid (string <= 80)
+    function isValidLeaderboardEntry(data, entryId) {
+      return data.keys().hasAll(['uid', 'username', 'totalUsd', 'donationCount', 'favoriteGirl', 'tierTitle', 'prizeStatus', 'lastDonatedAt']) &&
+        data.keys().hasOnly(['uid', 'username', 'contactHandle', 'totalUsd', 'donationCount', 'favoriteGirl', 'tierTitle', 'prizeStatus', 'lastDonatedAt', 'verifiedTxid']) &&
+        data.uid is string && data.uid == request.auth.uid && data.uid == entryId &&
+        data.username is string && data.username.size() >= 1 && data.username.size() <= 40 &&
+        (!('contactHandle' in data) || (data.contactHandle is string && data.contactHandle.size() <= 80)) &&
+        (!('verifiedTxid' in data) || (data.verifiedTxid is string && data.verifiedTxid.size() <= 80)) &&
+        data.totalUsd is int && data.totalUsd >= 0 && data.totalUsd <= 1000000 &&
+        data.donationCount is int && data.donationCount >= 0 && data.donationCount <= 10000 &&
+        data.favoriteGirl is string && data.favoriteGirl.size() >= 1 && data.favoriteGirl.size() <= 40 &&
+        data.tierTitle is string && data.tierTitle.size() >= 1 && data.tierTitle.size() <= 80 &&
+        data.prizeStatus is string && data.prizeStatus.size() >= 1 && data.prizeStatus.size() <= 120 &&
+        data.lastDonatedAt is int && data.lastDonatedAt >= 0;
+    }
+
+    // Assumed Data Model: /suggestions/{suggestionId}
+    // Required (all fields immutable on update except votes +1):
+    //   id (string == suggestionId), title (string 4..120), detail (string <= 400),
+    //   category (enum), status (enum), votes (int 1..1000000), author (string 1..40), createdAt (int >= 0)
+    function isValidSuggestion(data, suggestionId) {
+      return data.keys().hasAll(['id', 'title', 'detail', 'category', 'status', 'votes', 'author', 'createdAt']) &&
+        data.keys().hasOnly(['id', 'title', 'detail', 'category', 'status', 'votes', 'author', 'createdAt']) &&
+        data.id is string && data.id == suggestionId &&
+        data.title is string && data.title.size() >= 4 && data.title.size() <= 120 &&
+        data.detail is string && data.detail.size() <= 400 &&
+        data.category is string && data.category in ['Mobile & Tablet', 'AI & Video', 'Frontend', 'Backend', 'Companions'] &&
+        data.status is string && data.status in ['Planned', 'In Progress', 'Live'] &&
+        data.votes is int && data.votes >= 1 && data.votes <= 1000000 &&
+        data.author is string && data.author.size() >= 1 && data.author.size() <= 40 &&
+        data.createdAt is int && data.createdAt >= 0;
+    }
+
     // Root Collection: /users/{userId}
     match /users/{userId} {
       allow get: if isOwner(userId) && isValidId(userId);
@@ -222,6 +259,40 @@ service cloud.firestore {
         incoming().roomId == roomId &&
         incoming().text.size() <= 1000;
       allow update, delete: if false;
+    }
+
+    // Root Collection: /donatorLeaderboard/{entryId} — signed-in users can read rankings and manage their own entry
+    match /donatorLeaderboard/{entryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        isValidId(entryId) &&
+        entryId == request.auth.uid &&
+        isValidLeaderboardEntry(incoming(), entryId);
+      allow update: if isSignedIn() &&
+        isValidId(entryId) &&
+        entryId == request.auth.uid &&
+        isValidLeaderboardEntry(incoming(), entryId) &&
+        incoming().uid == existing().uid &&
+        incoming().totalUsd >= existing().totalUsd &&
+        incoming().donationCount >= existing().donationCount;
+      allow delete: if false;
+    }
+
+    // Root Collection: /suggestions/{suggestionId} — signed-in users can read, submit (votes == 1), and upvote (+1)
+    match /suggestions/{suggestionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        isValidId(suggestionId) &&
+        isValidSuggestion(incoming(), suggestionId) &&
+        incoming().votes == 1;
+      allow update: if isSignedIn() &&
+        isValidId(suggestionId) &&
+        isValidSuggestion(incoming(), suggestionId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['votes']) &&
+        incoming().votes is int &&
+        incoming().votes == existing().votes + 1 &&
+        incoming().votes <= 1000000;
+      allow delete: if false;
     }
   }
 }
