@@ -66,7 +66,9 @@ for (const dir of ["./app", "./components", "./lib"]) {
     if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
       const content = fs.readFileSync(`${dir}/${entry.name}`, "utf8").trim();
       assert.ok(
-        !/^(see_file_local|see_local_file|see local|see \/tmp\/|PLACEHOLDER)/i.test(content) && !content.includes("WILL REPLACE"),
+        !/^(see_file_local|see_local_file|see_below|see local|see \/tmp\/|PLACEHOLDER)/i.test(content) &&
+          !content.includes("WILL REPLACE") &&
+          !content.includes("WILL_FAIL"),
         `Corrupted placeholder file detected: ${dir}/${entry.name}`,
       );
     }

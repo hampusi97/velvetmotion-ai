@@ -107,8 +107,6 @@ export default function Home() {
   const [dualPair, setDualPair] = useState<{ a: string; b: string } | null>(null);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [installAppOpen, setInstallAppOpen] = useState(false);
-  const [stageGirlId, setStageGirlId] = useState<string | null>(null);
-  const [stageFromMatch, setStageFromMatch] = useState(false);
 
   useEffect(() => {
     const main = document.getElementById("main");
@@ -156,42 +154,204 @@ export default function Home() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  // NOTE: truncated restore — full page continues in next commit if needed
+  useEffect(() => {
+    if (!authReady || typeof window === "undefined") return;
+    try {
+      const url = new URL(window.location.href);
+      if (view === "home") {
+        url.searchParams.delete("view");
+        url.searchParams.delete("id");
+      } else {
+        url.searchParams.set("view", view);
+        if ((view === "chat" || view === "profile") && selectedId) {
+          url.searchParams.set("id", selectedId);
+        } else {
+          url.searchParams.delete("id");
+        }
+      }
+      window.history.replaceState({}, "", url.toString());
+    } catch {
+      /* ignore */
+    }
+  }, [authReady, view, selectedId]);
+
+  useEffect(() => {
+    if (!authReady || !user) return;
+    return startProactiveWatcher(
+      () => {
+        if (selectedId) {
+          const c =
+            customCharacter?.id === selectedId
+              ? customCharacter
+              : CHARACTERS.find((x) => x.id === selectedId);
+          if (c) return c;
+        }
+        return CHARACTERS[Math.floor(Math.random() * Math.min(8, CHARACTERS.length))] || null;
+      },
+      (ping) => setProactive(ping),
+    );
+  }, [authReady, user, selectedId, customCharacter]);
+
+  useEffect(() => {
+    if (!authReady || !user?.isFirebase || !user?.uid) return;
+    let unsubGallery = () => {};
+    let unsubCompanions = () => {};
+    void import("@/lib/firebase")
+      .then((fb) => {
+        unsubGallery = fb.subscribeUserGallery(user.uid!, (cloudItems) => {
+          if (!cloudItems.length) return;
+          try {
+            const raw = localStorage.getItem("vm-gallery");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const item of [...cloudItems, ...(Array.isArray(local) ? local : [])]) {
+              if (item && typeof item.id === "string" && !map.has(item.id)) {
+                map.set(item.id, item);
+              }
+            }
+            localStorage.setItem("vm-gallery", JSON.stringify(Array.from(map.values()).slice(0, 200)));
+          } catch {
+            /* ignore */
+          }
+        });
+        unsubCompanions = fb.subscribeUserCompanions(user.uid!, (cloudGirls) => {
+          if (!cloudGirls.length) return;
+          try {
+            const raw = localStorage.getItem("vm-custom-girls");
+            const local = raw ? JSON.parse(raw) : [];
+            const map = new Map<string, unknown>();
+            for (const g of Array.isArray(local) ? local : []) {
+              if (g && typeof g.id === "string") map.set(g.id, g);
+            }
+            for (const cg of cloudGirls) {
+              if (!map.has(cg.id)) {
+                map.set(cg.id, {
+                  ...CHARACTERS[0],
+                  ...cg,
+                  traits: ["Custom", cg.personality],
+                  initialMessage: `Hey baby… I'm ${cg.name}. ${cg.tagline}`,
+                });
+              }
+            }
+            localStorage.setItem("vm-custom-girls", JSON.stringify(Array.from(map.values())));
+          } catch {
+            /* ignore */
+          }
+        });
+      })
+      .catch(() => {});
+    return () => {
+      unsubGallery();
+      unsubCompanions();
+    };
+  }, [authReady, user?.isFirebase, user?.uid]);
+
+  const navigate = (next: string) => {
+    setMenuOpen(false);
+    if (next === "install-app") {
+      setInstallAppOpen(true);
+      return;
+    }
+    if (next === "girls" || next === "romance") openRoster(next === "romance");
+    else setView(next as View);
+    window.scrollTo({ top: 0 });
+  };
+
+  const categories = useMemo(() => ["All", ...characterCategories()], []);
+  const tags = useMemo(
+    () => Array.from(new Set(CHARACTERS.flatMap((character) => character.tags))).sort(),
+    [],
+  );
+  const selected =
+    customCharacter?.id === selectedId
+      ? customCharacter
+      : (selectedId ? getCharacter(selectedId) : undefined) ??
+        ((view === "chat" || view === "profile") ? (CHARACTERS[0] ?? null) : null);
+
+  const openRoster = (romance: boolean) => {
+    setRomanceMode(romance);
+    setListView(romance ? "romance" : "girls");
+    setView(romance ? "romance" : "girls");
+  };
+
+  const openProfile = (character: Character) => {
+    setCustomCharacter(character);
+    setSelectedId(character.id);
+    setView("profile");
+  };
+
+  const openChatById = (id: string, scenarioPrompt?: string, incomingAssistantNote?: string) => {
+    const found = getCharacter(id);
+    if (found) setCustomCharacter(found);
+    if (scenarioPrompt && scenarioPrompt.trim()) {
+      const existing = loadChat(id);
+      const base =
+        existing.length > 0
+          ? existing
+          : found
+            ? [{ role: "assistant" as const, content: found.initialMessage }]
+            : [];
+      saveChat(id, [
+        ...base,
+        {
+          role: "assistant",
+          content: `*Scenario:* ${scenarioPrompt.trim()}\n\n“We're right here inside the scene. Tell me your next move.”`,
+        },
+      ]);
+    } else if (incomingAssistantNote && incomingAssistantNote.trim()) {
+      const existing = loadChat(id);
+      const note = incomingAssistantNote.trim();
+      if (!existing.some((m) => m.content === note)) {
+        const base =
+          existing.length > 0
+            ? existing
+            : found
+              ? [{ role: "assistant" as const, content: found.initialMessage }]
+              : [];
+        saveChat(id, [...base, { role: "assistant", content: note }]);
+      }
+    }
+    setSelectedId(id);
+    setRomanceMode(false);
+    setView("chat");
+  };
+
+  const openDualWithPair = (aId: string, bId: string) => {
+    setDualPair({ a: aId, b: bId });
+    setView("dual");
+  };
+
+  const showRoster = view === "girls" || view === "romance";
+
   if (adult === null || !authReady) return <div className="min-h-screen bg-black" />;
 
   if (!adult) {
     return (
       <main className="min-h-screen bg-[#07050c] text-white flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-3xl border border-pink-500/30 bg-gradient-to-b from-zinc-950 to-black p-8">
-          <h1 className="text-3xl font-extrabold text-center text-pink-400">VelvetMotion</h1>
-          <p className="text-sm text-zinc-400 text-center mt-3 mb-6">Adult fantasy companions. Fictional 21+ only.</p>
-          <label className="flex items-start gap-3 text-sm text-zinc-300 mb-4">
-            <input type="checkbox" className="mt-1" id="age-ok" />
-            <span>I confirm I am 18 or older and want adult fictional content.</span>
-          </label>
+        <div className="max-w-md w-full rounded-3xl border border-pink-500/30 bg-gradient-to-b from-zinc-950 to-black p-8 shadow-[0_0_80px_rgba(236,72,153,0.2)]">
+          <div className="text-5xl mb-4 text-center">💋</div>
+          <h1 className="text-3xl font-extrabold text-center bg-gradient-to-r from-pink-400 to-fuchsia-400 bg-clip-text text-transparent">
+            VelvetMotion
+          </h1>
+          <p className="text-sm text-zinc-400 leading-relaxed mb-6 mt-3 text-center">
+            Adult fantasy companions. Chat, nudes, tributes, shorts, blindfold JOI. Fictional 21+ only.
+          </p>
           <button
             onClick={() => {
-              const el = document.getElementById("age-ok") as HTMLInputElement | null;
-              if (!el?.checked) return;
-              try { localStorage.setItem("velvet-age", "true"); } catch { /* */ }
+              try {
+                localStorage.setItem("velvet-age", "true");
+              } catch {
+                /* */
+              }
               setAdult(true);
             }}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/30"
           >
-            Enter
+            I am 18 or older — Enter
           </button>
-          <div className="flex justify-center gap-4 mt-4 text-xs text-zinc-500">
-            <button type="button" onClick={() => setView("terms")}>Terms</button>
-            <button type="button" onClick={() => setView("privacy")}>Privacy</button>
-            <button type="button" onClick={() => setView("safety")}>Safety</button>
-          </div>
         </div>
       </main>
     );
-  }
-
-  if (view === "terms" || view === "privacy" || view === "safety") {
-    return <LegalPages page={view} onBack={() => setView("home")} />;
   }
 
   if (!user) {
@@ -199,43 +359,108 @@ export default function Home() {
       <LoginGate
         onLoggedIn={(u) => {
           setUser(u);
-          if (shouldShowSupportPromptOnLogin()) setSupportModalOpen(true);
+          if (shouldShowSupportPromptOnLogin()) {
+            setSupportModalOpen(true);
+          }
         }}
       />
     );
   }
 
-  const openChatById = (id: string, scenarioPrompt?: string, incomingAssistantNote?: string) => {
-    const found = getCharacter(id);
-    if (found) setCustomCharacter(found);
-    setSelectedId(id);
-    setRomanceMode(false);
-    setView("chat");
-  };
-
-  const selected =
-    customCharacter?.id === selectedId
-      ? customCharacter
-      : (selectedId ? getCharacter(selectedId) : undefined) ?? null;
+  const sidebarActive =
+    view === "profile" || view === "chat"
+      ? "girls"
+      : view === "dual" || view === "group"
+        ? view
+        : (view as string);
 
   return (
     <div className="min-h-screen bg-ink-950 text-white pb-16 lg:pb-0">
       <SiteHeader
-        view={view === "chat" || view === "profile" ? listView : (view as ViewId)}
+        view={
+          view === "profile" ||
+          view === "chat" ||
+          view === "dual" ||
+          view === "group" ||
+          view === "share" ||
+          view === "lounge" ||
+          view === "shorts" ||
+          view === "advanced" ||
+          view === "import" ||
+          view === "vault" ||
+          view === "my-girls" ||
+          view === "wallet" ||
+          view === "roadmap" ||
+          view === "joi3d" ||
+          view === "terms" ||
+          view === "privacy" ||
+          view === "safety"
+            ? listView
+            : (view as ViewId)
+        }
         menuOpen={menuOpen}
         onToggleMenu={toggleMenu}
-        onNavigate={(v) => { setMenuOpen(false); setView(v as View); }}
+        onNavigate={navigate as (v: ViewId) => void}
         onUserChange={setUser}
       />
       <div className="flex">
-        <CandySidebar active={view === "chat" ? "girls" : (view as string)} onNavigate={(v) => setView(v as View)} coins={coins} />
-        <div id="main" className={containerClass + " flex-1 py-6 min-w-0"}>
+        <CandySidebar active={sidebarActive} onNavigate={navigate} coins={coins} />
+        <div id="main" aria-hidden={menuOpen || undefined} className={containerClass + " flex-1 py-6 min-w-0"}>
           {view === "home" && (
             <HomeScreen
-              onNavigate={(v) => setView(v as View)}
+              onNavigate={navigate}
               onOpenGirl={(id, note) => openChatById(id, undefined, note)}
-              onOpenDual={(a, b) => { setDualPair({ a, b }); setView("dual"); }}
+              onOpenDual={openDualWithPair}
             />
+          )}
+          {view === "shorts" && <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "advanced" && <AdvancedMediaSettings onHome={() => setView("home")} />}
+          {view === "import" && (
+            <CardImport
+              onHome={() => setView("home")}
+              onOpen={(c) => {
+                setCustomCharacter(c);
+                setSelectedId(c.id);
+                setView("chat");
+              }}
+            />
+          )}
+          {view === "penthouse" && (
+            <Penthouse3DSuite onHome={() => setView("home")} onOpenChat={openChatById} />
+          )}
+          {showRoster && (
+            <CharacterRoster
+              romanceMode={romanceMode}
+              query={query}
+              category={category}
+              tag={tag}
+              categories={categories}
+              tags={tags}
+              onQuery={setQuery}
+              onCategory={(value) => {
+                setCategory(value);
+                setTag(null);
+              }}
+              onTag={setTag}
+              onSelect={openProfile}
+              onBack={() => setView("home")}
+            />
+          )}
+          {view === "profile" && selected && (
+            <CharacterProfile
+              character={selected}
+              romanceMode={romanceMode}
+              onBack={() => setView(listView)}
+              onChat={() => setView("chat")}
+              onTag={(nextTag) => {
+                setTag(nextTag);
+                setCategory("All");
+                setView(listView);
+              }}
+            />
+          )}
+          {view === "chat" && selected && (
+            <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("profile")} />
           )}
           {view === "create" && (
             <CreateGirlWizard
@@ -243,77 +468,185 @@ export default function Home() {
               onDone={(character) => {
                 setCustomCharacter(character);
                 setSelectedId(character.id);
+                setRomanceMode(false);
                 setView("chat");
               }}
-              onOpen3D={(character) => {
-                setCustomCharacter(character);
-                setSelectedId(character.id);
-                setStageGirlId(character.id);
-                setStageFromMatch(false);
-                setView("joi3d");
+            />
+          )}
+          {view === "dual" && (
+            <DualGirlChat
+              onHome={() => setView("home")}
+              initialGirlAId={dualPair?.a}
+              initialGirlBId={dualPair?.b}
+            />
+          )}
+          {view === "group" && <GroupChat onHome={() => setView("home")} />}
+          {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
+          {view === "share" && (
+            <ShareImport
+              onHome={() => setView("home")}
+              onImport={(girl) => {
+                setCustomCharacter(girl);
+                setSelectedId(girl.id);
+                setView("chat");
               }}
             />
           )}
-          {view === "chat" && selected && (
-            <CharacterChat character={selected} romanceMode={romanceMode} onBack={() => setView("home")} />
+          {view === "room" && (
+            <GoonRoom
+              onHome={() => setView("home")}
+              onChat={openChatById}
+              onOpenDual={openDualWithPair}
+            />
+          )}
+          {view === "roulette" && <RouletteRoom onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
+          {view === "scenario" && (
+            <SpicyScenarioSimulator
+              onHome={() => setView("home")}
+              onStartChat={(id, customPrompt) => openChatById(id, customPrompt)}
+            />
+          )}
+          {view === "tribute" && (
+            <>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400 text-sm">← Home</button>
+              <TributeBrowser onStartWithGirl={openChatById} />
+            </>
+          )}
+          {view === "packs" && (
+            <>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
+              <StoryPackBrowser initialPackId={activePackId} />
+            </>
+          )}
+          {view === "joi" && (
+            <>
+              <button onClick={() => setView("home")} className="mb-4 text-pink-400">← Home</button>
+              <JoiBrowser initialScenarioId={activeJoiId} />
+            </>
           )}
           {view === "joi3d" && (
-            <Joi3DStage
-              onHome={() => { setStageFromMatch(false); setView("home"); }}
-              onChat={openChatById}
-              initialGirlId={stageGirlId}
-              fromMatch={stageFromMatch}
+            <Joi3DStage onHome={() => setView("home")} onChat={openChatById} />
+          )}
+          {["suggest", "gallery"].includes(view) && (
+            <UtilitySection
+              view={view}
+              onHome={() => setView("home")}
+              onOpenCustom={(name) => {
+                const character: Character = {
+                  ...CHARACTERS[0],
+                  id: `custom-${name}`,
+                  name,
+                  tagline: "Your fictional character",
+                  initialMessage: `Hello, I'm ${name}.`,
+                  personality: "Friendly",
+                  traits: ["Custom"],
+                  background: "An original fictional adult character.",
+                  figure: "Photoreal fictional adult woman, influencer aesthetic",
+                  kink: "Not specified",
+                  reply: "I'm listening.",
+                  category: "Custom",
+                };
+                setCustomCharacter(character);
+                setSelectedId(character.id);
+                setRomanceMode(false);
+                setView("chat");
+              }}
             />
+          )}
+          {view === "bnwo" && (
+            <SectionView
+              section={findSection(view)}
+              onHome={() => setView("home")}
+              onNavigate={navigate as (v: ViewId) => void}
+              onOpenGirl={openChatById}
+              onOpenPack={(packId) => {
+                setActivePackId(packId);
+                setView("packs");
+              }}
+              onOpenJoi={(scenarioId) => {
+                setActiveJoiId(scenarioId);
+                setView("joi");
+              }}
+            />
+          )}
+          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
+          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
+          {view === "wallet" && (
+            <CoinWallet
+              onHome={() => setView("home")}
+              onPreviewLoginModal={() => setSupportModalOpen(true)}
+              onCoinsChanged={setCoins}
+            />
+          )}
+          {view === "roadmap" && <SuggestionsHub onHome={() => setView("home")} />}
+          {view === "my-girls" && (
+            <MyGirlsHub
+              onHome={() => setView("home")}
+              onCreate={() => setView("create")}
+              onOpenChat={(character) => {
+                if (character.id.startsWith("custom-")) setCustomCharacter(character);
+                openChatById(character.id);
+              }}
+            />
+          )}
+          {(view === "terms" || view === "privacy" || view === "safety") && (
+            <LegalPages page={view} onHome={() => setView("home")} />
           )}
           {view === "tinder" && (
             <DiscoverSwipe
               onHome={() => setView("home")}
-              onChat={openChatById}
-              onMeet3D={(c) => {
-                setStageGirlId(c.id);
-                setStageFromMatch(true);
-                setView("joi3d");
+              onMatch={(c) => {
+                if (c.id.startsWith("custom-")) setCustomCharacter(c);
+                setSelectedId(c.id);
+                setRomanceMode(false);
+                setView("profile");
               }}
             />
           )}
-          {view === "room" && <GoonRoom onHome={() => setView("home")} onChat={openChatById} onOpenDual={(a,b)=>{setDualPair({a,b});setView("dual");}} />}
-          {view === "blindfold" && <BlindfoldJoi onHome={() => setView("home")} onChat={openChatById} />}
-          {view === "dual" && <DualGirlChat onHome={() => setView("home")} initialGirlAId={dualPair?.a} initialGirlBId={dualPair?.b} />}
-          {view === "vault" && <VaultPanel onHome={() => setView("home")} />}
-          {view === "wallet" && <CoinWallet onHome={() => setView("home")} />}
-          {view === "my-girls" && <MyGirlsHub onHome={() => setView("home")} onOpenGirl={openChatById} />}
-          {view === "shorts" && <ShortsFeed onHome={() => setView("home")} onChat={openChatById} />}
-          {view === "lounge" && <UserLounge onHome={() => setView("home")} />}
-          {view === "workspace" && <WorkspaceHub onHome={() => setView("home")} />}
-          {view === "advanced" && <AdvancedMediaSettings onHome={() => setView("home")} />}
-          {(view === "girls" || view === "romance") && (
-            <CharacterRoster
-              romanceMode={view === "romance"}
-              query={query}
-              category={category}
-              tag={tag}
-              categories={["All", ...characterCategories()]}
-              tags={[]}
-              onQuery={setQuery}
-              onCategory={setCategory}
-              onTag={setTag}
-              onSelect={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("profile"); }}
-              onBack={() => setView("home")}
-            />
-          )}
-          {view === "profile" && selected && (
-            <CharacterProfile character={selected} romanceMode={romanceMode} onBack={() => setView("girls")} onChat={() => setView("chat")} onTag={() => {}} />
-          )}
+          <footer className="mt-12 border-t border-white/10 pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500">
+            <span>VelvetMotion AI · Fictional adults 21+ only · 100% Free</span>
+            <div className="flex flex-wrap gap-4">
+              <button type="button" onClick={() => setInstallAppOpen(true)} className="text-emerald-300 hover:text-emerald-200 font-medium">
+                📱 Android &amp; Apple App
+              </button>
+              <button type="button" onClick={() => navigate("roadmap")} className="text-pink-300 hover:text-pink-200 font-medium">
+                💡 Roadmap &amp; Ideas
+              </button>
+              <button type="button" onClick={() => navigate("wallet")} className="text-amber-300 hover:text-amber-200 font-medium">
+                🪙 Coin Wallet ($5 Support)
+              </button>
+              <button type="button" onClick={() => navigate("my-girls")} className="hover:text-pink-300">
+                My Girls
+              </button>
+              <button type="button" onClick={() => navigate("terms")} className="hover:text-pink-300">
+                Terms
+              </button>
+              <button type="button" onClick={() => navigate("privacy")} className="hover:text-pink-300">
+                Privacy
+              </button>
+              <button type="button" onClick={() => navigate("safety")} className="hover:text-pink-300">
+                Safety &amp; 18+ Policy
+              </button>
+            </div>
+          </footer>
         </div>
       </div>
-      <MobileBottomNav active={view as string} onNavigate={(v) => setView(v as View)} />
-      {supportModalOpen && <SupportModal onClose={() => setSupportModalOpen(false)} />}
+      <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
+      {supportModalOpen && (
+        <SupportModal
+          onClose={() => setSupportModalOpen(false)}
+          onOpenWallet={() => setView("wallet")}
+          onCoinsChanged={setCoins}
+        />
+      )}
       {installAppOpen && <InstallAppModal onClose={() => setInstallAppOpen(false)} />}
       {proactive && (
         <ProactiveToast
           ping={proactive}
           onOpen={() => {
             openChatById(proactive.characterId, undefined, proactive.text);
+            dismissProactive(proactive.at);
             setProactive(null);
           }}
           onDismiss={() => {
