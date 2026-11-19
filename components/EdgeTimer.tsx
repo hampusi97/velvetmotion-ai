@@ -50,6 +50,7 @@ export function EdgeTimer({ onHome }: { onHome: () => void }) {
     setRunning(false);
     setFailed(true);
     setScore(0);
+    try { localStorage.setItem("vm-edge-lock", String(Date.now() + 60000)); } catch {}
   };
 
   return (
