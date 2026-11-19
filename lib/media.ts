@@ -122,12 +122,18 @@ function pollinationsUrl(
   )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true&quality=100`;
 }
 
+const STATIC_PORTRAITS = new Set(["briony","calla","isolde","liora","maren","nadine","tess","vesper"]);
+
 export function characterMediaUrl(
   character: Pick<Character, "id" | "name" | "figure" | "age">,
   mood: MediaMood = "beauty",
   extra = "",
   opts?: { width?: number; height?: number; enhance?: boolean; seedOverride?: number },
 ): string {
+  // Prefer static high-quality portraits when available (no rate limit)
+  if (mood === "beauty" && STATIC_PORTRAITS.has(character.id)) {
+    return `/portraits/${character.id}.jpg`;
+  }
   return pollinationsUrl(character, mood, extra, opts);
 }
 
