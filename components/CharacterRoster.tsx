@@ -52,11 +52,11 @@ export function CharacterRoster({
       </div>
 
       {visible.length === 0 ? (
-        <p className="text-zinc-500 text-sm">No one matches that filter.</p>
+        <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 text-center text-sm text-zinc-400">No matches. Try another filter or clear search.</div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5">
+        <div className="grid grid-rows-2 grid-flow-col auto-cols-[31%] sm:auto-cols-[22%] md:auto-cols-[18%] lg:auto-cols-[15%] gap-2 overflow-x-auto snap-x snap-mandatory pb-2">
           {visible.map((character, i) => (
-            <button key={character.id} onClick={() => onSelect(character)} className="girl-card group relative aspect-[3/4] w-full overflow-hidden rounded-xl border border-white/10 bg-zinc-950 text-left">
+            <button key={character.id} onClick={() => onSelect(character)} className="girl-card group relative aspect-[3/4.6] w-full snap-start overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left">
               <img
                 src={staticPortraitUrl(character.id)}
                 alt={character.name}
@@ -64,20 +64,29 @@ export function CharacterRoster({
                 onError={onPortraitError}
                 className="absolute inset-0 h-full w-full object-cover object-top group-hover:scale-[1.04] transition duration-500"
               />
-              {i < 4 && <span className="absolute top-2 left-2 inline-flex items-center gap-0.5 rounded-full bg-pink-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><Sparkles className="h-2 w-2" />NEW</span>}
-              <span className="absolute top-2 right-2 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[8px] font-bold uppercase text-white">Online</span>
-              <div className="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black/95 via-black/55 to-transparent">
+              {i < 4 && <span className="absolute top-0 left-0 inline-flex items-center gap-0.5 rounded-tl-2xl rounded-br-xl bg-gradient-to-r from-pink-500 to-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">✦ NEW</span>}
+              <span className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 backdrop-blur flex items-center justify-center text-[10px] text-white">▶</span>
+              <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/90 via-black/40 to-transparent">
                 <div className="flex items-center gap-1">
-                  <span className="truncate text-xs font-semibold text-white">{character.name}</span>
-                  <span className="text-[10px] text-zinc-400">{character.age}</span>
+                  <span className="truncate text-[13px] font-semibold text-white">{character.name.split(" ")[0]}</span>
+                  <span className="text-[11px] text-zinc-400">{character.age}</span>
                   <BadgeCheck className="h-3 w-3 text-pink-400" />
                 </div>
-                <p className="mt-0.5 line-clamp-1 text-[9px] text-zinc-400">{character.category}</p>
               </div>
             </button>
           ))}
         </div>
       )}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => onSelect(visible[0])} className="rounded-2xl border-2 border-fuchsia-500/80 bg-gradient-to-br from-fuchsia-950 to-zinc-950 p-3 text-left shadow-[0_0_20px_rgba(217,70,239,0.25)]">
+          <div className="text-lg font-bold text-fuchsia-300">SHORTS</div>
+          <div className="mt-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-center text-xs font-semibold text-white py-1.5">Watch</div>
+        </button>
+        <button type="button" onClick={() => onSelect(visible[1] || visible[0])} className="rounded-2xl border-2 border-pink-500/80 bg-gradient-to-br from-pink-950 to-zinc-950 p-3 text-left shadow-[0_0_20px_rgba(236,72,153,0.25)]">
+          <div className="text-lg font-bold text-pink-300 italic">Private Content</div>
+          <div className="mt-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-center text-xs font-semibold text-white py-1.5">Unlock</div>
+        </button>
+      </div>
     </div>
   );
 }
