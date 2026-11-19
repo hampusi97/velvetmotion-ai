@@ -127,7 +127,7 @@ export function LoginGate({ onLoggedIn }: { onLoggedIn: (u: LocalUser) => void }
   };
 
   return (
-    <main className="min-h-screen bg-[#07050c] text-white flex items-center justify-center p-6">
+    <main className="min-h-screen bg-[#07050c] text-white flex items-center justify-center p-6" onClick={(e) => { if (e.target === e.currentTarget) onLoggedIn({ username: "guest", joinedAt: Date.now(), email: null }); }}>
       <div className="relative max-w-md w-full rounded-3xl border border-pink-500/40 bg-gradient-to-b from-zinc-950 to-black p-8 shadow-[0_0_80px_rgba(236,72,153,0.25)]">
         <button type="button" onClick={() => onLoggedIn({ username: "guest", joinedAt: Date.now(), email: null })} className="absolute top-4 right-4 text-zinc-400 hover:text-white text-2xl z-10" aria-label="Close">✕</button>
         <div className="text-5xl mb-3 text-center">💋</div>

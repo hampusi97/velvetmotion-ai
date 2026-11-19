@@ -289,7 +289,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
       let replyText = "";
       if (res.ok) {
         const data = await res.json();
-        replyText = data.reply || data.message || "";
+        replyText = (data.reply || data.message || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
       }
       if (!replyText) {
         try {
@@ -297,7 +297,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
             next.slice(-12).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
             { id: character.id, name: character.name, age: character.age, tagline: character.tagline, personality: character.personality }
           );
-          replyText = routed.text;
+          replyText = (routed.text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
         } catch {}
       }
       if (!replyText) {
@@ -607,7 +607,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-cream truncate">{character.name}</div>
-          <div className="text-xs text-zinc-400 flex flex-wrap items-center gap-x-2">
+          <div className="text-xs text-zinc-400 flex items-center gap-2 overflow-hidden">
             <span className="text-pink-300">{intimacy}% · {stage.label}</span>
             <span className="text-amber-200">🪙 {coins} coins</span>
             <button
@@ -820,7 +820,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
       )}
 
       <button type="button" onClick={() => setShowScenes(v => !v)} className="text-[10px] uppercase tracking-wide text-zinc-400 px-1 pb-1 hover:text-pink-300">{showScenes ? "▼" : "▶"} Scene Selfies</button>
-      {showScenes && <div className="flex gap-1.5 overflow-x-auto pb-2">
+      {showScenes && <div className="flex gap-1.5 overflow-x-auto pb-2 px-1">
         {SCENE_LIBRARY.map((scene) => (
           <button
             key={scene.id}
