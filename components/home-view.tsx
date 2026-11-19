@@ -153,7 +153,7 @@ export function HomeView({
               <button
                 type="button"
                 onClick={() => onOpenGirl?.(hero.id)}
-                className="rounded-full bg-pink-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-pink-500/40 hover:bg-pink-500"
+                className="btn-candy px-6 py-2.5 text-sm font-semibold shadow-lg shadow-pink-500/40"
               >
                 Show me
               </button>
