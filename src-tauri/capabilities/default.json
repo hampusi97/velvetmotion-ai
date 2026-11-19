@@ -21,6 +21,7 @@
         { "url": "https://aihorde.net/**" },
         { "url": "https://*.aihorde.net/**" },
         { "url": "https://github.com/hampusi97/velvetmotion-ai/releases/**" },
+        { "url": "https://github.com/hampusi97/velvetmotion-releases/releases/**" },
         { "url": "http://127.0.0.1:5001/**" },
         { "url": "http://127.0.0.1:5002/**" },
         { "url": "http://127.0.0.1:11434/**" },

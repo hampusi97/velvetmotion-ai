@@ -1,12 +1,14 @@
 {
   "name": "velvetmotion-ai",
-  "version": "0.1.0",
+  "version": "1.0.4",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 -H 0.0.0.0",
+    "prebuild": "node scripts/generate-build-meta.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "version:bump": "node scripts/bump-version.mjs",
     "audit:companions": "node scripts/audit-companions.mjs",
     "test": "tsx --test firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts lib/safety.test.ts lib/apiRoutes.test.ts && tsx scripts/validate-content.ts && node scripts/smoke-test.mjs && python3 -B -m unittest workers/test_workers.py",
     "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project ivory-sunset-mxq1s",

@@ -1,6 +1,6 @@
 [package]
 name = "velvetmotion-desktop"
-version = "1.0.0"
+version = "1.0.4"
 description = "VelvetMotion AI Hybrid Hyper-Neon Companion Desktop App"
 authors = ["VelvetMotion"]
 edition = "2021"

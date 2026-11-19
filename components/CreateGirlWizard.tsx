@@ -605,19 +605,19 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
                     </button>
                   </div>
                 </div>
-                <label className="flex items-start gap-2 text-[11px] text-zinc-200 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={fictionalConfirmed}
-                    onChange={(e) => setFictionalConfirmed(e.target.checked)}
-                    className="mt-0.5 accent-[#ff5678]"
-                  />
-                  <span>
-                    I confirm this is a fictional/AI-generated 18+ character or my own authorized artwork — NOT a real third-party person.
-                  </span>
-                </label>
               </div>
             )}
+            <label className="flex items-start gap-2 pt-1 text-[11px] text-zinc-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={fictionalConfirmed}
+                onChange={(e) => setFictionalConfirmed(e.target.checked)}
+                className="mt-0.5 accent-[#ff5678]"
+              />
+              <span>
+                I confirm this companion &amp; any uploaded artwork depict a fictional/AI-generated 18+ character — NOT a real third-party person.
+              </span>
+            </label>
             {permHint && <p className="text-xs text-rose-300">{permHint}</p>}
           </div>
 

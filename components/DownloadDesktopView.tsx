@@ -21,8 +21,10 @@ function detectOs(): DetectedOs {
   return "windows";
 }
 
-const RELEASES_INDEX = "https://github.com/hampusi97/velvetmotion-ai/releases";
-const RELEASE_API = "https://api.github.com/repos/hampusi97/velvetmotion-ai/releases/latest";
+const RELEASE_REPO = process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim() || "hampusi97/velvetmotion-ai";
+const RELEASES_INDEX = `https://github.com/${RELEASE_REPO}/releases`;
+const RELEASE_API = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
+const FALLBACK_RELEASE_API = "https://api.github.com/repos/hampusi97/velvetmotion-releases/releases/latest";
 
 interface GithubReleaseAsset {
   name: string;
@@ -108,21 +110,26 @@ export function DownloadDesktopView() {
   useEffect(() => {
     setOs(detectOs());
     let active = true;
-    fetch(RELEASE_API)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: { tag_name?: string; assets?: GithubReleaseAsset[] } | null) => {
-        if (!active) return;
-        if (data && data.tag_name && Array.isArray(data.assets) && data.assets.length > 0) {
-          setReleaseTag(data.tag_name);
-          setReleaseAssets(data.assets);
-          setReleaseState("live");
-        } else {
-          setReleaseState("pending");
+    const loadRelease = async () => {
+      for (const apiUrl of Array.from(new Set([RELEASE_API, FALLBACK_RELEASE_API]))) {
+        try {
+          const res = await fetch(apiUrl);
+          if (!res.ok) continue;
+          const data = (await res.json()) as { tag_name?: string; assets?: GithubReleaseAsset[] } | null;
+          if (!active) return;
+          if (data && data.tag_name && Array.isArray(data.assets) && data.assets.length > 0) {
+            setReleaseTag(data.tag_name);
+            setReleaseAssets(data.assets);
+            setReleaseState("live");
+            return;
+          }
+        } catch {
+          /* try next release endpoint */
         }
-      })
-      .catch(() => {
-        if (active) setReleaseState("pending");
-      });
+      }
+      if (active) setReleaseState("pending");
+    };
+    void loadRelease();
     return () => {
       active = false;
     };
@@ -159,7 +166,7 @@ export function DownloadDesktopView() {
             <div className="flex -space-x-3">
               <img src="/portraits/nova-park.webp" alt="Nova Park" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#ff1e8e]" />
               <img src="/portraits/chloe-parker.webp" alt="Chloe Parker" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#00f5ff]" />
-              <img src="/portraits/aria-montgomery.webp" alt="Aria Montgomery" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#a855f7]" />
+              <img src="/portraits/aria-velasco.webp" alt="Aria Velasco" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#a855f7]" />
             </div>
             <div className="text-left text-[11px] leading-tight">
               <p className="font-extrabold text-[#00ffa3]">● Tauri v2 Native Bridge</p>

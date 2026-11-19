@@ -140,22 +140,32 @@ export async function triggerBossKey(): Promise<boolean> {
 }
 
 export async function checkDesktopUpdate(): Promise<{ available: boolean; version?: string; note: string }> {
-  try {
-    const res = await fetch("https://github.com/hampusi97/velvetmotion-ai/releases/latest/download/latest.json", {
-      cache: "no-store",
-    });
-    if (res.ok) {
-      const manifest = (await res.json()) as { version?: string };
-      return {
-        available: Boolean(manifest.version),
-        version: manifest.version,
-        note: manifest.version
-          ? `Latest desktop build v${manifest.version} is live on GitHub Releases.`
-          : "Web layer updates automatically on reload.",
-      };
+  const configuredRepo = process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim();
+  const repos = Array.from(
+    new Set(
+      [configuredRepo, "hampusi97/velvetmotion-ai", "hampusi97/velvetmotion-releases"].filter(
+        (r): r is string => Boolean(r)
+      )
+    )
+  );
+  for (const repo of repos) {
+    try {
+      const res = await fetch(`https://github.com/${repo}/releases/latest/download/latest.json`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const manifest = (await res.json()) as { version?: string };
+        return {
+          available: Boolean(manifest.version),
+          version: manifest.version,
+          note: manifest.version
+            ? `Latest desktop build v${manifest.version} is live on GitHub Releases.`
+            : "Web layer updates automatically on reload.",
+        };
+      }
+    } catch {
+      /* network or CORS; try next endpoint */
     }
-  } catch {
-    /* network or CORS */
   }
   return {
     available: false,
