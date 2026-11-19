@@ -2,12 +2,14 @@
  * VelvetMotion Media Engine
  * Beauty/seductive → Cloudflare Flux worker.
  * NSFW moods → AI Horde (free, nsfw:true) with Pollinations fallback.
+ * Quality presets applied to all paths.
  */
 
 import type { Character } from "./charactersTypes";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 import { generateHordeImage } from "./aiHorde";
+import { QUALITY_PROMPT, IMAGE_STEPS, IMAGE_WIDTH, IMAGE_HEIGHT } from "./quality";
 
 const CF_IMAGE_WORKER =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_IMAGE_WORKER_URL) ||
@@ -40,7 +42,7 @@ export function seedFromPhotoDataUrl(dataUrl: string): number {
   return Math.abs(hashCode(slice)) % 100000;
 }
 
-const PHOTO_BASE = "Tight close-up portrait, shot on Sony A7R V, 85mm f/1.4 GM lens, soft natural window light from the left, subtle fill. Realistic skin with visible pores, fine peach fuzz, natural freckles or subtle imperfections, no plastic skin, no oversmoothing. Individual hair strands with flyaways, soft catchlights in eyes. Kodak Portra 400 warmth, shallow depth of field, razor sharp eyes, photoreal editorial quality, looking directly at camera, gentle natural smile, high detail skin texture.";
+const PHOTO_BASE = QUALITY_PROMPT;
 
 const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty: PHOTO_BASE + " Natural makeup, soft ambient indoor light, influencer editorial close-up, intimate and warm.",
@@ -81,7 +83,7 @@ function pollinationsUncensoredUrl(character: Pick<Character, "id" | "name" | "f
   const seed = (baseFace * 97 + mediaSeed(character.id, mood, extra)) % 100000;
   const key = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_POLLINATIONS_KEY) || "";
   const keyParam = key ? `&key=${encodeURIComponent(key)}` : "";
-  return `${POLLINATIONS_BASE}/${encodeURIComponent(prompt.slice(0, 1200))}?width=1024&height=1536&nologo=true&model=flux&seed=${seed}&enhance=true${keyParam}`;
+  return `${POLLINATIONS_BASE}/${encodeURIComponent(prompt.slice(0, 1200))}?width=${IMAGE_WIDTH}&height=${IMAGE_HEIGHT}&nologo=true&model=flux&seed=${seed}&enhance=true${keyParam}`;
 }
 
 const STATIC_PORTRAITS = new Set(["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper","livia-n","dalia-r","lisa-k","suzu-m","delilah-v","mila-s","diana-m","nova-p","valentina","lana-rho","lena-plug","dalia-x","riley-re"]);
@@ -101,7 +103,7 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
   if (settings?.preferLocal && settings.localImageBase) {
     const prompt = buildPrompt(character, mood, extra);
     const seed = (faceSeed(character) * 97 + (mediaSeed(character.id, mood, extra) % 17)) % 100000;
-    const localRes = await generateLocalImage({ prompt, seed, width: 768, height: 1152, characterId: character.id });
+    const localRes = await generateLocalImage({ prompt, seed, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, characterId: character.id });
     if (localRes.ok && localRes.imageUrl) return { url: localRes.imageUrl, note: localRes.note };
   }
 
@@ -109,7 +111,7 @@ export async function resolveBestMediaUrl(character: Pick<Character, "id" | "nam
     try {
       const prompt = buildPrompt(character, mood, extra);
       const seed = (faceSeed(character) * 97 + mediaSeed(character.id, mood, extra)) % 100000;
-      const horde = await generateHordeImage({ prompt, seed, nsfw: true, width: 768, height: 1152 });
+      const horde = await generateHordeImage({ prompt, seed, nsfw: true, width: IMAGE_WIDTH, height: IMAGE_HEIGHT, steps: IMAGE_STEPS });
       return horde;
     } catch {
       return { url: pollinationsUncensoredUrl(character, mood, extra), note: "Pollinations fallback" };
@@ -152,5 +154,5 @@ export function freeformImageUrl(prompt: string, character?: Pick<Character, "id
   const base = character ? `${character.figure || character.name}, same face, ` : "";
   const full = `${base}${prompt}. ${PHOTO_BASE}`;
   const seed = character ? faceSeed(character) + mediaSeed(character.id, "free", seedExtra) : mediaSeed("free", prompt, seedExtra);
-  return `${POLLINATIONS_BASE}/${encodeURIComponent(full)}?width=1024&height=1536&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
+  return `${POLLINATIONS_BASE}/${encodeURIComponent(full)}?width=${IMAGE_WIDTH}&height=${IMAGE_HEIGHT}&nologo=true&model=flux&seed=${seed % 100000}&enhance=true`;
 }
