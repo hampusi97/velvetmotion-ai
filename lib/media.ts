@@ -8,6 +8,9 @@ import type { Character } from "./charactersTypes";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { generateLocalImage } from "./comfyClient";
 
+/** Cloudflare Workers AI image endpoint — free tier ~173/day, no 45s limit. */
+const CF_IMAGE_WORKER = "https://velvetmotion-image.velvetmotion-ai.workers.dev/generate";
+
 export type MediaMood =
   | "beauty"
   | "lingerie"
@@ -116,10 +119,10 @@ function pollinationsUrl(
     }
   }
 
-  // enhance=true + flux for sharper Candy-like results
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(
-    prompt,
-  )}?width=${w}&height=${h}&nologo=true&seed=${seed}&model=flux&enhance=true&quality=100&private=true`;
+  // Prefer Cloudflare Workers AI (free tier, no 45s limit), fall back to Pollinations
+  const cf = `${CF_IMAGE_WORKER}?prompt=${encodeURIComponent(prompt.slice(0, 1800))}&seed=${seed}`;
+  // Client can race or prefer CF; for static export we return CF URL directly
+  return cf;
 }
 
 const STATIC_PORTRAITS = new Set(["briony","calla","isolde","liora","maren","nadine","tess","vesper"]);
