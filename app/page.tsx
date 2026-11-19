@@ -109,7 +109,7 @@ export default function Home() {
     return () => clearInterval(coinTimer);
     setAuthReady(true);
     registerServiceWorker();
-    if (existingUser && shouldShowSupportPromptOnLogin()) setSupportModalOpen(true);
+    if (existingUser && shouldShowSupportPromptOnLogin()) { const d = Number(localStorage.getItem("vm-support-dismissed") || 0); if (Date.now() - d > 7 * 86400000) setSupportModalOpen(true); }
   }, []);
 
   useEffect(() => {
@@ -245,7 +245,7 @@ export default function Home() {
       <LoginGate
         onLoggedIn={(u) => {
           setUser(u);
-          if (shouldShowSupportPromptOnLogin()) setSupportModalOpen(true);
+          if (shouldShowSupportPromptOnLogin()) { const d = Number(localStorage.getItem("vm-support-dismissed") || 0); if (Date.now() - d > 7 * 86400000) setSupportModalOpen(true); }
         }}
       />
     );
@@ -461,7 +461,10 @@ export default function Home() {
       <MobileBottomNav active={sidebarActive} onNavigate={navigate} />
       {supportModalOpen && (
         <SupportModal
-          onClose={() => setSupportModalOpen(false)}
+          onClose={() => {
+            setSupportModalOpen(false);
+            try { localStorage.setItem("vm-support-dismissed", String(Date.now())); } catch {}
+          }}
           onOpenWallet={() => setView("wallet")}
           onCoinsChanged={setCoins}
         />

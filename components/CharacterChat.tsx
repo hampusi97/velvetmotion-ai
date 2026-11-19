@@ -577,6 +577,27 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D }: Char
           const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = character.id + ".json"; a.click();
         }} className="text-xs text-zinc-300 border border-white/15 rounded-full px-2 py-0.5">Export</button>
         <button type="button" onClick={() => setByokOpen(true)} className="text-xs text-amber-200 border border-amber-500/30 rounded-full px-2 py-0.5">BYOK</button>
+        <button type="button" onClick={() => {
+          const data: Record<string, string> = {};
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith("vm-") || k.startsWith("velvet"))) data[k] = localStorage.getItem(k) || "";
+          }
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "velvetmotion-backup.json"; a.click();
+        }} className="text-xs text-zinc-300 border border-white/15 rounded-full px-2 py-0.5">Backup</button>
+        <label className="text-xs text-zinc-300 border border-white/15 rounded-full px-2 py-0.5 cursor-pointer">Import<input type="file" accept="application/json" className="hidden" onChange={(e) => {
+          const f = e.target.files?.[0]; if (!f) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const data = JSON.parse(String(reader.result));
+              Object.entries(data).forEach(([k, v]) => localStorage.setItem(k, String(v)));
+              alert("Backup imported. Refresh to see it.");
+            } catch { alert("Invalid backup file"); }
+          };
+          reader.readAsText(f);
+        }} /></label>
         <div className="h-11 w-11 rounded-full overflow-hidden border border-pink-500/40 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={characterMediaUrl(character, "beauty")} alt={character.name} className="h-full w-full object-cover" />
