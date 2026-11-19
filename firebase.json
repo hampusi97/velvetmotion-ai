@@ -1,4 +1,18 @@
 {
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "VelvetMotion AI",
+        "supportEmail": "hampusi97@gmail.com",
+        "authorizedRedirectUris": [
+          "https://ivory-sunset-mxq1s.firebaseapp.com/__/auth/handler",
+          "http://localhost:3000"
+        ]
+      }
+    }
+  },
   "firestore": [
     {
       "database": "(default)",

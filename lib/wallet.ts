@@ -1,11 +1,14 @@
 /**
- * VelvetMotion Coin Wallet & Optional Community Support / Donation System
+ * VelvetMotion Coin Wallet, Top Donators Leaderboard & Owner Prize Pool System
  *
  * 100% optional: users get free daily coins and free instant refills anytime.
- * Donations (like a $5 dev boost) help fund development, servers, and GPU workers.
+ * Donations (like a $5 dev boost) help fund development, servers, and GPU workers,
+ * and place supporters on the Top Donators Leaderboard where they can win prizes
+ * directly from the owner.
  */
 
 import { addCoins, getCoins } from "./storage";
+import { getUser } from "./auth";
 
 export interface DonationTier {
   id: string;
@@ -25,10 +28,43 @@ export interface CryptoWalletAddress {
 
 export interface WalletTransaction {
   id: string;
-  type: "free-refill" | "daily-claim" | "supporter-bonus" | "login-gift";
+  type: "free-refill" | "daily-claim" | "supporter-bonus" | "login-gift" | "owner-prize";
   amount: number;
   label: string;
   at: number;
+}
+
+export interface OwnerPrize {
+  id: string;
+  rankRequirement: string;
+  minUsd: number;
+  minDonations: number;
+  title: string;
+  badge: string;
+  rewardFromOwner: string;
+  bonusCoins: number;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  username: string;
+  contactHandle?: string;
+  totalUsd: number;
+  donationCount: number;
+  favoriteGirl: string;
+  tierTitle: string;
+  prizeStatus: string;
+  lastDonatedAt: number;
+  isCurrentUser?: boolean;
+}
+
+export interface UserDonationStats {
+  username: string;
+  contactHandle: string;
+  totalUsd: number;
+  donationCount: number;
+  favoriteGirl: string;
+  unlockedPrizeIds: string[];
 }
 
 const TX_KEY = "vm-wallet-tx";
@@ -36,15 +72,17 @@ const SUPPORTER_KEY = "vm-wallet-supporter";
 const PROMPT_LAST_KEY = "vm-support-prompt-last";
 const PROMPT_COUNT_KEY = "vm-support-login-count";
 const CUSTOM_DONATE_URL_KEY = "vm-custom-donate-url";
+const USER_DONATION_STATS_KEY = "vm-wallet-user-donation-stats";
+const LEADERBOARD_CACHE_KEY = "vm-wallet-leaderboard";
 
 export const DONATION_TIERS: DonationTier[] = [
   {
     id: "coffee-3",
     amountUsd: 3,
     label: "Late-Night Espresso",
-    badge: "+1,500 Coins",
+    badge: "+1,500 Coins · +1 Streak",
     bonusCoins: 1500,
-    description: "Fuels late-night coding sessions and bug fixes.",
+    description: "Fuels late-night coding sessions, climbs the leaderboard, and adds +1 to your Owner Prize streak.",
   },
   {
     id: "dev-boost-5",
@@ -53,16 +91,116 @@ export const DONATION_TIERS: DonationTier[] = [
     badge: "Most Appreciated ★ +3,500 Coins",
     bonusCoins: 3500,
     description:
-      "$5 is hugely appreciated to help develop new features, faster NSFW image/video models, and keep VelvetMotion 100% free.",
+      "$5 is hugely appreciated to help develop new features, faster NSFW models, and enters you for Owner Prizes on the Leaderboard.",
     featured: true,
   },
   {
     id: "gpu-patron-15",
     amountUsd: 15,
     label: "GPU & Video Server Patron",
-    badge: "VIP Supporter +12,000 Coins",
+    badge: "VIP Whale +12,000 Coins",
     bonusCoins: 12000,
-    description: "Helps fund dedicated ComfyUI / img2vid GPU workers and new companion packs.",
+    description:
+      "Fast-tracks you toward the Top 3 Donators Podium for custom companions & private 4K renders directly from the owner.",
+  },
+];
+
+export const OWNER_PRIZES: OwnerPrize[] = [
+  {
+    id: "prize-streak-mystery",
+    rankRequirement: "Top 10 or 2+ Donations ($5+)",
+    minUsd: 5,
+    minDonations: 2,
+    title: "🎁 Owner Mystery Drop & VIP Raffle Ticket",
+    badge: "Direct From Owner",
+    rewardFromOwner:
+      "Entered into the Owner's direct prize drop (crypto/gift rewards, secret fantasy codes, early unreleased companions & +5,000 bonus coins).",
+    bonusCoins: 5000,
+  },
+  {
+    id: "prize-top3-render",
+    rankRequirement: "Top 3 Donators or $25+ Total",
+    minUsd: 25,
+    minDonations: 3,
+    title: "🥈 Private 4K Uncensored Video Pack & Custom JOI",
+    badge: "Top 3 VIP Prize",
+    rewardFromOwner:
+      "The owner personally renders a custom uncensored ComfyUI 4K video loop pack + custom name-whispered JOI scenario for your favorite girl.",
+    bonusCoins: 15000,
+  },
+  {
+    id: "prize-rank1-dreamgirl",
+    rankRequirement: "#1 Top Donator or $50+ Legend",
+    minUsd: 50,
+    minDonations: 5,
+    title: "👑 Custom Dream Companion Built By The Owner",
+    badge: "#1 Grand Prize",
+    rewardFromOwner:
+      "The owner personally builds & publishes your custom dream companion (face lock, outfits, voice, kinks & story pack) + direct VIP owner contact & 50,000 coins.",
+    bonusCoins: 50000,
+  },
+];
+
+export const DEFAULT_LEADERBOARD: Omit<LeaderboardEntry, "rank">[] = [
+  {
+    username: "MidnightWhale_99",
+    contactHandle: "@midnight_vip",
+    totalUsd: 65,
+    donationCount: 7,
+    favoriteGirl: "Maren",
+    tierTitle: "👑 #1 Grand Patron",
+    prizeStatus: "Won Custom Dream Girl from Owner",
+    lastDonatedAt: Date.now() - 1000 * 60 * 35,
+  },
+  {
+    username: "VelvetKing_XO",
+    contactHandle: "@velvetking",
+    totalUsd: 40,
+    donationCount: 5,
+    favoriteGirl: "Sable",
+    tierTitle: "🥈 Diamond Donator",
+    prizeStatus: "Eligible: Private 4K Render Pack",
+    lastDonatedAt: Date.now() - 1000 * 60 * 110,
+  },
+  {
+    username: "CryptoDaddy_BTC",
+    contactHandle: "@cryptodaddy",
+    totalUsd: 25,
+    donationCount: 4,
+    favoriteGirl: "Valentina",
+    tierTitle: "🥉 Gold Supporter",
+    prizeStatus: "Eligible: Top 3 VIP Prize Drop",
+    lastDonatedAt: Date.now() - 1000 * 60 * 240,
+  },
+  {
+    username: "LioraObsessed",
+    contactHandle: "@liora_fan",
+    totalUsd: 15,
+    donationCount: 3,
+    favoriteGirl: "Liora",
+    tierTitle: "🔥 3x Streak VIP",
+    prizeStatus: "Entered: Owner Mystery Prize Drop",
+    lastDonatedAt: Date.now() - 1000 * 60 * 400,
+  },
+  {
+    username: "NeonGooner77",
+    contactHandle: "@neongoon",
+    totalUsd: 10,
+    donationCount: 2,
+    favoriteGirl: "Yuki",
+    tierTitle: "💖 2x Repeat Supporter",
+    prizeStatus: "Entered: Owner Mystery Prize Drop",
+    lastDonatedAt: Date.now() - 1000 * 60 * 720,
+  },
+  {
+    username: "BoudoirRider",
+    contactHandle: "@boudoir",
+    totalUsd: 5,
+    donationCount: 1,
+    favoriteGirl: "Chloe",
+    tierTitle: "★ $5 Dev Booster",
+    prizeStatus: "1 donation away from Mystery Drop",
+    lastDonatedAt: Date.now() - 1000 * 60 * 1200,
   },
 ];
 
@@ -90,6 +228,146 @@ export const CRYPTO_WALLETS: CryptoWalletAddress[] = [
     address: process.env.NEXT_PUBLIC_USDT_WALLET || "0x71C95911E9a5D330f4D621842EC243EE1343292e",
   },
 ];
+
+export function computeTierTitle(totalUsd: number, donationCount: number): string {
+  if (totalUsd >= 50 || donationCount >= 6) return "👑 Grand Patron Legend";
+  if (totalUsd >= 25 || donationCount >= 4) return "💎 Diamond VIP Streak";
+  if (totalUsd >= 15 || donationCount >= 3) return "🔥 3x+ Streak Contender";
+  if (totalUsd >= 10 || donationCount >= 2) return "💖 Repeat Dev Booster";
+  if (totalUsd >= 5) return "★ $5 Dev Supporter";
+  return "🪙 Supporter";
+}
+
+export function computePrizeStatus(totalUsd: number, donationCount: number, rank?: number): string {
+  if (rank === 1 || totalUsd >= 50) return "👑 Eligible: Owner Custom Dream Girl + 4K Pack";
+  if ((rank && rank <= 3) || totalUsd >= 25) return "🥈 Eligible: Owner 4K Render Pack + Mystery Drop";
+  if (donationCount >= 2 || totalUsd >= 10) return "🎁 Entered: Owner Mystery Prize Drop";
+  if (totalUsd >= 5) return "★ 1 more donation unlocks Owner Mystery Drop";
+  return "Donate $5 to enter the Owner Prize Pool";
+}
+
+export function getMyDonationStats(): UserDonationStats {
+  const defaultName = getUser()?.username || "You";
+  if (typeof window === "undefined") {
+    return {
+      username: defaultName,
+      contactHandle: "",
+      totalUsd: 0,
+      donationCount: 0,
+      favoriteGirl: "Maren",
+      unlockedPrizeIds: [],
+    };
+  }
+  try {
+    const raw = localStorage.getItem(USER_DONATION_STATS_KEY);
+    if (!raw) {
+      return {
+        username: defaultName,
+        contactHandle: "",
+        totalUsd: 0,
+        donationCount: 0,
+        favoriteGirl: "Maren",
+        unlockedPrizeIds: [],
+      };
+    }
+    const parsed = JSON.parse(raw) as Partial<UserDonationStats>;
+    return {
+      username: parsed.username || defaultName,
+      contactHandle: parsed.contactHandle || "",
+      totalUsd: typeof parsed.totalUsd === "number" ? parsed.totalUsd : 0,
+      donationCount: typeof parsed.donationCount === "number" ? parsed.donationCount : 0,
+      favoriteGirl: parsed.favoriteGirl || "Maren",
+      unlockedPrizeIds: Array.isArray(parsed.unlockedPrizeIds) ? parsed.unlockedPrizeIds : [],
+    };
+  } catch {
+    return {
+      username: defaultName,
+      contactHandle: "",
+      totalUsd: 0,
+      donationCount: 0,
+      favoriteGirl: "Maren",
+      unlockedPrizeIds: [],
+    };
+  }
+}
+
+export function saveMyDonationProfile(patch: Partial<Pick<UserDonationStats, "username" | "contactHandle" | "favoriteGirl">>): UserDonationStats {
+  const current = getMyDonationStats();
+  const next: UserDonationStats = {
+    ...current,
+    username: (patch.username ?? current.username).trim().slice(0, 32) || current.username,
+    contactHandle: (patch.contactHandle ?? current.contactHandle).trim().slice(0, 64),
+    favoriteGirl: (patch.favoriteGirl ?? current.favoriteGirl).trim().slice(0, 32) || "Maren",
+  };
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(USER_DONATION_STATS_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }
+  return next;
+}
+
+export function buildRankedLeaderboard(
+  entries: Omit<LeaderboardEntry, "rank">[],
+  currentUserStats?: UserDonationStats,
+): LeaderboardEntry[] {
+  const map = new Map<string, Omit<LeaderboardEntry, "rank">>();
+  for (const item of entries) {
+    map.set(item.username.toLowerCase(), { ...item });
+  }
+  if (currentUserStats && currentUserStats.totalUsd > 0) {
+    const key = currentUserStats.username.toLowerCase();
+    const existing = map.get(key);
+    const totalUsd = Math.max(currentUserStats.totalUsd, existing?.totalUsd ?? 0);
+    const donationCount = Math.max(currentUserStats.donationCount, existing?.donationCount ?? 0);
+    map.set(key, {
+      username: currentUserStats.username,
+      contactHandle: currentUserStats.contactHandle || existing?.contactHandle,
+      totalUsd,
+      donationCount,
+      favoriteGirl: currentUserStats.favoriteGirl || existing?.favoriteGirl || "Maren",
+      tierTitle: computeTierTitle(totalUsd, donationCount),
+      prizeStatus: computePrizeStatus(totalUsd, donationCount),
+      lastDonatedAt: Date.now(),
+      isCurrentUser: true,
+    });
+  }
+  const sorted = Array.from(map.values()).sort((a, b) => {
+    if (b.totalUsd !== a.totalUsd) return b.totalUsd - a.totalUsd;
+    if (b.donationCount !== a.donationCount) return b.donationCount - a.donationCount;
+    return b.lastDonatedAt - a.lastDonatedAt;
+  });
+
+  return sorted.map((entry, idx) => {
+    const rank = idx + 1;
+    return {
+      ...entry,
+      rank,
+      prizeStatus: computePrizeStatus(entry.totalUsd, entry.donationCount, rank),
+    };
+  });
+}
+
+export function loadLeaderboard(): LeaderboardEntry[] {
+  const myStats = getMyDonationStats();
+  if (typeof window === "undefined") {
+    return buildRankedLeaderboard(DEFAULT_LEADERBOARD);
+  }
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return buildRankedLeaderboard(parsed, myStats);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return buildRankedLeaderboard(DEFAULT_LEADERBOARD, myStats);
+}
 
 export function getDonationUrl(): string {
   if (typeof window !== "undefined") {
@@ -166,27 +444,97 @@ export function claimFreeWalletRefill(amount = 500): { balance: number; tx: Wall
   return { balance: getCoins(), tx };
 }
 
-/** Claim thank-you bonus coins & supporter badge when supporting the project. */
+/**
+ * Claim thank-you bonus coins, increment Top Donators Leaderboard rank & streak,
+ * and unlock Owner Prizes when supporting the project.
+ */
 export function claimSupporterBonus(tierId = "dev-boost-5"): {
   balance: number;
   tier: DonationTier;
   tx: WalletTransaction;
+  stats: UserDonationStats;
+  newlyUnlockedPrizes: OwnerPrize[];
+  leaderboard: LeaderboardEntry[];
 } {
   const tier = DONATION_TIERS.find((t) => t.id === tierId) || DONATION_TIERS[1];
   addCoins(tier.bonusCoins);
+
+  const prevStats = getMyDonationStats();
+  const nextTotalUsd = prevStats.totalUsd + tier.amountUsd;
+  const nextCount = prevStats.donationCount + 1;
+
+  const newlyUnlockedPrizes: OwnerPrize[] = [];
+  const nextUnlockedIds = [...prevStats.unlockedPrizeIds];
+
+  for (const prize of OWNER_PRIZES) {
+    if (
+      !nextUnlockedIds.includes(prize.id) &&
+      (nextTotalUsd >= prize.minUsd || nextCount >= prize.minDonations)
+    ) {
+      nextUnlockedIds.push(prize.id);
+      newlyUnlockedPrizes.push(prize);
+      addCoins(prize.bonusCoins);
+      recordTransaction(
+        "owner-prize",
+        prize.bonusCoins,
+        `🏆 Unlocked Owner Prize Milestone: ${prize.title} (+${prize.bonusCoins.toLocaleString()} bonus coins)`,
+      );
+    }
+  }
+
+  const nextStats: UserDonationStats = {
+    ...prevStats,
+    totalUsd: nextTotalUsd,
+    donationCount: nextCount,
+    unlockedPrizeIds: nextUnlockedIds,
+  };
+
   if (typeof window !== "undefined") {
     try {
       localStorage.setItem(SUPPORTER_KEY, "true");
+      localStorage.setItem(USER_DONATION_STATS_KEY, JSON.stringify(nextStats));
     } catch {
       /* ignore */
     }
   }
+
   const tx = recordTransaction(
     "supporter-bonus",
     tier.bonusCoins,
-    `Supporter Thank-You Bonus (${tier.label} · $${tier.amountUsd})`,
+    `Supporter Thank-You Bonus (${tier.label} · $${tier.amountUsd} · Streak #${nextCount})`,
   );
-  return { balance: getCoins(), tier, tx };
+
+  const leaderboard = buildRankedLeaderboard(loadLeaderboard(), nextStats);
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify(leaderboard));
+    } catch {
+      /* ignore */
+    }
+    // Sync donation asynchronously to server `/api/wallet` leaderboard
+    if (typeof fetch !== "undefined") {
+      void fetch("/api/wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "supporter-bonus",
+          tierId: tier.id,
+          username: nextStats.username,
+          contactHandle: nextStats.contactHandle,
+          favoriteGirl: nextStats.favoriteGirl,
+        }),
+      }).catch(() => {});
+    }
+  }
+
+  return {
+    balance: getCoins(),
+    tier,
+    tx,
+    stats: nextStats,
+    newlyUnlockedPrizes,
+    leaderboard,
+  };
 }
 
 /**

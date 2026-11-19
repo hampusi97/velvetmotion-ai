@@ -33,6 +33,10 @@ assert.ok(
 assert.ok(rules.includes("isValidLoungeMessage"), "firestore.rules missing isValidLoungeMessage");
 const firebaseJson = JSON.parse(fs.readFileSync("./firebase.json", "utf8"));
 assert.ok(Array.isArray(firebaseJson.firestore) && firebaseJson.firestore.length === 2, "firebase.json missing firestore targets");
+assert.equal(firebaseJson.auth?.providers?.emailPassword, true, "firebase.json missing emailPassword auth provider");
+const appletConfig = JSON.parse(fs.readFileSync("./firebase-applet-config.json", "utf8"));
+assert.equal(appletConfig.projectId, "ivory-sunset-mxq1s", "firebase-applet-config.json projectId mismatch");
+assert.equal(appletConfig.appId, "1:738750089666:web:8950a5b6c603c03ac32e5b", "firebase-applet-config.json appId mismatch");
 const firebaserc = JSON.parse(fs.readFileSync("./.firebaserc", "utf8"));
 assert.equal(firebaserc.projects?.default, "ivory-sunset-mxq1s", ".firebaserc project mismatch");
 assert.ok(fs.existsSync("./public/icon-192.png"), "Missing public/icon-192.png");

@@ -85,7 +85,9 @@ export function SupportModal({
           <p className="mt-2 text-sm text-zinc-300 leading-relaxed">
             VelvetMotion is <strong className="text-pink-300">100% free</strong> with no paywalls or required subscriptions.
             If you enjoy the companions, a <strong className="text-amber-300">$5 donation</strong> would be hugely appreciated
-            to help develop new features, faster NSFW video models, and server upgrades — but you never have to!
+            to help develop new features — plus you climb the{" "}
+            <strong className="text-amber-200">🏆 Top Donators Leaderboard</strong> where repeat supporters{" "}
+            <strong className="text-pink-200">win custom companions, private 4K video packs &amp; mystery prizes directly from the owner!</strong>
           </p>
         </div>
 

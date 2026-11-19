@@ -30,12 +30,10 @@ export function MyGirlsHub({
   onHome,
   onOpenChat,
   onCreate,
-  onHome,
 }: {
   onHome?: () => void;
   onOpenChat: (character: Character) => void;
   onCreate?: () => void;
-  onHome?: () => void;
 }) {
   const [customs, setCustoms] = useState<Character[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);

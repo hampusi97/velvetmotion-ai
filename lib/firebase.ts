@@ -3,6 +3,11 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  updateProfile,
   onAuthStateChanged,
   type User,
 } from "firebase/auth";
@@ -25,7 +30,7 @@ import firebaseConfig from "../firebase-applet-config.json";
 import blueprint from "../firebase-blueprint.json";
 import { characterPortraitUrl } from "./portraits";
 
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
@@ -204,6 +209,50 @@ export async function googleSignIn(): Promise<{ user: User; accessToken: string 
   } finally {
     isSigningIn = false;
   }
+}
+
+export async function emailPasswordSignUp(
+  email: string,
+  password: string,
+  displayName?: string,
+): Promise<{ user: User }> {
+  try {
+    isSigningIn = true;
+    const cleanEmail = email.trim();
+    const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+    const desiredName = (displayName || cleanEmail.split("@")[0] || "VelvetMember")
+      .trim()
+      .slice(0, MAX_USERNAME_LEN);
+    if (desiredName) {
+      await updateProfile(credential.user, { displayName: desiredName }).catch(() => {});
+    }
+    await sendEmailVerification(credential.user).catch(() => {});
+    await ensureUserProfileInFirestore(credential.user, 500).catch(() => {});
+    notifyListeners(credential.user, null);
+    return { user: credential.user };
+  } finally {
+    isSigningIn = false;
+  }
+}
+
+export async function emailPasswordSignIn(
+  email: string,
+  password: string,
+): Promise<{ user: User }> {
+  try {
+    isSigningIn = true;
+    const cleanEmail = email.trim();
+    const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
+    await ensureUserProfileInFirestore(credential.user, 500).catch(() => {});
+    notifyListeners(credential.user, null);
+    return { user: credential.user };
+  } finally {
+    isSigningIn = false;
+  }
+}
+
+export async function resetEmailPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email.trim());
 }
 
 export async function getAccessToken(): Promise<string | null> {

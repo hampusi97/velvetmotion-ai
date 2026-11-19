@@ -205,7 +205,7 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     assert.ok(typeof out.aftercare === "string" && out.aftercare.length > 5);
   });
 
-  it("GET & POST /api/wallet returns $5 Developer Boost tier, crypto wallets, and free refills", async () => {
+  it("GET & POST /api/wallet returns $5 Developer Boost tier, crypto wallets, Top Donators Leaderboard, Owner Prizes, and free refills", async () => {
     const wGet = await getWallet();
     assert.equal(wGet.status, 200);
     const wData = await wGet.json();
@@ -214,18 +214,28 @@ describe("Next.js API Routes & ComfyUI / IP-Adapter Integration", () => {
     assert.equal(wData.primaryBtcWallet, "bc1qjmf9u3cmrn59q5nqmzgkvrgy7exegnfmph999k");
     assert.ok(Array.isArray(wData.tiers) && wData.tiers.some((t: { amountUsd: number }) => t.amountUsd === 5));
     assert.ok(Array.isArray(wData.cryptoWallets) && wData.cryptoWallets.length >= 4);
+    assert.ok(Array.isArray(wData.ownerPrizes) && wData.ownerPrizes.length >= 3);
+    assert.ok(Array.isArray(wData.leaderboard) && wData.leaderboard.length >= 5);
 
     const wPost = await postWallet(
       new Request("http://localhost:3000/api/wallet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "supporter-bonus", tierId: "dev-boost-5" }),
+        body: JSON.stringify({
+          action: "supporter-bonus",
+          tierId: "dev-boost-5",
+          username: "LeaderboardChamp",
+          contactHandle: "@champ_vip",
+          favoriteGirl: "Maren",
+        }),
       }),
     );
     assert.equal(wPost.status, 200);
     const pData = await wPost.json();
     assert.equal(pData.ok, true);
     assert.equal(pData.grantedCoins, 3500);
+    assert.equal(pData.userRank.username, "LeaderboardChamp");
+    assert.ok(typeof pData.userRank.rank === "number" && pData.userRank.rank >= 1);
   });
 
   it("GET & POST /api/lounge handles production multi-room lounge reads and writes", async () => {
