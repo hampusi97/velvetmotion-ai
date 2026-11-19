@@ -15,13 +15,15 @@ import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 
+const PORTRAIT_POOL = ["briony","calla","freya","isolde","liora","maren","nadine","nova","tess","vesper"];
+
 const EXPERIENCES = [
-  { id: "create" as SectionId, title: "CREATE HER", subtitle: "Look · personality · heat", neon: "from-pink-400 to-cyan-400" },
-  { id: "tinder" as SectionId, title: "DISCOVER", subtitle: "Swipe · match · undress", neon: "from-fuchsia-400 to-pink-400" },
-  { id: "joi" as SectionId, title: "PRIVATE", subtitle: "JOI · galleries · tributes", neon: "from-pink-300 to-rose-400" },
-  { id: "blindfold" as SectionId, title: "BLINDFOLD", subtitle: "Audio first · reveal later", neon: "from-zinc-200 to-pink-300" },
-  { id: "penthouse" as SectionId, title: "3D SUITE", subtitle: "Hotspots · lighting", neon: "from-fuchsia-300 to-violet-400" },
-  { id: "room" as SectionId, title: "GOON ROOM", subtitle: "Timed · dual", neon: "from-rose-400 to-pink-500" },
+  { id: "create" as SectionId, title: "CREATE HER", subtitle: "Look · personality · heat", neon: "from-pink-400 to-cyan-400", face: "briony" },
+  { id: "tinder" as SectionId, title: "DISCOVER", subtitle: "Swipe · match · undress", neon: "from-fuchsia-400 to-pink-400", face: "calla" },
+  { id: "joi" as SectionId, title: "PRIVATE", subtitle: "JOI · galleries · tributes", neon: "from-pink-300 to-rose-400", face: "nadine" },
+  { id: "blindfold" as SectionId, title: "BLINDFOLD", subtitle: "Audio first · reveal later", neon: "from-zinc-200 to-pink-300", face: "liora" },
+  { id: "penthouse" as SectionId, title: "3D SUITE", subtitle: "Hotspots · lighting", neon: "from-fuchsia-300 to-violet-400", face: "isolde" },
+  { id: "room" as SectionId, title: "GOON ROOM", subtitle: "Timed · dual", neon: "from-rose-400 to-pink-500", face: "tess" },
 ];
 
 export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
@@ -62,12 +64,13 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
   const categories = useMemo(() => ["All", ...characterCategories()], []);
   const featured = useMemo(() => filterCharacters({ query: homeQuery, category: homeCategory }).slice(0, 30), [homeQuery, homeCategory]);
   const hero = CHARACTERS[heroIdx % CHARACTERS.length];
+  const heroFace = PORTRAIT_POOL[heroIdx % PORTRAIT_POOL.length];
 
   return (
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show">
       <motion.section variants={riseItem} className="relative mb-8 overflow-hidden rounded-[1.75rem] border border-pink-500/25 candy-hero neon-pulse">
         <div className="relative aspect-[2.2/1] min-h-[240px] sm:min-h-[320px]">
-          <img src={staticPortraitUrl(hero.id)} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+          <img src={`/portraits/${heroFace}.jpg`} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/60 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
           <div className="relative z-10 flex h-full flex-col justify-end p-6 sm:p-10 max-w-lg">
@@ -105,19 +108,16 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual }: {
       <motion.section variants={riseItem} className="pb-10">
         <div className="mb-4"><h2 className="font-display text-2xl text-cream">Experiences</h2></div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {EXPERIENCES.map((exp, i) => {
-            const face = CHARACTERS[i % CHARACTERS.length];
-            return (
-              <button key={exp.id} type="button" onClick={() => onNavigate(exp.id)} className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 text-left girl-card glass-card">
-                <img src={staticPortraitUrl(face.id)} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-4">
-                  <div className={`text-xl font-black tracking-tight bg-gradient-to-r ${exp.neon} bg-clip-text text-transparent neon-text`}>{exp.title}</div>
-                  <p className="text-xs text-zinc-300 mt-0.5">{exp.subtitle}</p>
-                </div>
-              </button>
-            );
-          })}
+          {EXPERIENCES.map((exp) => (
+            <button key={exp.id} type="button" onClick={() => onNavigate(exp.id)} className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-white/10 text-left girl-card glass-card">
+              <img src={`/portraits/${exp.face}.jpg`} alt="" className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-4">
+                <div className={`text-xl font-black tracking-tight bg-gradient-to-r ${exp.neon} bg-clip-text text-transparent neon-text`}>{exp.title}</div>
+                <p className="text-xs text-zinc-300 mt-0.5">{exp.subtitle}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </motion.section>
 
