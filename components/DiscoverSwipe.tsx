@@ -372,7 +372,7 @@ export function DiscoverSwipe({
         )}
 
         <div
-          className="relative aspect-[3/4] rounded-3xl overflow-hidden border border-pink-500/30 shadow-[0_0_50px_rgba(236,72,153,0.25)] touch-none select-none cursor-grab active:cursor-grabbing z-10"
+          className="relative aspect-[3/4] rounded-3xl overflow-hidden border border-pink-500/30 shadow-[0_0_50px_rgba(236,72,153,0.25)] touch-none select-none cursor-grab active:cursor-grabbing z-10 transition-transform duration-200 ease-out"
           style={{
             transform: `translateX(${dragX}px) rotate(${rot}deg)`,
             transition: dragging ? "none" : "transform 0.22s ease",
@@ -412,9 +412,9 @@ export function DiscoverSwipe({
               className="rounded-full bg-black/55 backdrop-blur-sm px-2.5 py-1 text-fuchsia-200 hover:bg-pink-600/50 transition"
             >
               {peekLevel === 0 && "Peek 🔥"}
-              {peekLevel === 1 && "Lingerie"}
+              {peekLevel === 1 && "Lingerie ✨"}
               {peekLevel === 2 && "Nude 🔥"}
-              {peekLevel === 3 && "Explicit"}
+              {peekLevel === 3 && "Explicit 💦"}
             </button>
           </div>
           {peekLevel >= 2 && (
