@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCharacter } from "@/lib/characters";
-import { checkContentSafety, checkRateLimit } from "@/lib/safety";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +11,15 @@ const STYLES: Record<string, string> = {
   nude:
     "fully nude, naked body, bare breasts, visible nipples, natural skin detail, erotic photography, uncensored nsfw, soft shadows, highly detailed anatomy",
   explicit:
-    "explicit nude, sexual pose, detailed genitals, wet skin, uncensored nsfw, photorealistic, studio quality lighting, sharp focus, aroused expression",
+    "explicit nude, sexual pose, detailed genitals, wet skin, uncensored nsfw, photorealistic, studio quality lighting, sharp focus, aroused expression, legs spread or arched back",
+  sex:
+    "explicit heterosexual sex scene, penetration, intimate couple on bed, sweaty skin, uncensored nsfw, photorealistic, passionate, cinematic lighting",
+  doggy:
+    "explicit sex from behind, doggy style, arched back, uncensored nsfw, photorealistic, bedroom",
+  cowgirl:
+    "woman on top cowgirl position, explicit, uncensored nsfw, photorealistic, intimate eye contact",
   video:
-    "cinematic still from adult film, explicit sex scene, dramatic rim light, shallow depth of field, film grain, 35mm, intense",
+    "cinematic still from adult film, explicit sex scene, dramatic rim light, shallow depth of field, film grain, 35mm, intense, uncensored",
 };
 
 function seedFromId(id: string): number {
@@ -25,22 +30,11 @@ function seedFromId(id: string): number {
 
 export async function POST(req: Request) {
   try {
-    const rl = checkRateLimit("api-generate-image", req, 40, 60_000);
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Try again shortly." },
-        { status: 429, headers: { "Retry-After": String(rl.retryAfterSec) } },
-      );
-    }
     const body = await req.json();
     const characterId = typeof body.characterId === "string" ? body.characterId : "";
     const type = typeof body.type === "string" ? body.type : "portrait";
-    const pose = typeof body.pose === "string" ? body.pose.slice(0, 400) : "looking at viewer, seductive";
-    const extra = typeof body.extra === "string" ? body.extra.slice(0, 500) : "";
-    const safety = checkContentSafety(`${pose} ${extra}`);
-    if (!safety.allowed) {
-      return NextResponse.json({ error: safety.reason, blocked: true }, { status: 400 });
-    }
+    const pose = typeof body.pose === "string" ? body.pose : "looking at viewer, seductive";
+    const extra = typeof body.extra === "string" ? body.extra : "";
     const character = getCharacter(characterId);
 
     const look = character?.figure || "beautiful adult woman, proportionate figure";
