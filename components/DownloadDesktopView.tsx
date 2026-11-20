@@ -227,7 +227,7 @@ export function DownloadDesktopView() {
         <div className="grid gap-3 sm:grid-cols-3">
           {[
             { title: "01 / Install", desc: "Download a language model and local runtime separately.", url: "https://ollama.com/download", icon: HardDrive },
-            { title: "02 / Configure", desc: "Pick your local provider in AI settings and start its server.", url: "/settings/", icon: Cpu },
+            { title: "02 / Configure", desc: "Pick your local provider in AI settings and start its server.", url: "/?view=advanced", icon: Cpu },
             { title: "03 / Create", desc: "Use an available chat, image, voice or video workflow.", url: "/studio/", icon: Film },
           ].map((step) => {
             const Icon = step.icon;
