@@ -7,6 +7,8 @@ export type MediaBackendSettings = {
   localImageMode: "comfy" | "forge" | "prompt-url";
   /** Optional img2vid endpoint that accepts image URL + prompt */
   img2vidUrl: string;
+  /** Optional reference-aware img2img bridge URL for original fictional artwork. */
+  img2imgUrl: string;
   /** Pollinations / external API key if needed for video */
   pollinationsKey: string;
   /** Prefer local when set */
@@ -21,6 +23,7 @@ const DEFAULTS: MediaBackendSettings = {
   localImageBase: "",
   localImageMode: "prompt-url",
   img2vidUrl: "",
+  img2imgUrl: "",
   pollinationsKey: "",
   preferLocal: false,
   aggressiveFaceLock: true,
