@@ -100,6 +100,7 @@ export function DownloadDesktopView() {
         setUpdateCheckResult(result.available
           ? `A signed update ${result.version || ""} is available. The update notification will let you install it safely.`
           : "No newer signed desktop release is available.");
+        if (result.available) window.dispatchEvent(new Event("vm:check-desktop-updates"));
       } else {
         const result = await checkDesktopUpdate();
         setUpdateCheckResult(result.note);
