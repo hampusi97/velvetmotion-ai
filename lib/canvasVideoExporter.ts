@@ -74,6 +74,7 @@ export interface StudioVideoResult {
   engine: string;
   /** False for the canvas pan/zoom effect; it does not synthesize new video frames. */
   isGenerative: boolean;
+  videoFormat: "mp4" | "webm" | "unknown";
   warning?: string;
 }
 
@@ -222,12 +223,13 @@ export async function generateStudioVideoClip(
           videoUrl: URL.createObjectURL(blob),
           engine: "Configured AI video backend",
           isGenerative: true,
+          videoFormat: contentType.includes("webm") ? "webm" : contentType.includes("mp4") ? "mp4" : "unknown",
         };
       }
       const data = (await res.json()) as { videoUrl?: string; url?: string; video?: string; output?: string; error?: string };
       const url = data.videoUrl || data.url || data.video || data.output;
       if (url && /^(https?:\/\/|blob:|data:video\/)/i.test(url)) {
-        return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true };
+        return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true, videoFormat: /\.webm(?:$|[?#])/i.test(url) ? "webm" : /\.mp4(?:$|[?#])/i.test(url) ? "mp4" : "unknown" };
       }
       backendError = data.error || "Video service returned no playable video URL";
     } catch (err) {
@@ -243,6 +245,7 @@ export async function generateStudioVideoClip(
     videoUrl: webmUrl,
     engine: "Browser motion effect (animated still)",
     isGenerative: false,
+    videoFormat: "webm",
     warning: backendError || (req.comfyOnline
       ? "ComfyUI is reachable, but no AI video workflow endpoint is configured."
       : "Configure a compatible image-to-video endpoint for genuine AI motion."),
