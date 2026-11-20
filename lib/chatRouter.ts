@@ -8,6 +8,7 @@
  *  5. Context-Aware In-Character Fallback
  */
 import { assertCompliance } from "./complianceFilter";
+import { localComputeBudget } from "./localComputePreferences";
 import { reportGenerationSpeed } from "./localEngineBridge";
 import {
   buildDynamicSystemPrompt,
@@ -248,6 +249,7 @@ async function tryOpenAIChatTiers(
   const allowLocal = settings.provider === "auto" || settings.provider === "local";
   const allowCustom = settings.provider === "auto" || settings.provider === "custom";
   const allowOpenRouter = settings.provider === "auto" || settings.provider === "openrouter";
+  const localBudget = localComputeBudget();
   const presetId: SamplerPresetId = settings.samplerPreset || "roleplay-balanced";
   const enableAntiSlop = settings.enableAntiSlop !== false;
   const measure = (text: string, providerUsed: string, startedMs: number) => {
@@ -262,8 +264,8 @@ async function tryOpenAIChatTiers(
     const t0 = Date.now();
     const koboldRaw = await fetchOpenAICompat("http://127.0.0.1:5001/v1/chat/completions", chatMessages, {
       model: "koboldcpp",
-      timeoutMs: 15000,
-      samplerPayload: buildSamplerPayload("koboldcpp", presetId, enableAntiSlop),
+      timeoutMs: localBudget.timeoutMs,
+      samplerPayload: { ...buildSamplerPayload("koboldcpp", presetId, enableAntiSlop), max_tokens: localBudget.maxTokens },
     });
     const koboldClean = sanitizeCompanionReply(koboldRaw, companionName);
     if (koboldClean) return measure(koboldClean, "koboldcpp-local", t0);
@@ -275,8 +277,8 @@ async function tryOpenAIChatTiers(
     const ollamaBase = (settings.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
     const ollamaRaw = await fetchOpenAICompat(`${ollamaBase}/v1/chat/completions`, chatMessages, {
       model: settings.ollamaModel || "llama3.1:8b",
-      timeoutMs: 20000,
-      samplerPayload: buildSamplerPayload("ollama", presetId, enableAntiSlop),
+      timeoutMs: localBudget.timeoutMs,
+      samplerPayload: { ...buildSamplerPayload("ollama", presetId, enableAntiSlop), max_tokens: localBudget.maxTokens },
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, companionName);
     if (ollamaClean) return measure(ollamaClean, "ollama-local", t0);
@@ -288,7 +290,7 @@ async function tryOpenAIChatTiers(
     const homeBase = (settings.homeEngineUrl || "http://127.0.0.1:8787").replace(/\/+$/, "");
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 15000);
+      const timer = setTimeout(() => ctrl.abort(), localBudget.timeoutMs);
       const res = await fetch(`${homeBase}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -298,6 +300,7 @@ async function tryOpenAIChatTiers(
           samplerPreset: presetId,
           enableAntiSlop,
           ...buildSamplerPayload("koboldcpp", presetId, enableAntiSlop),
+          max_tokens: localBudget.maxTokens,
         }),
         signal: ctrl.signal,
       });
