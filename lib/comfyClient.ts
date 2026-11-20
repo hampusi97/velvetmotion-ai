@@ -193,7 +193,24 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
   }
 
   try {
+    // A reachable ComfyUI server does not imply the old hard-coded FLUX
+    // filename is installed. Ask ComfyUI which checkpoints actually exist.
+    const infoRes = await fetch(`${base}/object_info/CheckpointLoaderSimple`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!infoRes.ok) {
+      return { ok: false, note: `ComfyUI checkpoint discovery HTTP ${infoRes.status}` };
+    }
+    const info = (await infoRes.json()) as {
+      CheckpointLoaderSimple?: { input?: { required?: { ckpt_name?: string[][] } } };
+    };
+    const checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+    const checkpoint = checkpoints.find((name) => typeof name === "string" && name.trim());
+    if (!checkpoint) {
+      return { ok: false, note: "ComfyUI is online, but no CheckpointLoaderSimple model is installed. Install a compatible checkpoint or configure a custom image workflow." };
+    }
     const workflow = buildComfyWorkflowGraph({
+      checkpoint,
       prompt: req.prompt,
       negativePrompt: req.negative,
       seed: req.seed,
