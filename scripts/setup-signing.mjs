@@ -85,6 +85,8 @@ async function main() {
     console.log("The GitHub CLI will ask you to enter the SAME signing password.");
     console.log("Do not paste the password into ChatGPT or use it as a shell argument.");
     const setPassword = await rl.question("Did you choose a nonempty signing password? Type YES or NO: ");
+    // Release the interactive terminal before gh asks for the secret value.
+    rl.close();
     if (setPassword.trim() === "YES") {
       // gh prompts interactively, without printing the secret in script output.
       run("gh", ["secret", "set", "TAURI_SIGNING_PRIVATE_KEY_PASSWORD", "--repo", REPO]);
