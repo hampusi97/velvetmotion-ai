@@ -189,6 +189,29 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-pink-300">Reference-aware image variations</h2>
+        <p className="text-xs text-zinc-400">
+          Optional img2img bridge for original fictional adult artwork. The Studio sends the source image
+          only after you explicitly request generation. Compatible ComfyUI with the required reference nodes
+          can be used without a custom endpoint.
+        </p>
+        <label className="block text-[11px] text-zinc-300">
+          Image-to-image endpoint (optional)
+          <input
+            type="url"
+            className="mt-1 w-full rounded-xl border border-white/15 bg-black px-3 py-2 text-xs text-white"
+            placeholder="http://127.0.0.1:8787/api/img2img"
+            value={s.img2imgUrl}
+            onChange={(e) => update({ img2imgUrl: e.target.value.trim() })}
+          />
+        </label>
+        <p className="text-[10px] text-zinc-500">
+          Your bridge must enforce authentication, adult-only original artwork rules, and the configured provider’s policies.
+          Do not expose private API keys or accept unverified real-person sexual transformations.
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-pink-300">Img2vid / real clips</h2>
         <input
           className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
