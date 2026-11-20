@@ -737,20 +737,23 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
   const generateSequence = async (kind: SequenceKind) => {
     setBusy(true);
-    setClipStatus(kind === "joi" ? "Rendering JOI .webm video clip..." : "Rendering motion .webm clip...");
+    setClipStatus("Checking compatible video generator...");
     try {
       const result = runSequenceGeneration(character, kind);
       const existingLiveImg = [...messages].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
       let baseImageUrl = existingLiveImg || "";
       if (!baseImageUrl) {
         const liveShot = await resolveBestMediaUrl(character, kind === "joi" ? "joi" : "seductive", "cinematic framing");
+        if (liveShot.isFallback || !liveShot.url) {
+          throw new Error(liveShot.error || "A source image couldn't be generated. Connect an image model first.");
+        }
         baseImageUrl = liveShot.url;
       }
       const frames = baseImageUrl ? [baseImageUrl, ...result.frames.slice(1)] : result.frames;
       const url = baseImageUrl || frames[frames.length - 1];
 
       let videoUrl: string | null = null;
-      let note = "Live motion clip";
+      let note = "Video generator not configured";
 
       const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
       videoUrl = enhanced.videoUrl;
@@ -790,10 +793,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         type: kind,
         note,
       });
-      setClipStatus(videoUrl ? `Live .webm clip ready (${note})` : note);
+      setClipStatus(note);
       setIntimacy(bumpIntimacy(character.id, 7));
       const { progression: nextProg } = earnCompanionXp(character.id, 10);
       setProgression(nextProg);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Video generator failed";
+      setSafetyError(message);
+      setClipStatus(`Video unavailable: ${message}`);
     } finally {
       setBusy(false);
     }
