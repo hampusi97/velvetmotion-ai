@@ -1509,6 +1509,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               NSFW selfie
             </button>
             <span className="text-[10px] text-zinc-500">Free cloud may return SFW. Run ComfyUI (:8188) or SD web UI (:7860) for local NSFW.</span>
+            <span className="ml-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-300">Local NSFW ready when engine is online</span>
           </div>
 
           {/* Pinned Bottom Composer */}
