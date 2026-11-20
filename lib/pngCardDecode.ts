@@ -68,7 +68,7 @@ export function parseCharacterFromPngBuffer(buffer: ArrayBuffer): unknown | null
   for (const raw of [chunks.ccv3, chunks.chara, chunks.Chara]) {
     if (!raw || raw.length > MAX_METADATA_BYTES) continue;
     try {
-      const binary = atob(raw.replace(/\\s/g, ""));
+      const binary = atob(raw.replace(/\s/g, ""));
       const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
       return JSON.parse(decoder.decode(bytes));
     } catch { /* try next supported chunk */ }
