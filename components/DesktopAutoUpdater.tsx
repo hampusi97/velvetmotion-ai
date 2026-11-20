@@ -62,9 +62,9 @@ export function DesktopAutoUpdater() {
       }
     };
 
-    const check = async (startOfSession = false) => {
+    const check = async (startOfSession = false, force = false) => {
       if (checkingRef.current || installedRef.current || !active) return;
-      if (!startOfSession && Date.now() - lastCheckedRef.current < FOCUS_THROTTLE_MS) return;
+      if (!force && !startOfSession && Date.now() - lastCheckedRef.current < FOCUS_THROTTLE_MS) return;
       checkingRef.current = true;
       lastCheckedRef.current = Date.now();
       try {
@@ -97,8 +97,10 @@ export function DesktopAutoUpdater() {
     const periodic = window.setInterval(() => { void check(); }, POLL_MS);
     const onFocus = () => { void check(); };
     const onOnline = () => { void check(); };
+    const onExplicitCheck = () => { void check(false, true); };
     window.addEventListener("focus", onFocus);
     window.addEventListener("online", onOnline);
+    window.addEventListener("vm:check-desktop-updates", onExplicitCheck);
     return () => {
       active = false;
       activeRef.current = false;
@@ -106,6 +108,7 @@ export function DesktopAutoUpdater() {
       window.clearInterval(periodic);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", onOnline);
+      window.removeEventListener("vm:check-desktop-updates", onExplicitCheck);
     };
   }, []);
 
