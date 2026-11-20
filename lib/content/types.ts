@@ -61,6 +61,7 @@ export interface StoryPack {
   id: string;
   title: string;
   tag: StoryTag;
+  relatedTags?: readonly StoryTag[];
   /** Short card line. Expanded historical packs keep their original desc. */
   desc: string;
   /** Longer description shown inside the pack. */

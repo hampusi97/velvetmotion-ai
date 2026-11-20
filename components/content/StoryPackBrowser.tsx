@@ -48,8 +48,8 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
 
   useEffect(() => () => stopSpeaking(), []);
 
-  const tags = useMemo(() => ["ALL", ...Array.from(new Set(ALL_STORY_PACKS.map((p) => p.tag)))], []);
-  const visible = ALL_STORY_PACKS.filter((p) => tag === "ALL" || p.tag === tag);
+  const tags = useMemo(() => ["ALL", ...new Set(ALL_STORY_PACKS.flatMap((pack) => [pack.tag, ...(pack.relatedTags ?? [])]))], []);
+  const visible = ALL_STORY_PACKS.filter((pack) => tag === "ALL" || pack.tag === tag || pack.relatedTags?.some((relatedTag) => relatedTag === tag));
   const pack = packId ? getStoryPack(packId) : undefined;
   const scene: StoryScene | undefined = pack && sceneId ? pack.scenes.find((s) => s.id === sceneId) : undefined;
   const face = pack ? pack.character.companionId ?? faceFor(pack.id) : "chloe";

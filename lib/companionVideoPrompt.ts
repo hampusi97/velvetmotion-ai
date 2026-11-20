@@ -96,12 +96,12 @@ export const VIDEO_SCENE_PRESETS = [
   },
   {
     id: "her-choice",
-    label: "Her Choice · Last dance",
+    label: "BNWO · Her Choice",
     adult: true,
     scene: {
-      action: "She takes her date's hand and leads him into one last dance. When the music stops, she leans in for a kiss. Consenting adults in an open relationship.",
-      setting: "a private club after the last show",
-      camera: "slow two-shot, then close on her smile",
+      action: "Consensual BNWO open-relationship scene. She tells her white adult boyfriend about the Black man she chose for the last dance. She leans in as if sharing a secret, describes the kiss with a smile, then waits for his reaction.",
+      setting: "her velvet couch after a late night out",
+      camera: "first-person from his seat, at eye level",
       lighting: "soft amber stage lights and velvet shadows",
     },
   },

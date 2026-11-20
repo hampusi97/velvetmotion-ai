@@ -102,7 +102,7 @@ test("local video health probes use the configured loopback bridge", () => {
 });
 
 test("roleplay video scene presets require explicit adult mode", () => {
-  for (const id of ["bnwo-secret-date", "sph-night-in", "bnwo-private-fantasy"]) {
+  for (const id of ["bnwo-secret-date", "her-choice", "sph-night-in", "bnwo-private-fantasy"]) {
     const preset = VIDEO_SCENE_PRESETS.find((scene) => scene.id === id);
     assert.ok(preset?.adult);
     const prompt = composeCompanionVideoPrompt(preset.scene, true, true);
