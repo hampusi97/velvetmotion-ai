@@ -8,7 +8,7 @@
     "prebuild": "node scripts/generate-build-meta.mjs",
     "build": "next build",
     "preview:static": "node scripts/serve-static.mjs",
-    "start": "next start",
+    "start": "node scripts/serve-static.mjs 3000",
     "lint": "next lint",
     "version:bump": "node scripts/bump-version.mjs",
     "audit:companions": "node scripts/audit-companions.mjs",

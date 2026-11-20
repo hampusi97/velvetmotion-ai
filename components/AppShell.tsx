@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
 import { CHARACTERS, characterCategories, getCharacter, type Character } from "@/lib/characters";
 import { containerClass } from "@/lib/cn";
 import { getUser, login, type LocalUser } from "@/lib/auth";
-import { loadChat, saveChat } from "@/lib/storage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { decodeSharedCharacterHash } from "@/lib/shareCardUrl";
-import { saveCustomCompanionDB } from "@/lib/db";
+import { appendMainChatMessage, saveCustomCompanionDB } from "@/lib/db";
 import { emitVaultUpdated, useFirebaseCloudSync } from "@/lib/firebaseSync";
 import { dismissProactive, startProactiveWatcher, type ProactivePing } from "@/lib/proactiveIdle";
 import { SiteHeader } from "@/components/site-header";
@@ -128,13 +127,23 @@ function ComingSoon3DCard({ onBack }: { onBack: () => void }) {
   );
 }
 
-export function AppShell({ initialView = "home" }: { initialView?: ShellRouteView }) {
+export function AppShell(props: { initialView?: ShellRouteView }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#05050a]" />}>
+      <AppShellContent {...props} />
+    </Suspense>
+  );
+}
+
+function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteView }) {
   const pathname = usePathname() || "/";
+  const search = useSearchParams()?.toString() || "";
   const [view, setView] = useState<ShellRouteView>(initialView);
   const [studioInitialTab, setStudioInitialTab] = useState<"photo" | "video">("photo");
   const [joiTheme, setJoiTheme] = useState<CompanionSessionTheme | null>(null);
   const [storyPackId, setStoryPackId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [chatRevision, setChatRevision] = useState(0);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
   const [query, setQuery] = useState("");
@@ -189,24 +198,19 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   }, []);
 
   useEffect(() => {
-    setView(initialView);
-  }, [initialView]);
+    const params = new URLSearchParams(search);
+    const qView = pathname === "/" ? params.get("view") as ShellRouteView | null : null;
+    setView(qView || initialView);
+    setStoryPackId(qView === "packs" ? params.get("pack") : null);
+    setStudioInitialTab(pathname.startsWith("/studio") && params.get("mode") === "video" ? "video" : "photo");
+    setJoiTheme(pathname.startsWith("/joi") ? parseCompanionSessionTheme(params.get("theme")) : null);
+    const qId = params.get("companion") || params.get("id");
+    setSelectedId(qId ? getCharacter(qId)?.id ?? qId : null);
+  }, [initialView, pathname, search]);
 
   useEffect(() => {
     try {
-      const params = new URLSearchParams(window.location.search);
-      // Query parameters must never silently bypass the adult confirmation gate.
       setAdult(localStorage.getItem("velvet-age") === "true");
-      const qView = params.get("view") as ShellRouteView | null;
-      if (qView && pathname === "/") setView(qView);
-      setStoryPackId(pathname === "/" && qView === "packs" ? params.get("pack") : null);
-      if (pathname.startsWith("/studio")) setStudioInitialTab(params.get("mode") === "video" ? "video" : "photo");
-      setJoiTheme(pathname.startsWith("/joi") ? parseCompanionSessionTheme(params.get("theme")) : null);
-      const qId = params.get("companion") || params.get("id");
-      if (qId) {
-        const resolved = getCharacter(qId);
-        setSelectedId(resolved ? resolved.id : qId);
-      }
 
       // Phase 8 #8: Auto-open import preview modal if URL hash contains #import=<compressed>
       if (window.location.hash && window.location.hash.includes("import=")) {
@@ -252,26 +256,25 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       ? customCharacter
       : (selectedId ? getCharacter(selectedId) : undefined) ?? CHARACTERS[0] ?? null;
 
-  const openChatById = (id: string, scenarioPrompt?: string, incomingNote?: string) => {
+  const openChatById = async (id: string, scenarioPrompt?: string, incomingNote?: string) => {
     const found = getCharacter(id);
-    if (found) setCustomCharacter(found);
-    if (scenarioPrompt?.trim()) {
-      const prev = loadChat(id);
-      const base = prev.length ? prev : found ? [{ role: "assistant" as const, content: found.initialMessage }] : [];
-      saveChat(id, [
-        ...base,
-        { role: "assistant", content: `*Scenario:* ${scenarioPrompt.trim()}\n\n“Right here inside the scene with you.”` },
-      ]);
-    } else if (incomingNote?.trim()) {
-      const prev = loadChat(id);
-      if (!prev.some((m) => m.content === incomingNote.trim())) {
-        const base = prev.length ? prev : found ? [{ role: "assistant" as const, content: found.initialMessage }] : [];
-        saveChat(id, [...base, { role: "assistant", content: incomingNote.trim() }]);
-      }
+    const scenario = scenarioPrompt?.trim();
+    const content = scenario ? `*Scenario:* ${scenario}\n\n“Right here inside the scene with you.”` : incomingNote?.trim();
+    if (content) {
+      await appendMainChatMessage(id, { role: "assistant", content }, { initialMessage: found?.initialMessage, once: !scenario });
+      setChatRevision((value) => value + 1);
     }
+    if (found) setCustomCharacter(found);
     setSelectedId(id);
     setRomanceMode(false);
     setView("chat");
+  };
+
+  const handleStudioDrop = async (id: string, imageUrl: string, content: string) => {
+    await appendMainChatMessage(id, { role: "assistant", content, imageUrl });
+    setChatRevision((value) => value + 1);
+    setStudioModalOpen(false);
+    await openChatById(id);
   };
 
   const navigate = (next: string) => {
@@ -281,55 +284,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     else setView(next as ShellRouteView);
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
-
-  const lastSearchRef = useRef<string | null>(null);
-  const hadQueryViewRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const syncFromLocation = () => {
-      const searchStr = window.location.search || "";
-      if (lastSearchRef.current === searchStr) return;
-      const isInitial = lastSearchRef.current === null;
-      lastSearchRef.current = searchStr;
-      const params = new URLSearchParams(searchStr);
-      const qView = params.get("view") as ShellRouteView | null;
-      if (pathname.startsWith("/studio")) setStudioInitialTab(params.get("mode") === "video" ? "video" : "photo");
-      const qId = params.get("companion") || params.get("id");
-      if (window.location.pathname === "/") {
-        if (qView) {
-          hadQueryViewRef.current = true;
-          setView(qView);
-        } else if (!isInitial && hadQueryViewRef.current) {
-          hadQueryViewRef.current = false;
-          setView("home");
-        }
-      }
-      if (qId) {
-        const resolved = getCharacter(qId);
-        setSelectedId(resolved ? resolved.id : qId);
-      }
-    };
-
-    const origPush = window.history.pushState.bind(window.history);
-    const origReplace = window.history.replaceState.bind(window.history);
-    const emit = () => queueMicrotask(syncFromLocation);
-    window.history.pushState = function pushState(...args) {
-      origPush(...args);
-      emit();
-    };
-    window.history.replaceState = function replaceState(...args) {
-      origReplace(...args);
-      emit();
-    };
-    window.addEventListener("popstate", emit);
-    syncFromLocation();
-    return () => {
-      window.history.pushState = origPush;
-      window.history.replaceState = origReplace;
-      window.removeEventListener("popstate", emit);
-    };
-  }, [pathname]);
 
   if (adult === null) return <div className="min-h-screen bg-[#05050a]" />;
 
@@ -441,7 +395,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "chat" && selected && (
             <NeonErrorBoundary label="Chat Command Center" onReset={() => setView("home")}>
               <CharacterChat
-                key={selected.id}
+                key={`${selected.id}:${chatRevision}`}
                 character={selected}
                 romanceMode={romanceMode}
                 onBack={() => setView("home")}
@@ -509,13 +463,9 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
                 standalone={true}
                 key={`${selected?.id || ""}:${studioInitialTab}`}
                 initialTab={studioInitialTab}
-                activeChatCompanionId={selected?.id}
+                activeChatCompanionId={selectedId ?? undefined}
                 onClose={() => setView("home")}
-                onDropIntoChat={(id, imgUrl, cap) => {
-                  const prev = loadChat(id);
-                  saveChat(id, [...prev, { role: "assistant", content: cap, imageUrl: imgUrl }]);
-                  openChatById(id);
-                }}
+                onDropIntoChat={handleStudioDrop}
               />
             </NeonErrorBoundary>
           )}
@@ -528,7 +478,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "edge" && <EdgeTimer onHome={() => setView("home")} />}
           {view === "scenario" && <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id, p) => openChatById(id, p)} />}
           {view === "tribute" && <TributeBrowser />}
-          {view === "packs" && <StoryPackBrowser initialPackId={storyPackId} />}
+          {view === "packs" && <StoryPackBrowser key={storyPackId || "stories"} initialPackId={storyPackId} />}
           {view === "joi" && <JoiBrowser key={`${selected?.id}:${joiTheme}`} initialCompanionId={selected?.id} initialTheme={joiTheme} />}
           {view === "import" && <CardImport onHome={() => setView("home")} onOpen={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "share" && <ShareImport onHome={() => setView("home")} onImport={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
@@ -576,7 +526,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <SettingsAndBackupDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
-        <MediaStudioModal isOpen={studioModalOpen} onClose={() => setStudioModalOpen(false)} />
+        <MediaStudioModal isOpen={studioModalOpen} onClose={() => setStudioModalOpen(false)} onDropIntoChat={handleStudioDrop} />
       </NeonErrorBoundary>
 
       {sharedImportPreview && (

@@ -3,6 +3,7 @@
  * Static-export safe; browser-only.
  */
 import Dexie, { type Table } from "dexie";
+import { loadChat, saveChat, type StoredMessage } from "./storage";
 
 export interface ChatRow {
   id: string;
@@ -21,6 +22,8 @@ export interface MatchRow {
 export interface GalleryRow {
   id: string;
   characterId?: string;
+  characterName?: string;
+  prompt?: string;
   url: string;
   mood: string;
   createdAt: number;
@@ -112,6 +115,28 @@ export async function loadChatDB(characterId: string): Promise<unknown[] | null>
   if (!d) return null;
   const row = await d.chats.get(characterId);
   return row?.messages ?? null;
+}
+
+/** Append to the main chat before a different view opens it. */
+export async function appendMainChatMessage(
+  characterId: string,
+  message: StoredMessage,
+  options: { initialMessage?: string; once?: boolean } = {},
+) {
+  const append = (messages: StoredMessage[]) => {
+    if (options.once && messages.some((entry) => entry?.content === message.content)) return messages;
+    const base = messages.length || !options.initialMessage
+      ? messages : [{ role: "assistant" as const, content: options.initialMessage }];
+    return [...base, message];
+  };
+  const db = getDb();
+  const indexed = await db?.transaction("rw", db.chats, async () => {
+    const row = await db.chats.get(characterId);
+    const messages = append(Array.isArray(row?.messages) ? row.messages as StoredMessage[] : loadChat(characterId));
+    await db.chats.put({ id: characterId, messages, updatedAt: Date.now() });
+    return messages;
+  }).catch(() => null);
+  saveChat(characterId, indexed ?? append(loadChat(characterId)));
 }
 
 export async function saveMemoryDB(characterId: string, facts: string[]) {

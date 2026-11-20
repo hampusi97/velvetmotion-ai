@@ -19,8 +19,10 @@ import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/compone
 import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { useLocalEngineStatus } from '@/lib/localEngineBridge';
-import { addToGallery, getGallery, loadChat, saveChat } from '@/lib/storage';
-import { saveCustomCompanionDB, saveGalleryDB } from '@/lib/db';
+import { addToGallery, getGallery } from '@/lib/storage';
+import { appendMainChatMessage, saveCustomCompanionDB, saveGalleryDB } from '@/lib/db';
+import { saveCollectionClip } from '@/lib/collectionMedia';
+import { remoteImageToStableDataUrl } from '@/lib/imageStore';
 import { emitVaultUpdated } from '@/lib/firebaseSync';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
 import { SafeImage } from '@/components/SafeImage';
@@ -43,7 +45,7 @@ interface MediaStudioModalProps {
   activeChatCompanionId?: string;
   onClose: () => void;
   onCompanionCreated?: (companion: CompanionProfile) => void;
-  onDropIntoChat?: (companionId: string, imageUrl: string, caption: string) => void;
+  onDropIntoChat?: (companionId: string, imageUrl: string, caption: string) => void | Promise<void>;
 }
 
 const SCENE_PRESETS = [
@@ -142,6 +144,8 @@ export default function MediaStudioModal({
   const [videoAdultMode, setVideoAdultMode] = useState(false);
   const videoAbort = useRef<AbortController | null>(null);
   const [videoBusy, setVideoBusy] = useState(false);
+  const [clipSaving, setClipSaving] = useState(false);
+  const [clipCompanion, setClipCompanion] = useState<{ id: string; name: string } | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoDimensions, setVideoDimensions] = useState('');
   const [videoEngineUsed, setVideoEngineUsed] = useState<string | null>(null);
@@ -184,6 +188,14 @@ export default function MediaStudioModal({
   useEffect(() => {
     if (isOpen || standalone) return () => videoAbort.current?.abort();
   }, [isOpen, standalone]);
+
+  useEffect(() => {
+    if (generatedVideoUrl?.startsWith('blob:')) return () => URL.revokeObjectURL(generatedVideoUrl);
+  }, [generatedVideoUrl]);
+
+  useEffect(() => {
+    if (generatedPhoto?.startsWith('blob:')) return () => URL.revokeObjectURL(generatedPhoto);
+  }, [generatedPhoto]);
 
   const draftCompanion = FLAGSHIP_COMPANIONS.find((profile) => profile.portraitUrl === videoSourceUrl);
   const draftCompanionId = draftCompanion?.id;
@@ -330,14 +342,18 @@ export default function MediaStudioModal({
               height: photoHeight,
               seed: parsedSeed,
             });
+            const galleryUrl = await remoteImageToStableDataUrl(blobUrl).catch((error) => {
+              URL.revokeObjectURL(blobUrl);
+              throw error;
+            });
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
             const engineLabel = `ComfyUI (${comfyCheckpoint || comfyInfo.checkpoints[0] || 'Local :8188'})`;
             setGeneratedPhoto(blobUrl);
-            setGalleryPhoto(null);
+            setGalleryPhoto(galleryUrl);
             setPhotoRevealed(true);
             setVideoSourceUrl(blobUrl);
             setEngineBadge(engineLabel);
-            handleSaveToCollection(blobUrl, 'studio-photo');
+            handleSaveToCollection(galleryUrl, 'studio-photo');
             setStatusMsg(`Rendered via ${engineLabel} in ${elapsedSec}s (seed ${parsedSeed}) · Auto-saved to Photo Diary & Collection`);
             return;
           } catch {
@@ -413,7 +429,7 @@ export default function MediaStudioModal({
         return;
       }
     }
-    if (videoAbort.current) return;
+    if (videoAbort.current || clipSaving) return;
     const request = new AbortController();
     videoAbort.current = request;
     setVideoBusy(true);
@@ -439,8 +455,8 @@ export default function MediaStudioModal({
         if (res.videoUrl.startsWith('blob:')) URL.revokeObjectURL(res.videoUrl);
         return;
       }
-      if (generatedVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(generatedVideoUrl);
       setGeneratedVideoUrl(res.videoUrl);
+      setClipCompanion(draftCompanion || companion);
       setVideoDimensions('');
       setVideoEngineUsed(res.engine);
       setVideoIsGenerative(res.isGenerative);
@@ -448,7 +464,7 @@ export default function MediaStudioModal({
       if (res.isGenerative) {
         setStatusMsg(`AI clip ready · ${res.engine}`);
       } else {
-        setStatusMsg(`Created ${durationSec}s animated-still effect, not generative AI video.`);
+        setStatusMsg(`Created a ${durationSec}-second animated still.`);
         if (res.warning) setErrorMsg(res.warning);
       }
     } catch (err) {
@@ -539,16 +555,41 @@ export default function MediaStudioModal({
     setStatusMsg('Saved permanently to Collection!');
   }
 
-  function handleDropToChat(url: string) {
+  async function handleSaveClip() {
+    if (!generatedVideoUrl || !clipCompanion || clipSaving || videoBusy) return;
+    setClipSaving(true);
+    setErrorMsg(null);
+    setStatusMsg(null);
+    try {
+      await saveCollectionClip({
+        characterId: clipCompanion.id,
+        characterName: clipCompanion.name,
+        url: generatedVideoUrl,
+        prompt: videoIsGenerative ? 'AI-generated motion' : 'Animated still',
+      });
+      emitVaultUpdated();
+      setStatusMsg('Clip saved to Collection.');
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'The clip could not be saved to browser storage.');
+    } finally {
+      setClipSaving(false);
+    }
+  }
+
+  async function handleDropToChat(url: string) {
     const targetId = activeChatCompanionId || companion.id;
     const caption = `*Studio drop (${studioStyle}):* ${scenePresets.find((s) => s.id === sceneId)?.label || 'Custom'}`;
-    if (onDropIntoChat) {
-      onDropIntoChat(targetId, url, caption);
-    } else {
-      const prev = loadChat(targetId);
-      saveChat(targetId, [...prev, { role: 'assistant', content: caption, imageUrl: url }]);
+    try {
+      const imageUrl = url.startsWith('blob:') ? await remoteImageToStableDataUrl(url) : url;
+      if (onDropIntoChat) {
+        await onDropIntoChat(targetId, imageUrl, caption);
+      } else {
+        await appendMainChatMessage(targetId, { role: 'assistant', content: caption, imageUrl });
+      }
+      setStatusMsg('Photo added to chat.');
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Could not add the photo to chat.');
     }
-    setStatusMsg(`Dropped directly into ${companion.name}'s chat!`);
   }
 
   function handleSaveUploadedCompanion() {
@@ -921,7 +962,7 @@ export default function MediaStudioModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDropToChat(galleryPhoto || generatedPhoto)}
+                  onClick={() => void handleDropToChat(galleryPhoto || generatedPhoto)}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff1e8e]/50 bg-[#ff1e8e]/20 px-3 py-1.5 text-[11px] font-bold text-pink-100"
                 >
                   <MessageSquare className="h-3.5 w-3.5" /> Drop into Active Chat
@@ -1148,7 +1189,7 @@ export default function MediaStudioModal({
 
           <button
             type="button"
-            disabled={videoBusy}
+            disabled={videoBusy || clipSaving}
             onClick={() => void handleGenerateVideo()}
             className="w-full rounded-full neon-btn-primary py-2.5 text-xs font-bold text-white disabled:opacity-50"
           >
@@ -1182,17 +1223,11 @@ export default function MediaStudioModal({
               <div className="flex flex-wrap justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!generatedVideoUrl) return;
-                    if (generatedVideoUrl.startsWith('blob:')) {
-                      setErrorMsg('This is a temporary video URL. Download the clip to keep it; permanent video storage is not connected yet.');
-                      return;
-                    }
-                    handleSaveToCollection(generatedVideoUrl, 'video');
-                  }}
-                  className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/45 bg-[#2a1820] px-3.5 py-1.5 text-xs font-bold text-white"
+                  onClick={() => void handleSaveClip()}
+                  disabled={clipSaving || videoBusy}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/45 bg-[#2a1820] px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
-                  <BookmarkPlus className="h-3.5 w-3.5" /> Save to Shorts / Collection
+                  <BookmarkPlus className="h-3.5 w-3.5" /> {clipSaving ? 'Saving clip…' : 'Save clip to Collection'}
                 </button>
                 <a
                   href={generatedVideoUrl}

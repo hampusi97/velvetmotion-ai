@@ -249,11 +249,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
   const refreshDiary = () => {
     const lsItems = getGallery()
-      .filter((g) => g.characterId === character.id)
+      .filter((g) => g.characterId === character.id && g.type !== "video")
       .map((g) => ({ id: g.id, url: g.url, label: g.type || "selfie" }));
     void loadGalleryDB(character.id).then((dbItems) => {
       const merged = new Map<string, { id: string; url: string; label: string }>();
-      for (const r of dbItems) merged.set(r.url, { id: r.id, url: r.url, label: r.mood || "selfie" });
+      for (const r of dbItems) {
+        if (r.mood !== "video") merged.set(r.url, { id: r.id, url: r.url, label: r.mood || "selfie" });
+      }
       for (const l of lsItems) if (!merged.has(l.url)) merged.set(l.url, l);
       setDiaryPhotos(Array.from(merged.values()));
     });
@@ -267,7 +269,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     refreshDiary();
     void listChatBranchesDB(character.id).then(setBranches);
     void (async () => {
-      const dbLoaded = await loadChatDB(character.id);
+      const dbLoaded = await loadChatDB(character.id).catch(() => null);
       const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
       if (loaded.length > 0) setMessages(loaded);
       else {
@@ -334,7 +336,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     if (busy) return;
     setActiveBranchId(branchId);
     if (branchId === "main") {
-      const dbLoaded = await loadChatDB(character.id);
+      const dbLoaded = await loadChatDB(character.id).catch(() => null);
       const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
       setMessages(loaded.length ? loaded : [{ role: "assistant", content: character.initialMessage }]);
       return;

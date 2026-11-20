@@ -9,7 +9,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const outDir = path.join(root, "out");
-const port = Number(process.env.PORT || 8080);
+const port = Number(process.env.PORT || process.argv[2] || 8080);
 const host = process.env.HOST || "0.0.0.0";
 
 if (!fs.existsSync(outDir)) {
@@ -34,6 +34,7 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml; charset=utf-8",
   ".webm": "video/webm",
+  ".mp4": "video/mp4",
   ".wasm": "application/wasm",
 };
 

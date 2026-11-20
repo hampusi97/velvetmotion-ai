@@ -15,6 +15,7 @@ import { generateStudioPicture } from "./mediaGenerator";
 import { LOCAL_COMFY_VIDEO_URL, localComfyVideoHealthUrl } from "./mediaSettings";
 import { HER_CHOICE_SCENES } from "./herChoiceScenes";
 import { readChatEventStream } from "./chatStream";
+import { collectionMediaFile } from "./collectionMedia";
 
 const videoRequest: StudioVideoRequest = {
   mode: "ai",
@@ -27,6 +28,13 @@ const videoRequest: StudioVideoRequest = {
   adultMode: true,
   videoBackendUrl: "https://example.test/render",
 };
+
+test("Collection uses the saved media format for display and downloads", () => {
+  assert.deepEqual(collectionMediaFile({ type: "portrait", url: "/clip.MP4?download=true" }), { isVideo: true, extension: "mp4" });
+  assert.deepEqual(collectionMediaFile({ type: "video", url: "data:video/webm;base64,test" }), { isVideo: true, extension: "webm" });
+  assert.deepEqual(collectionMediaFile({ type: "video", url: "/still.webp" }), { isVideo: false, extension: "webp" });
+  assert.deepEqual(collectionMediaFile({ type: "portrait", url: "/view?next=example.mp4" }), { isVideo: false, extension: "png" });
+});
 
 test("AI video keeps source classification and resolution across a queued render", async (t) => {
   const fetcher = t.mock.method(globalThis, "fetch", async (target: URL, init?: RequestInit) => {

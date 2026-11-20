@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Download, Heart, Lock, Search, Sparkles, Tags, Trash2 } from "lucide-react";
 import { getGallery, removeGalleryItem, type GalleryItem } from "@/lib/storage";
 import { deleteGalleryDB, exportFullBackupJson } from "@/lib/db";
+import { collectionMediaFile, loadCollectionItems } from "@/lib/collectionMedia";
 import { deleteMediaFromFirestore } from "@/lib/firebase";
 import { SafeImage } from "@/components/SafeImage";
 
@@ -17,14 +18,6 @@ function readGalleryMeta(): GalleryMeta {
     return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as GalleryMeta : {};
   } catch { return {}; }
 }
-function localExtension(item: GalleryItem) {
-  if (item.url.startsWith("data:image/webp")) return "webp";
-  if (item.url.startsWith("data:image/jpeg")) return "jpg";
-  if (item.url.startsWith("data:video/mp4") || /\\.mp4(?:$|[?#])/i.test(item.url)) return "mp4";
-  if (item.type === "video" || /\\.webm(?:$|[?#])/i.test(item.url)) return "webm";
-  return "png";
-}
-
 export function CollectionGalleryView({
   onHome,
   onOpenStudio,
@@ -46,10 +39,19 @@ export function CollectionGalleryView({
 
   useEffect(() => {
     setMeta(readGalleryMeta());
-    const refresh = () => setItems(getGallery());
+    let active = true;
+    let version = 0;
+    const refresh = () => {
+      const request = ++version;
+      void loadCollectionItems().then((next) => {
+        if (active && request === version) setItems(next);
+      });
+    };
+    refresh();
     window.addEventListener("vm:vault-updated", refresh);
     window.addEventListener("storage", refresh);
     return () => {
+      active = false;
       window.removeEventListener("vm:vault-updated", refresh);
       window.removeEventListener("storage", refresh);
     };
@@ -68,7 +70,7 @@ export function CollectionGalleryView({
   const shown = useMemo(() => {
     const term = query.toLowerCase().trim();
     return items.filter((x) => {
-      const isVideo = x.type === "video" || /\\.(mp4|webm)(?:$|[?#])/i.test(x.url);
+      const { isVideo } = collectionMediaFile(x);
       if (characterFilter !== "all" && x.characterName !== characterFilter) return false;
       if (kind === "video" && !isVideo) return false;
       if (kind === "images" && isVideo) return false;
@@ -92,13 +94,13 @@ export function CollectionGalleryView({
         await deleteGalleryDB(id);
         try { await deleteMediaFromFirestore(id); } catch { remoteIssues++; }
       }
-      setItems(getGallery());
+      setItems(await loadCollectionItems());
       setSelected([]);
       setConfirmDelete(false);
       setStatus(`Removed ${ids.length} item(s) from local gallery and IndexedDB.${remoteIssues ? " Some cloud deletions failed; check connected storage." : " Cloud deletions were requested where available."}`);
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Couldn't delete every selected item.");
-      setItems(getGallery());
+      setItems(await loadCollectionItems());
     } finally { setBusy(false); }
   };
 
@@ -190,7 +192,7 @@ export function CollectionGalleryView({
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {shown.map((item) => {
-            const isVideo = item.type === "video" || /\\.(mp4|webm)(?:$|[?#])/i.test(item.url);
+            const { isVideo, extension } = collectionMediaFile(item);
             const tags = meta[item.id]?.tags || [];
             return <article key={item.id}
               className={`group flex flex-col overflow-hidden rounded-[22px] border bg-[#1b1520] ${selected.includes(item.id) ? "border-rose-300/70" : "border-white/10"}`}>
@@ -211,7 +213,7 @@ export function CollectionGalleryView({
               <div className="flex flex-1 flex-col gap-2 p-3">
                 <div>
                   <h3 className="truncate text-xs font-semibold text-white">{item.characterName}</h3>
-                  <p className="mt-0.5 truncate text-[10px] text-zinc-400">{item.type} · {new Date(item.createdAt).toLocaleDateString()}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-zinc-400">{isVideo ? "video" : item.type === "video" ? "image" : item.type} · {new Date(item.createdAt).toLocaleDateString()}</p>
                 </div>
                 {!!tags.length && <div className="flex flex-wrap gap-1">{tags.map((tag) => <span key={tag}
                   className="rounded-full bg-rose-300/10 px-2 py-0.5 text-[10px] text-rose-200">{tag}</span>)}</div>}
@@ -226,7 +228,7 @@ export function CollectionGalleryView({
                 <div className="mt-auto flex flex-wrap gap-2 pt-1">
                   <button type="button" onClick={() => { setEditingTagId(item.id); setTagDraft(tags.join(", ")); }}
                     className="inline-flex items-center gap-1 text-[11px] text-[#e5b6c9]"><Tags className="h-3.5 w-3.5" /> Tags</button>
-                  <a href={item.url} download={`velvetmotion-${item.id}.${localExtension(item)}`}
+                  <a href={item.url} download={`velvetmotion-${item.id}.${extension}`}
                     className="inline-flex items-center gap-1 text-[11px] text-[#e5b6c9]"><Download className="h-3.5 w-3.5" /> Save file</a>
                   <button type="button" onClick={() => { setSelected([item.id]); setConfirmDelete(true); }}
                     className="ml-auto inline-flex items-center gap-1 text-[11px] text-rose-300"><Trash2 className="h-3.5 w-3.5" /> Delete</button>
