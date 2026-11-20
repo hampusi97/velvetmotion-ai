@@ -29,6 +29,7 @@ STATIC_DIR = Path(os.environ.get("VELVET_STATIC_DIR", "out")).resolve()
 CF_IMAGE_WORKER = os.environ.get(
     "VELVET_CF_IMAGE_WORKER", "https://velvetmotion-image.hampusi97.workers.dev"
 ).rstrip("/")
+ALLOW_CLOUD_FALLBACK = os.environ.get("VELVET_ALLOW_CLOUD_FALLBACK", "0") == "1"
 
 KOBOLD_URL = os.environ.get("KOBOLD_URL", "http://127.0.0.1:5001")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
@@ -170,7 +171,7 @@ def strip_think(text):
 
 class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        directory = str(STATIC_DIR) if STATIC_DIR.exists() else os.getcwd()
+        directory = str(STATIC_DIR)  # Missing static bundle returns 404, never serves cwd files.
         super().__init__(*args, directory=directory, **kwargs)
 
     def request_origin_allowed(self):
@@ -231,6 +232,7 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
                 "engines": {"koboldcpp": kobold, "ollama": ollama, "comfyui": comfy},
                 "publicTunnelUrl": None,
                 "hostingStaticOut": STATIC_DIR.exists(),
+                "cloudFallbackEnabled": ALLOW_CLOUD_FALLBACK,
             })
             return
 
@@ -345,7 +347,14 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json(503, {"error": "No compatible local adult image model is online."})
             return
 
-        # 2. General-purpose cloud image fallback (availability not guaranteed)
+        # Never upload local prompts to the cloud unless explicitly enabled.
+        if not ALLOW_CLOUD_FALLBACK:
+            self.send_json(503, {
+                "error": "No compatible local image model online. Cloud fallback is disabled by default.",
+            })
+            return
+
+        # 2. Optional general-purpose cloud image fallback.
         try:
             qs = urllib.parse.urlencode({"prompt": prompt[:1500], "steps": steps, "seed": seed})
             url = f"{CF_IMAGE_WORKER}/generate?{qs}"
@@ -375,6 +384,7 @@ def main():
     print("=" * 68)
 
     print("• Network:          loopback-only; no public tunnel is started")
+    print(f"• Cloud fallback:   {'enabled' if ALLOW_CLOUD_FALLBACK else 'off (private by default)'}")
 
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", PORT), VelvetEngineHandler) as httpd:
