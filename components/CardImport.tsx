@@ -8,7 +8,7 @@ import {
   saveImportedCharacter,
 } from "@/lib/sillyTavernImport";
 import { parseCharacterCardFile } from "@/lib/pngCardDecode";
-import { compactCardPortrait } from "@/lib/avatarOptimize";
+import { compactCardPortrait, rasterizeStarterIllustration } from "@/lib/avatarOptimize";
 import { loadLorebook, parseCharacterLorebook, saveLorebook } from "@/lib/lorebook";
 import { ORIGINAL_STARTER_COMPANIONS } from "@/lib/originalStarterCompanions";
 
@@ -26,10 +26,17 @@ export function CardImport({
     typeof window !== "undefined" ? loadImportedCharacters() : [],
   );
 
-  const addStarter = (character: Character) => {
+  const addStarter = async (character: Character) => {
     setError(null);
     setOk(null);
-    if (!saveImportedCharacter(character)) {
+    let avatar: string;
+    try {
+      avatar = await rasterizeStarterIllustration(character.avatar);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not prepare the new companion illustration.");
+      return;
+    }
+    if (!saveImportedCharacter({ ...character, avatar })) {
       setError("Could not add the companion. Browser storage is full or disabled.");
       return;
     }
@@ -124,7 +131,7 @@ export function CardImport({
                 <div className="space-y-1.5 p-2.5">
                   <p className="truncate text-xs font-semibold text-white">{character.name} · {character.age}</p>
                   <p className="line-clamp-2 min-h-8 text-[10px] leading-4 text-zinc-300">{character.tagline}</p>
-                  <button type="button" onClick={() => alreadyAdded ? onOpen(character) : addStarter(character)}
+                  <button type="button" onClick={() => alreadyAdded ? onOpen(list.find(item=>item.id===character.id) || character) : void addStarter(character)}
                     className="w-full rounded-lg border border-pink-300/30 bg-pink-500/15 px-2 py-2 text-[11px] font-semibold text-pink-100 hover:bg-pink-500/30">
                     {alreadyAdded ? "Start chatting" : "Add companion"}
                   </button>
