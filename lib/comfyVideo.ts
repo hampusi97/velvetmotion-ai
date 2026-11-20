@@ -29,6 +29,7 @@ export function prepareComfyVideoWorkflow(json: string, imageNodeId: string, ima
   try { raw = JSON.parse(json); } catch { throw new Error("Workflow is not valid JSON."); }
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Expected ComfyUI API-format node map.");
   const nodes = raw as Record<string, unknown>;
+  if (Array.isArray(nodes.nodes)) throw new Error("ComfyUI canvas workflow detected. Export in API format instead.");
   if (Object.keys(nodes).length === 0 || Object.keys(nodes).length > 250) throw new Error("Workflow must contain 1–250 nodes.");
   const graph: Workflow = Object.create(null);
   for (const [id, node] of Object.entries(nodes)) {
