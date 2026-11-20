@@ -12,7 +12,14 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
-import { AFTER_DARK_COMPANIONS } from '@/data/companions';
+import {
+  AFTER_DARK_COMPANIONS,
+  ARCHETYPE_COMPANIONS,
+  COMPANION_ARCHETYPE_FILTERS,
+  FLAGSHIP_COMPANIONS,
+  type CompanionCategory,
+  type CompanionProfile,
+} from '@/data/companions';
 
 export interface ShowcaseCompanion {
   id: string;
@@ -26,25 +33,54 @@ export interface ShowcaseCompanion {
   hasPrivate?: boolean;
   tagline: string;
   role?: string;
+  archetypeCategory?: CompanionCategory;
 }
 
 const FALLBACK_PORTRAIT = '/portraits/nova.jpg';
 
-/** Verified files confirmed inside `public/portraits/` in hampusi97/velvetmotion-ai */
-const AFTER_DARK_CARDS: ShowcaseCompanion[] = AFTER_DARK_COMPANIONS.map((profile) => ({
-  id: profile.id,
-  name: profile.name,
-  age: profile.age,
-  portrait: profile.portraitUrl,
-  category: profile.id === 'imani-reed' ? 'Black' : profile.id === 'renata-costa' ? 'Latina' : undefined,
-  hair: profile.id === 'renata-costa' ? 'Brunette' : 'Black',
-  isNew: true,
-  role: profile.archetype,
-  tagline: profile.tagline,
-}));
+function toShowcaseCard(
+  profile: CompanionProfile,
+  hair: ShowcaseCompanion['hair'],
+  category?: ShowcaseCompanion['category'],
+): ShowcaseCompanion {
+  return {
+    id: profile.id,
+    name: profile.name,
+    age: profile.age,
+    portrait: profile.portraitUrl,
+    category,
+    hair,
+    isNew: profile.isNew,
+    archetypeCategory: profile.category,
+    role: profile.archetype,
+    tagline: profile.tagline,
+  };
+}
+
+const AFTER_DARK_CARDS = AFTER_DARK_COMPANIONS.map((profile) => toShowcaseCard(
+  profile,
+  profile.id === 'renata-costa' ? 'Brunette' : 'Black',
+  profile.id === 'imani-reed' ? 'Black' : profile.id === 'renata-costa' ? 'Latina' : undefined,
+));
+
+const ARCHETYPE_HAIR: Record<string, ShowcaseCompanion['hair']> = {
+  'mara-graves': 'Black',
+  'vesna-nox': 'Red',
+  'blair-hartwell': 'Blonde',
+  'rowan-mercer': 'Black',
+  'jade-aster': 'Black',
+  'morgan-ellis': 'Red',
+};
+const newArchetypeCards = ARCHETYPE_COMPANIONS.map((profile) => toShowcaseCard(profile, ARCHETYPE_HAIR[profile.id]));
+const includedProfileIds = new Set([...AFTER_DARK_CARDS, ...newArchetypeCards].map(({ id }) => id));
+const additionalGothCards = FLAGSHIP_COMPANIONS
+  .filter((profile) => profile.category === 'Goth' && !includedProfileIds.has(profile.id))
+  .map((profile) => toShowcaseCard(profile, 'Black'));
 
 export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
+  ...newArchetypeCards,
   ...AFTER_DARK_CARDS,
+  ...additionalGothCards,
   {
     id: 'chloe',
     name: 'Chloe',
@@ -295,7 +331,7 @@ const SHORTS_EPISODES = [
   },
 ];
 
-const FILTER_PILLS = ['All', 'After Hours', 'New arrivals', 'Private Content', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
+const FILTER_PILLS = ['All', ...COMPANION_ARCHETYPE_FILTERS, 'After Hours', 'New arrivals', 'Private Content', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
 
 function SafePortrait({
   src,
@@ -333,17 +369,17 @@ export default function VelvetExploreShowcase() {
   }, []);
 
   const filtered = useMemo(() => {
+    const search = query.trim().toLowerCase().replace(/\bstep[- ]*daughters?\b/g, 'stepdaughter');
     return SHOWCASE_COMPANIONS.filter((c) => {
-      const matchesQuery =
-        !query.trim() ||
-        [c.name, c.tagline, c.role].some((value) => value?.toLowerCase().includes(query.trim().toLowerCase()));
+      const matchesQuery = !search ||
+        [c.name, c.tagline, c.role, c.archetypeCategory].some((value) => value?.toLowerCase().includes(search));
       if (!matchesQuery) return false;
       if (activeFilter === 'All') return true;
       if (activeFilter === 'New arrivals') return Boolean(c.isNew);
       if (activeFilter === 'After Hours') return AFTER_DARK_CARDS.some(({ id }) => id === c.id);
       if (activeFilter === 'Private Content') return Boolean(c.hasPrivate);
       if (activeFilter === 'Blonde' || activeFilter === 'Brunette') return c.hair === activeFilter;
-      return c.category === activeFilter;
+      return c.category === activeFilter || c.archetypeCategory === activeFilter;
     });
   }, [query, activeFilter]);
 

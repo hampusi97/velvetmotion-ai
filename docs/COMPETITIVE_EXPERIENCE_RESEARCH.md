@@ -88,3 +88,13 @@ Do not assume competitor marketing claims are independently verified. Confirm mo
 The After Hours collection tests three archetypes with original fictional adults. Imani is a jazz lounge host, Renata a surf coach, and Celeste a costume designer. Use opt-in aggregate measures, such as profile-to-chat starts and repeat visits, before promoting an archetype as popular.
 
 Next priorities are a one-tap path from a character's chat to a scene draft, private render history with prompt and first-frame reuse, and a side-by-side model benchmark for facial consistency, flicker, motion, latency, and cost.
+
+## Archetype collection
+
+| Public reference | VelvetMotion interpretation |
+|---|---|
+| [Candy AI's goth profile](https://candy.ai/fr/ai-girlfriend/lila-crazy) and [Joyland's goth-roommate listing](https://www.joyland.ai/chat/5xMY2) | Give goth characters an immediate voice and a specific subculture. Mara is an analog photographer and Vesna is a darkwave DJ. |
+| [Character.AI's sorority-president listing](https://character.ai/character/5g1glGEn/sage-morgan-burke-college-leader) and [Talkie's sorority profile](https://www.talkie-ai.com/chat/chloe-sterling-169111) | Put the social-leader archetype in a scenario with an immediate invitation. Blair hosts a gala and Jade produces the opening of a community art project. Both are adult alumnae. |
+| [CandyShorts' blended-family setup](https://candy.ai/candy-shorts/series/darkangel666) | Adapt the tension around a family gathering into an original storyline. Rowan is the bride’s adult stepdaughter. Morgan is the bookstore owner’s adult stepdaughter. The user meets them as an unrelated wedding guest or local collector. |
+
+The public Character.AI listing displayed about 209,000 interactions. Other sites use different counters and promotion strategies. The references establish that these archetypes are visible, while opt-in VelvetMotion usage can show which new characters people actually return to.

@@ -20,6 +20,12 @@ export const PORTRAIT_BY_ID: Record<string, string> = {
   "imani-reed": "/portraits/imani-reed.webp",
   "renata-costa": "/portraits/renata-costa.webp",
   "celeste-voss": "/portraits/celeste-voss.webp",
+  "mara-graves": "/portraits/mara-graves.webp",
+  "vesna-nox": "/portraits/vesna-nox.webp",
+  "blair-hartwell": "/portraits/blair-hartwell.webp",
+  "rowan-mercer": "/portraits/rowan-mercer.webp",
+  "jade-aster": "/portraits/jade-aster.webp",
+  "morgan-ellis": "/portraits/morgan-ellis.webp",
 
   // 36 Distinct Roster Companions (.jpg)
   "nova-g": "/portraits/nova-g.jpg",

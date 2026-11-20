@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Heart, RotateCcw, Sparkles, Star, Volume2, X } from 'lucide-react';
-import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
+import { CompanionProfile, COMPANION_ARCHETYPE_FILTERS, FLAGSHIP_COMPANIONS } from '@/data/companions';
 import type { Character } from '@/lib/characters';
 import { bumpIntimacy, saveMatch } from '@/lib/storage';
 import { useCoinsStore } from '@/lib/coinsStore';
@@ -80,7 +80,14 @@ export function DiscoverSwipe({
   onHome,
   onMatch,
 }: DiscoverSwipeProps) {
-  const [deck, setDeck] = useState<DiscoverCard[]>(() => profiles ?? buildDefaultDeck());
+  const [fullDeck, setFullDeck] = useState<DiscoverCard[]>(() => profiles ?? buildDefaultDeck());
+  const [deckFilter, setDeckFilter] = useState('All');
+  const deck = React.useMemo(() => deckFilter === 'All'
+    ? fullDeck
+    : fullDeck.filter((card) => card.category === deckFilter && !card.isSecretAdmirer), [deckFilter, fullDeck]);
+  const availableFilters = COMPANION_ARCHETYPE_FILTERS.filter((category) =>
+    fullDeck.some((card) => card.category === category),
+  );
   const [index, setIndex] = useState(0);
   const [lastPass, setLastPass] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
@@ -105,7 +112,7 @@ export function DiscoverSwipe({
   const current = deck[index];
   const knownMatches = useRef(new Set<string>());
   const matchedProfiles = matchIds.flatMap((id) => {
-    const profile = deck.find((card) => card.id === id) ?? FLAGSHIP_COMPANIONS.find((card) => card.id === id);
+    const profile = fullDeck.find((card) => card.id === id) ?? FLAGSHIP_COMPANIONS.find((card) => card.id === id);
     return profile ? [profile] : [];
   });
 
@@ -316,6 +323,24 @@ export function DiscoverSwipe({
               </button>
             )}
           </div>
+          {availableFilters.length > 0 && (
+            <label className="mt-4 flex max-w-xs items-center gap-3 text-sm text-rose-100">
+              Companion type
+              <select value={deckFilter} onChange={(event) => {
+                stopVoicePreview();
+                isTransitioning.current = false;
+                setDeckFilter(event.target.value);
+                setIndex(0);
+                setLastPass(null);
+                setDragX(0);
+                setIsDragging(false);
+                setAdmirerRevealed(false);
+              }} className="min-w-0 flex-1 rounded-lg border border-rose-200/25 bg-[#211626] p-2 text-rose-50">
+                <option value="All">All companions</option>
+                {availableFilters.map((category) => <option key={category}>{category}</option>)}
+              </select>
+            </label>
+          )}
           {showMatches && (
             <div className="mt-4 max-h-72 max-w-md space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/30 p-3">
               {!matchedProfiles.length && <p className="p-2 text-sm text-zinc-300">Your matches will appear here.</p>}
@@ -340,12 +365,12 @@ export function DiscoverSwipe({
               type="button"
               onClick={() => {
                 isTransitioning.current = false;
-                const shuffled = [...deck];
+                const shuffled = [...fullDeck];
                 for (let at = shuffled.length - 1; at > 0; at--) {
                   const swap = Math.floor(Math.random() * (at + 1));
                   [shuffled[at], shuffled[swap]] = [shuffled[swap], shuffled[at]];
                 }
-                setDeck(shuffled);
+                setFullDeck(shuffled);
                 setLastPass(null);
                 setIndex(0);
               }}
