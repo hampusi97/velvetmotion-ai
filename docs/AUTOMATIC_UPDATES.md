@@ -1,6 +1,6 @@
 # VelvetMotion automatic updates — website and desktop
 
-This implementation is included in GitHub PR #6. Updates are triggered by **commits merged or pushed to `main`**, not by unmerged feature branches. In-app signed updates require one-time GitHub Actions key configuration.
+This implementation is on GitHub `main` (initial rollout) with an additional follow-up for desktop connectivity. Changes to **commits merged or pushed to `main`** trigger GitHub release builds; unmerged feature branches are not executable update sources. In-app signed updates require one-time GitHub Actions key configuration.
 
 ## Website: every main commit
 
@@ -43,11 +43,11 @@ The app's Tauri code has a separate `signed-updater` feature. It is enabled **on
 2. Store the private key in GitHub repository **Actions secret** `TAURI_SIGNING_PRIVATE_KEY`. If the key is passphrase-protected, store the passphrase in Actions secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Never put the private key into Git.
 3. Store the matching **public key content**, not a filesystem path, as GitHub repository **Actions variable** `TAURI_UPDATER_PUBKEY`.
 4. Merge a vetted commit to `main` or trigger the workflow with a fresh release version. GitHub now produces signed update artifacts and `latest.json` at `https://github.com/hampusi97/velvetmotion-ai/releases/latest/download/latest.json`.
-5. Download **that newly signed** release once. Earlier unsigned releases cannot retrospectively trust newly created signing keys. The signed build checks at startup and installs newer verified releases automatically by default; users can turn this off in the desktop Download page.
+5. Download **that newly signed** release once. Earlier unsigned releases cannot retrospectively trust newly created signing keys. The signed build checks at startup and can automatically install verified updates by default; users can turn that off in the desktop Download page. On new releases during an active session, it prompts instead of interrupting.
 
 When either public or private key is missing, the workflow publishes **manual-download installers only**. A partially configured pair causes a hard error. This prevents silently creating an allegedly signed updater with incomplete credentials.
 
-**Update behavior:** The desktop checks for signed updates when starting. Installing on Windows can close the app, so startup—not mid-conversation—is the update window. macOS/Linux may require reopening the app after installation. Updates are not installed without signature verification and users can disable auto-install on startup.
+**Online update behavior:** The desktop checks at startup, when the network comes back online, on window focus (throttled), and every 30 minutes. Signed updates can install automatically on startup if enabled. When a newer release is found mid-session, the app offers an **Install verified update** button; it never restarts over an ongoing conversation. After installation, the user may restart to run the new version. Older unsigned builds are directed to the official installer, not a simulated self-update. Updates are *published releases*, not arbitrary source-file commits. Tauri requires a valid signature before installation.
 
 ### Signing and code signing are different
 Tauri's update signature authenticates an update payload; it does *not* automatically provide Windows Authenticode signing, Apple Developer ID signing or notarization. Those are separate distribution requirements for a polished professional installer.
@@ -56,7 +56,7 @@ Tauri's update signature authenticates an update payload; it does *not* automati
 
 - Merge a minor content/UI edit into `main` and confirm the **CI & Deploy Web** run includes the Cloudflare production step. If credentials are absent, it must fail with an explicit error.
 - Confirm the deployed site's `build-meta.json` commit matches that deployment. Test a fresh browser and an already-open tab.
-- Confirm **Automatic VelvetMotion Desktop Release** created a new release with all four platforms; if not, investigate failing native-build jobs.
+- Confirm **Automatic VelvetMotion Desktop Release** created a new release with all four platforms; it now checks Windows x64, macOS Intel, macOS Apple Silicon and Linux x64 installers before publishing. For signed releases it also checks the Tauri manifest contains verified platform entries. If validation fails, it remains a draft.
 - After configuring signing, verify that the release contains `latest.json` and signed payloads, then test upgrade from a signed older version on real Windows, macOS (both architectures) and Linux devices. Refuse corrupted signatures and untrusted URLs.
 - GitHub workflows can run successfully without proving that Chat, TTS, image or video models are installed. Test those separately with real compatible backends.
 
@@ -64,4 +64,4 @@ Tauri's update signature authenticates an update payload; it does *not* automati
 
 This GitHub connection can commit workflows but cannot write GitHub Actions secrets/variables. Without the account owner's one-time Cloudflare deployment token and Tauri signing setup, automated web deployment and signed in-app updates cannot be claimed as active. The CI workflows reveal missing credentials rather than pretending success.
 
-Web frontend changes can deploy on every `main` commit. Native installers and true local AI model dependencies require separate platform build processes; the source repo does not contain pretrained GPU model weights.
+Web frontend changes can deploy on every `main` commit when the configured host is available. The desktop keeps its bundled UI locally but connects to GitHub Releases for update checks and to explicitly selected internet/cloud services. The Download page links to the live web version, which updates on its own hosting schedule. Native installers and true local AI model dependencies require separate platform builds; source code does not contain pretrained GPU weights.
