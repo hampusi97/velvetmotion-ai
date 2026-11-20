@@ -14,7 +14,7 @@ type UpdateNotice =
   | { kind: "ready"; version?: string }
   | { kind: "signed"; version?: string }
   | { kind: "manual"; version?: string }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; version?: string };
 
 /**
  * The bundled native UI remains local. The desktop connects over HTTPS to
