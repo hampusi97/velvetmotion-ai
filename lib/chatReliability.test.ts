@@ -9,7 +9,7 @@ import {
   type RouterMessage,
 } from "./chatRouter";
 import { detectExplicitMediaIntent, splitIntoNaturalBubbles } from "./dynamicChatEngine";
-import { createChatTurnGuard, shouldCommitTurnToActiveView } from "./chatTurn";
+import { createChatTurnGuard, createTranscriptRevision, shouldCommitTurnToActiveView } from "./chatTurn";
 
 const persona: CompanionPersona = {
   id: "aria-vale",
@@ -165,20 +165,28 @@ describe("companion chat reliability", () => {
 
   it("uses a secondary provider when the primary endpoint fails", async () => {
     const seen: string[] = [];
+    const hostOf = (url: string) => {
+      try {
+        return new URL(url).hostname;
+      } catch {
+        return "";
+      }
+    };
     const fetchImpl = (async (url: string) => {
       const target = String(url);
       seen.push(target);
-      if (target.includes("primary.example.test")) return jsonResponse({ error: "down" }, 503);
-      if (target.includes("openrouter.ai")) {
+      const host = hostOf(target);
+      if (host === "primary.example.test") return jsonResponse({ error: "down" }, 503);
+      if (host === "openrouter.ai") {
         return jsonResponse({ choices: [{ message: { content: "I kept the lights low and waited for you." } }] });
       }
       return jsonResponse({ error: "horde should not run" }, 500);
     }) as typeof fetch;
 
     const result = await replyWith(fetchImpl, customSettings("auto"));
-    assert.equal(seen.filter((url) => url.includes("primary.example.test")).length, 2);
-    assert.ok(seen.some((url) => url.includes("openrouter.ai")));
-    assert.equal(seen.some((url) => url.includes("aihorde.net")), false);
+    assert.equal(seen.filter((url) => hostOf(url) === "primary.example.test").length, 2);
+    assert.ok(seen.some((url) => hostOf(url) === "openrouter.ai"));
+    assert.equal(seen.some((url) => hostOf(url) === "aihorde.net"), false);
     assert.equal(result.providerUsed, "openrouter-byok");
     assert.match(result.text, /lights low/);
   });
@@ -211,6 +219,8 @@ describe("companion chat reliability", () => {
     assert.equal(detectExplicitMediaIntent("Send me a cozy couch selfie first")?.kind, "image");
     assert.equal(detectExplicitMediaIntent("show me a photo of you")?.kind, "image");
     assert.equal(detectExplicitMediaIntent("make a short video")?.kind, "video");
+    assert.equal(detectExplicitMediaIntent("Do not send me a photo"), null);
+    assert.equal(detectExplicitMediaIntent("Please do not make a video"), null);
     assert.deepEqual(splitIntoNaturalBubbles("   "), []);
   });
 
@@ -315,6 +325,12 @@ describe("companion chat reliability", () => {
     assert.equal(guard.snapshot().thinking, true);
     assert.equal(guard.snapshot().locked, true);
     assert.equal(guard.settle(second || 0, "abort"), true);
+    const revisions = createTranscriptRevision();
+    const firstWrite = revisions.start("aria-vale");
+    const newerWrite = revisions.start("aria-vale");
+    assert.equal(revisions.owns("aria-vale", firstWrite), false);
+    assert.equal(revisions.owns("aria-vale", newerWrite), true);
+    assert.equal(revisions.owns("blair-cole", firstWrite), false);
     assert.equal(guard.snapshot().thinking, false);
     assert.equal(guard.snapshot().locked, false);
   });

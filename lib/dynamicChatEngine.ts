@@ -146,9 +146,12 @@ export type ExplicitMediaIntent = {
  * "make a clip"). Ordinary words that merely contain "pic" ("Pick", "epic", "spicy")
  * are not requests.
  */
+const NEGATED_MEDIA_REQUEST =
+  /\b(?:do not|don't|dont|never|stop)\b(?:\s+\w+){0,4}\s+\b(?:send|show|generate|make|take|snap|give|share)\b/i;
+
 export function detectExplicitMediaIntent(text: string): ExplicitMediaIntent | null {
   const raw = (text || "").trim();
-  if (!raw) return null;
+  if (!raw || NEGATED_MEDIA_REQUEST.test(raw)) return null;
   const videoAt = raw.search(EXPLICIT_VIDEO_REQUEST);
   const imageAt = raw.search(EXPLICIT_IMAGE_REQUEST);
   if (videoAt >= 0 && (imageAt < 0 || videoAt <= imageAt)) {

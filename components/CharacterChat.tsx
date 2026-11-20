@@ -31,7 +31,7 @@ import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } from "@/lib/audioEngine";
 import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
 import { chatDebugBadgeEnabled, continueCompanionScene, ensureVisibleReply, generateCompanionReply, sanitizeCompanionReply, type RouterMessage } from "@/lib/chatRouter";
-import { createChatTurnGuard, shouldCommitTurnToActiveView, type ChatTurnOutcome } from "@/lib/chatTurn";
+import { createChatTurnGuard, createTranscriptRevision, shouldCommitTurnToActiveView, type ChatTurnOutcome } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
 import {
   listChatBranchesDB,
@@ -178,6 +178,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
   const [activeCharacterId, setActiveCharacterId] = useState(character.id);
   const guardRef = useRef(createChatTurnGuard(character.id));
+  const transcriptRevisions = useRef(createTranscriptRevision());
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
   const [intimacy, setIntimacy] = useState(character.intimacy);
@@ -283,10 +284,25 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       if (!cancelled && guardRef.current.snapshot().conversationId === requestedId) setBranches(rows);
     });
     void (async () => {
-      const dbLoaded = await loadChatDB(requestedId);
+      let fromDb: ChatMessage[] | null = null;
+      try {
+        const dbLoaded = await loadChatDB(requestedId);
+        if (Array.isArray(dbLoaded)) fromDb = dbLoaded as ChatMessage[];
+      } catch {
+        fromDb = null;
+      }
       if (cancelled || guardRef.current.snapshot().conversationId !== requestedId) return;
-      if (guardRef.current.snapshot().locked) return;
-      const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(requestedId);
+      if (guardRef.current.snapshot().locked) {
+        setTranscriptReady(true);
+        return;
+      }
+      let stored: ChatMessage[] = [];
+      try {
+        stored = loadChat(requestedId);
+      } catch {
+        stored = [];
+      }
+      const loaded = fromDb && fromDb.length > 0 ? fromDb : stored;
       const next =
         loaded.length > 0
           ? loaded
@@ -346,6 +362,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     if (generation === null) return null;
     const originId = character.id;
     const originBranch = activeBranchId;
+    const revision = transcriptRevisions.current.start(originId);
     setBusy(true);
     if (opts?.thinking !== false) setAwaitingReply(true);
     let finished = false;
@@ -364,6 +381,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     return {
       isCurrent,
       commit: (next: ChatMessage[]) => {
+        if (!transcriptRevisions.current.owns(originId, revision)) return;
         writeTranscript(originId, originBranch, next);
         if (!isCurrent()) return;
         messagesRef.current = next;
@@ -737,6 +755,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     const turn = beginTurn();
     if (!turn) return;
     const prior = messagesRef.current.slice(0, assistantIndex);
+    const suffix = messagesRef.current.slice(assistantIndex + 1);
     const lastUser = [...prior].reverse().find((m) => m.role === "user")?.content || "Continue right where we left off";
     const mediaIntent = detectExplicitMediaIntent(lastUser);
     try {
@@ -750,7 +769,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const updated = [
         ...prior,
         { role: "assistant" as const, content: nextReply },
-        ...messagesRef.current.slice(assistantIndex + 1),
+        ...suffix,
       ];
       turn.commit(updated);
       turn.clearThinking();
@@ -768,7 +787,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       turn.commit([
         ...prior,
         { role: "assistant", content: fallbackReply(character, lastUser, romanceMode) },
-        ...messagesRef.current.slice(assistantIndex + 1),
+        ...suffix,
       ]);
       turn.finish("error");
     }

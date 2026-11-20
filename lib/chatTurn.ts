@@ -68,6 +68,21 @@ export function createChatTurnGuard(conversationId: string) {
 export type ChatTurnGuard = ReturnType<typeof createChatTurnGuard>;
 
 /** View updates apply only to the conversation that started the turn. */
+/** Monotonic per-conversation write token. A late turn must not replace a newer transcript. */
+export function createTranscriptRevision() {
+  const latest = new Map<string, number>();
+  return {
+    start(conversationId: string): number {
+      const next = (latest.get(conversationId) || 0) + 1;
+      latest.set(conversationId, next);
+      return next;
+    },
+    owns(conversationId: string, revision: number): boolean {
+      return latest.get(conversationId) === revision;
+    },
+  };
+}
+
 export function shouldCommitTurnToActiveView(args: {
   activeConversationId: string;
   originConversationId: string;
