@@ -29,7 +29,7 @@ Run a real chat test. The `/api/tags` check only confirms model availability, no
 - [InternLM2.5 7B Chat](https://huggingface.co/internlm/internlm2_5-7b-chat): separate model-weight licensing, review the terms for commercial use. Its model card describes an OpenAI-compatible vLLM route; no official Ollama tag is assumed here.
 - [Humanish Roleplay Llama 3.1 8B](https://huggingface.co/vicgalle/Humanish-Roleplay-Llama-3.1-8B): model card lists Apache 2.0; review upstream Llama-family terms too. No official Ollama tag is assumed.
 
-For either, independently install a licensed, supported model server and configure VelvetMotion's **custom OpenAI-compatible endpoint** and exact model ID. Do not paste an API key into a public model link. Custom server compatibility, tokenizer/chat templates and hardware requirements need local verification.
+For either, independently install a licensed, supported model server and configure VelvetMotion's **custom OpenAI-compatible endpoint** and exact model ID. In Settings, enter a working model server URL such as `http://127.0.0.1:8000/v1` and choose **Use custom server** on the model card. This only selects the model and route; it does not launch a server or download any weights. Do not paste an API key into a public model link. Custom server compatibility, tokenizer/chat templates and hardware requirements need local verification.
 
 ## Privacy and licenses
 
