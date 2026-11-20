@@ -103,17 +103,20 @@ fn main() {
             toggle_boss_key
         ])
         .setup(|app| {
-            let show_item = MenuItem::with_id(app, "toggle", "Show / Stealth Hide", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "Quit VelvetMotion", true, None::<&str>)?;
+            let show_item =
+                MenuItem::with_id(app, "toggle", "Show / Stealth Hide", true, None::<&str>)?;
+            let quit_item =
+                MenuItem::with_id(app, "quit", "Quit VelvetMotion", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
 
-            let mut tray = TrayIconBuilder::new()
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "toggle" => toggle_boss_key(app.clone()),
-                    "quit" => app.exit(0),
-                    _ => {}
-                });
+            let mut tray =
+                TrayIconBuilder::new()
+                    .menu(&menu)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "toggle" => toggle_boss_key(app.clone()),
+                        "quit" => app.exit(0),
+                        _ => {}
+                    });
             if let Some(icon) = app.default_window_icon().cloned() {
                 tray = tray.icon(icon);
             }
