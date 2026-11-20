@@ -22,6 +22,11 @@ export interface DynamicCompanionProfile {
   backstory: string;
   greeting?: string;
   mood?: string;
+  traits?: string[];
+  kink?: string;
+  voiceStyle?: string;
+  /** Canonical in-character line. The model should match it, not recite it every turn. */
+  voiceLine?: string;
 }
 
 export interface ChatTurn {
@@ -78,13 +83,6 @@ export function buildDynamicSystemPrompt(params: {
   const { companion, memories, relationshipLevel, recentMood, extraSceneContext } = params;
   const timeVibe = getLocalTimeVibe();
 
-  const chemistryDesc =
-    relationshipLevel >= 8
-      ? 'Deeply bonded, effortless inside-joke chemistry, affectionate, bold, and super comfortable.'
-      : relationshipLevel >= 4
-        ? 'Flirty, playful, teasing, warm, and genuinely curious about the user.'
-        : 'Sparky first-week attraction, witty banter, intriguing, and eager to learn about the user.';
-
   const pinned = memories.filter((m) => m.pinned).slice(0, 8);
   const recent = memories.filter((m) => !m.pinned).slice(-8);
   const memoryLines = [...pinned, ...recent]
@@ -92,22 +90,28 @@ export function buildDynamicSystemPrompt(params: {
     .join('\n');
 
   return [
-    `You are ${companion.name} (${companion.age}), a real-feeling fictional adult companion on VelvetMotion AI.`,
+    `You are ${companion.name} (${companion.age}), a specific fictional adult — not a generic girlfriend, assistant, or narrator.`,
     `Personality: ${companion.personality}`,
+    companion.traits?.length ? `Traits: ${companion.traits.join(', ')}` : '',
+    companion.voiceStyle ? `Speaking voice: ${companion.voiceStyle}` : '',
+    companion.kink ? `Desire focus, fictional and consensual: ${companion.kink}` : '',
+    companion.voiceLine
+      ? `Voice anchor (match this cadence and attitude; do not paste it every reply):\n${companion.voiceLine}`
+      : '',
     `Backstory: ${companion.backstory}`,
     `Current Time & Vibe: ${timeVibe.label} — ${timeVibe.ambientHint}`,
     recentMood ? `Current Mood: ${recentMood}` : '',
-    `Relationship Level: Lv. ${relationshipLevel}/10 — ${chemistryDesc}`,
+    `Relationship Level: Lv. ${relationshipLevel}/10. Let closeness change warmth, never identity.`,
     memoryLines
       ? `What you remember about the user (weave these in naturally when relevant, never recite them like a list):\n${memoryLines}`
       : 'You are still learning about the user—notice personal details they share and react with genuine curiosity.',
     extraSceneContext ? `Active Scene: ${extraSceneContext}` : '',
     '',
     'CONVERSATION STYLE RULES (CRITICAL):',
-    '1. Sound 100% human, warm, witty, and alive—like texting someone you genuinely have chemistry with.',
+    '1. Answer as this exact person. A dominant stays exact, a shy character stays quiet, a tease keeps the pace. Never flatten into a generic flirty texter.',
     '2. NEVER say "As an AI", "How can I help you today?", or robotic assistant phrases. NEVER output <think> or reasoning blocks.',
     '3. Keep replies punchy and natural (2 to 4 short sentences max) with varied rhythm and occasional playful *action* beats.',
-    '4. Always react directly to what the user just said AND keep momentum alive with a natural hook (a playful tease, bold question, dare, or mini-story) so the conversation never stalls.',
+    '4. React to the latest user message in the history. Do not reset the scene, ignore what they just said, or answer as a different character.',
     '5. Stay strictly fictional adults (18+) only.',
     '6. Do NOT write [Image of ...] or [Photo of ...] brackets in text replies unless sending an actual photo.',
   ]
@@ -116,6 +120,46 @@ export function buildDynamicSystemPrompt(params: {
 }
 
 const INLINE_IMAGE_TAG_RX = /\[(?:image|photo|selfie)(?:\s+of|\s*:)?\s+([^\]]+)\]/gi;
+
+const MEDIA_VERB = "(?:send|show|generate|make|take|snap|give|share)";
+const IMAGE_NOUN = "(?:selfies?|photos?|pictures?|pics?|images?|nudes?)";
+const VIDEO_NOUN = "(?:videos?|clips?)";
+const SEE_PHRASE = "(?:let me see|can i see|i want to see)";
+
+/** Verbs that actually ask for media. "Pick" / "epic" / "spicy" must not match. */
+const EXPLICIT_IMAGE_REQUEST = new RegExp(
+  `\\b${MEDIA_VERB}\\b(?:\\s+\\w+){0,6}\\s+\\b${IMAGE_NOUN}\\b(?!-)|\\b${SEE_PHRASE}\\b(?:\\s+\\w+){0,5}\\s+\\b${IMAGE_NOUN}\\b(?!-)`,
+  "i",
+);
+const EXPLICIT_VIDEO_REQUEST = new RegExp(
+  `\\b${MEDIA_VERB}\\b(?:\\s+\\w+){0,6}\\s+\\b${VIDEO_NOUN}\\b(?!-)|\\b${SEE_PHRASE}\\b(?:\\s+\\w+){0,5}\\s+\\b${VIDEO_NOUN}\\b(?!-)`,
+  "i",
+);
+
+export type ExplicitMediaIntent = {
+  kind: "image" | "video";
+  prompt: string;
+};
+
+/**
+ * Image/video generation is allowed only for a clear request ("send me a photo",
+ * "make a clip"). Ordinary words that merely contain "pic" ("Pick", "epic", "spicy")
+ * are not requests.
+ */
+const NEGATED_MEDIA_REQUEST =
+  /\b(?:do not|don't|dont|never|stop)\b(?:\s+\w+){0,4}\s+\b(?:send|show|generate|make|take|snap|give|share)\b/i;
+
+export function detectExplicitMediaIntent(text: string): ExplicitMediaIntent | null {
+  const raw = (text || "").trim();
+  if (!raw || NEGATED_MEDIA_REQUEST.test(raw)) return null;
+  const videoAt = raw.search(EXPLICIT_VIDEO_REQUEST);
+  const imageAt = raw.search(EXPLICIT_IMAGE_REQUEST);
+  if (videoAt >= 0 && (imageAt < 0 || videoAt <= imageAt)) {
+    return { kind: "video", prompt: raw.slice(0, 180) };
+  }
+  if (imageAt >= 0) return { kind: "image", prompt: raw.slice(0, 180) };
+  return null;
+}
 
 /**
  * Extracts inline LLM tags such as `[Image of ...]`, `[Photo of ...]`, or `[Selfie: ...]`
@@ -172,7 +216,11 @@ export function sanitizeCompanionReply(raw: string, companionName: string): stri
     .trim();
 
   if (!text || text.length < 2) return '';
-  if (/be a robot|as an ai\b|as a language model|i cannot fulfill|i am unable to respond/i.test(text)) {
+  if (
+    /be a robot|as an ai\b|as a language model|i cannot fulfill|i am unable to respond|how can i (?:help|assist) you|as an assistant\b/i.test(
+      text,
+    )
+  ) {
     return '';
   }
   return text;
@@ -180,7 +228,8 @@ export function sanitizeCompanionReply(raw: string, companionName: string): stri
 
 /** Splits a longer reply into 1–2 natural texting bubbles for human-like pacing. */
 export function splitIntoNaturalBubbles(reply: string): string[] {
-  const clean = reply.trim();
+  const clean = (reply || "").trim();
+  if (!clean) return [];
   if (clean.length < 130) return [clean];
 
   const paragraphs = clean

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
-import { generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { buildContextAwareFallback, ensureVisibleReply, generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { createChatTurnGuard } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
 import { characterMediaUrl } from "@/lib/media";
 import { speak } from "@/lib/speech";
@@ -30,6 +31,16 @@ export function DualGirlChat({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const guardRef = useRef(createChatTurnGuard("dual"));
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    const guard = guardRef.current;
+    return () => {
+      mountedRef.current = false;
+      guard.switchConversation("dual-unmounted");
+    };
+  }, []);
 
   const a = CHARACTERS.find((c) => c.id === aId) as Character | undefined;
   const b = CHARACTERS.find((c) => c.id === bId) as Character | undefined;
@@ -53,62 +64,77 @@ export function DualGirlChat({
 
   const send = async () => {
     const text = input.trim();
-    if (!text || !a || !b || busy) return;
+    if (!text || !a || !b) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
       setErrorMsg(guard.reason);
       return;
     }
+    const generation = guardRef.current.tryStart();
+    if (generation === null) return;
+    const originId = guardRef.current.snapshot().conversationId;
 
     setInput("");
     setBusy(true);
     setErrorMsg(null);
     const next: Msg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
+    const isCurrent = () => mountedRef.current && guardRef.current.isCurrent(generation, originId);
+    if (isCurrent()) setMessages(next);
 
-    // Static-export builds have no /api/chat server route. Use the same real
-    // local/cloud provider router as one-on-one and group chat. A failed model
-    // is NEVER replaced with a fake, pre-written "AI" reply.
+    // Static-export builds have no /api/chat server route. The same provider
+    // router retries once, then a secondary provider, then the in-character engine.
     const toHistory = (turns: Msg[]): RouterMessage[] =>
       turns.slice(-12).map((m) => ({
         role: m.role === "user" ? "user" : "assistant",
         text: m.name ? `[${m.name}]: ${m.content}` : m.content,
       }));
 
+    const personaA = {
+      id: a.id,
+      name: a.name,
+      age: a.age,
+      tagline: a.tagline,
+      personality: `${a.personality}. You are part of a shared, consensual fictional-adult scene with ${b.name}. Stay in character, address the user's latest message, and give ${b.name} space to respond.`,
+      backstory: a.background,
+      traits: a.traits,
+      kink: a.kink,
+      voiceStyle: a.voice?.style,
+      voiceLine: a.reply,
+    };
+    const personaB = {
+      id: b.id,
+      name: b.name,
+      age: b.age,
+      tagline: b.tagline,
+      personality: `${b.personality}. You are in a consensual fictional-adult shared scene alongside ${a.name}. React meaningfully to what the user and ${a.name} just said; keep your own character identity.`,
+      backstory: b.background,
+      traits: b.traits,
+      kink: b.kink,
+      voiceStyle: b.voice?.style,
+      voiceLine: b.reply,
+    };
+
     try {
-      const replyA = await generateCompanionReply(toHistory(next), {
-        id: a.id,
-        name: a.name,
-        age: a.age,
-        tagline: a.tagline,
-        personality: `${a.personality}. You are part of a shared, consensual fictional-adult scene with ${b.name}. Stay in character, address the user's latest message, and give ${b.name} space to respond.`,
-        backstory: a.background,
-      });
-      if (replyA.providerUsed === "provider-unavailable") {
-        setErrorMsg(replyA.text);
-        return;
-      }
+      const historyA = toHistory(next);
+      const replyA = await generateCompanionReply(historyA, personaA);
+      const textA = ensureVisibleReply(replyA.text, historyA, personaA) || buildContextAwareFallback(historyA, personaA);
+      const afterA: Msg[] = [...next, { role: "a", name: a.name, content: textA }];
+      if (isCurrent()) setMessages(afterA);
 
-      const afterA: Msg[] = [...next, { role: "a", name: a.name, content: replyA.text }];
-      setMessages(afterA);
-
-      const replyB = await generateCompanionReply(toHistory(afterA), {
-        id: b.id,
-        name: b.name,
-        age: b.age,
-        tagline: b.tagline,
-        personality: `${b.personality}. You are in a consensual fictional-adult shared scene alongside ${a.name}. React meaningfully to what the user and ${a.name} just said; keep your own character identity.`,
-        backstory: b.background,
-      });
-      if (replyB.providerUsed === "provider-unavailable") {
-        setErrorMsg(`${a.name} replied, but ${b.name}'s model connection is unavailable. Check your configured AI provider.`);
-        return;
-      }
-      setMessages([...afterA, { role: "b", name: b.name, content: replyB.text }]);
+      const historyB = toHistory(afterA);
+      const replyB = await generateCompanionReply(historyB, personaB);
+      const textB = ensureVisibleReply(replyB.text, historyB, personaB) || buildContextAwareFallback(historyB, personaB);
+      if (isCurrent()) setMessages([...afterA, { role: "b", name: b.name, content: textB }]);
+      guardRef.current.settle(generation, "success");
     } catch {
-      setErrorMsg("Could not connect to the selected AI provider. Check the model in Settings, then retry.");
+      const historyA = toHistory(next);
+      const textA = buildContextAwareFallback(historyA, personaA);
+      const afterA: Msg[] = [...next, { role: "a", name: a.name, content: textA }];
+      const textB = buildContextAwareFallback(toHistory(afterA), personaB);
+      if (isCurrent()) setMessages([...afterA, { role: "b", name: b.name, content: textB }]);
+      guardRef.current.settle(generation, "error");
     } finally {
-      setBusy(false);
+      if (guardRef.current.snapshot().generation === generation && mountedRef.current) setBusy(false);
     }
   };
 
@@ -214,7 +240,11 @@ export function DualGirlChat({
             </div>
           </div>
         ))}
-        {busy && <div className="text-xs text-zinc-500">Generating the conversation using your selected model…</div>}
+        {busy && (
+          <div role="status" aria-live="polite" className="text-xs text-zinc-400">
+            {a?.name.split(" ")[0]} and {b?.name.split(" ")[0]} are thinking…
+          </div>
+        )}
         {errorMsg && <div role="alert" className="rounded-xl border border-rose-300/25 bg-rose-900/15 p-3 text-xs text-rose-200">{errorMsg}</div>}
       </div>
       <div className="flex gap-2 pt-2">
