@@ -278,6 +278,19 @@ export async function speakWithNeuralVoice(
       if (selected === "kitten-tts-2-pico") return { engine: "kitten-pico", label: "Kitten-TTS-2 Pico" };
       return { engine: "kokoro", label: "Kokoro-82M Neural" };
     }
+    // Many Kokoro servers do not provide the optional Reverb/Kitten model IDs.
+    // Prefer an actual Kokoro neural response over an immediate robotic browser fallback.
+    if (selected === "reverb-tts-webgpu" || selected === "kitten-tts-2-pico") {
+      if (speechGeneration !== generation) return { engine: "none", label: "Stopped" };
+      const kokoroFallback = await tryLocalTtsEndpoint(
+        "http://127.0.0.1:8880/v1/audio/speech",
+        "kokoro",
+        clean,
+        femaleKokoroVoice,
+        generation,
+      );
+      if (kokoroFallback) return { engine: "kokoro", label: "Kokoro-82M (neural fallback)" };
+    }
   }
 
   // 3. Guaranteed Web Speech API fallback (strictly female voice, awaits onvoiceschanged)
