@@ -237,3 +237,12 @@ html, body {
   }
   .vm-portrait-light { display: none; }
 }
+
+/* Premium editorial hover motion for the desktop companion collage. */
+.vm-download-motion {
+  animation: vm-atelier-kenburns 21s ease-in-out infinite alternate;
+  transform-origin: center center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vm-download-motion { animation: none !important; transform: none !important; }
+}
