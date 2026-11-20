@@ -24,6 +24,7 @@ jobs:
       - run: npx tsx --test lib/pngCardDecode.test.ts
       - run: npx tsx --test lib/sillyTavernImport.test.ts
       - run: npx tsx --test lib/memoryTiers.test.ts
+      - run: npx tsx --test lib/lorebook.test.ts
       - run: node --check scripts/setup-signing.mjs
       - run: npm run build
         env:
