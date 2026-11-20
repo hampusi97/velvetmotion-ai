@@ -7,6 +7,7 @@ import { characterMediaUrl, joiSequenceFrames } from "@/lib/media";
 import { generateCompanionReply } from "@/lib/chatRouter";
 import { pushShort, memoryPromptBlock } from "@/lib/memoryTiers";
 import { detectVoiceAction } from "@/lib/voiceCommands";
+import { buildLorebookContext, loadLorebook } from "@/lib/lorebook";
 import { bumpIntimacy, getIntimacy } from "@/lib/storage";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
@@ -115,7 +116,8 @@ export function VoiceCallUI({ character, onClose }: Props) {
           tagline: character.tagline,
           personality: character.personality,
           backstory: character.background,
-          memoryBlock: memoryPromptBlock(character.id),
+          memoryBlock: [memoryPromptBlock(character.id), buildLorebookContext(loadLorebook(character.id), userText)]
+            .filter(Boolean).join("\n"),
           relationshipLevel: getIntimacy(character.id, character.intimacy),
         },
       );
