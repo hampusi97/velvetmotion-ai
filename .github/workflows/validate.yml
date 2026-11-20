@@ -28,6 +28,8 @@ jobs:
       - run: npx tsx --test lib/comfyClient.test.ts
       - run: npx tsx --test lib/voiceCommands.test.ts
       - run: npx tsx --test data/companionTextModels.test.ts
+      - run: npx tsx --test lib/a1111Client.test.ts
+      - run: npx tsx --test lib/originalStarterCompanions.test.ts
       - run: node --check scripts/setup-signing.mjs
       - run: npm run build
         env:
