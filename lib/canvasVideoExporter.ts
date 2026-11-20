@@ -7,7 +7,7 @@
  */
 import { assertCompliance } from "./complianceFilter";
 import { getMediaSettings } from "./mediaSettings";
-import { generateComfyVideo } from "./comfyVideo";
+import { generateComfyVideo, videoCanceledError } from "./comfyVideo";
 
 export interface VideoMotionPreset {
   id: "slow-zoom-blink" | "neon-hair-sway" | "balcony-breeze" | "club-light-pulse";
@@ -73,6 +73,8 @@ export interface StudioVideoRequest {
   comfyOnline?: boolean;
   videoBackendUrl?: string;
   onProgress?: (message: string) => void;
+  /** Cancel the browser-side render / model request, without interrupting unrelated server jobs. */
+  signal?: AbortSignal;
 }
 
 export interface StudioVideoResult {
@@ -89,7 +91,9 @@ export async function renderCanvasMotionWebm(
   motion: VideoMotionPreset,
   durationSec: 3 | 5 | 8 = 5,
   speed: 0.75 | 1 | 1.25 = 1,
+  signal?: AbortSignal,
 ): Promise<string> {
+  if (signal?.aborted) throw videoCanceledError();
   if (typeof document === "undefined" || typeof MediaRecorder === "undefined") {
     throw new Error("In-browser video encoding is unavailable on this browser.");
   }
@@ -97,10 +101,19 @@ export async function renderCanvasMotionWebm(
   const img = new Image();
   img.crossOrigin = "anonymous";
   await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve();
-    img.onerror = () => reject(new Error("Could not load source image for animation."));
+    const cleanup = () => signal?.removeEventListener("abort", cancel);
+    const cancel = () => {
+      img.src = "";
+      cleanup();
+      reject(videoCanceledError());
+    };
+    img.onload = () => { cleanup(); resolve(); };
+    img.onerror = () => { cleanup(); reject(new Error("Could not load source image for animation.")); };
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) { cancel(); return; }
     img.src = imageUrl;
   });
+  if (signal?.aborted) throw videoCanceledError();
 
   const canvas = document.createElement("canvas");
   canvas.width = 540;
@@ -118,75 +131,86 @@ export async function renderCanvasMotionWebm(
     if (e.data.size > 0) chunks.push(e.data);
   };
 
-  const done = new Promise<string>((resolve) => {
+  const done = new Promise<string>((resolve, reject) => {
     recorder.onstop = () => {
+      if (signal?.aborted) { reject(videoCanceledError()); return; }
       const blob = new Blob(chunks, { type: "video/webm" });
       resolve(URL.createObjectURL(blob));
     };
+    recorder.onerror = () => reject(new Error("Canvas video recording failed."));
   });
 
   recorder.start();
   const totalMs = Math.max(1500, Math.round((durationSec * 1000) / speed));
   const start = performance.now();
+  let frame = 0;
+  let cancelFrame: (() => void) | undefined;
 
-  await new Promise<void>((resolve) => {
-    function drawFrame(now: number) {
-      const t = Math.min(1, (now - start) / totalMs);
-      const ease = 0.5 - Math.cos(t * Math.PI) / 2;
-      const sway = Math.sin(t * Math.PI * 2 * speed) * 8;
-      const scale = 1 + (motion.scaleEnd - 1) * ease;
-      const drawW = canvas.width * scale;
-      const drawH = canvas.height * scale;
-      const extraX = motion.pulseMode === "sway" || motion.pulseMode === "breeze" ? sway : 0;
-      const offsetX = (canvas.width - drawW) / 2 + motion.dx * ease + extraX;
-      const offsetY = (canvas.height - drawH) / 2 + motion.dy * ease;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const cancel = () => {
+        cancelAnimationFrame(frame);
+        reject(videoCanceledError());
+      };
+      cancelFrame = cancel;
+      signal?.addEventListener("abort", cancel, { once: true });
+      if (signal?.aborted) { cancel(); return; }
+      function drawFrame(now: number) {
+        if (signal?.aborted) { reject(videoCanceledError()); return; }
+        const t = Math.min(1, (now - start) / totalMs);
+        const ease = 0.5 - Math.cos(t * Math.PI) / 2;
+        const sway = Math.sin(t * Math.PI * 2 * speed) * 8;
+        const scale = 1 + (motion.scaleEnd - 1) * ease;
+        const drawW = canvas.width * scale;
+        const drawH = canvas.height * scale;
+        const extraX = motion.pulseMode === "sway" || motion.pulseMode === "breeze" ? sway : 0;
+        const offsetX = (canvas.width - drawW) / 2 + motion.dx * ease + extraX;
+        const offsetY = (canvas.height - drawH) / 2 + motion.dy * ease;
 
-      ctx!.clearRect(0, 0, canvas.width, canvas.height);
-      ctx!.drawImage(img, offsetX, offsetY, drawW, drawH);
-
-      // Lighting sheen & vignette
-      const grad = ctx!.createRadialGradient(
-        canvas.width / 2,
-        canvas.height * 0.38,
-        canvas.width * 0.2,
-        canvas.width / 2,
-        canvas.height / 2,
-        canvas.height * 0.68,
-      );
-      grad.addColorStop(0, "rgba(0,0,0,0)");
-      grad.addColorStop(1, "rgba(0,0,0,0.42)");
-      ctx!.fillStyle = grad;
-      ctx!.fillRect(0, 0, canvas.width, canvas.height);
-
-      if (motion.pulseMode === "club") {
-        const pulseAlpha = (0.5 + 0.5 * Math.sin(t * Math.PI * 6)) * 0.24;
-        ctx!.fillStyle = `rgba(255, 86, 120, ${pulseAlpha.toFixed(3)})`;
+        ctx!.clearRect(0, 0, canvas.width, canvas.height);
+        ctx!.drawImage(img, offsetX, offsetY, drawW, drawH);
+        const grad = ctx!.createRadialGradient(
+          canvas.width / 2, canvas.height * 0.38, canvas.width * 0.2,
+          canvas.width / 2, canvas.height / 2, canvas.height * 0.68,
+        );
+        grad.addColorStop(0, "rgba(0,0,0,0)");
+        grad.addColorStop(1, "rgba(0,0,0,0.42)");
+        ctx!.fillStyle = grad;
         ctx!.fillRect(0, 0, canvas.width, canvas.height);
-      } else if (motion.pulseMode === "blink") {
-        // Gentle mid-clip shadow blink pulse
-        const blinkWindow = Math.max(0, 1 - Math.abs(t - 0.52) * 14);
-        if (blinkWindow > 0) {
-          ctx!.fillStyle = `rgba(10, 10, 14, ${(blinkWindow * 0.25).toFixed(3)})`;
+        if (motion.pulseMode === "club") {
+          const pulseAlpha = (0.5 + 0.5 * Math.sin(t * Math.PI * 6)) * 0.24;
+          ctx!.fillStyle = `rgba(255, 86, 120, ${pulseAlpha.toFixed(3)})`;
           ctx!.fillRect(0, 0, canvas.width, canvas.height);
+        } else if (motion.pulseMode === "blink") {
+          const blinkWindow = Math.max(0, 1 - Math.abs(t - 0.52) * 14);
+          if (blinkWindow > 0) {
+            ctx!.fillStyle = `rgba(10, 10, 14, ${(blinkWindow * 0.25).toFixed(3)})`;
+            ctx!.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        } else {
+          ctx!.fillStyle = motion.tint;
+          ctx!.globalAlpha = 0.25 + 0.25 * Math.sin(t * Math.PI);
+          ctx!.fillRect(0, 0, canvas.width, canvas.height);
+          ctx!.globalAlpha = 1;
         }
-      } else {
-        ctx!.fillStyle = motion.tint;
-        ctx!.globalAlpha = 0.25 + 0.25 * Math.sin(t * Math.PI);
-        ctx!.fillRect(0, 0, canvas.width, canvas.height);
-        ctx!.globalAlpha = 1;
+        if (t < 1) frame = requestAnimationFrame(drawFrame);
+        else {
+          recorder.stop();
+          resolve();
+        }
       }
-
-      if (t < 1) {
-        requestAnimationFrame(drawFrame);
-      } else {
-        recorder.stop();
-        resolve();
-      }
-    }
-    requestAnimationFrame(drawFrame);
-  });
-
-  return done;
+      frame = requestAnimationFrame(drawFrame);
+    });
+    if (signal?.aborted) throw videoCanceledError();
+    return await done;
+  } catch (error) {
+    if (recorder.state !== "inactive") recorder.stop();
+    await done.catch(() => undefined);
+    throw error;
+  } finally {
+    if (cancelFrame) signal?.removeEventListener("abort", cancelFrame);
+    stream.getTracks().forEach(track => track.stop());
+  }
 }
 
 type VideoBackendResponse = {
@@ -257,6 +281,7 @@ export async function generateStudioVideoClip(
     if (!compliance.ok) throw new Error(compliance.reason);
   }
 
+  if (req.signal?.aborted) throw videoCanceledError();
   const motion = VIDEO_MOTION_PRESETS.find((m) => m.id === req.motionId) ?? VIDEO_MOTION_PRESETS[0];
 
   // 1. A real video requires a configured backend that implements this HTTP contract.
@@ -277,17 +302,22 @@ export async function generateStudioVideoClip(
         prompt: req.prompt || "",
         sourceImageUrl: req.imageUrl,
         onStatus: req.onProgress,
+        signal: req.signal,
       });
       return { videoUrl: generated.videoUrl, videoFormat: generated.videoFormat, isGenerative: true,
         engine: "ComfyUI video model (local)" };
     } catch (error) {
+      if (req.signal?.aborted) throw videoCanceledError();
       backendError = error instanceof Error ? error.message : "ComfyUI video workflow did not generate a video.";
     }
   }
   if (endpoint) {
     const ctrl = new AbortController();
+    const cancel = () => ctrl.abort();
+    req.signal?.addEventListener("abort", cancel, { once: true });
     const timer = setTimeout(() => ctrl.abort(), 120000);
     try {
+      if (req.signal?.aborted) throw videoCanceledError();
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -328,14 +358,17 @@ export async function generateStudioVideoClip(
       }
       backendError = data.error || "Video provider returned neither playable video nor a statusUrl for polling.";
     } catch (err) {
+      if (req.signal?.aborted) throw videoCanceledError();
       backendError = err instanceof Error ? err.message : "Video service unavailable";
     } finally {
       clearTimeout(timer);
+      req.signal?.removeEventListener("abort", cancel);
     }
   }
 
   // 2. Optional browser fallback: pan/zoom only, NOT generated character motion.
-  const webmUrl = await renderCanvasMotionWebm(req.imageUrl, motion, req.durationSec, req.speed);
+  if (req.signal?.aborted) throw videoCanceledError();
+  const webmUrl = await renderCanvasMotionWebm(req.imageUrl, motion, req.durationSec, req.speed, req.signal);
   return {
     videoUrl: webmUrl,
     engine: "Browser motion effect (animated still)",

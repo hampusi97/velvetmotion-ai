@@ -14,6 +14,8 @@ export interface ComfyVideoRequest extends ComfyVideoConfig {
   sourceImageUrl: string;
   prompt: string;
   onStatus?: (stage: string) => void;
+  /** Abort the client-side upload, queue request, or polling; does not stop server GPU jobs. */
+  signal?: AbortSignal;
 }
 type WorkflowNode = { class_type: string; inputs: Record<string, unknown> };
 type Workflow = Record<string, WorkflowNode>;
@@ -22,6 +24,53 @@ type VideoHistory = Record<string, {
   status?: { status_str?: string };
   outputs?: Record<string, { gifs?: MediaFile[]; videos?: MediaFile[]; images?: MediaFile[] }>;
 }>;
+
+
+export function videoCanceledError(): DOMException {
+  return new DOMException("Video generation canceled by the user.", "AbortError");
+}
+
+function ensureVideoActive(signal?: AbortSignal): void {
+  if (signal?.aborted) throw videoCanceledError();
+}
+
+async function fetchWithVideoAbort(
+  url: string, init: RequestInit, signal: AbortSignal | undefined, timeoutMs: number,
+): Promise<Response> {
+  ensureVideoActive(signal);
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  signal?.addEventListener("abort", cancel, { once: true });
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const result = await fetch(url, { ...init, signal: controller.signal });
+    ensureVideoActive(signal);
+    return result;
+  } catch (error) {
+    ensureVideoActive(signal);
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", cancel);
+  }
+}
+
+async function waitVideoPoll(ms: number, signal?: AbortSignal): Promise<void> {
+  ensureVideoActive(signal);
+  await new Promise<void>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const cancel = () => { clearTimeout(timer); reject(videoCanceledError()); };
+    timer = setTimeout(() => {
+      signal?.removeEventListener("abort", cancel);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) {
+      signal.removeEventListener("abort", cancel);
+      cancel();
+    }
+  });
+}
 
 export function prepareComfyVideoWorkflow(json: string, imageNodeId: string, imageFile: string, promptNodeId: string | undefined, prompt: string): Workflow {
   if (!json || json.length > 250_000) throw new Error("ComfyUI API workflow must be under 250 KB.");
@@ -91,13 +140,15 @@ export function validateComfyVideoBase(baseUrl: string): string {
 }
 
 export async function generateComfyVideo(req: ComfyVideoRequest): Promise<{videoUrl:string; videoFormat:"mp4"|"webm"}> {
+  ensureVideoActive(req.signal);
   const base = validateComfyVideoBase(req.baseUrl);
   // Validate the entire workflow before uploading the user's source photo.
   prepareComfyVideoWorkflow(req.workflowJson, req.imageNodeId, "validation.png", req.promptNodeId, req.prompt);
   req.onStatus?.("Preparing original source image");
-  const source = await fetch(req.sourceImageUrl, {signal:AbortSignal.timeout(20000)});
+  const source = await fetchWithVideoAbort(req.sourceImageUrl, {}, req.signal, 20000);
   if (!source.ok) throw new Error(`Unable to load source image (HTTP ${source.status}).`);
   const blob = await source.blob();
+  ensureVideoActive(req.signal);
   if (!/^image\/(?:png|jpeg|webp)$/i.test(blob.type) || blob.size > 12 * 1024 * 1024 || blob.size === 0) {
     throw new Error("ComfyUI video source must be a PNG, JPEG or WebP image under 12 MB.");
   }
@@ -107,28 +158,32 @@ export async function generateComfyVideo(req: ComfyVideoRequest): Promise<{video
   form.append("type", "input");
   form.append("overwrite", "true");
   req.onStatus?.("Uploading to your ComfyUI server");
-  const uploaded = await fetch(`${base}/upload/image`, { method:"POST", body:form, signal:AbortSignal.timeout(45000) });
+  const uploaded = await fetchWithVideoAbort(`${base}/upload/image`, { method:"POST", body:form }, req.signal, 45000);
   if (!uploaded.ok) throw new Error(`ComfyUI image upload failed (HTTP ${uploaded.status}).`);
   const uploadData = (await uploaded.json()) as {name?:unknown};
+  ensureVideoActive(req.signal);
   if (typeof uploadData.name !== "string") throw new Error("ComfyUI returned no uploaded image filename.");
   const workflow = prepareComfyVideoWorkflow(req.workflowJson, req.imageNodeId, uploadData.name, req.promptNodeId, req.prompt);
   req.onStatus?.("Queueing video model workflow");
-  const queued = await fetch(`${base}/prompt`, { method:"POST", headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:workflow}),signal:AbortSignal.timeout(45000) });
+  const queued = await fetchWithVideoAbort(`${base}/prompt`, { method:"POST", headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:workflow}) }, req.signal, 45000);
   if (!queued.ok) {
     const detail = await queued.text().catch(()=>"");
     throw new Error(`ComfyUI video workflow rejected (HTTP ${queued.status}): ${detail.slice(0,250)}`);
   }
   const data = (await queued.json()) as {prompt_id?:unknown; error?:unknown};
+  ensureVideoActive(req.signal);
   if (typeof data.prompt_id !== "string" || !data.prompt_id) {
     throw new Error(typeof data.error === "string" ? data.error.slice(0,250) : "ComfyUI returned no video prompt ID.");
   }
   for (let i=0; i<180; i++) {
+    ensureVideoActive(req.signal);
     req.onStatus?.(`Generating video locally (check ${i + 1}/180)`);
     // Check promptly on the first attempt, then allow long-running GPU workflows.
-    if (i > 0) await new Promise(resolve=>setTimeout(resolve, 2500));
-    const historyResponse = await fetch(`${base}/history/${encodeURIComponent(data.prompt_id)}`,{cache:"no-store",signal:AbortSignal.timeout(10000)});
+    if (i > 0) await waitVideoPoll(2500, req.signal);
+    const historyResponse = await fetchWithVideoAbort(`${base}/history/${encodeURIComponent(data.prompt_id)}`, {cache:"no-store"}, req.signal, 10000);
     if (!historyResponse.ok) continue;
     const history = (await historyResponse.json()) as VideoHistory;
+    ensureVideoActive(req.signal);
     const url = findComfyVideoOutput(history, data.prompt_id, base);
     if (url) {
       req.onStatus?.("Real video generated");

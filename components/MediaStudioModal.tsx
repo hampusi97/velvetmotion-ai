@@ -119,6 +119,7 @@ export default function MediaStudioModal({
   const [durationSec, setDurationSec] = useState<3 | 5 | 8>(5);
   const [videoSpeed, setVideoSpeed] = useState<0.75 | 1 | 1.25>(1);
   const [videoBusy, setVideoBusy] = useState(false);
+  const videoAbortRef = useRef<AbortController | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoEngineUsed, setVideoEngineUsed] = useState<string | null>(null);
 
@@ -143,6 +144,12 @@ export default function MediaStudioModal({
   const localEngine = useLocalEngineStatus();
   const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([]);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(() => getMediaSettings().comfyCheckpoint);
+
+  // Closing the Studio or unmounting its route must stop client-side video work.
+  useEffect(() => {
+    if (!isOpen && !standalone) videoAbortRef.current?.abort();
+  }, [isOpen, standalone]);
+  useEffect(() => () => { videoAbortRef.current?.abort(); }, []);
 
   useEffect(() => {
     if (!isOpen && !standalone) return;
@@ -267,6 +274,7 @@ export default function MediaStudioModal({
   }
 
   async function handleGenerateVideo() {
+    if (videoAbortRef.current) return;
     const derivedFromUpload = Boolean(uploadedPreview && (
       videoSourceUrl === uploadedPreview ||
       (referenceResult && videoSourceUrl === referenceResult)
@@ -275,6 +283,8 @@ export default function MediaStudioModal({
       setErrorMsg('Choose the image source and confirm that you have permission to use it before animating.');
       return;
     }
+    const controller = new AbortController();
+    videoAbortRef.current = controller;
     setVideoBusy(true);
     setErrorMsg(null);
     setStatusMsg(null);
@@ -295,8 +305,10 @@ export default function MediaStudioModal({
         adultMode: derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode,
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
-        onProgress: (stage) => setStatusMsg(stage),
+        signal: controller.signal,
+        onProgress: (stage) => { if (!controller.signal.aborted) setStatusMsg(stage); },
       });
+      if (controller.signal.aborted) return;
       setGeneratedVideoUrl(res.videoUrl);
       setVideoEngineUsed(res.engine);
       setVideoIsGenerative(res.isGenerative);
@@ -308,9 +320,17 @@ export default function MediaStudioModal({
         setErrorMsg(res.warning || 'Set up a compatible video backend to generate motion.');
       }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
+      if (controller.signal.aborted) {
+        setErrorMsg(null);
+        setStatusMsg('Video request canceled locally. A job already queued on your video server may continue using its GPU.');
+      } else {
+        setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
+      }
     } finally {
-      setVideoBusy(false);
+      if (videoAbortRef.current === controller) {
+        videoAbortRef.current = null;
+        setVideoBusy(false);
+      }
     }
   }
 
@@ -892,6 +912,16 @@ export default function MediaStudioModal({
           >
             {videoBusy ? `Processing ${durationSec}s clip...` : `Create ${durationSec}s Video · AI if connected`}
           </button>
+          {videoBusy && (
+            <button type="button"
+              onClick={() => {
+                videoAbortRef.current?.abort();
+                setStatusMsg('Canceling this video request...');
+              }}
+              className="w-full rounded-full border border-rose-300/35 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-100 hover:bg-rose-500/20">
+              Cancel video request
+            </button>
+          )}
           {generatedVideoUrl && (
             <div className="space-y-2 pt-2 text-center">
               {videoEngineUsed && (

@@ -54,3 +54,34 @@ test("resolves a relative video result URL against the configured provider", asy
     assert.equal(result.videoUrl, "https://video.example.test/clips/generated.mp4");
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("canceling a configured video backend does not silently produce an animated still", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  let calls = 0;
+  globalThis.fetch = async (_input, init) => {
+    calls++;
+    assert.equal(init?.signal?.aborted, false);
+    controller.abort();
+    throw new DOMException("Canceled", "AbortError");
+  };
+  try {
+    await assert.rejects(() => generateStudioVideoClip({
+      imageUrl:"https://images.example.test/portrait.png",
+      motionId:"slow-zoom-blink",durationSec:3,speed:1,
+      sourceType:"fictional",videoBackendUrl:"https://video.example.test/generate",
+      signal:controller.signal,
+    }), (error: unknown) => error instanceof Error && error.name === "AbortError");
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("a canceled browser fallback exits before accessing browser recording APIs", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(() => generateStudioVideoClip({
+    imageUrl:"data:image/png;base64,AQID",
+    motionId:"slow-zoom-blink",durationSec:3,speed:1,
+    sourceType:"fictional",signal:controller.signal,
+  }), (error: unknown) => error instanceof Error && error.name === "AbortError");
+});
