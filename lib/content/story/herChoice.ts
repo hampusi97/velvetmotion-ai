@@ -5,8 +5,8 @@ export const HER_CHOICE_STORY: StoryPack = {
   title: "Her Choice",
   tag: "BNWO",
   relatedTags: ["OPEN RELATIONSHIP"],
-  desc: "Juno comes home to tell you about the Black men she's been seeing and the dates she chose.",
-  summary: "In your open relationship with Juno, you play her white adult boyfriend. She picks her dates and tells you about her adventures. You choose which parts you want to hear.",
+  desc: "Juno chooses her lovers. You keep your listener-only agreement and she tells you about her nights out.",
+  summary: "You play Juno's white adult boyfriend. You've agreed to stay celibate while she takes Black adult lovers. Tonight she offers to tell you about her date or the breeding fantasy she brought up with Miles.",
   accent: "rose",
   character: {
     companionId: "juno-aimes",
@@ -17,17 +17,18 @@ export const HER_CHOICE_STORY: StoryPack = {
   },
   chapters: [
     { id: "home", title: "After the Show", sceneIds: ["arrival"] },
-    { id: "choose", title: "What You Want to Hear", sceneIds: ["details", "last-weekend", "feelings", "space"] },
+    { id: "choose", title: "What You Want to Hear", sceneIds: ["details", "last-weekend", "breeding-fantasy", "feelings", "space"] },
     { id: "end", title: "The Rest of the Night", sceneIds: ["together"] },
   ],
   scenes: [
     {
       id: "arrival",
       title: "Home in Velvet",
-      text: "Juno kicks off her heels and drops beside you on the couch. The hem of her velvet dress still smells faintly of the club.\n\n‘Come here, white boy.’ At thirty, you still blush when she calls you that. ‘Miles and I stayed for the last song. I asked him out, I picked the club, and I kissed him goodnight.’ Miles is the Black lighting designer she met at rehearsal. She catches your grin. ‘Want to hear about tonight or the trouble I got into last weekend?’",
+      text: "Juno kicks off her heels and drops beside you on the couch. The hem of her velvet dress still smells faintly of the club.\n\n‘Come here, white boy.’ At thirty, you still blush when she calls you that. ‘We agreed that you stay hands-off and I choose my lovers. I only take Black lovers, and I like coming home to tell you about them.’\n\nTonight it was Miles, the Black lighting designer she met at rehearsal. ‘I picked the club, I picked the last song, and I finally told him about the fantasy I've been thinking about.’ She catches your grin. ‘Which part do you want first?’",
       choices: [
         { id: "hear-details", label: "Ask about the kiss", nextSceneId: "details" },
         { id: "hear-weekend", label: "Ask about last weekend", nextSceneId: "last-weekend" },
+        { id: "hear-fantasy", label: "Ask about her breeding fantasy", nextSceneId: "breeding-fantasy" },
         { id: "hear-feelings", label: "Ask how she felt", nextSceneId: "feelings" },
         { id: "ask-space", label: "Take a quiet minute", nextSceneId: "space" },
       ],
@@ -42,6 +43,12 @@ export const HER_CHOICE_STORY: StoryPack = {
       id: "last-weekend",
       title: "One More Hour",
       text: "‘Andre took me to that little jazz place by the river,’ Juno says. Andre is the Black photographer she asked out after her last show. ‘After the band packed up, I asked him to walk me back. He offered me his jacket. I told him he could come upstairs if he wanted it back.’\n\nShe lets you sit with that for a beat. ‘We spent another hour on the balcony. By morning I'd forgotten which one of us still had the jacket.’",
+      nextSceneId: "together",
+    },
+    {
+      id: "breeding-fantasy",
+      title: "What She Told Miles",
+      text: "Juno sets her glass down. ‘I told Miles I'd been imagining getting pregnant by him. Saying it aloud felt good. He asked if I meant we should talk about having a baby, or if I wanted to play out a fantasy.’\n\n‘A fantasy,’ she says, settling back into the couch. ‘I told him the part I liked most was getting to ask for it in my own words. He said he'd like to hear more.’ She smiles at you. ‘Now you can ask me about it, too.’",
       nextSceneId: "together",
     },
     {

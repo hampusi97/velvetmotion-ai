@@ -9,7 +9,7 @@ export const COMPANION_SESSION_THEMES = {
   interracial: { label: "Interracial romance", direction: "Focus on mutual attraction and equal agency between fictional adults from different backgrounds. Leave their identities to the user." },
   sph: { label: "SPH · Size teasing", direction: "Use consensual, private size teasing with the listener's agreed words and limits. Check in before raising the intensity." },
   cheating: { label: "Cheating fantasy", direction: "Set up a fictional jealousy or secret-date roleplay agreed to by all adult participants. Let the listener choose whether to hear the confession, ask a question, or stop." },
-  "her-choice": { label: "BNWO · Her Choice", direction: "In an agreed open relationship, the fictional adult companion chooses her dates with Black adult men. She tells her white adult boyfriend about her adventures in first person. Use 'white boy' as an affectionate nickname if he likes it, and let him choose which details he wants to hear." },
+  "her-choice": { label: "BNWO · Her Choice", direction: "In their agreed open relationship, the fictional adult companion takes only Black adult men as lovers. Her white adult boyfriend agrees to stay celibate and listen while she tells him about her nights out. She wants to explore a breeding fantasy with one of her lovers. Speak in her voice and let him choose whether to hear about a date, the fantasy, or how she feels. Use 'white boy' affectionately when welcome." },
   breeding: { label: "Breeding fantasy", direction: "Keep the breeding theme within an agreed fictional fantasy. Check what language the listener wants and finish with aftercare." },
   bnwo: { label: "BNWO roleplay", direction: "Use an explicitly agreed fictional scene centered on attraction to a Black adult partner. Let every character express their own wants and limits." },
   "bnwo-sph": { label: "BNWO · SPH", direction: "Combine attraction between fictional adult partners with opt-in size teasing. Direct teasing to the agreed role and individual preferences. Keep racial identity separate from ratings or insults." },
@@ -37,9 +37,9 @@ export const THEMED_GUIDED_CUES: Partial<Record<CompanionSessionTheme, readonly 
     "Our secret-date scene is over. Tell me whether you want a little reassurance or a quiet minute together.",
   ],
   "her-choice": [
-    "Come sit beside me, white boy. I went out with Miles, the Black guy I met at the club, and I've been saving the story for you.",
-    "I chose the last song. I chose the kiss, too. Want to hear how Miles looked at me when the lights went down, or what happened on my date last weekend?",
-    "I love that I get to choose my adventures and come home and tell you about them. Want to ask me something, get closer, or take a little space?",
+    "Come sit beside me, white boy. You agreed to stay hands-off and hear about my dates. I went out with Miles tonight, and I saved you the story.",
+    "You know I only take Black lovers. Tonight I told Miles about my breeding fantasy. Want to hear what I asked him or how he took it?",
+    "I like choosing my adventures and coming home to tell you about them. Want one more detail, a little reassurance, or a quiet minute?",
   ],
   breeding: [
     "Tell me how bold you want tonight's breeding fantasy to feel. We can change the scene whenever you like.",

@@ -99,7 +99,7 @@ export const VIDEO_SCENE_PRESETS = [
     label: "BNWO · Her Choice",
     adult: true,
     scene: {
-      action: "Consensual BNWO open-relationship scene. She tells her white adult boyfriend about the Black man she chose for the last dance. She leans in as if sharing a secret, describes the kiss with a smile, then waits for his reaction.",
+      action: "Consensual BNWO scene. Her white adult boyfriend listens from the couch as she tells him about Miles, her Black adult lover, and the breeding fantasy she shared with him. Show her expression as she leans in and waits for his reaction.",
       setting: "her velvet couch after a late night out",
       camera: "first-person from his seat, at eye level",
       lighting: "soft amber stage lights and velvet shadows",
