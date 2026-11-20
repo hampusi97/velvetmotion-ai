@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Object3D, WebGLRenderer } from "three";
+import type { Mesh, Object3D, WebGLRenderer } from "three";
 import { loadVrmAvatar } from "@/lib/vrmAvatarStore";
 
 /**
@@ -72,7 +72,7 @@ export function VrmAvatarViewer({
         });
         if (dead) {
           gltf.scene.traverse(child => {
-            const m = child as THREE.Mesh;
+            const m = child as Mesh;
             if (m.isMesh) m.geometry?.dispose();
           });
           return;
@@ -102,7 +102,7 @@ export function VrmAvatarViewer({
         }
         const morphs: Array<{ influences: number[]; mouth: number[]; blink: number[] }> = [];
         root.traverse(child => {
-          const mesh = child as THREE.Mesh & {
+          const mesh = child as Mesh & {
             morphTargetDictionary?: Record<string, number>;
             morphTargetInfluences?: number[];
           };
