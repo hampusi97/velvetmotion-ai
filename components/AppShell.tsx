@@ -343,7 +343,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               </div>
               <h1 className="text-3xl font-black text-white neon-text-glow">VelvetMotion AI</h1>
               <p className="text-sm text-[#a6a6c4] leading-relaxed">
-                Hyper-Neon uncensored companion studio. Fictional consenting adults 18+ only. Zero server logging.
+                A private-first AI companion studio for adults. Local and selected cloud AI options; review our privacy policy before sharing chats or images.
               </p>
               <div className="flex gap-4 justify-center text-xs text-[#a6a6c4]">
                 <Link href="/terms/" className="underline hover:text-[#00f5ff]">Terms</Link>
