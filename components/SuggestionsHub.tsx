@@ -58,15 +58,6 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
       })
       .catch(() => {});
 
-    void fetch("/api/suggestions", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (Array.isArray(d?.suggestions) && d.suggestions.length > 0) {
-          setItems(d.suggestions);
-        }
-      })
-      .catch(() => {});
-
     return () => {
       unsubFirestore();
     };
@@ -88,22 +79,11 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
         .map((s) => (s.id === id ? { ...s, votes: nextVotes } : s))
         .sort((a, b) => b.votes - a.votes),
     );
-    void import("@/lib/firebase")
+    const saved = await import("@/lib/firebase")
       .then((fb) => fb.upvoteSuggestionInFirestore(id, nextVotes))
-      .catch(() => {});
-    try {
-      const res = await fetch("/api/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "upvote", id }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.suggestions)) setItems(data.suggestions);
-      }
-    } catch {
-      /* ignore */
-    }
+      .catch(() => false);
+    if (!saved) setNotice("Vote saved on this device. Cloud syncing is unavailable; it is not a verified global vote.");
+
   };
 
   const submit = async () => {
@@ -111,34 +91,29 @@ export function SuggestionsHub({ onHome }: { onHome: () => void }) {
     if (cleanTitle.length < 4 || busy) return;
     setBusy(true);
     setNotice(null);
+    const item: FeatureSuggestion = {
+      id: `community-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      title: cleanTitle.slice(0, 120),
+      detail: detail.trim().slice(0, 400),
+      category,
+      author: getUser()?.username || "VelvetMember",
+      status: "Planned",
+      votes: 1,
+      createdAt: Date.now(),
+    };
     try {
-      const res = await fetch("/api/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "submit",
-          title: cleanTitle,
-          detail: detail.trim(),
-          category,
-          author: getUser()?.username || "VelvetMember",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setNotice(data.error || "Could not submit suggestion.");
+      const synced = await import("@/lib/firebase")
+        .then((fb) => fb.submitSuggestionToFirestore(item))
+        .catch(() => false);
+      if (synced) {
+        setItems((prev) => [item, ...prev]);
+        setNotice("Suggestion submitted to the community roadmap.");
       } else {
-        if (data.suggestion) {
-          void import("@/lib/firebase")
-            .then((fb) => fb.submitSuggestionToFirestore(data.suggestion))
-            .catch(() => {});
-        }
-        if (Array.isArray(data.suggestions)) setItems(data.suggestions);
-        setTitle("");
-        setDetail("");
-        setNotice("Feature suggestion added to the live roadmap & synced to Firestore!");
+        setItems((prev) => [item, ...prev]);
+        setNotice("Suggestion is visible only in this session. Community sync is unavailable; nothing was submitted to a server.");
       }
-    } catch {
-      setNotice("Network error — try again.");
+      setTitle("");
+      setDetail("");
     } finally {
       setBusy(false);
     }
