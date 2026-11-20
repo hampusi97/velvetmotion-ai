@@ -10,6 +10,8 @@ import { detectVoiceAction } from "@/lib/voiceCommands";
 import { buildLorebookContext, loadLorebook } from "@/lib/lorebook";
 import { bumpIntimacy, getIntimacy } from "@/lib/storage";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
+import { VrmAvatarViewer } from "@/components/VrmAvatarViewer";
+import { saveVrmAvatar, removeVrmAvatar } from "@/lib/vrmAvatarStore";
 
 type Props = {
   character: Character;
@@ -37,6 +39,10 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 export function VoiceCallUI({ character, onClose }: Props) {
   const [live, setLive] = useState(false);
   const [videoMode, setVideoMode] = useState(false);
+  const [vrmMode, setVrmMode] = useState(false);
+  const [vrmRevision, setVrmRevision] = useState(0);
+  const [vrmBusy, setVrmBusy] = useState(false);
+  const vrmUploadRef = useRef<HTMLInputElement | null>(null);
   const [camActive, setCamActive] = useState(false);
   const [listening, setListening] = useState(false);
   const [micPaused, setMicPaused] = useState(false);
@@ -49,6 +55,31 @@ export function VoiceCallUI({ character, onClose }: Props) {
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const uploadVrm = async (file?: File) => {
+    if (!file) return;
+    setVrmBusy(true);
+    try {
+      const result = await saveVrmAvatar(character.id, file);
+      setVrmRevision(n => n + 1);
+      setVrmMode(true);
+      setVideoMode(false);
+      setStatus(`VRM ${result.version === 1 ? "1.0" : "0.x"} model saved locally. Basic 3D preview is active.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "VRM import failed.");
+    } finally {
+      if (vrmUploadRef.current) vrmUploadRef.current.value = "";
+      setVrmBusy(false);
+    }
+  };
+  const clearVrm = async () => {
+    try {
+      await removeVrmAvatar(character.id);
+      setVrmRevision(n => n + 1);
+      setVrmMode(false);
+      setStatus("3D avatar removed from local storage.");
+    } catch (error) { setStatus(error instanceof Error ? error.message : "Could not remove avatar."); }
+  };
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -260,7 +291,11 @@ export function VoiceCallUI({ character, onClose }: Props) {
       <div className="w-full max-w-sm rounded-3xl border border-pink-500/40 bg-gradient-to-b from-zinc-900 to-black p-6 shadow-[0_0_60px_rgba(236,72,153,0.25)]">
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="relative w-full flex justify-center">
-            {videoMode ? (
+            {vrmMode ? (
+              <div className="relative w-full aspect-[3/4] max-h-64 rounded-2xl overflow-hidden border-2 border-purple-400/50 bg-black">
+                <VrmAvatarViewer characterId={character.id} revision={vrmRevision} speaking={speaking} listening={listening} />
+              </div>
+            ) : videoMode ? (
               <div className="relative w-full aspect-[3/4] max-h-64 rounded-2xl overflow-hidden border-2 border-pink-500/50 bg-black">
                 <MotionSequencePlayer frames={frames} alt={character.name} />
                 {camActive && (
@@ -301,12 +336,17 @@ export function VoiceCallUI({ character, onClose }: Props) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setVideoMode((v) => !v)}
+              onClick={() => { setVrmMode(false); setVideoMode((v) => !v); }}
               className={`rounded-full px-3 py-1 text-xs border ${
                 videoMode ? "border-pink-500 bg-pink-500/20 text-pink-200" : "border-white/15 text-zinc-400"
               }`}
             >
               {videoMode ? "🎬 Live video ON" : "🎬 Companion video"}
+            </button>
+            <button type="button" aria-pressed={vrmMode}
+              onClick={() => { setVrmMode(v=>!v); setVideoMode(false); }}
+              className={`rounded-full px-3 py-1 text-xs border ${vrmMode ? "border-violet-300 bg-violet-500/20 text-violet-100" : "border-white/15 text-zinc-400"}`}>
+              {vrmMode ? "3D avatar ON" : "3D avatar"}
             </button>
             <button
               type="button"
@@ -319,6 +359,18 @@ export function VoiceCallUI({ character, onClose }: Props) {
             </button>
           </div>
 
+          <div className="flex w-full flex-wrap items-center justify-center gap-2">
+            <input type="file" accept=".vrm,model/gltf-binary" ref={vrmUploadRef} className="hidden"
+              aria-label="Upload a local VRM avatar" onChange={e => { void uploadVrm(e.target.files?.[0]); }} />
+            <button type="button" disabled={vrmBusy} onClick={() => vrmUploadRef.current?.click()}
+              className="rounded-lg border border-violet-300/25 bg-violet-500/10 px-2 py-1.5 text-xs text-violet-200 disabled:opacity-50">
+              {vrmBusy ? "Saving avatar…" : "Import .vrm avatar"}
+            </button>
+            {vrmMode && <button type="button" onClick={() => void clearVrm()}
+              className="rounded-lg border border-white/15 px-2 py-1.5 text-xs text-zinc-300">
+              Remove 3D avatar
+            </button>}
+          </div>
           <div className="w-full max-h-28 overflow-y-auto text-left space-y-1 text-xs text-zinc-400 px-1">
             {log.map((l, i) => (
               <div key={i}>{l}</div>
@@ -364,7 +416,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
             </button>
           )}
           <p className="text-[10px] text-zinc-600">
-            Voice chat uses optional browser speech recognition. Say “end call” or “stop listening” during a call; no voice commands run system programs.
+            Voice chat uses optional browser speech recognition. VRM is a local Three.js preview with basic motion/blendshapes, not full Live2D/Cubism or VRM spring-bone support. Say “end call” or “stop listening” during a call.
           </p>
         </div>
       </div>

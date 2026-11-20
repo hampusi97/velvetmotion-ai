@@ -36,6 +36,7 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
   const [webuiCheckpoints, setWebuiCheckpoints] = useState<A1111Checkpoint[]>([]);
   const [checkingWebui, setCheckingWebui] = useState(false);
   const [webuiStatus, setWebuiStatus] = useState("");
+  const [videoWorkflowStatus, setVideoWorkflowStatus] = useState("");
 
   const checkA1111 = async () => {
     if (!s) return;
@@ -87,10 +88,12 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
     checks.push({
       id: "video",
       label: "True AI video generation",
-      status: settings.img2vidUrl ? "warn" : "error",
+      status: settings.img2vidUrl || (settings.comfyVideoEnabled && settings.comfyVideoWorkflowJson) ? "warn" : "error",
       detail: settings.img2vidUrl
-        ? "Endpoint configured · verify by generating a clip"
-        : "No video model endpoint set · canvas clips animate stills only",
+        ? "Custom video endpoint configured · verify by generating a clip"
+        : settings.comfyVideoEnabled && settings.comfyVideoWorkflowJson
+          ? "ComfyUI workflow configured · model and output not yet generation-tested"
+          : "No video model workflow configured · canvas clips animate stills only",
     });
     checks.push({
       id: "cloud",
@@ -115,6 +118,37 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
   const update = (partial: Partial<MediaBackendSettings>) => {
     setS((prev) => (prev ? { ...prev, ...partial } : prev));
     setSaved(false);
+  };
+
+  const importComfyWorkflow = async (file?: File) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".json") || file.size > 250_000) {
+      setVideoWorkflowStatus("Select a ComfyUI API-format JSON file smaller than 250 KB.");
+      return;
+    }
+    try {
+      const json = await file.text();
+      const raw: unknown = JSON.parse(json);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("Invalid workflow object.");
+      const nodes = Object.entries(raw as Record<string,unknown>);
+      if (nodes.length < 1 || nodes.length > 250) throw new Error("Workflow must contain 1–250 nodes.");
+      const classify = (node: unknown): string => (
+        node && typeof node === "object" && "class_type" in node &&
+        typeof (node as {class_type?:unknown}).class_type === "string"
+          ? (node as {class_type:string}).class_type : ""
+      );
+      if (!nodes.every(([id, node]) => /^[A-Za-z0-9_-]{1,64}$/.test(id) &&
+        node && typeof node === "object" && !Array.isArray(node) &&
+        "inputs" in node && typeof (node as {inputs?:unknown}).inputs === "object" &&
+        !!(node as {inputs?:unknown}).inputs)) throw new Error("Export in ComfyUI API format, not workflow canvas JSON.");
+      const imageNodeId = nodes.find(([, node])=>classify(node)==="LoadImage")?.[0];
+      const promptNodeId = nodes.find(([, node])=>classify(node)==="CLIPTextEncode")?.[0] || "";
+      if (!imageNodeId) throw new Error("Workflow needs a LoadImage node for its source frame.");
+      update({comfyVideoWorkflowJson:json,comfyVideoImageNodeId:imageNodeId,comfyVideoPromptNodeId:promptNodeId});
+      setVideoWorkflowStatus(`Imported ${nodes.length} nodes; source image node ${imageNodeId}${promptNodeId ? `; text node ${promptNodeId}` : ""}. Save settings, then test a clip.`);
+    } catch (error) {
+      setVideoWorkflowStatus(error instanceof Error ? error.message : "Could not import ComfyUI video workflow.");
+    }
   };
 
   const onSave = () => {
@@ -271,6 +305,50 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
           value={s.pollinationsKey}
           onChange={(e) => update({ pollinationsKey: e.target.value.trim() })}
         />
+        <div className="space-y-2 rounded-xl border border-violet-300/20 bg-violet-500/5 p-3">
+          <label className="flex items-start gap-2 text-xs text-violet-100">
+            <input type="checkbox" checked={s.comfyVideoEnabled}
+              onChange={(e)=>update({comfyVideoEnabled:e.target.checked})} className="mt-0.5" />
+            Use my local ComfyUI image-to-video workflow when the custom endpoint above is blank
+          </label>
+          {s.comfyVideoEnabled && (
+            <>
+              <label className="block text-[11px] text-zinc-300">
+                ComfyUI server URL
+                <input type="url" value={s.comfyVideoBase}
+                  onChange={(e)=>update({comfyVideoBase:e.target.value.trim()})}
+                  placeholder="http://127.0.0.1:8188"
+                  className="mt-1 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-xs text-white" />
+              </label>
+              <label className="block text-[11px] text-zinc-300">
+                Import workflow (ComfyUI Save API Format .json)
+                <input type="file" accept=".json,application/json"
+                  onChange={(e)=>{ void importComfyWorkflow(e.target.files?.[0]); e.target.value=""; }}
+                  className="mt-1 block w-full rounded-lg border border-white/15 bg-black p-2 text-xs" />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[11px] text-zinc-300">
+                  LoadImage node ID
+                  <input value={s.comfyVideoImageNodeId} onChange={(e)=>update({comfyVideoImageNodeId:e.target.value})}
+                    placeholder="e.g. 10" className="mt-1 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-xs text-white" />
+                </label>
+                <label className="block text-[11px] text-zinc-300">
+                  CLIPTextEncode ID (optional)
+                  <input value={s.comfyVideoPromptNodeId} onChange={(e)=>update({comfyVideoPromptNodeId:e.target.value})}
+                    placeholder="e.g. 6" className="mt-1 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-xs text-white" />
+                </label>
+              </div>
+              <p role="status" className="text-[11px] text-violet-100">{videoWorkflowStatus ||
+                (s.comfyVideoWorkflowJson ? "API workflow imported. Save and test actual video generation." :
+                 "Upload an API workflow from an installed Wan, LTX or other compatible ComfyUI video model.")}</p>
+              <p className="text-[10px] leading-relaxed text-zinc-400">
+                This uses a real installed video workflow, not a fake pan/zoom animation.
+                Your source image is uploaded to your chosen ComfyUI server only after you click Generate.
+                A SaveVideo or VHS_VideoCombine output must produce an MP4/WebM file.
+              </p>
+            </>
+          )}
+        </div>
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">

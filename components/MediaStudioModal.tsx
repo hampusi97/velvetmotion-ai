@@ -295,6 +295,7 @@ export default function MediaStudioModal({
         adultMode: derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode,
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
+        onProgress: (stage) => setStatusMsg(stage),
       });
       setGeneratedVideoUrl(res.videoUrl);
       setVideoEngineUsed(res.engine);
