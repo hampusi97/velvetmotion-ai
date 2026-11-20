@@ -16,7 +16,6 @@ import {
   clearGallery,
   getCoins,
   addCoins,
-  spendCoins,
   addToGallery,
   type GalleryItem,
 } from "@/lib/storage";
@@ -34,6 +33,12 @@ import {
 } from "@/lib/firebase";
 import { CHARACTERS } from "@/lib/characters";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
+import { generateStudioPicture } from "@/lib/mediaGenerator";
+import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
+import { generateFictionalReferenceVariation } from "@/lib/referenceImageGenerator";
+import { getMediaSettings } from "@/lib/mediaSettings";
+import { assertCompliance } from "@/lib/complianceFilter";
+import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 
 const STUDIO_TYPES = [
   { id: "portrait", label: "Portrait", cost: 8 },
@@ -78,7 +83,10 @@ export function UtilitySection({
   const [videoAspectRatio, setVideoAspectRatio] = useState<"9:16" | "16:9">("9:16");
   const [referencePhotoDataUrl, setReferencePhotoDataUrl] = useState<string | null>(null);
   const [studioBusy, setStudioBusy] = useState(false);
+  const [referenceRightsConfirmed, setReferenceRightsConfirmed] = useState(false);
+  const engine = useLocalEngineStatus();
   const [studioNotice, setStudioNotice] = useState<string | null>(null);
+  const [tempVideoUrl, setTempVideoUrl] = useState<string | null>(null);
   const [importUrl, setImportUrl] = useState("");
   const [importOpen, setImportOpen] = useState(false);
 
@@ -162,6 +170,7 @@ export function UtilitySection({
     const reader = new FileReader();
     reader.onload = () => {
       setReferencePhotoDataUrl(String(reader.result || ""));
+      setReferenceRightsConfirmed(false);
     };
     reader.readAsDataURL(file);
   };
@@ -170,113 +179,76 @@ export function UtilitySection({
     if (studioBusy) return;
     const char = CHARACTERS.find((c) => c.id === studioCharId) || CHARACTERS[0];
     const dual = studioDualId ? CHARACTERS.find((c) => c.id === studioDualId) : null;
-    const meta = STUDIO_TYPES.find((t) => t.id === studioType) || STUDIO_TYPES[0];
-    const totalCost = meta.cost + (dual ? 10 : 0);
-
-    if (!spendCoins(totalCost)) {
-      setStudioNotice(`Need ${totalCost} coins (you have ${coins}). Click '+150 demo coins' below.`);
+    const prompt = [char.visualDna || char.figure, studioPose, studioExtra.trim(),
+      dual ? `fictional adult scene with ${dual.name}` : "", "cinematic portrait, fictional consenting adults 21+"].filter(Boolean).join(", ");
+    const compliance = assertCompliance(prompt);
+    if (!compliance.ok) { setStudioNotice(compliance.reason); return; }
+    if (referencePhotoDataUrl && !referenceRightsConfirmed) {
+      setStudioNotice("Confirm the reference is original fictional adult artwork you own. Real selfies can only be animated nonsexually in the main Media Studio.");
       return;
     }
-    setCoins(getCoins());
     setStudioBusy(true);
-    setStudioNotice(null);
-
-    const dualExtra = dual ? `, duo scene with ${dual.name}` : "";
+    setStudioNotice("Requesting a compatible AI provider…");
     try {
+      const characterName = dual ? `${char.name} & ${dual.name}` : char.name;
       if (studioType === "video") {
-        const res = await fetch("/api/generate-video", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId: char.id,
-            pose: studioPose,
-            aspectRatio: videoAspectRatio,
-            referenceImageBase64: referencePhotoDataUrl || undefined,
-            prompt: `${studioPose}${studioExtra ? `, ${studioExtra}` : ""}${dualExtra}`,
-          }),
+        const result = await generateStudioVideoClip({
+          imageUrl: referencePhotoDataUrl || char.avatar,
+          prompt, motionId: "slow-zoom-blink", durationSec: 5, speed: 1,
+          sourceType: "fictional", adultMode: true,
+          comfyOnline: engine.comfyOnline, videoBackendUrl: getMediaSettings().img2vidUrl,
         });
-        const data = await res.json();
-        const frames: string[] | undefined = Array.isArray(data.frames) ? data.frames : undefined;
-        const url = data.videoUrl || data.imageUrl || frames?.[0];
-        if (url) {
-          addToGallery({
-            characterId: char.id,
-            characterName: dual
-              ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}`
-              : char.name,
-            type: "video",
-            url,
-            frames,
-            prompt: data.promptUsed || studioPose,
-          });
+        if (result.videoUrl.startsWith("blob:")) {
+          setTempVideoUrl(result.videoUrl);
+        } else {
+          setTempVideoUrl(null);
+          addToGallery({ characterId: char.id, characterName, type: "video", url: result.videoUrl, prompt });
           setGallery(getGallery());
-          setStudioNotice(
-            referencePhotoDataUrl
-              ? `Animated your uploaded photo into a ${videoAspectRatio} video sequence for ${char.name}.`
-              : `Generated ${videoAspectRatio} video sequence for ${char.name}.`,
-          );
         }
+        setStudioNotice(`${result.isGenerative ? "Generated AI video" : "Created animated still"} via ${result.engine}. ${result.videoUrl.startsWith("blob:") ? "Temporary clip: use main Video Studio to download a file." : "Added to Gallery."} ${result.warning || ""}`);
       } else {
-        const res = await fetch("/api/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId: char.id,
-            name: char.name,
-            figure: char.figure,
-            type: studioType,
-            pose: studioPose,
-            extra: `${studioExtra}${dualExtra}`,
-            referenceImageBase64: referencePhotoDataUrl || undefined,
-          }),
-        });
-        const data = await res.json();
-        if (data.url) {
-          addToGallery({
-            characterId: char.id,
-            characterName: dual
-              ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}`
-              : char.name,
-            type: studioType,
-            url: data.url,
-            prompt: data.prompt || studioPose,
-          });
-          setGallery(getGallery());
-          setStudioNotice(
-            referencePhotoDataUrl
-              ? `Edited reference image with Nano Banana 2.1 for ${char.name} and saved to Gallery.`
-              : `Saved new ${studioType} scene of ${char.name} to Gallery.`,
-          );
-        }
+        const result = referencePhotoDataUrl
+          ? await generateFictionalReferenceVariation({
+              referenceImage: referencePhotoDataUrl, prompt,
+              sourceType: "fictional", adultMode: studioType !== "portrait",
+            })
+          : await generateStudioPicture({
+              prompt, width: 640, height: 960, characterId: char.id,
+              nsfw: studioType !== "portrait", localEngine: engine,
+            });
+        addToGallery({ characterId: char.id, characterName, type: studioType, url: result.imageUrl, prompt });
+        setGallery(getGallery());
+        setStudioNotice(`Generated image via ${result.engine}. No browser-demo coins charged; external provider fees may apply.`);
       }
-    } catch {
-      setStudioNotice("Could not generate media right now.");
+    } catch (error) {
+      setStudioNotice(error instanceof Error ? error.message : "No compatible generation backend responded.");
     } finally {
       setStudioBusy(false);
-      setCoins(getCoins());
     }
   };
 
   const handleGenerateLyriaMusic = async () => {
     if (lyriaBusy) return;
     setLyriaBusy(true);
+    setLyriaAudioUrl(null);
+    const endpoint = (process.env.NEXT_PUBLIC_MUSIC_WORKER_URL || "").trim();
+    if (!endpoint) {
+      setLyriaCaption("Music generation is not connected. No audio has been generated.");
+      setLyriaBusy(false);
+      return;
+    }
     try {
-      const res = await fetch("/api/generate-music", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: lyriaModel,
-          prompt: lyriaPrompt,
-          referenceImageBase64: referencePhotoDataUrl || undefined,
-        }),
+      const res = await fetch(endpoint, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: lyriaModel, prompt: lyriaPrompt.slice(0, 600) }),
       });
-      const data = await res.json();
-      if (data.audioUrl) {
-        setLyriaAudioUrl(data.audioUrl);
-        setLyriaCaption(data.lyrics || `Generated with ${lyriaModel}`);
-      }
-    } catch {
-      /* ignore */
+      if (!res.ok) throw new Error(`Music model HTTP ${res.status}`);
+      const data = (await res.json()) as { audioUrl?: string; title?: string };
+      if (!data.audioUrl || !data.audioUrl.startsWith("https://")) throw new Error("Music provider returned no valid HTTPS audio");
+      setLyriaAudioUrl(data.audioUrl);
+      setLyriaCaption(data.title || "Audio generated by configured service.");
+    } catch (error) {
+      setLyriaCaption(error instanceof Error ? error.message : "Music provider unavailable.");
     } finally {
       setLyriaBusy(false);
     }
@@ -400,9 +372,6 @@ export function UtilitySection({
       return g.type !== "video";
     });
 
-    const activeTypeCost =
-      (STUDIO_TYPES.find((t) => t.id === studioType)?.cost || 12) + (studioDualId ? 10 : 0);
-
     return (
       <section className="mx-auto max-w-5xl space-y-6">
         <button onClick={onHome} className="text-pink-400 text-sm">
@@ -430,7 +399,7 @@ export function UtilitySection({
                 <Sparkles className="h-3.5 w-3.5" /> Instant Media Lab
               </div>
               <h2 className="text-lg font-semibold text-white mt-0.5">
-                Nano Banana 2.1 Image Creation/Editing & Omni Flash Video Animation
+                Connected Image / Video Studio
               </h2>
             </div>
             <button
@@ -508,7 +477,7 @@ export function UtilitySection({
                 <option value="">Solo scene</option>
                 {CHARACTERS.filter((c) => c.id !== studioCharId).map((c) => (
                   <option key={c.id} value={c.id}>
-                    + {c.name} (+10c)
+                    + {c.name}
                   </option>
                 ))}
               </select>
@@ -546,7 +515,7 @@ export function UtilitySection({
                   }`}
                 >
                   {t.id === "video" && <Film className="h-3.5 w-3.5 text-fuchsia-400" />}
-                  {t.label} · {t.cost}c
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -575,8 +544,8 @@ export function UtilitySection({
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-zinc-900/50 px-3.5 py-2.5">
             <span className="text-xs text-zinc-300">
               {studioType === "video"
-                ? "Upload a photo to animate into a video (or leave blank for text-to-video):"
-                : "Upload a reference photo to edit with Nano Banana 2.1 (optional):"}
+                ? "Optional original fictional artwork reference for motion:"
+                : "Optional original fictional adult artwork reference:"}
             </span>
             <div className="flex items-center gap-2">
               <label className="inline-flex items-center gap-1.5 rounded-xl border border-pink-500/40 bg-pink-500/15 px-3 py-1.5 text-xs font-medium text-pink-200 cursor-pointer hover:bg-pink-500/25">
@@ -592,7 +561,7 @@ export function UtilitySection({
               {referencePhotoDataUrl && (
                 <button
                   type="button"
-                  onClick={() => setReferencePhotoDataUrl(null)}
+                  onClick={() => { setReferencePhotoDataUrl(null); setReferenceRightsConfirmed(false); }}
                   className="text-xs text-rose-400"
                 >
                   Clear
@@ -601,6 +570,12 @@ export function UtilitySection({
             </div>
           </div>
 
+          {referencePhotoDataUrl && (
+            <label className="flex gap-2 rounded-xl border border-rose-300/25 bg-rose-300/10 p-3 text-[11px] text-zinc-200">
+              <input type="checkbox" checked={referenceRightsConfirmed} onChange={(e) => setReferenceRightsConfirmed(e.target.checked)} />
+              <span>This reference is original fictional-adult artwork I own or may use; it is not a photograph of a real person. For a nonsexual self-portrait animation, use the main Media Studio.</span>
+            </label>
+          )}
           <div className="flex flex-wrap gap-2">
             <input
               type="text"
@@ -620,14 +595,21 @@ export function UtilitySection({
                 ? "Rendering…"
                 : studioType === "video"
                   ? referencePhotoDataUrl
-                    ? `Animate Photo (${videoAspectRatio}) · ${activeTypeCost}c`
-                    : `Generate ${videoAspectRatio} Video (${activeTypeCost}c)`
+                    ? `Animate fictional art (${videoAspectRatio})`
+                    : `Create ${videoAspectRatio} Video`
                   : referencePhotoDataUrl
-                    ? `Edit Photo (${activeTypeCost}c)`
-                    : `Generate Picture (${activeTypeCost}c)`}
+                    ? "Edit original fictional art"
+                    : "Generate Picture"}
             </button>
           </div>
 
+          {tempVideoUrl && (
+            <div className="space-y-2 rounded-xl border border-rose-300/20 bg-black/40 p-3">
+              <p className="text-[11px] text-rose-200">Temporary video clip — download before leaving the page</p>
+              <video src={tempVideoUrl} controls playsInline className="max-h-80 w-full rounded-xl object-contain" />
+              <a href={tempVideoUrl} download="velvetmotion-clip.webm" className="inline-block rounded-full bg-rose-700 px-4 py-2 text-xs font-bold text-white">Download video</a>
+            </div>
+          )}
           {studioNotice && (
             <p className="text-xs text-pink-300 bg-pink-500/10 border border-pink-500/30 rounded-xl px-3 py-2">
               {studioNotice}
@@ -641,7 +623,7 @@ export function UtilitySection({
             <div className="flex items-center gap-2">
               <Music className="h-4 w-4 text-fuchsia-400" />
               <h2 className="text-base font-semibold text-white">
-                Lyria 3 Lounge & Bedroom Soundtrack Generator
+                Music Studio (optional connected model)
               </h2>
             </div>
             <div className="flex items-center gap-1.5">
@@ -681,10 +663,11 @@ export function UtilitySection({
               onClick={() => void handleGenerateLyriaMusic()}
               className="rounded-xl bg-fuchsia-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50"
             >
-              {lyriaBusy ? "Composing…" : "Generate Music"}
+              {lyriaBusy ? "Composing…" : "Generate with connected model"}
             </button>
           </div>
 
+          {lyriaCaption && !lyriaAudioUrl && <p role="status" className="rounded-xl border border-white/10 p-3 text-xs text-zinc-300">{lyriaCaption}</p>}
           {lyriaAudioUrl && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-4 py-2.5 text-xs text-fuchsia-200">
               <span className="truncate max-w-md">{lyriaCaption}</span>

@@ -170,23 +170,29 @@ export function Penthouse3DSuite({ onHome, onOpenChat }: Penthouse3DSuiteProps) 
   const handleGenerateSoundtrack = useCallback(async () => {
     if (musicLoading) return;
     setMusicLoading(true);
+    setMusicTitle(null);
+    const url = (process.env.NEXT_PUBLIC_MUSIC_WORKER_URL || "").trim();
+    if (!url) {
+      setMusicTitle("Music generation is not connected. Configure an approved audio service.");
+      setMusicLoading(false);
+      return;
+    }
     try {
       const preset = LIGHTING_PRESETS[stateRef.current.lighting];
-      const res = await fetch("/api/generate-music", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch(url, {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           model: "lyria-3-clip-preview",
-          prompt: `Sensual ${preset.name} penthouse lounge music with warm synth pads, slow R&B pulse, and velvet nocturnal atmosphere for ${companion.name}`,
+          prompt: `Original instrumental ${preset.name} penthouse lounge soundtrack with warm synth pads and cinematic atmosphere for fictional character ${companion.name}`,
         }),
       });
-      const data = await res.json();
-      if (data.audioUrl) {
-        setMusicUrl(data.audioUrl);
-        setMusicTitle(data.lyrics || `${preset.name} Lounge Track`);
-      }
-    } catch {
-      /* ignore */
+      if (!res.ok) throw new Error(`Music service returned HTTP ${res.status}`);
+      const data = (await res.json()) as { audioUrl?: string; title?: string };
+      if (!data.audioUrl || !data.audioUrl.startsWith("https://")) throw new Error("Music service returned no valid HTTPS audio URL");
+      setMusicUrl(data.audioUrl);
+      setMusicTitle(data.title || `${preset.name} Lounge Track`);
+    } catch (error) {
+      setMusicTitle(error instanceof Error ? error.message : "Music provider unavailable.");
     } finally {
       setMusicLoading(false);
     }
@@ -933,7 +939,7 @@ export function Penthouse3DSuite({ onHome, onOpenChat }: Penthouse3DSuiteProps) 
               disabled={musicLoading}
               className="rounded-xl border border-fuchsia-500/40 bg-fuchsia-500/20 px-2.5 py-1 text-[11px] text-fuchsia-200 hover:bg-fuchsia-500/30 disabled:opacity-50"
             >
-              {musicLoading ? "Composing…" : "♪ Lyria Lounge Music"}
+              {musicLoading ? "Composing…" : "♪ Connected music service"}
             </button>
             <button
               type="button"
@@ -956,6 +962,9 @@ export function Penthouse3DSuite({ onHome, onOpenChat }: Penthouse3DSuiteProps) 
       {/* Active Narrative & Quick Hotspot Strip */}
       {suiteState.phase === "playing" && (
         <div className="absolute bottom-14 left-3 right-3 z-10 flex flex-col items-center gap-2 pointer-events-none">
+          {musicTitle && !musicUrl && (
+            <p role="status" className="pointer-events-auto rounded-xl border border-fuchsia-300/20 bg-[#0d0616]/90 px-3 py-2 text-xs text-fuchsia-200">{musicTitle}</p>
+          )}
           {musicUrl && (
             <div className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-fuchsia-500/30 bg-[#0d0616]/90 px-3.5 py-1.5 text-xs text-fuchsia-200">
               <span className="truncate max-w-xs">{musicTitle}</span>

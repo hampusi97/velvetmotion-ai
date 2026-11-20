@@ -240,6 +240,46 @@ async function tryLocalTtsEndpoint(
   }
 }
 
+/**
+ * Export a real, explicitly synthesized sample from the user's own local
+ * Kokoro service. This does not generate a recorded human voice or silently
+ * fall back to device speech (which cannot be exported as an audio file).
+ */
+export async function generateLocalNeuralVoiceSample(
+  text: string,
+  voiceId: KokoroVoiceId,
+): Promise<Blob> {
+  const clean = cleanSpeechText(text).slice(0, 300);
+  if (!clean) throw new Error("Write a sample line before generating audio.");
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), 30000);
+  try {
+    const res = await fetch("http://127.0.0.1:8880/v1/audio/speech", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "kokoro",
+        input: clean,
+        voice: normalizeFemaleKokoroVoice(voiceId),
+        response_format: "mp3",
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) throw new Error(`Local neural voice service returned HTTP ${res.status}`);
+    const type = res.headers.get("content-type") || "";
+    if (!type.toLowerCase().startsWith("audio/")) {
+      throw new Error("The configured service returned data rather than an MP3 audio file.");
+    }
+    const blob = await res.blob();
+    if (blob.size < 512) throw new Error("The voice model returned an empty or invalid recording.");
+    return new Blob([blob], { type: "audio/mpeg" });
+  } catch (e) {
+    throw new Error(e instanceof Error ? e.message : "Kokoro is not running at 127.0.0.1:8880");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function speakWithNeuralVoice(
   text: string,
   opts: { voiceId?: string; whispery?: boolean; pitch?: number; rate?: number; engineOverride?: VoiceEngineId } = {},

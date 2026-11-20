@@ -146,6 +146,12 @@ export async function saveGalleryDB(item: GalleryRow) {
   await d.gallery.put(item);
 }
 
+/** Remove a gallery row from IndexedDB, not just the browser's localStorage index. */
+export async function deleteGalleryDB(id: string): Promise<void> {
+  const db = getDb();
+  if (db) await db.gallery.delete(id);
+}
+
 export async function loadGalleryDB(characterId?: string): Promise<GalleryRow[]> {
   const d = getDb();
   if (!d) return [];
