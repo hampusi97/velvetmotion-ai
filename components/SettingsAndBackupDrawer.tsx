@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Cloud, Copy, Cpu, Download, ExternalLink, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
 import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
-import { loadRouterSettings, saveRouterSettings } from "@/lib/chatRouter";
+import { loadRouterSettings, saveRouterSettings, type ChatRouterSettings } from "@/lib/chatRouter";
 import { checkDesktopUpdate, triggerBossKey, useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
 import { useFirebaseCloudSync } from "@/lib/firebaseSync";
@@ -30,8 +30,11 @@ export function SettingsAndBackupDrawer({
     if (typeof document === "undefined") return "hyper";
     return document.documentElement.getAttribute("data-neon") === "subtle" ? "subtle" : "hyper";
   });
+  const [chatProvider, setChatProvider] = useState(initialRouter.provider);
   const [openRouterKey, setOpenRouterKey] = useState(initialRouter.openRouterApiKey || "");
   const [customUrl, setCustomUrl] = useState(initialRouter.customBaseUrl || "");
+  const [customModel, setCustomModel] = useState(initialRouter.customModel || "");
+  const [customApiKey, setCustomApiKey] = useState(initialRouter.customApiKey || "");
   const [homeEngineUrl, setHomeEngineUrl] = useState(initialRouter.homeEngineUrl || "");
   const [ollamaModel, setOllamaModel] = useState(initialRouter.ollamaModel || "llama3.1:8b");
   const [stealthNotif, setStealthNotif] = useState(() => {
@@ -87,8 +90,11 @@ export function SettingsAndBackupDrawer({
 
   const saveModelSettings = () => {
     saveRouterSettings({
+      provider: chatProvider,
       openRouterApiKey: openRouterKey.trim() || undefined,
       customBaseUrl: customUrl.trim() || undefined,
+      customModel: customModel.trim() || undefined,
+      customApiKey: customApiKey.trim() || undefined,
       homeEngineUrl: homeEngineUrl.trim() || undefined,
       ollamaModel: ollamaModel.trim() || "llama3.1:8b",
       samplerPreset,
@@ -505,7 +511,17 @@ export function SettingsAndBackupDrawer({
 
         {/* BYOK + Stealth */}
         <div className="rounded-2xl border border-white/10 bg-[#05050a] p-3.5 space-y-2.5">
-          <p className="text-xs font-bold text-[#f7f7fc]">BYOK AI &amp; Privacy</p>
+          <h3 className="text-xs font-bold text-[#f7f7fc]">Chat model</h3>
+          <label className="block text-xs text-[#a6a6c4]">Chat provider
+            <select value={chatProvider} onChange={(e) => setChatProvider(e.target.value as ChatRouterSettings["provider"])}
+              className="mt-1 w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white">
+              <option value="auto">Automatic</option>
+              <option value="local">Built-in local endpoints</option>
+              <option value="custom">Custom (OpenAI-compatible)</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="ai-horde">AI Horde</option>
+            </select>
+          </label>
           <input
             type="password"
             value={openRouterKey}
@@ -516,7 +532,23 @@ export function SettingsAndBackupDrawer({
           <input
             value={customUrl}
             onChange={(e) => setCustomUrl(e.target.value)}
-            placeholder="Custom OpenAI-compatible URL (e.g. http://127.0.0.1:5001/v1)"
+            aria-label="Custom endpoint URL"
+            placeholder="Custom endpoint URL (e.g. http://127.0.0.1:18081/v1)"
+            className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
+          />
+          <input
+            value={customModel}
+            onChange={(e) => setCustomModel(e.target.value)}
+            aria-label="Model ID"
+            placeholder="Custom or OpenRouter model ID (e.g. qwen3-4b)"
+            className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
+          />
+          <input
+            type="password"
+            value={customApiKey}
+            onChange={(e) => setCustomApiKey(e.target.value)}
+            aria-label="Custom endpoint API key"
+            placeholder="Custom endpoint API key (optional)"
             className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
           />
           <input

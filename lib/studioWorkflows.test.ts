@@ -12,6 +12,7 @@ import {
 import { parseVideoSceneDraft, videoSceneDraftKey, type VideoSceneDraft } from "./videoSceneDraft";
 import { buildGuidedSession } from "./guidedSession";
 import { generateStudioPicture } from "./mediaGenerator";
+import { readChatEventStream } from "./chatStream";
 
 const videoRequest: StudioVideoRequest = {
   mode: "ai",
@@ -76,6 +77,31 @@ test("JOI drafts map model cues to the selected session length", () => {
   assert.deepEqual(session.steps.map((step) => step.suggestedSeconds), [60, 120, 60]);
   assert.throws(() => buildGuidedSession('["One cue"]', persona, "gentle", 4), /three usable cues/);
   assert.throws(() => buildGuidedSession('["Start slowly.", "Use a deepfake.", "Take a breath."]', persona, "gentle", 4), /strictly prohibited/);
+});
+
+test("chat previews survive split SSE events and hide reasoning as tokens arrive", async () => {
+  const encoder = new TextEncoder();
+  const event = (content: string) => `data: ${JSON.stringify({ choices: [{ delta: { content } }] })}\r\n\r\n`;
+  const prefix = encoder.encode(event("<thi") + event("nk>private plan") + event("</think>Play it again "));
+  const suffix = encoder.encode(event("🎵") + "data: [DONE]\r\n\r\n");
+  const emojiStart = suffix.indexOf(0xf0);
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of [prefix.subarray(0, 12), prefix.subarray(12), suffix.subarray(0, emojiStart + 1), suffix.subarray(emojiStart + 1)]) {
+        controller.enqueue(chunk);
+      }
+      controller.close();
+    },
+  });
+  const previews: string[] = [];
+  const reply = await readChatEventStream(body, (preview) => previews.push(preview));
+  assert.equal(reply, "<think>private plan</think>Play it again 🎵");
+  assert.deepEqual(previews, ["", "", "Play it again ", "Play it again 🎵"]);
+});
+
+test("chat rejects a disconnected stream before a reply can be saved", async () => {
+  const body = new Response('data: {"choices":[{"delta":{"content":"Partial reply"}}]}\n\n').body!;
+  await assert.rejects(readChatEventStream(body), /ended before the provider completed/);
 });
 
 test("18+ video presets produce an editable fictional prompt and require 18+ mode", () => {

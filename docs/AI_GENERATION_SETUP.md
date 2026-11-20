@@ -10,15 +10,40 @@ The web app is a static Next.js export. It does not ship an LLM, a TTS model, a 
 - **Free route:** AI Horde can be slow, full, or lack compatible workers. Availability is not guaranteed.
 - The chosen provider now controls routing: choosing local will not quietly send chats to a cloud worker. When all compatible providers fail, the app reports a connection error instead of pretending it generated a reply.
 
+### Run Qwen3-4B on a CPU
+
+Install a recent [llama.cpp](https://github.com/ggml-org/llama.cpp/releases) build and download `Qwen3-4B-Q4_K_M.gguf` from the [official Qwen repository](https://huggingface.co/Qwen/Qwen3-4B-GGUF). The download is about 2.5 GB. The following command uses the CPU and permits requests from the local VelvetMotion web app.
+
+```bash
+llama-server -m ./Qwen3-4B-Q4_K_M.gguf --alias qwen3-4b \
+  --host 127.0.0.1 --port 18081 --n-gpu-layers 0 --ctx-size 8192 \
+  --reasoning off --cors-origins http://localhost:3000
+```
+
+Run `npm run dev` at the repository root and open `http://localhost:3000`. Use the same app origin in your browser and the `--cors-origins` flag. Open **Settings → Chat model** and select **Custom (OpenAI-compatible)**. Enter `http://127.0.0.1:18081/v1` as the endpoint URL and `qwen3-4b` as the model ID. Leave the API key blank and select **Save Preferences Locally**. Chat streams replies as the model writes. The same model can draft guided audio scripts. Generation speed depends on the machine, and supported content depends on the model and provider.
+
 ## Neural voice
 - **Kokoro-FastAPI:** an OpenAI-compatible TTS endpoint at `http://127.0.0.1:8880/v1/audio/speech`, with a female voice such as `af_heart` or `af_bella`; requires a separately running TTS server.
 - **Optional Fish local service:** OpenAI-compatible speech endpoint at `http://127.0.0.1:5002/v1/audio/speech`, only if one is installed there.
 - The UI falls back to browser speech when neural services are unreachable. The label **Browser voice (fallback)** is literal; it is not Kokoro-quality audio. The server now has a more realistic synthesis timeout, and hands-free calls wait for playback to complete before restarting the microphone.
 - Browser autoplay, browser CORS, and HTTPS-to-localhost restrictions may prevent local TTS despite a running server.
 
+### Run Kokoro voice on a CPU
+
+Download `kokoro-v1.0.int8.onnx` and `voices-v1.0.bin` from the [Kokoro ONNX model release](https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0) into the same folder. From the repository root, install the dependencies into a Python virtual environment and start the adapter.
+
+```bash
+python3 -m venv .venv-kokoro
+.venv-kokoro/bin/python -m pip install kokoro-onnx==0.4.9 espeakng-loader==0.2.4
+.venv-kokoro/bin/python workers/kokoro_local.py \
+  --model /path/to/kokoro-v1.0.int8.onnx --voices /path/to/voices-v1.0.bin
+```
+
+The app discovers the service on `127.0.0.1:8880`. Open the Voice Atelier and try **Neural preview** or play a companion cue in Guided JOI Audio. This adapter returns 24 kHz WAV audio. Set `VELVET_VOICE_ORIGINS` to a comma-separated list of trusted app origins if using a different frontend origin.
+
 ## Images
 - **Local ComfyUI:** `http://127.0.0.1:8188` plus a *real installed compatible image checkpoint/workflow*.
-- **General-purpose cloud worker:** used for ordinary images, not mature-mode requests.
+- **General-purpose cloud worker:** used for ordinary images. Studio keeps the original resolution for download and animation, and saves a compact copy to Collection.
 - **AI Horde:** optional image generation with `nsfw: true` only for appropriate adult requests; only workers accepting that type of request can run it. Free queues, active models, and moderation decisions vary. No model names are hard-coded unless a user explicitly selects them.
 - **Face identity:** the same per-character seed is used when aggressive face lock is enabled. A seed alone does not provide face identity fidelity; a compatible reference-image workflow/IP-Adapter is better.
 
@@ -47,7 +72,7 @@ The **AI video** option requests 480p, 720p, or 1080p. The provider chooses what
 
 ### Use an installed ComfyUI video workflow locally
 
-1. In ComfyUI, test a working image-to-video graph such as a compatible Wan or LTX workflow with an MP4 or WebM save node. Install its checkpoints and custom nodes first.
+1. On a GPU-backed ComfyUI installation, try the [Wan2.2 5B TI2V workflow](https://docs.comfy.org/tutorials/video/wan/wan2_2). Wan2.2 5B supports 720p at 24 fps. Install the checkpoints, run a short image-to-video test, and confirm the workflow produces an MP4 or WebM. See the [model requirements](https://github.com/Wan-Video/Wan2.2) for GPU memory and supported resolutions.
 2. Export the graph as **API format**. In the exported JSON, set the `LoadImage` node's `inputs.image` to `"{{image}}"`. You can also replace the positive prompt field with `"{{prompt}}"`. Optional `"{{durationSec}}"` and `"{{resolution}}"` slots are replaced with numbers. Use these only in nodes that accept seconds and the configured resolution value. Leave frame counts and dimension pairs at your model's supported settings.
 3. Set the `VELVET_COMFY_VIDEO_WORKFLOW` environment variable to that trusted local JSON file and start `python3 workers/local_media_proxy.py`. With the default loopback binding, set the Studio endpoint to `http://127.0.0.1:8787/generate-video`. For a local browser, run the app on localhost. The adapter accepts inline PNG, JPEG and WebP and sends them to your ComfyUI server.
 4. Start with a short 480p test and inspect the real result before increasing resolution. Set `VELVET_VIDEO_ORIGINS` only if your app runs on a different trusted origin. For a publicly hosted bridge, enforce authentication and content rules on the server.

@@ -436,6 +436,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "chat" && selected && (
             <NeonErrorBoundary label="Chat Command Center" onReset={() => setView("home")}>
               <CharacterChat
+                key={selected.id}
                 character={selected}
                 romanceMode={romanceMode}
                 onBack={() => setView("home")}

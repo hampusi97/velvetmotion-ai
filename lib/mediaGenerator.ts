@@ -31,6 +31,7 @@ export interface PictureGenerationRequest {
 
 export interface PictureGenerationResult {
   imageUrl: string;
+  galleryImageUrl?: string;
   engine: string;
   seed: number;
   elapsedSec: number;
@@ -84,6 +85,7 @@ export async function generateStudioPicture(
   const parsedSeed = req.seed ?? Math.floor(Math.random() * 90000 + 1000);
   const t0 = performance.now();
   let imageUrl: string | null = null;
+  let galleryImageUrl: string | undefined;
   let localError: string | undefined;
   let engine = "Cloud Free";
 
@@ -125,9 +127,11 @@ export async function generateStudioPicture(
     const cf = await fetchWorkerImage(req.prompt, {
       baseUrl: req.imageWorkerUrl,
       seed: parsedSeed,
+      includeOriginal: true,
     });
     if (cf.ok) {
-      imageUrl = cf.url;
+      imageUrl = cf.originalUrl || cf.url;
+      galleryImageUrl = cf.url;
       engine = "Cloudflare Flux";
     }
   }
@@ -149,5 +153,5 @@ export async function generateStudioPicture(
   const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
   reportGenerationSpeed({ imgSec: elapsedSec, lastEngine: engine });
 
-  return { imageUrl, engine, seed: parsedSeed, elapsedSec };
+  return { imageUrl, galleryImageUrl, engine, seed: parsedSeed, elapsedSec };
 }

@@ -191,6 +191,7 @@ async function tryLocalTtsEndpoint(
   text: string,
   voiceId: string,
   generation: number,
+  speed?: number,
 ): Promise<boolean> {
   const ctrl = new AbortController();
   activeSpeechRequest = ctrl;
@@ -204,6 +205,7 @@ async function tryLocalTtsEndpoint(
         input: text,
         voice: voiceId,
         response_format: "mp3",
+        ...(speed !== undefined ? { speed } : {}),
       }),
       signal: ctrl.signal,
     });
@@ -268,11 +270,11 @@ export async function generateLocalNeuralVoiceSample(
     if (!res.ok) throw new Error(`Local neural voice service returned HTTP ${res.status}`);
     const type = res.headers.get("content-type") || "";
     if (!type.toLowerCase().startsWith("audio/")) {
-      throw new Error("The configured service returned data rather than an MP3 audio file.");
+      throw new Error("The configured service did not return playable audio.");
     }
     const blob = await res.blob();
     if (blob.size < 512) throw new Error("The voice model returned an empty or invalid recording.");
-    return new Blob([blob], { type: "audio/mpeg" });
+    return blob;
   } catch (e) {
     throw new Error(e instanceof Error ? e.message : "Kokoro is not running at 127.0.0.1:8880");
   } finally {
@@ -312,6 +314,7 @@ export async function speakWithNeuralVoice(
       clean,
       femaleKokoroVoice,
       generation,
+      opts.rate,
     );
     if (okKokoro) {
       if (selected === "reverb-tts-webgpu") return { engine: "reverb-webgpu", label: "Reverb-TTS WebGPU" };
@@ -328,6 +331,7 @@ export async function speakWithNeuralVoice(
         clean,
         femaleKokoroVoice,
         generation,
+        opts.rate,
       );
       if (kokoroFallback) return { engine: "kokoro", label: "Kokoro-82M (neural fallback)" };
     }

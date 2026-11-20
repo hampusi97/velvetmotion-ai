@@ -30,8 +30,8 @@ import {
 } from "lucide-react";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } from "@/lib/audioEngine";
-import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
-import { continueCompanionScene, generateCompanionReply, sanitizeCompanionReply } from "@/lib/chatRouter";
+import { CHARACTERS, type Character } from "@/lib/characters";
+import { continueCompanionScene, generateCompanionReply, sanitizeCompanionReply, type ChatStreamOptions } from "@/lib/chatRouter";
 import { assertCompliance } from "@/lib/complianceFilter";
 import {
   listChatBranchesDB,
@@ -47,7 +47,6 @@ import { playLevelUpSwell } from "@/lib/neonAudio";
 import { hapticLevelUp } from "@/lib/haptics";
 import { ChatMiniGames } from "@/components/ChatMiniGames";
 import { AmbientMixer } from "@/components/AmbientMixer";
-import { computeMoodState } from "@/lib/moodEngine";
 import { extractMemoriesFromMessage, loadMemories, saveMemories, splitInnerThoughtAndReply } from "@/lib/memoryMap";
 import { memoryPromptBlock, pinLong, pushShort } from "@/lib/memoryTiers";
 import { stageFromIntimacy } from "@/lib/relationship";
@@ -84,7 +83,6 @@ import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 import { VoiceCallModal } from "@/components/VoiceCallModal";
 import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories, type MemoryCategory } from "@/components/MemoryVaultDrawer";
 import {
-  buildProactiveFollowUp,
   extractInlineImageRequests,
   extractMemoriesFromMessage as extractDynamicMemories,
   generateQuickReplySuggestions,
@@ -117,7 +115,6 @@ function toVaultCategory(cat: CompanionMemoryItem["category"]): MemoryCategory {
 }
 import { SafeImage } from "@/components/SafeImage";
 import { ScenarioDirector } from "@/components/ScenarioDirector";
-import { useDelayedLingerieDrop } from "@/components/ChatExtrasHooks";
 
 type ChatMessage = StoredMessage & {
   id?: string;
@@ -166,11 +163,24 @@ const SEQUENCE_LINES: Record<SequenceKind, string> = {
   bnwo: "*Neon night.*\n\n“Follow every beat.”",
 };
 
+const SCENE_TONES = {
+  "In character": "",
+  "Playful": "Use quick banter, a specific callback to the user's message, and a playful choice.",
+  "Slow burn": "Let the tension build gradually. Use a small sensory detail and leave space for the user to respond.",
+  "Bold": "Make the dialogue more direct and flirtatious while checking the user's pace.",
+} as const;
+
+type ChatSceneTone = keyof typeof SCENE_TONES;
+
 export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSelectCompanion }: CharacterChatProps) {
   const flagshipProfile = FLAGSHIP_COMPANIONS.some(({ id }) => id === character.id);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [liveReply, setLiveReply] = useState("");
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [sceneTone, setSceneTone] = useState<ChatSceneTone>("In character");
+  const replyController = useRef<AbortController | null>(null);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
@@ -206,12 +216,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [progression, setProgression] = useState<CompanionProgression>(() => getCompanionProgression(character.id));
   const [timeMood] = useState(() => getTimeMood());
   const [timeVibe] = useState(() => getLocalTimeVibe());
-  const proactiveSentRef = useRef(false);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      replyController.current?.abort();
     };
   }, []);
   const [branches, setBranches] = useState<BranchRow[]>([]);
@@ -226,14 +236,6 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const engineStatus = useLocalEngineStatus();
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  useDelayedLingerieDrop(character, intimacy, messages.length, (msg) => {
-    setMessages((prev) => {
-      const next = [...prev, msg];
-      saveChat(character.id, next);
-      return next;
-    });
-  });
 
   const stage = stageFromIntimacy(intimacy);
   const progStats = levelProgressPercent(progression.xp);
@@ -251,7 +253,6 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   useEffect(() => {
-    proactiveSentRef.current = false;
     setProgression(getCompanionProgression(character.id));
     setGifts(getGiftsFor(character.id));
     setIntimacy(getIntimacy(character.id, character.intimacy));
@@ -273,6 +274,10 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeMedia, generatingPhoto]);
+
+  useEffect(() => {
+    if (liveReply) bottomRef.current?.scrollIntoView({ behavior: "instant" });
+  }, [liveReply]);
 
   useEffect(() => () => stopIntimacyAudio(), []);
 
@@ -298,32 +303,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     return generateQuickReplySuggestions(lastAssistant, character.name.split(" ")[0]);
   }, [character.initialMessage, character.name, messages]);
 
-  // Gentle idle double-text timer (75s inactivity in an open chat, max once per session)
-  useEffect(() => {
-    if (proactiveSentRef.current || busy || generatingPhoto || input.trim() || messages.length === 0) return;
-    const timer = window.setTimeout(() => {
-      if (!mountedRef.current || proactiveSentRef.current) return;
-      proactiveSentRef.current = true;
-      const followUp = buildProactiveFollowUp(
-        {
-          id: character.id,
-          name: character.name,
-          age: character.age,
-          personality: character.personality,
-          backstory: character.background,
-          mood: timeMood.badge,
-        },
-        toDynamicMemories(character.id),
-      );
-      const nextMsgs: ChatMessage[] = [...messages, { role: "assistant", content: followUp }];
-      setMessages(nextMsgs);
-      void saveChatDB(character.id, nextMsgs);
-      saveChat(character.id, nextMsgs);
-    }, 75_000);
-    return () => window.clearTimeout(timer);
-  }, [busy, character.age, character.background, character.id, character.name, character.personality, generatingPhoto, input, messages, timeMood.badge]);
-
   const forkFromMessage = async (idx: number) => {
+    if (busy) return;
     const slice = messages.slice(0, idx + 1);
     const branchId = `b-${Date.now().toString(36)}`;
     const label = `What-If #${branches.length + 1}`;
@@ -343,6 +324,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const switchBranch = async (branchId: string) => {
+    if (busy) return;
     setActiveBranchId(branchId);
     if (branchId === "main") {
       const dbLoaded = await loadChatDB(character.id);
@@ -388,6 +370,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       .map((m) => `- [${m.category}] ${m.text}`)
       .join("\n");
     const memoryBlock = [vaultNotes, memoryPromptBlock(character.id)].filter(Boolean).join("\n");
+    const kinks = getKinks(character.id).slice(-3);
     return {
       id: character.id,
       name: character.name,
@@ -399,10 +382,20 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       memories: dynamicMemories,
       relationshipLevel: progStats.level,
       recentMood: timeMood.badge,
+      extraSceneContext: [
+        SCENE_TONES[sceneTone],
+        kinks.length ? `User-selected fantasy themes, only when relevant: ${kinks.join(", ")}.`
+          : "",
+      ].filter(Boolean).join(" "),
     };
   };
 
-  const requestReplyForHistory = async (historyMsgs: ChatMessage[], userPrompt: string) => {
+  const requestReplyForHistory = async (
+    historyMsgs: ChatMessage[],
+    userPrompt: string,
+    options: ChatStreamOptions = {},
+    rememberUser = true,
+  ) => {
     const safety = assertCompliance(userPrompt);
     if (!safety.ok) {
       setSafetyError(safety.reason);
@@ -411,30 +404,32 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     setSafetyError(null);
 
     try {
-      pushShort(character.id, "user", userPrompt);
-      const existing = loadMemories(character.id);
-      saveMemories(character.id, extractMemoriesFromMessage(userPrompt, existing));
+      if (rememberUser) {
+        pushShort(character.id, "user", userPrompt);
+        const existing = loadMemories(character.id);
+        saveMemories(character.id, extractMemoriesFromMessage(userPrompt, existing));
 
-      const extractedFacts = extractDynamicMemories(userPrompt);
-      if (extractedFacts.length > 0) {
-        const currentVault = loadCategorizedMemories(character.id);
-        const newVaultItems = extractedFacts
-          .filter((f) => !currentVault.some((v) => v.text.toLowerCase() === f.text.toLowerCase()))
-          .map((f, idx) => ({
-            id: `dyn-${Date.now()}-${idx}`,
-            category: toVaultCategory(f.category),
-            text: f.text,
-            pinned: Boolean(f.pinned),
-            updatedAt: Date.now(),
-          }));
-        if (newVaultItems.length > 0) {
-          saveCategorizedMemories(character.id, [...newVaultItems, ...currentVault]);
-          notifySaved("🧠 Saved to Memory Vault");
+        const extractedFacts = extractDynamicMemories(userPrompt);
+        if (extractedFacts.length > 0) {
+          const currentVault = loadCategorizedMemories(character.id);
+          const newVaultItems = extractedFacts
+            .filter((f) => !currentVault.some((v) => v.text.toLowerCase() === f.text.toLowerCase()))
+            .map((f, idx) => ({
+              id: `dyn-${Date.now()}-${idx}`,
+              category: toVaultCategory(f.category),
+              text: f.text,
+              pinned: Boolean(f.pinned),
+              updatedAt: Date.now(),
+            }));
+          if (newVaultItems.length > 0) {
+            saveCategorizedMemories(character.id, [...newVaultItems, ...currentVault]);
+            notifySaved("🧠 Saved to Memory Vault");
+          }
         }
-      }
 
-      if (/(always remember|never forget|my name is|call me)/i.test(userPrompt)) {
-        pinLong(character.id, userPrompt.slice(0, 180));
+        if (/(always remember|never forget|my name is|call me)/i.test(userPrompt)) {
+          pinLong(character.id, userPrompt.slice(0, 180));
+        }
       }
     } catch {
       /* ignore */
@@ -443,20 +438,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     const routed = await generateCompanionReply(
       historyMsgs.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
       buildPersonaPayload(),
+      options,
     );
-
-    const sanitized = sanitizeCompanionReply(routed.text, character.name);
-    if (sanitized) return sanitized;
-
-    const mood = computeMoodState?.({
-      character,
-      messages: historyMsgs,
-      durationSeconds: 60,
-      intimacy,
-      romanceMode,
-      giftCount: gifts.length,
-    });
-    return fallbackReply(character, userPrompt, romanceMode, mood);
+    if (!mountedRef.current || options.signal?.aborted) return null;
+    if (routed.providerUsed === "provider-unavailable" || routed.providerUsed === "compliance-guard") {
+      setReplyError(routed.text);
+      return null;
+    }
+    return routed.text;
   };
 
   const attachInlinePhotoAt = async (baseBatch: ChatMessage[], targetIdx: number, scenePrompt: string) => {
@@ -511,42 +500,45 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     }
   };
 
-  const send = async (overrideText?: string, bonusXp = 6) => {
-    const text = (overrideText ?? input).trim();
-    if (!text || busy) return;
+  const send = async (overrideText?: string, bonusXp = 6, retryExisting = false) => {
+    const previous = messages.at(-1);
+    const text = (retryExisting ? previous?.content || "" : overrideText ?? input).trim();
+    if (!text || busy || replyController.current || (retryExisting && previous?.role !== "user")) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
       setSafetyError(guard.reason);
       return;
     }
 
-    if (!overrideText) setInput("");
-    const userMsg: ChatMessage = { role: "user", content: text };
-    const next = [...messages, userMsg];
-    persist(next);
+    if (!overrideText && !retryExisting) setInput("");
+    const next: ChatMessage[] = retryExisting ? messages : [...messages, { role: "user", content: text }];
+    if (!retryExisting) persist(next);
+    const controller = new AbortController();
+    replyController.current = controller;
+    setReplyError(null);
+    setLiveReply("");
     setBusy(true);
 
     try {
-      const kinks = getKinks(character.id);
-      const rawReply = (await requestReplyForHistory(next, text)) || fallbackReply(character, text, romanceMode);
+      const rawReply = await requestReplyForHistory(next, text, {
+        signal: controller.signal,
+        onProgress: (preview) => {
+          if (!mountedRef.current || controller.signal.aborted) return;
+          setLiveReply(extractInlineImageRequests(preview.replace(/\[(?:image|photo|selfie)[^\]]*$/i, "")).cleanText);
+        },
+      }, !retryExisting);
+      if (!rawReply || !mountedRef.current || controller.signal.aborted) return;
+      replyController.current = null;
+      setLiveReply("");
       const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
-      let replyText = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
-      if (kinks.length && Math.random() < 0.25) {
-        replyText += `\n\n*She remembers.* “Still thinking about ${kinks[kinks.length - 1]}…”`;
-      }
-
+      const replyText = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
       pushShort(character.id, "assistant", replyText);
       const bubbles = splitIntoNaturalBubbles(replyText);
-      let latestBatch: ChatMessage[] = [...next, { role: "assistant", content: bubbles[0] || replyText }];
+      const latestBatch: ChatMessage[] = [
+        ...next,
+        ...((bubbles.length ? bubbles : [replyText]).map((content) => ({ role: "assistant" as const, content }))),
+      ];
       persist(latestBatch);
-
-      if (bubbles.length > 1) {
-        await new Promise((r) => setTimeout(r, 750));
-        if (mountedRef.current) {
-          latestBatch = [...latestBatch, { role: "assistant", content: bubbles.slice(1).join(" ") }];
-          persist(latestBatch);
-        }
-      }
 
       if (imagePrompts.length > 0 && mountedRef.current) {
         await attachInlinePhotoAt(latestBatch, latestBatch.length - 1, imagePrompts[0]);
@@ -571,8 +563,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         });
       }
       updateIntimacyAudioIntensity?.(Math.min(100, newInt));
+    } catch {
+      if (mountedRef.current) setReplyError(controller.signal.aborted ? "Reply stopped. You can retry the same message." : "The reply was interrupted. Try again.");
     } finally {
-      setBusy(false);
+      replyController.current = null;
+      if (mountedRef.current) {
+        setLiveReply("");
+        setBusy(false);
+      }
     }
   };
 
@@ -580,9 +578,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     if (busy) return;
     const prior = messages.slice(0, assistantIndex);
     const lastUser = [...prior].reverse().find((m) => m.role === "user")?.content || "Continue right where we left off";
+    setReplyError(null);
     setBusy(true);
     try {
-      const rawReply = (await requestReplyForHistory(prior, lastUser)) || fallbackReply(character, lastUser, romanceMode);
+      const rawReply = await requestReplyForHistory(prior, lastUser, {}, false);
+      if (!rawReply) return;
       const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
       const nextReply = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
       const updated = [...prior, { role: "assistant" as const, content: nextReply }, ...messages.slice(assistantIndex + 1)];
@@ -596,12 +596,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const rewindTo = (index: number) => {
+    if (busy) return;
     setEditingIndex(null);
     persist(messages.slice(0, index + 1));
     notifySaved("Rewound thread");
   };
 
   const saveEditedMessage = (assistantIndex: number) => {
+    if (busy) return;
     const trimmed = editDraft.trim();
     if (!trimmed) {
       setEditingIndex(null);
@@ -827,9 +829,19 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     setClipStatus("Running Client Director Pipeline (Mood → Reply → Selfie)...");
     try {
       const nextWithUser: ChatMessage[] = [...messages, { role: "user", content: promptText }];
-      const replyText = (await requestReplyForHistory(nextWithUser, promptText)) || fallbackReply(character, promptText, romanceMode);
+      const replyText = await requestReplyForHistory(nextWithUser, promptText);
+      if (!replyText) {
+        setClipStatus("Scene stopped because the chat model did not return a reply.");
+        return;
+      }
       const mood: MediaMood = intimacy >= 60 ? "nude" : "lingerie";
       const photo = await resolveBestMediaUrl(character, mood, promptText.slice(0, 120));
+      if (!mountedRef.current) return;
+      if (photo.isFallback || !photo.url) {
+        persist([...nextWithUser, { role: "assistant", content: replyText }]);
+        setClipStatus(`Reply saved. Photo unavailable. ${photo.error || "Check your image generator in Settings."}`);
+        return;
+      }
       addToGallery({
         characterId: character.id,
         characterName: character.name,
@@ -851,6 +863,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const sendGift = (giftId: string) => {
+    if (busy) return;
     const gift = GIFTS.find((g) => g.id === giftId);
     if (!gift) return;
     const res = spend(gift.cost || 12);
@@ -1298,10 +1311,25 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           )}
 
           {busy && !generatingPhoto && (
-            <div className="flex items-center gap-2 text-xs text-[#00f5ff] animate-pulse px-2">
-              <Sparkles className="h-3.5 w-3.5" /> {character.name.split(" ")[0]} is typing...
+            <div className="max-w-[88%] space-y-2 px-2">
+              {liveReply ? (
+                <p aria-label="Live companion reply" className="whitespace-pre-wrap rounded-2xl border border-rose-200/15 bg-[#241626] px-3 py-2 text-sm text-rose-50">
+                  {liveReply}
+                </p>
+              ) : (
+                <p role="status" className="flex items-center gap-2 text-xs text-rose-200">
+                  <Sparkles className="h-3.5 w-3.5" /> Waiting for {character.name.split(" ")[0]}’s reply…
+                </p>
+              )}
+              {replyController.current && (
+                <button type="button" onClick={() => replyController.current?.abort()}
+                  className="rounded-full border border-rose-200/25 px-3 py-1 text-xs text-rose-100">
+                  Stop reply
+                </button>
+              )}
             </div>
           )}
+          {replyError && !busy && <p role="alert" className="px-2 text-xs text-rose-200">{replyError}</p>}
           <div ref={bottomRef} />
         </div>
 
@@ -1501,6 +1529,22 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 {chip}
               </button>
             ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 px-1 text-xs">
+            <label className="flex items-center gap-2 text-rose-100">
+              Scene tone
+              <select value={sceneTone} onChange={(event) => setSceneTone(event.target.value as ChatSceneTone)}
+                disabled={busy} className="rounded-lg border border-white/15 bg-[#1b1320] px-2 py-1">
+                {(Object.keys(SCENE_TONES) as ChatSceneTone[]).map((tone) => <option key={tone}>{tone}</option>)}
+              </select>
+            </label>
+            {!busy && messages.at(-1)?.role === "user" && (
+              <button type="button" onClick={() => void send(undefined, 6, true)}
+                className="rounded-full border border-rose-200/30 px-3 py-1 text-rose-100">
+                Retry last message
+              </button>
+            )}
           </div>
 
           {/* Pinned Bottom Composer */}

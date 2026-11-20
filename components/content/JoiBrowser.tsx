@@ -62,9 +62,15 @@ const BPM_MODES = [
   { label: "Frenzy", bpm: 160 },
 ] as const;
 
-function playCue(step: JoiStep, voiceId: string | undefined, whispery: boolean) {
+const SESSION_PACES = {
+  unhurried: { timerScale: 1.25, voiceRate: 0.82 },
+  steady: { timerScale: 1, voiceRate: 0.92 },
+  quick: { timerScale: 0.8, voiceRate: 1.04 },
+};
+
+function playCue(step: JoiStep, voiceId: string | undefined, whispery: boolean, rate: number) {
   const text = `${step.title}. ${step.instruction}`;
-  const tuning = { pitch: 1.04, rate: 0.92, whispery };
+  const tuning = { pitch: 1.04, rate, whispery };
   if (voiceId) {
     void speakWithNeuralVoice(text, { ...tuning, voiceId });
   } else {
@@ -95,6 +101,9 @@ export function JoiBrowser({
   const [scenarioId, setScenarioId] = useState<string | null>(initialScenarioId);
   const [stepIndex, setStepIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
+  const [timerDeadline, setTimerDeadline] = useState<number | null>(null);
+  const [autoAdvance, setAutoAdvance] = useState(false);
+  const [pace, setPace] = useState<"unhurried" | "steady" | "quick">("steady");
   const [autoVoice, setAutoVoice] = useState(true);
   const [whisperMode, setWhisperMode] = useState(true);
   const [ambienceOn, setAmbienceOn] = useState(false);
@@ -106,6 +115,8 @@ export function JoiBrowser({
     if (initialScenarioId) {
       setScenarioId(initialScenarioId);
       setStepIndex(0);
+      setRemaining(null);
+      setTimerDeadline(null);
     }
   }, [initialScenarioId]);
 
@@ -114,19 +125,16 @@ export function JoiBrowser({
     : undefined;
   const step = scenario?.steps[stepIndex];
   const sessionVoiceId = scenario?.persona.voiceId;
-
-  useEffect(() => {
-    setRemaining(null);
-  }, [step]);
+  const { timerScale, voiceRate } = SESSION_PACES[pace];
 
   useEffect(() => {
     if (!autoVoice || !step) return;
-    playCue(step, sessionVoiceId, whisperMode);
+    playCue(step, sessionVoiceId, whisperMode, voiceRate);
     return () => {
       if (sessionVoiceId) stopNeuralSpeech();
       else stopSpeaking();
     };
-  }, [autoVoice, sessionVoiceId, step, whisperMode]);
+  }, [autoVoice, sessionVoiceId, step, voiceRate, whisperMode]);
 
   useEffect(() => {
     return () => {
@@ -137,14 +145,49 @@ export function JoiBrowser({
     };
   }, []);
 
+  const suggestedSeconds = step ? Math.max(1, Math.round(step.suggestedSeconds * timerScale)) : 0;
+
   useEffect(() => {
-    if (remaining === null || remaining <= 0) return;
-    const timer = setTimeout(
-      () => setRemaining((value) => (value === null ? value : value - 1)),
-      1000,
-    );
-    return () => clearTimeout(timer);
-  }, [remaining]);
+    if (timerDeadline === null || !step) return;
+    const timer = window.setInterval(() => {
+      const seconds = Math.max(0, Math.ceil((timerDeadline - Date.now()) / 1000));
+      setRemaining(seconds);
+      if (seconds > 0) return;
+
+      const next = scenario?.steps[stepIndex + 1];
+      if (autoAdvance && next) {
+        const duration = Math.max(1, Math.round(next.suggestedSeconds * timerScale));
+        setStepIndex(stepIndex + 1);
+        setRemaining(duration);
+        setTimerDeadline(Date.now() + duration * 1000);
+      } else {
+        setTimerDeadline(null);
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [autoAdvance, scenario, step, stepIndex, timerDeadline, timerScale]);
+
+  function moveToStep(index: number) {
+    setStepIndex(index);
+    setRemaining(null);
+    setTimerDeadline(null);
+    setCountdownLeft(null);
+    stopSpeaking();
+    stopNeuralSpeech();
+  }
+
+  function startTimer(seconds: number) {
+    setRemaining(seconds);
+    setTimerDeadline(Date.now() + seconds * 1000);
+    if (step && autoVoice) playCue(step, sessionVoiceId, whisperMode, voiceRate);
+  }
+
+  function pauseTimer() {
+    setTimerDeadline(null);
+    setCountdownLeft(null);
+    stopSpeaking();
+    stopNeuralSpeech();
+  }
 
   const toggleBeat = (bpm: number) => {
     if (beatBpm === bpm) {
@@ -232,7 +275,7 @@ export function JoiBrowser({
     const theme = COMPANION_SESSION_THEMES[sessionTheme];
     try {
       const raw = await runGenerativePrompt(
-        "Write cues for a private JOI session between consenting fictional adults who are unrelated. Respect the user's limits, include a way to slow down or stop, and close with a supportive wind-down. Treat identities with equal respect and avoid racial stereotypes or degradation. Return only a JSON array of three short speech-ready strings for warm-up, build, and wind-down.",
+        "Write three spoken cues for a private JOI session between consenting, unrelated fictional adults. Speak directly to the listener in first or second person. Bring in a specific detail from the chosen direction, give the build cue a fresh beat, and close with a supportive wind-down. Respect the user's limits and offer a way to slow down or stop. Treat identities with equal respect and avoid racial stereotypes or degradation. Return only a JSON array of three strings in order: warm-up, build, wind-down. Each cue contains at most two short sentences of exact spoken words. Omit narration, labels, dialogue tags, and stage directions.",
         `Fictional persona: ${companion.name}, age ${companion.age}. ${companion.personality}
 Theme: ${theme.label}. ${theme.direction}
 Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes.
@@ -330,7 +373,7 @@ Direction and limits: ${direction || "No additional directions."}`,
               <button type="button" onClick={() => {
                 stopSpeaking();
                 setAutoVoice(false);
-                setStepIndex(0);
+                moveToStep(0);
                 setScenarioId(draft.id);
               }} className="mt-4 rounded-full border border-rose-200/40 px-4 py-2 text-sm text-rose-100 hover:bg-rose-200/10">
                 Open guided session
@@ -449,7 +492,7 @@ Direction and limits: ${direction || "No additional directions."}`,
                 key={item.id}
                 onClick={() => {
                   setScenarioId(item.id);
-                  setStepIndex(0);
+                  moveToStep(0);
                 }}
                 className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50 active:scale-[0.99] transition"
               >
@@ -487,7 +530,7 @@ Direction and limits: ${direction || "No additional directions."}`,
   const atEnd = stepIndex === scenario.steps.length - 1;
   const progressPct =
     remaining !== null && step.suggestedSeconds > 0
-      ? Math.max(0, Math.min(100, ((step.suggestedSeconds - remaining) / step.suggestedSeconds) * 100))
+      ? Math.max(0, Math.min(100, ((suggestedSeconds - remaining) / suggestedSeconds) * 100))
       : 0;
 
   return (
@@ -502,7 +545,7 @@ Direction and limits: ${direction || "No additional directions."}`,
             stopIntimacyAudio();
             setAmbienceOn(false);
             setScenarioId(null);
-            setStepIndex(0);
+            moveToStep(0);
           }}
           className="text-sm text-pink-400"
         >
@@ -620,7 +663,7 @@ Direction and limits: ${direction || "No additional directions."}`,
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => playCue(step, sessionVoiceId, whisperMode)}
+              onClick={() => playCue(step, sessionVoiceId, whisperMode, voiceRate)}
               className="inline-flex items-center gap-1 rounded-lg border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 text-xs text-pink-200 hover:bg-pink-500/20"
             >
               <Volume2 className="h-3.5 w-3.5" /> Speak Step
@@ -643,24 +686,42 @@ Direction and limits: ${direction || "No additional directions."}`,
         )}
       </article>
 
-      <div className="flex items-center justify-between gap-3 text-xs text-zinc-400">
-        <span>Suggested {step.suggestedSeconds}s. Skip whenever you want.</span>
-        {remaining === null ? (
-          <button
-            onClick={() => setRemaining(step.suggestedSeconds)}
-            className="px-3 py-1.5 rounded-full bg-zinc-800 text-zinc-200"
-          >
-            Start timer
-          </button>
-        ) : remaining > 0 ? (
-          <span className="text-pink-300 tabular-nums font-medium">{remaining}s remaining</span>
-        ) : (
-          <span className="text-pink-300 font-medium">Time&apos;s up — ready for next step</span>
-        )}
+      <div className="space-y-3 rounded-2xl border border-rose-200/15 bg-[#211725] p-3 text-xs text-rose-100">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2">
+            Pace
+            <select value={pace} onChange={(event) => setPace(event.target.value as typeof pace)}
+              disabled={remaining !== null && remaining > 0}
+              className="rounded-lg border border-white/15 bg-[#151019] p-2">
+              <option value="unhurried">Unhurried</option>
+              <option value="steady">Steady</option>
+              <option value="quick">Quick</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={autoAdvance} onChange={(event) => setAutoAdvance(event.target.checked)} />
+            Auto-advance cues
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="tabular-nums">
+            {remaining === null ? `Suggested ${suggestedSeconds}s` : remaining > 0 ? `${remaining}s remaining` : "Cue complete"}
+          </span>
+          {timerDeadline !== null ? (
+            <button type="button" onClick={pauseTimer} className="rounded-full border border-white/20 px-3 py-2">
+              Pause timer
+            </button>
+          ) : (
+            <button type="button" onClick={() => startTimer(remaining && remaining > 0 ? remaining : suggestedSeconds)}
+              className="rounded-full bg-rose-200 px-3 py-2 font-semibold text-[#291722]">
+              {remaining && remaining > 0 ? "Resume timer" : remaining === 0 ? "Restart timer" : "Start timer"}
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex gap-2">
         <button
-          onClick={() => setStepIndex((index) => Math.max(0, index - 1))}
+          onClick={() => moveToStep(Math.max(0, stepIndex - 1))}
           disabled={atStart}
           className="flex-1 py-3 rounded-2xl border border-zinc-700 disabled:opacity-30"
         >
@@ -668,14 +729,14 @@ Direction and limits: ${direction || "No additional directions."}`,
         </button>
         {atEnd ? (
           <button
-            onClick={() => setStepIndex(0)}
+            onClick={() => moveToStep(0)}
             className="flex-1 py-3 rounded-2xl bg-pink-600 font-medium"
           >
             Replay
           </button>
         ) : (
           <button
-            onClick={() => setStepIndex((index) => index + 1)}
+            onClick={() => moveToStep(stepIndex + 1)}
             className="flex-1 py-3 rounded-2xl bg-pink-600 font-medium"
           >
             Next

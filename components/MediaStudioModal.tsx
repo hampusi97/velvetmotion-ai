@@ -124,6 +124,7 @@ export default function MediaStudioModal({
   const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
   const [photoRevealed, setPhotoRevealed] = useState(true);
   const [engineBadge, setEngineBadge] = useState<string | null>(null);
+  const [galleryPhoto, setGalleryPhoto] = useState<string | null>(null);
 
   const [videoSourceUrl, setVideoSourceUrl] = useState(() =>
     FLAGSHIP_COMPANIONS.find((profile) => profile.id === activeChatCompanionId)?.portraitUrl ?? FLAGSHIP_COMPANIONS[0].portraitUrl,
@@ -332,6 +333,7 @@ export default function MediaStudioModal({
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
             const engineLabel = `ComfyUI (${comfyCheckpoint || comfyInfo.checkpoints[0] || 'Local :8188'})`;
             setGeneratedPhoto(blobUrl);
+            setGalleryPhoto(null);
             setPhotoRevealed(true);
             setVideoSourceUrl(blobUrl);
             setEngineBadge(engineLabel);
@@ -359,10 +361,11 @@ export default function MediaStudioModal({
       });
 
       setGeneratedPhoto(result.imageUrl);
+      setGalleryPhoto(result.galleryImageUrl ?? null);
       setPhotoRevealed(!wantsNsfw);
       setVideoSourceUrl(result.imageUrl);
       setEngineBadge(result.engine);
-      handleSaveToCollection(result.imageUrl, wantsNsfw ? 'selfie' : 'studio-photo');
+      handleSaveToCollection(result.galleryImageUrl || result.imageUrl, wantsNsfw ? 'selfie' : 'studio-photo');
       setStatusMsg(`Rendered via ${result.engine} in ${result.elapsedSec}s (seed ${result.seed}) · Auto-saved to Photo Diary & Collection`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
@@ -901,7 +904,7 @@ export default function MediaStudioModal({
                 </a>
                 <button
                   type="button"
-                  onClick={() => handleSaveToCollection(generatedPhoto, 'studio-photo')}
+                  onClick={() => handleSaveToCollection(galleryPhoto || generatedPhoto, 'studio-photo')}
                   className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/15 px-3 py-1.5 text-[11px] font-bold text-[#00f5ff]"
                 >
                   <BookmarkPlus className="h-3.5 w-3.5" /> Save to Collection
@@ -918,7 +921,7 @@ export default function MediaStudioModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDropToChat(generatedPhoto)}
+                  onClick={() => handleDropToChat(galleryPhoto || generatedPhoto)}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff1e8e]/50 bg-[#ff1e8e]/20 px-3 py-1.5 text-[11px] font-bold text-pink-100"
                 >
                   <MessageSquare className="h-3.5 w-3.5" /> Drop into Active Chat
