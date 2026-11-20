@@ -331,6 +331,14 @@ export function DownloadDesktopView() {
               <a href="/downloads/start-velvet-engine.command" download className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-white/40">Mac (.command)</a>
               <a href="/downloads/velvetmotion_home_engine.py" download className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-white/40">Python only</a>
             </div>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Optional local AI (for real NSFW / offline)</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a href="https://ollama.com/download" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">Ollama (chat)</a>
+              <a href="https://github.com/LostRuins/koboldcpp" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">KoboldCpp</a>
+              <a href="https://github.com/Comfy-Org/ComfyUI" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">ComfyUI (images)</a>
+              <a href="https://github.com/ciredark/LAIGFE" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">LAIGFE full installer</a>
+            </div>
+            <p className="mt-2 text-[10px] text-zinc-500">Start the launcher, then open the site. If a local engine is running, NSFW selfies use your GPU.</p>
           </div>
           Already installed Ollama, KoboldCpp or ComfyUI? The optional Python Home Engine can discover running
           local services. It does not install AI models or start a public tunnel. Download the Python engine and a
