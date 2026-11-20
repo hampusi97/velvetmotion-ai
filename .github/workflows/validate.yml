@@ -34,6 +34,7 @@ jobs:
       - run: npx tsx --test lib/originalStarterCompanions.test.ts
       - run: npx tsx --test lib/vrmAvatarStore.test.ts
       - run: npx tsx --test lib/comfyVideo.test.ts
+      - run: npx tsx --test lib/studioVideoDownload.test.ts
       - run: npx tsx --test lib/localEngineBridge.test.ts
       - run: node --check scripts/setup-signing.mjs
       - run: npm run build
