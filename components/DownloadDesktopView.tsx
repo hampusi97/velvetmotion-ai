@@ -41,6 +41,7 @@ export function DownloadDesktopView() {
   const [motion, setMotion] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [signedUpdaterEnabled, setSignedUpdaterEnabled] = useState(false);
+  const [installedVersion, setInstalledVersion] = useState<string | null>(null);
   const [autoUpdateOnLaunch, setAutoUpdateOnLaunch] = useState(true);
   const engine = useLocalEngineStatus();
   const ram = getRecommendedPresetsForRam(engine.ramGb);
@@ -62,6 +63,8 @@ export function DownloadDesktopView() {
     if (window.__TAURI_INTERNALS__?.invoke) {
       void window.__TAURI_INTERNALS__.invoke<boolean>("desktop_signed_updates_enabled")
         .then(setSignedUpdaterEnabled).catch(() => setSignedUpdaterEnabled(false));
+      void window.__TAURI_INTERNALS__.invoke<string>("desktop_app_version")
+        .then(setInstalledVersion).catch(() => setInstalledVersion(null));
     }
     const controller = new AbortController();
     const load = async () => {
@@ -144,6 +147,26 @@ export function DownloadDesktopView() {
         </div>
       </section>
 
+      <section aria-label="Online and desktop update connection" className="flex flex-wrap items-center justify-between gap-4 rounded-[23px] border border-[#e7adbc]/20 bg-gradient-to-r from-[#291927] to-[#18131d] px-5 py-4">
+        <div className="flex items-start gap-3">
+          <span className={"mt-1 h-2.5 w-2.5 shrink-0 rounded-full " + (releaseStatus === "ready" ? "bg-emerald-400" : releaseStatus === "checking" ? "bg-amber-300" : "bg-rose-400")} aria-hidden="true" />
+          <div>
+            <p className="text-sm font-semibold text-white">
+              {releaseStatus === "ready" ? "Connected to GitHub releases" : releaseStatus === "checking" ? "Connecting to update service..." : "Update service unavailable"}
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+              {installedVersion ? `Installed desktop v${installedVersion} · ` : ""}
+              {release?.tag_name ? `Latest published release ${release.tag_name}. ` : ""}
+              The desktop uses an internet connection for selected cloud services and verified release checks. Its built-in interface also works offline.
+            </p>
+          </div>
+        </div>
+        <a href="https://velvetmotion-ai.vercel.app" target="_blank" rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#e4b1c0]/40 bg-[#d18aa4]/10 px-4 py-2 text-xs font-bold text-[#f7d4df] hover:bg-[#d18aa4]/20">
+          Open live web experience <ExternalLink className="h-3.5 w-3.5" />
+        </a>
+      </section>
+
       <section id="installer" className="space-y-5 rounded-[30px] border border-white/10 bg-[#17121b] p-5 sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -191,8 +214,7 @@ export function DownloadDesktopView() {
           )}
         </div>
         <p className="text-[11px] text-zinc-500">
-          This release page does not promise unattended updates: signing and updater configuration must be completed and verified first.
-          Check official GitHub Releases for newer installers.
+          The desktop checks for published releases over the internet. Signed installers can be installed automatically when signing keys are configured; older unsigned versions use official manual downloads.
         </p>
       </section>
 
@@ -321,7 +343,7 @@ export function DownloadDesktopView() {
                     setAutoUpdateOnLaunch(e.target.checked);
                     try { localStorage.setItem("vm:auto-signed-desktop-updates", e.target.checked ? "on" : "off"); } catch { /* private mode */ }
                   }} />
-                Auto-install verified updates on launch
+                Auto-install verified updates on launch · check every 30 minutes
               </label>
             ) : (
               <a href={RELEASES_PAGE} target="_blank" rel="noopener noreferrer"
@@ -341,7 +363,7 @@ export function DownloadDesktopView() {
         {[
           ["Does the installer include AI models?", "No. It bundles the desktop interface. You can install Ollama, KoboldCpp, ComfyUI and compatible models separately; your hardware needs determine what will run."],
           ["Will the app run offline?", "The bundled interface and configured local models can work offline for supported features. Account login, cloud generation and remote sync still need internet access."],
-          ["Are automatic updates already signed?", "No verified updater signing key is configured in the current source. Use official GitHub Releases for manually installed updates until signed distribution is validated."],
+          ["Will desktop updates arrive automatically?", "The desktop checks online at startup, on window focus, and every 30 minutes. A build equipped with signed-update keys can install verified updates; older unsigned builds need one manual upgrade. Releases are built after merges to main, not from every unreviewed GitHub commit."],
           ["Are my pictures always stored locally?", "Not necessarily. A local model can process data on your device, while selected cloud providers and sync features may receive uploads. Review provider choices before submitting personal information."],
         ].map(([question, answer]) => (
           <details key={question} className="group rounded-[16px] border border-white/10 bg-white/[.025] px-4 py-3">
