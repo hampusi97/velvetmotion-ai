@@ -15,6 +15,7 @@ export type LocalGenRequest = {
   negative?: string;
   characterId?: string;
   referenceImageBase64?: string;
+  checkpoint?: string;
 };
 
 export type LocalGenResult = {
@@ -46,6 +47,9 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
   const height = opts.height || 1152;
   const checkpoint = opts.checkpoint || "flux1-dev-fp8.safetensors";
   const hasRef = Boolean(opts.referenceImageBase64 && opts.referenceImageBase64.length > 32);
+  if (hasRef) {
+    throw new Error("Reference-image FaceID requires a compatible, installed IP-Adapter workflow; the basic txt2img workflow cannot guarantee face identity.");
+  }
 
   const graph: Record<string, unknown> = {
     "3": {
@@ -54,7 +58,7 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
         cfg: 5.5,
         denoise: 1.0,
         latent_image: ["5", 0],
-        model: [hasRef ? "11" : "4", 0],
+        model: ["4", 0],
         negative: ["7", 0],
         positive: ["6", 0],
         sampler_name: "euler",
@@ -89,25 +93,6 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
     },
   };
 
-  if (hasRef) {
-    graph["10"] = {
-      class_type: "ETN_LoadImageBase64",
-      inputs: {
-        image: opts.referenceImageBase64!.replace(/^data:[^;]+;base64,/, ""),
-      },
-    };
-    graph["11"] = {
-      class_type: "IPAdapterUnifiedLoaderFaceID",
-      inputs: {
-        model: ["4", 0],
-        preset: "FACEID PLUS V2",
-        lora_strength: 0.65,
-        provider: "CUDA",
-        image: ["10", 0],
-        weight: opts.ipAdapterWeight ?? 0.85,
-      },
-    };
-  }
 
   return graph;
 }
@@ -197,9 +182,16 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
       CheckpointLoaderSimple?: { input?: { required?: { ckpt_name?: string[][] } } };
     };
     const checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
-    const checkpoint = checkpoints.find((name) => typeof name === "string" && name.trim());
+    const preferred = req.checkpoint || getMediaSettings().comfyCheckpoint;
+    if (preferred && !checkpoints.includes(preferred)) {
+      return { ok: false, note: `Selected ComfyUI model "${preferred.slice(0, 100)}" is not installed. Choose an available checkpoint in the Studio.` };
+    }
+    const checkpoint = preferred || checkpoints.find((name) => typeof name === "string" && name.trim());
     if (!checkpoint) {
       return { ok: false, note: "ComfyUI is online, but no CheckpointLoaderSimple model is installed. Install a compatible checkpoint or configure a custom image workflow." };
+    }
+    if (req.referenceImageBase64) {
+      return { ok: false, note: "ComfyUI FaceID cannot run with the basic txt2img graph. Configure a compatible reference-aware image backend; no face-lock was applied." };
     }
     const workflow = buildComfyWorkflowGraph({
       checkpoint,
@@ -214,13 +206,16 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: workflow }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(30000),
     });
-    if (!queueRes.ok) return { ok: false, note: `ComfyUI queue HTTP ${queueRes.status}` };
+    if (!queueRes.ok) {
+      const detail = await queueRes.text().catch(() => "");
+      return { ok: false, note: `ComfyUI queue HTTP ${queueRes.status}: ${detail.slice(0, 300)}` };
+    }
     const { prompt_id: promptId } = (await queueRes.json()) as { prompt_id?: string };
     if (!promptId) return { ok: false, note: "ComfyUI returned no prompt_id" };
 
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 100; i++) {
       await new Promise((r) => setTimeout(r, 1200));
       const histRes = await fetch(`${base}/history/${encodeURIComponent(promptId)}`, {
         signal: AbortSignal.timeout(5000),
@@ -228,9 +223,13 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
       if (!histRes.ok) continue;
       const hist = (await histRes.json()) as Record<
         string,
-        { outputs?: Record<string, { images?: Array<{ filename: string; subfolder?: string; type?: string }> }> }
+        { status?: { status_str?: string }; outputs?: Record<string, { images?: Array<{ filename: string; subfolder?: string; type?: string }> }> }
       >;
-      const outputs = hist?.[promptId]?.outputs;
+      const current = hist?.[promptId];
+      if (current?.status?.status_str === "error") {
+        return { ok: false, note: "ComfyUI reported an execution error. Check model compatibility and ComfyUI console logs." };
+      }
+      const outputs = current?.outputs;
       if (!outputs) continue;
       for (const nodeOut of Object.values(outputs)) {
         const imgMeta = nodeOut?.images?.[0];
