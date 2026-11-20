@@ -1,26 +1,45 @@
-/** Resize imported PNG-card portraits before saving them to browser localStorage.
- * The original card metadata is parsed from the full file before this is called.
- */
+/** Resize imported card portraits for localStorage without saving full-size PNG bytes. */
 export async function compactCardPortrait(file: File): Promise<string> {
-  if (typeof createImageBitmap !== "function" || typeof document === "undefined") {
-    throw new Error("Your browser cannot prepare this portrait. Try a recent browser or smaller PNG.");
-  }
-  const bitmap = await createImageBitmap(file);
+  if (typeof document === "undefined") throw new Error("Portrait conversion needs a browser.");
+  let bitmap: ImageBitmap | null = null;
+  let objectUrl: string | null = null;
   try {
-    if (!bitmap.width || !bitmap.height) throw new Error("Invalid PNG portrait.");
-    const ratio = Math.min(1, 512 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * ratio));
-    canvas.height = Math.max(1, Math.round(bitmap.height * ratio));
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("Canvas rendering is unavailable.");
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const url = canvas.toDataURL("image/jpeg", 0.77);
-    if (!url.startsWith("data:image/") || url.length > 800_000) {
-      throw new Error("Portrait is too large for local card storage.");
+    let source: CanvasImageSource;
+    let width: number;
+    let height: number;
+    if (typeof createImageBitmap === "function") {
+      bitmap = await createImageBitmap(file);
+      source = bitmap;
+      width = bitmap.width;
+      height = bitmap.height;
+    } else {
+      // Fallback for desktop WebKit versions without createImageBitmap.
+      objectUrl = URL.createObjectURL(file);
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("Unable to decode card portrait."));
+        element.src = objectUrl!;
+      });
+      source = image;
+      width = image.naturalWidth;
+      height = image.naturalHeight;
     }
-    return url;
+    if (!width || !height) throw new Error("Invalid PNG portrait.");
+    const scale = Math.min(1, 512 / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas is unavailable for portrait conversion.");
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    const output = canvas.toDataURL("image/jpeg", 0.77);
+    if (!output.startsWith("data:image/jpeg") || output.length > 800_000) {
+      throw new Error("Portrait exceeds the local storage limit after compression.");
+    }
+    return output;
   } finally {
-    bitmap.close();
+    bitmap?.close();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
 }
