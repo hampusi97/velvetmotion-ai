@@ -12,6 +12,7 @@ import { FeaturedPair } from "./FeaturedPair";
 import { ProactiveInbox } from "./ProactiveInbox";
 import { CandyGirlCard } from "./CandyGirlCard";
 import { ExperienceRail } from "./ExperienceRail";
+import { CinematicPortraitShowcase } from "./CinematicPortraitShowcase";
 import { SafeImage } from "./SafeImage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { claimDailyDropReward, getDailyDropClaimState } from "@/lib/progression";
@@ -212,6 +213,20 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
       <motion.section variants={riseItem}>
         <ExperienceRail />
       </motion.section>
+
+      {onOpenGirl && (
+        <motion.section variants={riseItem}>
+          <CinematicPortraitShowcase
+            companions={featured.slice(0, 3).map((c) => ({
+              id: c.id,
+              name: c.name,
+              tagline: c.tagline,
+              category: c.category,
+            }))}
+            onOpenCompanion={(id) => onOpenGirl(id)}
+          />
+        </motion.section>
+      )}
 
       {/* Explore characters and original VelvetMotion experiences */}
       {onOpenGirl && (
