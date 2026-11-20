@@ -71,8 +71,8 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty: PHOTO_BASE + " Natural makeup, soft ambient indoor light, influencer editorial close-up, intimate and warm.",
   seductive: PHOTO_BASE + " Intimate close-up, warm bedside lamp + soft rim light. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores.",
   lingerie: PHOTO_BASE + " Mirror selfie, sheer lace lingerie slightly off shoulder, soft side window light. Looking over shoulder, natural skin texture, soft bokeh background, candid influencer aesthetic, authentic body.",
-  nude: PHOTO_BASE + " Fully nude adult woman, soft morning window light from the side. Natural skin texture with pores. Soft shadows defining form, looking at camera with soft expression. Unretouched photoreal adult, editorial nude, 21+.",
-  explicit: PHOTO_BASE + " Explicit nude adult woman, intense eye contact, flushed cheeks, slightly parted lips. Detailed natural anatomy, glistening skin with visible pores. Soft directional key light, high detail, uncensored photoreal adult, 21+.",
+  nude: PHOTO_BASE + " Fully nude adult woman, no clothes, naked body, bare breasts, soft window light, natural skin texture with pores, looking at camera, photoreal, 21+.",
+  explicit: PHOTO_BASE + " Explicit nude adult woman, naked, bare breasts, detailed anatomy, flushed, intense eye contact, uncensored photoreal, 21+.",
   sex: PHOTO_BASE + " Explicit intimate adult scene, sweaty realistic skin texture with pores, pleasure expression, detailed anatomy. Cinematic practical lighting, uncensored photoreal, natural proportions, 21+.",
   aftercare: PHOTO_BASE + " Post-intimacy, soft morning light through sheer curtains. Soft smile, messy hair, warm skin tones, realistic pores and glow. Intimate, tender, photoreal, gentle.",
   dual: PHOTO_BASE + " Two adult women together, soft shared warm lighting, both looking at viewer. Natural skin texture on both, warm bedroom atmosphere, photoreal, intimate, 21+.",
@@ -253,6 +253,27 @@ export async function resolveBestMediaUrl(
       }
     } catch (e) {
       errors.push(e instanceof Error ? e.message : "AI Horde failed");
+    }
+
+    // Priority 4: Pollinations classic (safe=false) for NSFW when Horde censors
+    if (requiresAdultEngine) {
+      try {
+        const p = encodeURIComponent(prompt.slice(0, 400));
+        const url = `https://image.pollinations.ai/prompt/${p}?width=512&height=768&seed=${seed}&safe=false&nologo=true`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.ok && res.headers.get("content-type")?.includes("image")) {
+          const blob = await res.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.readAsDataURL(blob);
+          });
+          reportImg("pollinations-nsfw");
+          return { url: dataUrl, note: "Pollinations (uncensored)", seed, engine: "pollinations-nsfw" };
+        }
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : "Pollinations failed");
+      }
     }
 
     const reason = errors.join(" · ") || "All compatible image generators are offline, unsupported, or rate-limited";
