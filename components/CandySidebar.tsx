@@ -28,6 +28,7 @@ type NavItem = {
 
 const ITEMS: NavItem[] = [
   { id: "home", href: "/", label: "Home", Icon: Home },
+  { id: "girls", href: "/companions/", label: "Companions", Icon: Users },
   { id: "shorts", href: "/shorts/", label: "Shorts", Icon: Film },
   { id: "chat", href: "/chat/", label: "Chat", Icon: MessageCircle },
   { id: "collection", href: "/collection/", label: "Collection", Icon: ImageIcon },

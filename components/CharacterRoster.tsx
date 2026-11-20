@@ -1,17 +1,36 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Heart, Search, Sparkles } from "lucide-react";
-import { filterCharacters, type Character } from "@/lib/characters";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Heart,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { allCharacters, CHARACTERS, type Character } from "@/lib/characters";
+import {
+  COMPANION_LIBRARY_EVENT,
+  loadFavoriteCompanions,
+  toggleFavoriteCompanion,
+} from "@/lib/companionLibrary";
+import {
+  CONVERSATION_TYPES,
+  VISUAL_STYLES,
+  discoveryFor,
+  discoverCompanions,
+} from "@/lib/companionDiscovery";
 import { CandyGirlCard } from "@/components/CandyGirlCard";
+import { SafeImage } from "@/components/SafeImage";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
   query: string;
   category: string;
   tag: string | null;
-  categories: string[];
-  tags: string[];
   onQuery: (value: string) => void;
   onCategory: (value: string) => void;
   onTag: (value: string | null) => void;
@@ -19,119 +38,366 @@ interface CharacterRosterProps {
   onBack: () => void;
 }
 
+const selectClass = "vm-field w-full py-3 text-sm";
+
 export function CharacterRoster({
-  romanceMode, query, category, tag, categories, tags, onQuery, onCategory, onTag, onSelect, onBack,
+  romanceMode,
+  query,
+  category,
+  tag,
+  onQuery,
+  onCategory,
+  onTag,
+  onSelect,
+  onBack,
 }: CharacterRosterProps) {
+  const [characters, setCharacters] = useState<Character[]>(CHARACTERS);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [savedOnly, setSavedOnly] = useState(false);
   const [sort, setSort] = useState<"featured" | "name">("featured");
-  const [showTags, setShowTags] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [interest, setInterest] = useState("");
+  const [conversation, setConversation] = useState("");
+  const [visualStyle, setVisualStyle] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("vm:favorite-companions") || "[]") as unknown;
-      setFavorites(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : []);
-    } catch { setFavorites([]); }
+    const refresh = () => {
+      setCharacters(allCharacters());
+      setFavorites(loadFavoriteCompanions());
+    };
+    refresh();
+    window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
-  const visible = useMemo(() => {
-    let list = filterCharacters({ query, category, tag: tag || undefined });
-    if (savedOnly) list = list.filter((c) => favorites.includes(c.id));
-    if (sort === "name") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
-    return list;
-  }, [query, category, tag, savedOnly, favorites, sort]);
-
+  const categories = useMemo(
+    () => ["All", ...new Set(characters.map((c) => c.category).sort())],
+    [characters],
+  );
+  const interests = useMemo(
+    () =>
+      [...new Set(characters.flatMap((c) => discoveryFor(c).interests))].sort(),
+    [characters],
+  );
+  const tags = useMemo(
+    () =>
+      [...new Set(characters.flatMap((c) => c.tags))]
+        .filter((t) => t !== "NEW")
+        .sort(),
+    [characters],
+  );
+  const visible = useMemo(
+    () =>
+      discoverCompanions(characters, {
+        query,
+        category,
+        tag,
+        interest,
+        conversation,
+        visualStyle,
+        favorites,
+        savedOnly,
+        sort,
+      }),
+    [
+      characters,
+      query,
+      category,
+      tag,
+      interest,
+      conversation,
+      visualStyle,
+      favorites,
+      savedOnly,
+      sort,
+    ],
+  );
+  const activeCount = [
+    category !== "All",
+    tag,
+    interest,
+    conversation,
+    visualStyle,
+    savedOnly,
+  ].filter(Boolean).length;
+  const clearFilters = () => {
+    onQuery("");
+    onCategory("All");
+    onTag(null);
+    setInterest("");
+    setConversation("");
+    setVisualStyle("");
+    setSavedOnly(false);
+  };
   const toggleFavorite = (character: Character) => {
-    setFavorites((old) => {
-      const next = old.includes(character.id)
-        ? old.filter((id) => id !== character.id)
-        : [...old, character.id];
-      try { localStorage.setItem("vm:favorite-companions", JSON.stringify(next)); } catch { /* storage optional */ }
-      return next;
-    });
+    try {
+      setFavorites(toggleFavoriteCompanion(character.id));
+      setNotice("");
+    } catch {
+      setNotice(
+        "Favorites could not be saved. Your browser storage may be full or disabled.",
+      );
+    }
   };
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 pb-16 text-white">
-      <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-xs font-semibold text-[#edb5c3] hover:text-white">
-        <ArrowLeft className="h-4 w-4" /> Return to the Atelier
-      </button>
-
-      <header className="rounded-[27px] border border-[#e8b8c3]/15 bg-gradient-to-r from-[#301c2c]/80 to-[#15111c] px-5 py-7 sm:px-8 sm:py-9">
-        <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#e6b8c5]">
-          <Sparkles className="h-3.5 w-3.5" /> VelvetMotion / Discover
-        </p>
-        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          {romanceMode ? "Find a new connection." : "Meet your next muse."}
-        </h1>
-        <p className="mt-2 max-w-xl text-xs leading-6 text-[#cabbc8]">
-          Discover distinct fictional adult characters, explore their personalities, and create a story on your terms.
-          Voice previews and media generation depend on a compatible connected model.
-        </p>
+    <main className="mx-auto max-w-6xl space-y-7 pb-16 text-white">
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={onBack} className="vm-text-button">
+          <ArrowLeft className="h-4 w-4" /> The Atelier
+        </button>
+        <Link href="/?view=import" className="vm-text-button">
+          Your character cards <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      </div>
+      <header className="relative isolate overflow-hidden rounded-[28px] border border-white/10 bg-[#17121f] px-6 py-10 sm:px-10 sm:py-14">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_15%_0%,rgba(160,95,181,.24),transparent_65%)]"
+        />
+        <div className="relative z-10 max-w-xl sm:w-2/3">
+          <p className="vm-eyebrow">
+            <Sparkles className="h-3.5 w-3.5" /> A little curiosity. A new
+            connection.
+          </p>
+          <h1 className="mt-4 font-display text-4xl font-medium leading-[1.1] tracking-tight sm:text-5xl">
+            {romanceMode ? "Someone to share" : "Extraordinary characters."}
+            <br />
+            <span className="text-[#d4b2dc]">
+              {romanceMode ? "your world with." : "Your kind of connection."}
+            </span>
+          </h1>
+          <p className="mt-5 max-w-md text-sm leading-7 text-[#bfb3c7]">
+            Meet fictional adults with stories of their own. Find the artist,
+            the adventurer, or the person who gets your sense of humor.
+          </p>
+          <p className="mt-5 text-xs text-[#cbb4d8]">
+            {characters.length} characters to discover{" "}
+            <span className="mx-2 text-white/20">/</span> Make the story yours
+          </p>
+        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 bottom-0 hidden h-[90%] w-[36%] gap-3 opacity-50 sm:flex lg:opacity-90"
+        >
+          {CHARACTERS.slice(0, 2).map((c, index) => (
+            <div
+              key={c.id}
+              className={
+                "h-full w-1/2 overflow-hidden rounded-t-[100px] " +
+                (index ? "translate-y-12" : "translate-y-3")
+              }
+            >
+              <SafeImage
+                src={c.avatar}
+                alt=""
+                className="h-full w-full object-cover object-top"
+              />
+            </div>
+          ))}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#17121f] via-transparent to-transparent" />
+        </div>
       </header>
 
-      <section aria-label="Filter companions" className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[190px] flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
-            <input type="search" aria-label="Search companions" value={query}
-              onChange={(e) => onQuery(e.target.value)} placeholder="Search by name, mood or personality"
-              className="w-full rounded-[16px] border border-white/10 bg-[#241b27] py-3 pl-10 pr-4 text-xs text-white outline-none transition placeholder:text-zinc-400 focus:border-[#e7afbd]/70" />
-          </div>
-          <button type="button" aria-pressed={savedOnly} onClick={() => setSavedOnly((old) => !old)}
-            className={"inline-flex items-center gap-2 rounded-[16px] border px-4 py-3 text-xs font-semibold transition " +
-              (savedOnly ? "border-[#edacbf]/70 bg-[#a14b70]/20 text-[#ffdfec]" : "border-white/10 bg-[#241b27] text-zinc-300 hover:border-white/30")}>
-            <Heart className="h-3.5 w-3.5" /> Saved ({favorites.length})
+      <section aria-label="Filter companions" className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <label className="relative min-w-[180px] flex-1">
+            <Search
+              className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+              aria-hidden="true"
+            />
+            <span className="sr-only">Search companions</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              placeholder="A name, an interest, a little intrigue…"
+              className="vm-field w-full py-3.5 text-sm"
+              style={{ paddingLeft: "2.75rem" }}
+            />
+          </label>
+          <button
+            type="button"
+            aria-pressed={savedOnly}
+            onClick={() => setSavedOnly((v) => !v)}
+            className={
+              "vm-secondary-button " +
+              (savedOnly
+                ? "!border-[#caa4d5] !bg-[#846196]/20 !text-white"
+                : "")
+            }
+          >
+            <Heart className={"h-4 w-4 " + (savedOnly ? "fill-current" : "")} />{" "}
+            Saved <span className="text-xs opacity-65">{favorites.length}</span>
           </button>
-          <select aria-label="Sort companions" value={sort} onChange={(e) => setSort(e.target.value as "featured" | "name")}
-            className="rounded-[16px] border border-white/10 bg-[#241b27] px-4 py-3 text-xs text-zinc-200">
-            <option value="featured">Featured order</option>
-            <option value="name">Name A–Z</option>
-          </select>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls="companion-filters"
+            onClick={() => setExpanded((v) => !v)}
+            className="vm-secondary-button"
+          >
+            <SlidersHorizontal className="h-4 w-4" /> Filters{" "}
+            {activeCount > 0 && (
+              <span className="rounded-full bg-violet-300/20 px-1.5 text-xs">
+                {activeCount}
+              </span>
+            )}
+          </button>
         </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar" role="group" aria-label="Category">
+        <div
+          className="flex gap-2 overflow-x-auto pb-1"
+          role="group"
+          aria-label="Personality"
+        >
           {categories.map((item) => (
-            <button key={item} type="button" aria-pressed={category === item} onClick={() => onCategory(item)}
-              className={"shrink-0 rounded-full border px-4 py-2 text-[11px] font-semibold transition " +
-                (category === item ? "border-[#e2a9b7]/70 bg-[#a35c78]/25 text-[#ffe1ec]" : "border-white/10 bg-[#211922] text-zinc-300 hover:border-white/25")}>
-              {item}
+            <button
+              key={item}
+              type="button"
+              aria-pressed={category === item}
+              onClick={() => onCategory(item)}
+              className={
+                "vm-filter-chip " +
+                (category === item ? "vm-filter-active" : "")
+              }
+            >
+              {item === "All" ? "All personalities" : item}
             </button>
           ))}
         </div>
-        <button type="button" aria-expanded={showTags} onClick={() => setShowTags((v) => !v)}
-          className="text-[11px] font-semibold text-[#e4b6c1] hover:text-white">
-          {showTags ? "Hide mood filters −" : tag ? "Mood filter: " + tag + " · Edit" : "More mood filters +"}
-        </button>
-        {showTags && (
-          <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-white/10 bg-[#17121b] p-3">
-            <button type="button" onClick={() => onTag(null)}
-              className={"rounded-full border px-3 py-1.5 text-[10px] " + (!tag ? "border-pink-300 bg-pink-300/10 text-white" : "border-white/10 text-zinc-300")}>Any mood</button>
-            {tags.map((item) => (
-              <button key={item} type="button" onClick={() => onTag(tag === item ? null : item)}
-                className={"rounded-full border px-3 py-1.5 text-[10px] " + (tag === item ? "border-pink-300 bg-pink-300/10 text-white" : "border-white/10 text-zinc-300")}>{item}</button>
-            ))}
+        {expanded && (
+          <div
+            id="companion-filters"
+            className="grid gap-4 rounded-2xl border border-white/10 bg-[#17121f] p-5 sm:grid-cols-2 lg:grid-cols-4"
+          >
+            <label className="vm-field-label">
+              Interests
+              <select
+                aria-label="Interests"
+                value={interest}
+                onChange={(e) => setInterest(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Any interest</option>
+                {interests.map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label className="vm-field-label">
+              Conversation
+              <select
+                aria-label="Conversation"
+                value={conversation}
+                onChange={(e) => setConversation(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Any conversation</option>
+                {CONVERSATION_TYPES.map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label className="vm-field-label">
+              Visual style
+              <select
+                aria-label="Visual style"
+                value={visualStyle}
+                onChange={(e) => setVisualStyle(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Any style</option>
+                {VISUAL_STYLES.map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
+            <label className="vm-field-label">
+              Mood
+              <select
+                aria-label="Mood"
+                value={tag || ""}
+                onChange={(e) => onTag(e.target.value || null)}
+                className={selectClass}
+              >
+                <option value="">Any mood</option>
+                {tags.map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            </label>
           </div>
+        )}
+        {(activeCount > 0 || query) && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="vm-text-button text-xs"
+          >
+            <X className="h-3.5 w-3.5" /> Clear all filters
+          </button>
+        )}
+        {notice && (
+          <p role="alert" className="text-sm text-amber-200">
+            {notice}
+          </p>
         )}
       </section>
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-[#d6c0cb]">{visible.length} fictional adult companions</p>
-        <span className="text-[10px] uppercase tracking-[.17em] text-zinc-500">Private Atelier</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
+        <p role="status" aria-live="polite" className="text-sm text-[#bfb3c7]">
+          <strong className="font-medium text-white">{visible.length}</strong>{" "}
+          fictional adult companions
+        </p>
+        <label className="flex items-center gap-2 text-xs text-[#bfb3c7]">
+          Sort by
+          <select
+            aria-label="Sort companions"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as "featured" | "name")}
+            className="rounded-lg border border-white/10 bg-[#17121f] px-3 py-2 text-xs text-white"
+          >
+            <option value="featured">Featured</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </label>
       </div>
-
-      {visible.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+      {visible.length ? (
+        <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">
           {visible.map((character) => (
-            <CandyGirlCard key={character.id} character={character} onSelect={onSelect}
-              isNew={(character.tags || []).some((t) => t.toUpperCase() === "NEW")}
+            <CandyGirlCard
+              key={character.id}
+              character={character}
+              onSelect={onSelect}
+              isNew={character.tags.some((t) => t.toUpperCase() === "NEW")}
               isFavorite={favorites.includes(character.id)}
-              onToggleFavorite={toggleFavorite} />
+              onToggleFavorite={toggleFavorite}
+            />
           ))}
         </div>
       ) : (
-        <div className="rounded-[22px] border border-white/10 bg-[#1a1520] p-10 text-center text-sm text-zinc-400">
-          No companions match these filters. Try another category, or turn off Saved.
+        <div className="rounded-3xl border border-dashed border-white/15 bg-[#17121f] px-6 py-16 text-center">
+          <Search className="mx-auto mb-4 h-7 w-7 text-[#bd9cc9]" />
+          <h2 className="font-display text-2xl">
+            A different kind of connection?
+          </h2>
+          <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#bfb3c7]">
+            {savedOnly && !favorites.length
+              ? "Save a character with the heart button to build your collection."
+              : "No characters match this combination. Open up the filters and see who you find."}
+          </p>
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="vm-secondary-button mx-auto mt-6"
+          >
+            Explore all companions
+          </button>
         </div>
       )}
     </main>

@@ -6,6 +6,7 @@
 
 import type { Character } from "./charactersTypes";
 import { validateCharacterCompliance } from "./complianceFilter";
+import { parseCharacterFromPngBuffer } from "./pngCardDecode";
 
 export interface CharacterCardV2 {
   spec: "chara_card_v2";
@@ -134,46 +135,11 @@ function encodeBase64Utf8(json: string): string {
   return btoa(binary);
 }
 
-function decodeBase64Utf8(b64: string): string {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new TextDecoder("utf-8").decode(bytes);
-}
 
 /** Extract `chara` JSON string from a SillyTavern / Character Card V2 PNG buffer. */
 export function extractCharaFromPngBuffer(buffer: ArrayBuffer): string | null {
-  const view = new DataView(buffer);
-  if (buffer.byteLength < 8) return null;
-  if (view.getUint32(0) !== 0x89504e47 || view.getUint32(4) !== 0x0d0a1a0a) return null;
-
-  let offset = 8;
-  while (offset + 12 <= buffer.byteLength) {
-    const length = view.getUint32(offset);
-    const type = String.fromCharCode(
-      view.getUint8(offset + 4),
-      view.getUint8(offset + 5),
-      view.getUint8(offset + 6),
-      view.getUint8(offset + 7),
-    );
-    const dataStart = offset + 8;
-    if (dataStart + length + 4 > buffer.byteLength) break;
-
-    if (type === "tEXt") {
-      const slice = new Uint8Array(buffer, dataStart, length);
-      const nul = slice.indexOf(0);
-      if (nul > 0) {
-        const key = new TextDecoder("latin1").decode(slice.slice(0, nul));
-        if (key === "chara") {
-          const val = new TextDecoder("latin1").decode(slice.slice(nul + 1));
-          return decodeBase64Utf8(val);
-        }
-      }
-    }
-    if (type === "IEND") break;
-    offset = dataStart + length + 4;
-  }
-  return null;
+  const card = parseCharacterFromPngBuffer(buffer);
+  return card ? JSON.stringify(card) : null;
 }
 
 /** Inject a `chara` tEXt chunk into an existing PNG image buffer before IEND. */

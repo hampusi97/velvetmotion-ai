@@ -72,8 +72,7 @@ function loadCompanionsViaTsx() {
       byId: Object.fromEntries(FLAGSHIP_COMPANIONS.concat(CHARACTERS.map((c) => ({ id: c.id }))).map((x) => [x.id, staticPortraitUrl(x.id)])),
     }));
   `;
-  const tsxCli = path.join(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
-  const out = execFileSync(process.execPath, [tsxCli, "-e", inline], { cwd: ROOT, encoding: "utf8" });
+  const out = execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", inline], { cwd: ROOT, encoding: "utf8" });
   return JSON.parse(out);
 }
 

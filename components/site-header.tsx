@@ -15,6 +15,7 @@ import { emitVaultUpdated } from "@/lib/firebaseSync";
 
 const NAV_LINKS = [
   { href: "/", label: "Explore", id: "home" },
+  { href: "/companions/", label: "Companions", id: "girls" },
   { href: "/discover/", label: "Discover", id: "discover" },
   { href: "/chat/", label: "Chat", id: "chat" },
   { href: "/group/", label: "Group chat", id: "group" },
@@ -228,7 +229,7 @@ export function SiteHeader({
             {/* Live Speed HUD Pill */}
             <Link
               href="/download/"
-              title={engine.anyLocalOnline ? "Local GPU/RAM Engine Connected" : "Running on Cloud Free Inference"}
+              title={engine.anyLocalOnline ? "Local AI services detected" : "Connect a model or review your provider setup"}
               className={cn(
                 "hidden sm:inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition tabular-nums",
                 engine.anyLocalOnline
@@ -237,8 +238,8 @@ export function SiteHeader({
               )}
             >
               {engine.anyLocalOnline
-                ? `⚡ Local Ultra (${engine.ramGb} GB RAM${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""})`
-                : `☁️ Cloud Free${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""}`}
+                ? `⚡ Local services (${engine.ramGb} GB RAM${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""})`
+                : `AI setup${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""}`}
             </Link>
 
             <button
@@ -320,6 +321,7 @@ export function SiteHeader({
           <nav className="relative max-h-[80dvh] overflow-y-auto border-b border-white/10 bg-[#080812] p-3 space-y-1">
             {[
               { href: "/", label: "Home / Explore" },
+              { href: "/companions/", label: "Companions" },
               { href: "/discover/", label: "Discover" },
               { href: "/chat/", label: "Chat" },
               { href: "/group/", label: "Group chat" },

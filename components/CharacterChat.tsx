@@ -29,7 +29,9 @@ import {
 } from "lucide-react";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } from "@/lib/audioEngine";
-import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
+import { CHARACTERS, allCharacters, fallbackReply, type Character } from "@/lib/characters";
+import { COMPANION_LIBRARY_EVENT } from "@/lib/companionLibrary";
+import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
 import { chatDebugBadgeEnabled, continueCompanionScene, ensureVisibleReply, generateCompanionReply, sanitizeCompanionReply, type RouterMessage } from "@/lib/chatRouter";
 import { createChatTurnGuard, createTranscriptRevision, shouldCommitTurnToActiveView, type ChatTurnOutcome } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
@@ -171,6 +173,17 @@ const SEQUENCE_LINES: Record<SequenceKind, string> = {
 
 export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSelectCompanion }: CharacterChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [threadCompanions, setThreadCompanions] = useState<Character[]>(CHARACTERS);
+  useEffect(() => {
+    const refresh = () => setThreadCompanions(allCharacters());
+    refresh();
+    window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
@@ -1191,7 +1204,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           Active Threads
         </div>
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pt-2">
-          {CHARACTERS.slice(0, 14).map((c) => {
+          {threadCompanions.map((c) => {
             const isCur = c.id === character.id;
             return (
               <button
@@ -1205,7 +1218,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 }`}
               >
                 <div className="relative h-9 w-9 shrink-0">
-                  <SafeImage src={staticPortraitUrl(c.id)} alt={c.name} className="h-9 w-9 rounded-full object-cover object-top" />
+                  <SafeImage src={safeCompanionAvatarUrl(c.avatar) || staticPortraitUrl(c.id)} alt={c.name} className="h-9 w-9 rounded-full object-cover object-top" />
                   <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#00ffa3] ring-2 ring-[#05050a]" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1232,7 +1245,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 ←
               </button>
               <SafeImage
-                src={staticPortraitUrl(character.id)}
+                src={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
                 alt={character.name}
                 className="h-10 w-10 rounded-full object-cover object-top border border-[#ff1e8e]/60 shrink-0"
               />
@@ -1852,7 +1865,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       <aside className="hidden lg:flex flex-col rounded-3xl neon-glass p-4 space-y-4 overflow-hidden">
         <div className="flex items-center gap-3">
           <SafeImage
-            src={staticPortraitUrl(character.id)}
+            src={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
             alt={character.name}
             className="h-14 w-14 rounded-2xl object-cover object-top border border-[#ff1e8e]/50 shrink-0"
           />

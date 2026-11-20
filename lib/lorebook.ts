@@ -41,7 +41,8 @@ export function parseCharacterLorebook(card: unknown): LorebookEntry[] {
       content,
       enabled: true,
       constant,
-      order: typeof entry.order === "number" && Number.isFinite(entry.order) ? entry.order : index,
+      order: typeof entry.insertion_order === "number" && Number.isFinite(entry.insertion_order) ? entry.insertion_order
+        : typeof entry.order === "number" && Number.isFinite(entry.order) ? entry.order : index,
     });
   }
   return entries;
