@@ -55,44 +55,18 @@ import { ProactiveToast } from "@/components/ProactiveToast";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { Joi3DStage } from "@/components/Joi3DStage";
 
-export type ShellRouteView =
-  | "home"
-  | "discover"
-  | "tinder"
-  | "chat"
-  | "profile"
-  | "girls"
-  | "romance"
-  | "group"
-  | "dual"
-  | "shorts"
-  | "collection"
-  | "gallery"
-  | "private"
-  | "create"
-  | "studio"
-  | "download"
-  | "blindfold"
-  | "room"
-  | "roulette"
-  | "strip"
-  | "edge"
-  | "scenario"
-  | "tribute"
-  | "packs"
-  | "joi"
-  | "import"
-  | "share"
-  | "lounge"
-  | "vault"
-  | "my-girls"
-  | "wallet"
-  | "advanced"
-  | "terms"
-  | "privacy"
-  | "safety"
-  | "penthouse"
-  | "joi3d";
+const SHELL_VIEWS = [
+  "home", "discover", "tinder", "chat", "profile", "girls", "romance", "group", "dual",
+  "shorts", "collection", "gallery", "private", "create", "studio", "download", "blindfold",
+  "room", "roulette", "strip", "edge", "scenario", "tribute", "packs", "joi", "import", "share",
+  "lounge", "vault", "my-girls", "wallet", "advanced", "terms", "privacy", "safety", "penthouse", "joi3d",
+] as const;
+
+export type ShellRouteView = typeof SHELL_VIEWS[number];
+
+function parseShellView(value: string | null): ShellRouteView | undefined {
+  return SHELL_VIEWS.find((view) => view === value);
+}
 
 const ENABLE_3D = process.env.NEXT_PUBLIC_ENABLE_3D === "true";
 
@@ -127,9 +101,17 @@ function ComingSoon3DCard({ onBack }: { onBack: () => void }) {
   );
 }
 
+function StartupStatus() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#100c13] text-rose-100">
+      <p role="status" className="text-sm">Opening VelvetMotion…</p>
+    </main>
+  );
+}
+
 export function AppShell(props: { initialView?: ShellRouteView }) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#05050a]" />}>
+    <Suspense fallback={<StartupStatus />}>
       <AppShellContent {...props} />
     </Suspense>
   );
@@ -199,8 +181,8 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
 
   useEffect(() => {
     const params = new URLSearchParams(search);
-    const qView = pathname === "/" ? params.get("view") as ShellRouteView | null : null;
-    setView(qView || initialView);
+    const qView = pathname === "/" ? parseShellView(params.get("view")) : undefined;
+    setView(qView ?? initialView);
     setStoryPackId(qView === "packs" ? params.get("pack") : null);
     setStudioInitialTab(pathname.startsWith("/studio") && params.get("mode") === "video" ? "video" : "photo");
     setJoiTheme(pathname.startsWith("/joi") ? parseCompanionSessionTheme(params.get("theme")) : null);
@@ -281,11 +263,11 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
     setMenuOpen(false);
     if (next === "gallery") setView("collection");
     else if (next === "tinder") setView("discover");
-    else setView(next as ShellRouteView);
+    else setView(parseShellView(next) ?? "home");
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
-  if (adult === null) return <div className="min-h-screen bg-[#05050a]" />;
+  if (adult === null) return <StartupStatus />;
 
   if (!adult) {
     return (

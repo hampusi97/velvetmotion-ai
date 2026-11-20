@@ -20,7 +20,9 @@ llama-server -m ./Qwen3-4B-Q4_K_M.gguf --alias qwen3-4b \
   --reasoning off --cors-origins http://localhost:3000
 ```
 
-Run `npm run dev` at the repository root and open `http://localhost:3000`. Use the same app origin in your browser and the `--cors-origins` flag. Open **Settings → Chat model** and select **Custom (OpenAI-compatible)**. Enter `http://127.0.0.1:18081/v1` as the endpoint URL and `qwen3-4b` as the model ID. Leave the API key blank and select **Save Preferences Locally**. Chat streams replies as the model writes. The same model can draft guided audio scripts. Generation speed depends on the machine, and supported content depends on the model and provider.
+For the web app, run `npm run dev` at the repository root and open `http://localhost:3000`. For the Windows desktop app, launch VelvetMotion and use `--cors-origins http://tauri.localhost` when starting `llama-server`.
+
+Open **Settings → Chat model** and select **Custom (OpenAI-compatible)**. Enter `http://127.0.0.1:18081/v1` as the endpoint URL and `qwen3-4b` as the model ID. Leave the API key blank and select **Save Preferences Locally**. Chat streams replies as the model writes. The same model can draft guided audio scripts. Generation speed depends on the machine, and supported content depends on the model and provider.
 
 ## Neural voice
 - **Kokoro-FastAPI:** an OpenAI-compatible TTS endpoint at `http://127.0.0.1:8880/v1/audio/speech`, with a female voice such as `af_heart` or `af_bella`; requires a separately running TTS server.

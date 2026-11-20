@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import tauriConfig from "../src-tauri/tauri.conf.json";
 import {
   chooseDesktopInstaller, detectDesktopPlatform, humanFileSize,
   type ReleaseAsset,
@@ -39,4 +40,13 @@ test("operating system guessing never pretends to know Mac CPU architecture", ()
 test("renders optional release file size", () => {
   assert.equal(humanFileSize(1024 * 1024 * 22), "22.0 MB");
   assert.equal(humanFileSize(undefined), "");
+});
+
+test("desktop permits user-configured loopback model ports", () => {
+  const connectionPolicy = tauriConfig.app.security.csp.split(";")
+    .map((directive) => directive.trim().split(/\s+/))
+    .find(([directive]) => directive === "connect-src");
+
+  assert.ok(connectionPolicy?.includes("http://127.0.0.1:*"));
+  assert.ok(connectionPolicy?.includes("http://localhost:*"));
 });
