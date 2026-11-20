@@ -254,8 +254,11 @@ export default function MediaStudioModal({
   }
 
   async function handleGenerateVideo() {
-    if (uploadedPreview && videoSourceUrl === uploadedPreview &&
-        (!uploadSourceKind || !uploadRightsConfirmed)) {
+    const derivedFromUpload = Boolean(uploadedPreview && (
+      videoSourceUrl === uploadedPreview ||
+      (referenceResult && videoSourceUrl === referenceResult)
+    ));
+    if (derivedFromUpload && (!uploadSourceKind || !uploadRightsConfirmed)) {
       setErrorMsg('Choose the image source and confirm that you have permission to use it before animating.');
       return;
     }
@@ -270,13 +273,13 @@ export default function MediaStudioModal({
         durationSec,
         speed: videoSpeed,
         // A real-person photograph may only be used for a neutral, nonsexual animation.
-        prompt: videoSourceUrl === uploadedPreview && uploadSourceKind === 'self'
+        prompt: derivedFromUpload && uploadSourceKind === 'self'
           ? 'Nonsexual portrait animation, subtle natural blink, gentle head turn, fully clothed, natural lighting'
           : `${companion.name} ${customPrompt}`,
-        sourceType: videoSourceUrl === uploadedPreview
+        sourceType: derivedFromUpload
           ? uploadSourceKind === 'fictional' ? 'fictional' : 'real-person'
           : 'unspecified',
-        adultMode: videoSourceUrl === uploadedPreview && uploadSourceKind === 'fictional' && uploadedAdultMode,
+        adultMode: derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode,
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
       });
@@ -802,7 +805,7 @@ export default function MediaStudioModal({
             </div>
           </div>
 
-          {uploadedPreview && videoSourceUrl === uploadedPreview && (
+          {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && (
             <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
               <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
               <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
@@ -812,7 +815,7 @@ export default function MediaStudioModal({
               </label>
             </div>
           )}
-          {uploadedPreview && videoSourceUrl === uploadedPreview && uploadSourceKind === 'fictional' && (
+          {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && uploadSourceKind === 'fictional' && (
             <label className="flex items-center justify-between rounded-xl border border-fuchsia-300/20 bg-black/30 p-3 text-[11px] text-pink-100">
               <span>18+ mode for original fictional adult artwork
                 <small className="mt-0.5 block text-zinc-400">Requires a compatible model; not a guarantee of content.</small>
