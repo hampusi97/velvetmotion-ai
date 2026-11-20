@@ -49,3 +49,5 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
       - name: Type-check native desktop app
         run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Type-check signed updater build
+        run: cargo check --manifest-path src-tauri/Cargo.toml --features signed-updater
