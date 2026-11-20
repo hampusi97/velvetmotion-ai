@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { discoverA1111Checkpoints, type A1111Checkpoint } from "@/lib/a1111Client";
 import {
   getMediaSettings,
   saveMediaSettings,
@@ -32,6 +33,20 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
   const [saved, setSaved] = useState(false);
   const [diagRunning, setDiagRunning] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticCheck[]>([]);
+  const [webuiCheckpoints, setWebuiCheckpoints] = useState<A1111Checkpoint[]>([]);
+  const [checkingWebui, setCheckingWebui] = useState(false);
+  const [webuiStatus, setWebuiStatus] = useState("");
+
+  const checkA1111 = async () => {
+    if (!s) return;
+    setCheckingWebui(true);
+    const result = await discoverA1111Checkpoints(s.localImageBase || "http://127.0.0.1:7860");
+    setWebuiCheckpoints(result.checkpoints);
+    setWebuiStatus(result.online
+      ? `WebUI reachable · ${result.checkpoints.length} installed checkpoint(s). Generation not yet tested.`
+      : result.error || "Could not reach AUTOMATIC1111 / Forge. Check --api and browser CORS.");
+    setCheckingWebui(false);
+  };
 
   const runDiagnostics = async () => {
     setDiagRunning(true);
@@ -65,11 +80,9 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
       probe("kobold", "KoboldCpp chat (:5001)", "http://127.0.0.1:5001/v1/models"),
       probe("ollama", "Ollama chat (:11434)", "http://127.0.0.1:11434/api/tags"),
       probe("kokoro", "Kokoro neural voice (:8880)", "http://127.0.0.1:8880/docs"),
-      probe(
-        "comfy",
-        "ComfyUI image engine (:8188)",
-        `${(settings.localImageBase || "http://127.0.0.1:8188").replace(/\/+$/, "")}/system_stats`,
-      ),
+      settings.localImageMode === "forge"
+        ? probe("a1111", "A1111 / Forge API", `${(settings.localImageBase || "http://127.0.0.1:7860").replace(/\/+$/, "")}/sdapi/v1/sd-models`)
+        : probe("comfy", "ComfyUI image engine (:8188)", "http://127.0.0.1:8188/system_stats"),
     ]);
     checks.push({
       id: "video",
@@ -175,9 +188,42 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
           }
         >
           <option value="prompt-url">Prompt URL template</option>
-          <option value="forge">Forge / A1111 txt2img</option>
+          <option value="forge">AUTOMATIC1111 / Forge (txt2img + img2img)</option>
           <option value="comfy">ComfyUI base</option>
         </select>
+        {s.localImageMode === "forge" && (
+          <div className="rounded-xl border border-rose-300/20 bg-rose-500/5 px-3 py-3 space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-pink-200">AUTOMATIC1111 / Forge checkpoints</p>
+              <button type="button" onClick={() => void checkA1111()} disabled={checkingWebui}
+                className="rounded-lg border border-pink-300/30 px-2.5 py-1 text-xs text-pink-100 hover:bg-pink-500/20 disabled:opacity-50">
+                {checkingWebui ? "Checking..." : "Find installed models"}
+              </button>
+            </div>
+            <p role="status" className="text-[11px] text-zinc-400">{webuiStatus || "Start the WebUI with --api and select an installed checkpoint."}</p>
+            <label className="block text-xs text-zinc-300">
+              Checkpoint (per-request; does not permanently switch the WebUI)
+              <select value={s.a1111Checkpoint} onChange={(event) => update({a1111Checkpoint:event.target.value})}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-xs text-white">
+                <option value="">Use WebUI's active checkpoint</option>
+                {webuiCheckpoints.map(model => <option key={model.title} value={model.title}>{model.title}</option>)}
+                {s.a1111Checkpoint && !webuiCheckpoints.some(x=>x.title===s.a1111Checkpoint) &&
+                  <option value={s.a1111Checkpoint}>{s.a1111Checkpoint} (not verified)</option>}
+              </select>
+            </label>
+            <label className="block text-xs text-zinc-300">
+              Img2img variation strength: {Math.min(.95, Math.max(.05, s.a1111Denoise ?? .55)).toFixed(2)}
+              <input type="range" min="0.05" max="0.95" step="0.05"
+                value={s.a1111Denoise ?? .55}
+                onChange={(event)=>update({a1111Denoise:Number(event.target.value)})}
+                className="mt-2 w-full accent-pink-400"/>
+            </label>
+            <p className="text-[10px] text-zinc-400">
+              Higher strength changes the reference image more. These are local generation settings, not a guaranteed face-identity lock.
+              The WebUI requires an installed model and --api; CORS may prevent browser access.
+            </p>
+          </div>
+        )}
         <label className="flex items-center gap-2 text-sm text-zinc-300">
           <input
             type="checkbox"
