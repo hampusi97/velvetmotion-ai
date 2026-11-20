@@ -54,6 +54,8 @@ export interface ChatRouterSettings {
   customModel?: string;
   ollamaUrl?: string;
   ollamaModel?: string;
+  /** Explicit model choice should not be intercepted by KoboldCpp. */
+  preferredLocalRuntime?: "auto" | "ollama" | "koboldcpp";
   homeEngineUrl?: string;
   aiHordeApiKey?: string;
   samplerPreset?: SamplerPresetId;
@@ -294,7 +296,7 @@ async function tryOpenAIChatTiers(
   };
 
   // Tier 1: Local KoboldCpp (127.0.0.1:5001)
-  if (allowLocal && typeof window !== "undefined") {
+  if (allowLocal && settings.preferredLocalRuntime !== "ollama" && typeof window !== "undefined") {
     const t0 = Date.now();
     const koboldRaw = await fetchOpenAICompat("http://127.0.0.1:5001/v1/chat/completions", chatMessages, {
       ...progress,
@@ -307,7 +309,7 @@ async function tryOpenAIChatTiers(
   }
 
   // Tier 2: Local Ollama (127.0.0.1:11434 or configured URL)
-  if (allowLocal && typeof window !== "undefined") {
+  if (allowLocal && settings.preferredLocalRuntime !== "koboldcpp" && typeof window !== "undefined") {
     const t0 = Date.now();
     const ollamaBase = (settings.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
     const ollamaRaw = await fetchOpenAICompat(`${ollamaBase}/v1/chat/completions`, chatMessages, {

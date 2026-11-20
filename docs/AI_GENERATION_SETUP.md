@@ -44,7 +44,7 @@ python3 -m venv .venv-kokoro
 The app discovers the service on `127.0.0.1:8880`. Open the Voice Atelier and try **Neural preview** or play a companion cue in Guided JOI Audio. This adapter returns 24 kHz WAV audio. Set `VELVET_VOICE_ORIGINS` to a comma-separated list of trusted app origins if using a different frontend origin.
 
 ## Images
-- **Local ComfyUI:** `http://127.0.0.1:8188` plus a *real installed compatible image checkpoint/workflow*.
+- **Local ComfyUI:** `http://127.0.0.1:8188` plus a *real installed compatible image checkpoint/workflow*. When Studio detects the local server, it can try port 8188 without a duplicate settings entry and discovers installed `CheckpointLoaderSimple` checkpoints before dispatch; CORS permission may still be necessary in a regular browser.
 - **General-purpose cloud worker:** used for ordinary images. Studio keeps the original resolution for download and animation, and saves a compact copy to Collection.
 - **AI Horde:** optional image generation with `nsfw: true` only for appropriate adult requests; only workers accepting that type of request can run it. Free queues, active models, and moderation decisions vary. No model names are hard-coded unless a user explicitly selects them.
 - **Face identity:** the same per-character seed is used when aggressive face lock is enabled. A seed alone does not provide face identity fidelity; a compatible reference-image workflow/IP-Adapter is better.

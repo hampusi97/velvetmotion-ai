@@ -5,8 +5,20 @@ export type MediaBackendSettings = {
   localImageBase: string;
   /** Path style: comfy | forge | custom-prompt-url */
   localImageMode: "comfy" | "forge" | "prompt-url";
+  /** Optional installed CheckpointLoaderSimple model selected in the Studio. */
+  comfyCheckpoint: string;
+  /** Selected per-request Stable Diffusion WebUI / Forge checkpoint title. */
+  a1111Checkpoint: string;
+  /** Denoise strength for reference-based img2img, from 0.05 to 0.95. */
+  a1111Denoise: number;
   /** Optional img2vid endpoint that accepts image URL + prompt */
   img2vidUrl: string;
+  /** Use a local ComfyUI API-format video workflow when no generic video endpoint is set. */
+  comfyVideoEnabled: boolean;
+  comfyVideoBase: string;
+  comfyVideoWorkflowJson: string;
+  comfyVideoImageNodeId: string;
+  comfyVideoPromptNodeId: string;
   /** Optional reference-aware img2img bridge URL for original fictional artwork. */
   img2imgUrl: string;
   /** Pollinations / external API key if needed for video */
@@ -35,7 +47,15 @@ export function localComfyVideoHealthUrl(endpoint: string): string | null {
 const DEFAULTS: MediaBackendSettings = {
   localImageBase: "",
   localImageMode: "prompt-url",
+  comfyCheckpoint: "",
+  a1111Checkpoint: "",
+  a1111Denoise: 0.55,
   img2vidUrl: "",
+  comfyVideoEnabled: false,
+  comfyVideoBase: "http://127.0.0.1:8188",
+  comfyVideoWorkflowJson: "",
+  comfyVideoImageNodeId: "",
+  comfyVideoPromptNodeId: "",
   img2imgUrl: "",
   pollinationsKey: "",
   preferLocal: false,

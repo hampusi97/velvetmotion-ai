@@ -52,6 +52,7 @@ export function DownloadDesktopView() {
     { title: "Ollama", status: engine.ollamaOnline, detail: "Local conversation" },
     { title: "KoboldCpp", status: engine.koboldOnline, detail: "Local conversation" },
     { title: "ComfyUI", status: engine.comfyOnline, detail: "Image workflows" },
+    { title: "SD web UI", status: false, detail: "Local NSFW (:7860)" },
     { title: "Fish voice", status: engine.fishOnline, detail: "Local neural voice" },
     { title: "Kokoro", status: engine.kokoroOnline, detail: "Local neural voice" },
     { title: "Home Engine", status: engine.homeEngineOnline, detail: "Optional bridge" },
@@ -265,6 +266,21 @@ export function DownloadDesktopView() {
           ))}
         </div>
 
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e9adbd]">Current mode</p>
+          <p className="mt-1 text-lg font-semibold">
+            {engine.ollamaOnline ? "LOCAL RAM — Ollama" : engine.koboldOnline ? "LOCAL RAM — KoboldCpp" : "DEMO MODE"}
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {engine.ollamaOnline || engine.koboldOnline
+              ? "A local engine is reachable. Chat can stay on your machine."
+              : "No local engine detected. Install Ollama or KoboldCpp, then hit Test connections."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href="https://ollama.com" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-zinc-200 hover:border-white/35">Get Ollama</a>
+            <a href="https://github.com/LostRuins/koboldcpp" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-zinc-200 hover:border-white/35">Get KoboldCpp</a>
+          </div>
+        </div>
         <p className="text-[11px] text-[#d3bbca]">Hardware estimate: {ram.label}. Model sizes depend on the real available RAM and VRAM; the browser estimate may be inaccurate.</p>
         <div className="grid gap-2 sm:grid-cols-3">
           {(Object.keys(LOCAL_COMPUTE_MODES) as LocalComputeMode[]).map((mode) => (
@@ -307,6 +323,25 @@ export function DownloadDesktopView() {
           </div>
         </div>
         <p className="max-w-3xl text-xs leading-6 text-[#d0beca]">
+          <div className="rounded-2xl border border-[#e9adbd]/30 bg-[#e9adbd]/5 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e9adbd]">One-click local host</p>
+            <h3 className="mt-1 text-lg font-semibold">Host the site on your PC</h3>
+            <p className="mt-1 text-xs text-zinc-400">Download, double-click, and open http://127.0.0.1:8787. Uses your RAM/GPU if Ollama, KoboldCpp or ComfyUI is running. Requires Python 3.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a href="/downloads/start-velvet-engine.bat" download className="rounded-full bg-[#e9adbd] px-4 py-2 text-xs font-semibold text-black hover:bg-[#f2c8d2]">Windows (.bat)</a>
+              <a href="/downloads/start-velvet-engine.command" download className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-white/40">Mac (.command)</a>
+              <a href="/downloads/velvetmotion_home_engine.py" download className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-white/40">Python only</a>
+            </div>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Optional local AI (for real NSFW / offline)</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a href="https://ollama.com/download" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">Ollama (chat)</a>
+              <a href="https://github.com/LostRuins/koboldcpp" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">KoboldCpp</a>
+              <a href="https://github.com/Comfy-Org/ComfyUI" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">ComfyUI (images)</a>
+              <a href="https://github.com/ciredark/LAIGFE" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">LAIGFE full installer</a>
+              <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">SD web UI (:7860)</a>
+            </div>
+            <p className="mt-2 text-[10px] text-zinc-500">Start the launcher, then open the site. If a local engine is running, NSFW selfies use your GPU.</p>
+          </div>
           Already installed Ollama, KoboldCpp or ComfyUI? The optional Python Home Engine can discover running
           local services. It does not install AI models or start a public tunnel. Download the Python engine and a
           matching launcher into the <strong>same folder</strong>; review the source before running it.

@@ -5,6 +5,8 @@
  */
 
 import { getMediaSettings } from "./mediaSettings";
+import { generateA1111Image } from "./a1111Client";
+import { blobToDataUrl } from "./imageStore";
 
 export type LocalGenRequest = {
   prompt: string;
@@ -46,6 +48,9 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
   const height = opts.height || 1152;
   const checkpoint = opts.checkpoint || "flux1-dev-fp8.safetensors";
   const hasRef = Boolean(opts.referenceImageBase64 && opts.referenceImageBase64.length > 32);
+  if (hasRef) {
+    throw new Error("Reference-image FaceID requires a compatible, installed IP-Adapter workflow; the basic txt2img workflow cannot guarantee face identity.");
+  }
 
   const graph: Record<string, unknown> = {
     "3": {
@@ -54,7 +59,7 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
         cfg: 5.5,
         denoise: 1.0,
         latent_image: ["5", 0],
-        model: [hasRef ? "11" : "4", 0],
+        model: ["4", 0],
         negative: ["7", 0],
         positive: ["6", 0],
         sampler_name: "euler",
@@ -89,61 +94,24 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
     },
   };
 
-  if (hasRef) {
-    graph["10"] = {
-      class_type: "ETN_LoadImageBase64",
-      inputs: {
-        image: opts.referenceImageBase64!.replace(/^data:[^;]+;base64,/, ""),
-      },
-    };
-    graph["11"] = {
-      class_type: "IPAdapterUnifiedLoaderFaceID",
-      inputs: {
-        model: ["4", 0],
-        preset: "FACEID PLUS V2",
-        lora_strength: 0.65,
-        provider: "CUDA",
-        image: ["10", 0],
-        weight: opts.ipAdapterWeight ?? 0.85,
-      },
-    };
-  }
 
   return graph;
 }
 
-/** Try Forge/A1111 txt2img style API */
+/** The A1111 and Forge backends share the documented Stable Diffusion WebUI API. */
 async function tryForge(base: string, req: LocalGenRequest): Promise<LocalGenResult> {
-  try {
-    const res = await fetch(`${base.replace(/\/$/, "")}/sdapi/v1/txt2img`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: req.prompt,
-        negative_prompt: req.negative || DEFAULT_NEG,
-        seed: req.seed,
-        width: req.width || 768,
-        height: req.height || 1152,
-        steps: 20,
-        cfg_scale: 5,
-      }),
-      signal: AbortSignal.timeout(120000),
-    });
-    if (!res.ok) return { ok: false, note: `Forge HTTP ${res.status}` };
-    const data = await res.json();
-    const b64 = data.images?.[0];
-    if (!b64) return { ok: false, note: "No image in Forge response" };
-    return {
-      ok: true,
-      imageUrl: b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`,
-      note: "Local Forge/A1111",
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      note: `Forge failed (CORS or offline): ${e instanceof Error ? e.message : "error"}`,
-    };
-  }
+  const settings = getMediaSettings();
+  return generateA1111Image({
+    baseUrl: base,
+    prompt: req.prompt,
+    negativePrompt: req.negative || DEFAULT_NEG,
+    seed: req.seed,
+    width: req.width,
+    height: req.height,
+    checkpoint: req.checkpoint || settings.a1111Checkpoint,
+    initImage: req.referenceImageBase64,
+    denoisingStrength: settings.a1111Denoise,
+  });
 }
 
 /** Generic prompt-url style: POST {prompt,seed} → {url|image} */
@@ -174,15 +142,6 @@ async function tryCustom(base: string, req: LocalGenRequest): Promise<LocalGenRe
   }
 }
 
-async function blobToDataUrlLocal(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(new Error("blob read failed"));
-    reader.readAsDataURL(blob);
-  });
-}
-
 /** Direct ComfyUI workflow runner (works in browser with --enable-cors-header or Tauri desktop). */
 export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Promise<LocalGenResult> {
   const base = baseUrl.replace(/\/$/, "");
@@ -194,22 +153,48 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
   }
 
   try {
+    // A reachable ComfyUI server does not imply the old hard-coded FLUX
+    // filename is installed. Ask ComfyUI which checkpoints actually exist.
+    const infoRes = await fetch(`${base}/object_info/CheckpointLoaderSimple`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!infoRes.ok) {
+      return { ok: false, note: `ComfyUI checkpoint discovery HTTP ${infoRes.status}` };
+    }
+    const info = (await infoRes.json()) as {
+      CheckpointLoaderSimple?: { input?: { required?: { ckpt_name?: string[][] } } };
+    };
+    const checkpoints = info.CheckpointLoaderSimple?.input?.required?.ckpt_name?.[0] || [];
+    const preferred = req.checkpoint || getMediaSettings().comfyCheckpoint;
+    if (preferred && !checkpoints.includes(preferred)) {
+      return { ok: false, note: `Selected ComfyUI model "${preferred.slice(0, 100)}" is not installed. Choose an available checkpoint in the Studio.` };
+    }
+    const checkpoint = preferred || checkpoints.find((name) => typeof name === "string" && name.trim());
+    if (!checkpoint) {
+      return { ok: false, note: "ComfyUI is online, but no CheckpointLoaderSimple model is installed. Install a compatible checkpoint or configure a custom image workflow." };
+    }
+    if (req.referenceImageBase64) {
+      return { ok: false, note: "ComfyUI FaceID cannot run with the basic txt2img graph. Configure a compatible reference-aware image backend; no face-lock was applied." };
+    }
     const workflow = buildComfyWorkflowGraph({
+      checkpoint,
       prompt: req.prompt,
       negativePrompt: req.negative,
       seed: req.seed,
       width: req.width || 768,
       height: req.height || 1152,
-      checkpoint: req.checkpoint,
       referenceImageBase64: req.referenceImageBase64,
     });
     const queueRes = await fetch(`${base}/prompt`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt: workflow }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(30000),
     });
-    if (!queueRes.ok) return { ok: false, note: `ComfyUI queue HTTP ${queueRes.status}` };
+    if (!queueRes.ok) {
+      const detail = await queueRes.text().catch(() => "");
+      return { ok: false, note: `ComfyUI queue HTTP ${queueRes.status}: ${detail.slice(0, 300)}` };
+    }
     const { prompt_id: promptId } = (await queueRes.json()) as { prompt_id?: string };
     if (!promptId) return { ok: false, note: "ComfyUI returned no prompt_id" };
 
@@ -241,7 +226,7 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
             signal: AbortSignal.timeout(10000),
           });
           if (!viewRes.ok) continue;
-          const dataUrl = await blobToDataUrlLocal(await viewRes.blob());
+          const dataUrl = await blobToDataUrl(await viewRes.blob());
           if (dataUrl) {
             return { ok: true, imageUrl: dataUrl, note: "Local ComfyUI (RTX/GPU)" };
           }
@@ -276,7 +261,7 @@ export async function generateLocalImage(
     }
   }
 
-  if (s.localImageMode === "forge") return tryForge(base, req);
+  if (s.localImageMode === "forge") return tryForge(base, { ...req, referenceImageBase64: refPhoto });
   if (s.localImageMode === "prompt-url" && !base.includes(":8188")) {
     return tryCustom(base, req);
   }

@@ -51,6 +51,7 @@ import { ChatMiniGames } from "@/components/ChatMiniGames";
 import { AmbientMixer } from "@/components/AmbientMixer";
 import { extractMemoriesFromMessage, loadMemories, saveMemories, splitInnerThoughtAndReply } from "@/lib/memoryMap";
 import { memoryPromptBlock, pinLong, pushShort } from "@/lib/memoryTiers";
+import { buildLorebookContext, loadLorebook } from "@/lib/lorebook";
 import { stageFromIntimacy } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
 import { cleanSpeechText, speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
@@ -426,13 +427,14 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
     notifySaved("Saved to Collection & Photo Diary");
   };
 
-  const buildPersonaPayload = () => {
+  const buildPersonaPayload = (recentUserText = "") => {
     const dynamicMemories = toDynamicMemories(character.id);
     const vaultNotes = loadCategorizedMemories(character.id)
       .slice(0, 8)
       .map((m) => `- [${m.category}] ${m.text}`)
       .join("\n");
-    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id)].filter(Boolean).join("\n");
+    const loreContext = buildLorebookContext(loadLorebook(character.id), recentUserText);
+    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext].filter(Boolean).join("\n");
     const kinks = getKinks(character.id).slice(-3);
     return {
       id: character.id,
@@ -502,7 +504,7 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
 
     const routed = await generateCompanionReply(
       historyMsgs.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
-      buildPersonaPayload(),
+      buildPersonaPayload(userPrompt),
       options,
     );
     if (!mountedRef.current || options.signal?.aborted) return null;
@@ -1166,6 +1168,9 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
               {clipController.current && <button type="button" onClick={() => clipController.current?.abort()}
                 className="rounded-full border border-current px-2 py-1">Stop waiting for clip</button>}
             </div>}
+            {clipStatus?.toLowerCase().includes("fail") && (
+              <button type="button" onClick={() => setClipStatus(null)} className="text-[11px] text-pink-300 underline">Try another mood</button>
+            )}
           </div>
         )}
 
@@ -1471,7 +1476,7 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
         )}
 
         {/* Explicit State Scene Selfies Panel + Action Controls + Gift Strip + Pinned Composer */}
-        <div className="shrink-0 border-t border-white/10 bg-[#05050a]/95 px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-1.5">
+        <div className="shrink-0 border-t border-white/10 bg-[#05050a]/95 px-2 pt-1.5 pb-[max(4.5rem,env(safe-area-inset-bottom)+3.5rem)] lg:pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-1.5">
           <div className="flex items-center justify-between gap-2 px-1">
             <button
               type="button"
@@ -1641,12 +1646,29 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
                 key={chip}
                 type="button"
                 disabled={busy}
-                onClick={() => void send(chip)}
+                onClick={() => {
+                  const lower = chip.toLowerCase();
+                  if (lower.includes("selfie") || lower.includes("photo") || lower.includes("pic")) {
+                    void generate("seductive", "Selfie", 0, "candid selfie, phone camera, natural light");
+                  } else {
+                    void send(chip);
+                  }
+                }}
                 className="rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-3 py-1 text-left text-[11px] font-medium text-[#e6faff] hover:border-[#ff1e8e] hover:bg-[#ff1e8e]/15 transition disabled:opacity-45"
               >
                 {chip}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void generate("nude", "NSFW Selfie", 0, "nude selfie, soft light, looking at camera")}
+              className="rounded-full border border-pink-500/40 bg-pink-500/10 px-3 py-1 text-[11px] font-medium text-pink-200 hover:bg-pink-500/20 transition disabled:opacity-45"
+            >
+              NSFW selfie
+            </button>
+            <span className="text-[10px] text-zinc-500">Free cloud may return SFW. Run ComfyUI (:8188) or SD web UI (:7860) for local NSFW.</span>
+            <span className="ml-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-0.5 text-[10px] text-emerald-300">Local NSFW ready when engine is online</span>
           </div>
 
           <div className="flex items-center justify-between gap-2 px-1 text-xs">

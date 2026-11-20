@@ -7,7 +7,8 @@
  */
 import { blobToDataUrl } from "./imageStore";
 import { assertCompliance } from "./complianceFilter";
-import { localComfyVideoHealthUrl } from "./mediaSettings";
+import { getMediaSettings, localComfyVideoHealthUrl } from "./mediaSettings";
+import { generateComfyVideo } from "./comfyVideo";
 
 export interface VideoMotionPreset {
   id: "slow-zoom-blink" | "neon-hair-sway" | "balcony-breeze" | "club-light-pulse";
@@ -76,6 +77,7 @@ export interface StudioVideoRequest {
   mode?: "ai" | "animated-still";
   resolution?: (typeof VIDEO_RESOLUTIONS)[number];
   signal?: AbortSignal;
+  onProgress?: (message: string) => void;
 }
 
 export interface StudioVideoResult {
@@ -192,6 +194,63 @@ export async function renderCanvasMotionWebm(
   return done;
 }
 
+type VideoBackendResponse = {
+  videoUrl?: string;
+  url?: string;
+  video?: string;
+  output?: string | { url?: string; videoUrl?: string };
+  result?: { url?: string; videoUrl?: string };
+  statusUrl?: string;
+  status_url?: string;
+  state?: string;
+  status?: string;
+  error?: string;
+};
+
+function videoUrlFromResponse(data: VideoBackendResponse, endpoint: string): string | null {
+  const url = data.videoUrl || data.url || data.video ||
+    (typeof data.output === "string" ? data.output : data.output?.videoUrl || data.output?.url) ||
+    data.result?.videoUrl || data.result?.url;
+  // A blob: URL created in a remote server process is not usable by a browser.
+  if (typeof url !== "string") return null;
+  if (/^(https?:\/\/|data:video\/)/i.test(url)) return url;
+  if (url.startsWith("/") && !url.startsWith("//")) {
+    const resolved = new URL(url, endpoint);
+    if (resolved.origin === new URL(endpoint).origin) return resolved.toString();
+  }
+  return null;
+}
+
+/** Accept async video jobs only from the same origin as the configured API. */
+function safeVideoStatusUrl(value: string, endpoint: string): string {
+  const url = new URL(value, endpoint);
+  const configured = new URL(endpoint);
+  if (url.origin !== configured.origin || !["http:", "https:"].includes(url.protocol)) {
+    throw new Error("Video job polling URL must use the configured provider's origin.");
+  }
+  return url.toString();
+}
+
+async function pollVideoJob(initial: VideoBackendResponse, endpoint: string, signal: AbortSignal): Promise<string> {
+  const statusUrl = initial.statusUrl || initial.status_url;
+  if (!statusUrl) throw new Error("Video provider returned a job without a statusUrl. Configure an endpoint returning a completed video or a pollable job.");
+  const url = safeVideoStatusUrl(statusUrl, endpoint);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (signal.aborted) throw new Error("Video generation timed out.");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const response = await fetch(url, { signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`Video job status HTTP ${response.status}`);
+    const current = (await response.json()) as VideoBackendResponse;
+    const finished = videoUrlFromResponse(current, endpoint);
+    if (finished) return finished;
+    const status = (current.state || current.status || "").toLowerCase();
+    if (["failed", "error", "cancelled", "canceled"].includes(status) || current.error) {
+      throw new Error(current.error || "Video job failed at the provider.");
+    }
+  }
+  throw new Error("Video job did not finish within the polling window.");
+}
+
 export async function generateStudioVideoClip(
   req: StudioVideoRequest,
 ): Promise<StudioVideoResult> {
@@ -209,6 +268,29 @@ export async function generateStudioVideoClip(
   // Reaching ComfyUI /system_stats alone does NOT mean a video workflow exists.
   const endpoint = req.videoBackendUrl?.trim();
   let backendError: string | undefined;
+  const settings = getMediaSettings();
+  if (!endpoint && req.mode !== "animated-still" && settings.comfyVideoEnabled) {
+    try {
+      if (!settings.comfyVideoWorkflowJson || !settings.comfyVideoImageNodeId) {
+        throw new Error("Import a ComfyUI API-format video workflow and select its LoadImage node in Advanced Media.");
+      }
+      const generated = await generateComfyVideo({
+        baseUrl: settings.comfyVideoBase || "http://127.0.0.1:8188",
+        workflowJson: settings.comfyVideoWorkflowJson,
+        imageNodeId: settings.comfyVideoImageNodeId,
+        promptNodeId: settings.comfyVideoPromptNodeId || undefined,
+        prompt: req.prompt || "",
+        sourceImageUrl: req.imageUrl,
+        onStatus: req.onProgress,
+        signal: req.signal,
+      });
+      return { videoUrl: generated.videoUrl, videoFormat: generated.videoFormat, isGenerative: true,
+        engine: "ComfyUI video model (local)" };
+    } catch (error) {
+      req.signal?.throwIfAborted();
+      backendError = error instanceof Error ? error.message : "ComfyUI video workflow did not generate a video.";
+    }
+  }
   if (endpoint && req.mode !== "animated-still") {
     const timeoutMinutes = localComfyVideoHealthUrl(endpoint) ? 30 : 5;
     const timeout = AbortSignal.timeout(timeoutMinutes * 60_000);
@@ -287,12 +369,18 @@ export async function generateStudioVideoClip(
           videoFormat: contentType.includes("webm") ? "webm" : contentType.includes("mp4") ? "mp4" : "unknown",
         };
       }
-      const data = (await response.json()) as { videoUrl?: string; url?: string; video?: string; output?: string; error?: string };
-      const url = data.videoUrl || data.url || data.video || data.output;
-      if (typeof url !== "string" || !/^(https?:\/\/|blob:|data:video\/)/i.test(url)) {
-        throw new Error(data.error || "Video service returned no playable video URL");
+      const data = (await response.json()) as VideoBackendResponse;
+      const url = videoUrlFromResponse(data, endpoint) ||
+        ((data.statusUrl || data.status_url) ? await pollVideoJob(data, endpoint, signal) : null);
+      if (url) {
+        return {
+          videoUrl: url,
+          engine: "Configured AI video backend",
+          isGenerative: true,
+          videoFormat: /\.webm(?:$|[?#])/i.test(url) ? "webm" : /\.mp4(?:$|[?#])/i.test(url) ? "mp4" : "unknown",
+        };
       }
-      return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true, videoFormat: /\.webm(?:$|[?#])|^data:video\/webm/i.test(url) ? "webm" : /\.mp4(?:$|[?#])|^data:video\/mp4/i.test(url) ? "mp4" : "unknown" };
+      backendError = data.error || "Video provider returned neither playable video nor a statusUrl for polling.";
     } catch (err) {
       req.signal?.throwIfAborted();
       backendError = timeout.aborted ? `The video job timed out after ${timeoutMinutes} minutes.` : err instanceof Error ? err.message : "Video service unavailable";

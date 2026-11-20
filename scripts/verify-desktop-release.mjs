@@ -5,18 +5,18 @@
  */
 import fs from "node:fs";
 
-const REQUIRED_INSTALLERS = [
-  { label: "Windows x64", test: (n) => /_x64-setup\.exe$/i.test(n) },
-  { label: "Mac Apple silicon", test: (n) => /_aarch64\.dmg$/i.test(n) },
-  { label: "Mac Intel", test: (n) => /_x64\.dmg$/i.test(n) },
-  { label: "Linux x64", test: (n) => /_amd64\.AppImage$/i.test(n) },
+const requiredInstallers = (version) => [
+  { label: "Windows x64", test: (n) => n.endsWith(`_${version}_x64-setup.exe`) },
+  { label: "Mac Apple silicon", test: (n) => n.endsWith(`_${version}_aarch64.dmg`) },
+  { label: "Mac Intel", test: (n) => n.endsWith(`_${version}_x64.dmg`) },
+  { label: "Linux x64", test: (n) => n.endsWith(`_${version}_amd64.AppImage`) },
 ];
 const REQUIRED_SIGNED_PLATFORMS = ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"];
 
 export function verifyDesktopRelease({ tag, assets, signed, manifest }) {
   if (!/^v\d+\.\d+\.\d+$/.test(tag)) throw new Error("Invalid release tag");
   if (!Array.isArray(assets)) throw new Error("Release assets must be an array");
-  for (const required of REQUIRED_INSTALLERS) {
+  for (const required of requiredInstallers(tag.slice(1))) {
     if (!assets.some((name) => typeof name === "string" && required.test(name))) {
       throw new Error(`Missing ${required.label} installer in draft release`);
     }
@@ -43,6 +43,10 @@ export function verifyDesktopRelease({ tag, assets, signed, manifest }) {
     if (url.protocol !== "https:" || url.hostname !== "github.com" ||
       !url.pathname.startsWith("/hampusi97/velvetmotion-ai/releases/download/" + tag + "/")) {
       throw new Error(`Untrusted signed updater URL for ${platform}`);
+    }
+    const filename = decodeURIComponent(url.pathname.split("/").at(-1) || "");
+    if (!assets.includes(filename)) {
+      throw new Error(`Signed updater for ${platform} references a missing release asset: ${filename}`);
     }
   }
   if (!assets.includes("latest.json")) throw new Error("Signed release missing latest.json asset");

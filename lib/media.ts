@@ -7,6 +7,7 @@
 
 import type { Character } from "./charactersTypes";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { loadRouterSettings } from "./chatRouter";
 import { generateComfySfwPortrait, probeComfyUi } from "./comfyBridge";
@@ -71,8 +72,8 @@ const MOOD_PROMPTS: Record<MediaMood, string> = {
   beauty: PHOTO_BASE + " Natural makeup, soft ambient indoor light, influencer editorial close-up, intimate and warm.",
   seductive: PHOTO_BASE + " Intimate close-up, warm bedside lamp + soft rim light. Heavy-lidded eyes, parted glossy lips, slight head tilt, flushed cheeks. Soft shadows, realistic skin sheen with pores.",
   lingerie: PHOTO_BASE + " Mirror selfie, sheer lace lingerie slightly off shoulder, soft side window light. Looking over shoulder, natural skin texture, soft bokeh background, candid influencer aesthetic, authentic body.",
-  nude: PHOTO_BASE + " Fully nude adult woman, soft morning window light from the side. Natural skin texture with pores. Soft shadows defining form, looking at camera with soft expression. Unretouched photoreal adult, editorial nude, 21+.",
-  explicit: PHOTO_BASE + " Explicit nude adult woman, intense eye contact, flushed cheeks, slightly parted lips. Detailed natural anatomy, glistening skin with visible pores. Soft directional key light, high detail, uncensored photoreal adult, 21+.",
+  nude: PHOTO_BASE + " Fully nude adult woman, no clothes, naked body, bare breasts, soft window light, natural skin texture with pores, looking at camera, photoreal, 21+.",
+  explicit: PHOTO_BASE + " Explicit nude adult woman, naked, bare breasts, detailed anatomy, flushed, intense eye contact, uncensored photoreal, 21+.",
   sex: PHOTO_BASE + " Explicit intimate adult scene, sweaty realistic skin texture with pores, pleasure expression, detailed anatomy. Cinematic practical lighting, uncensored photoreal, natural proportions, 21+.",
   aftercare: PHOTO_BASE + " Post-intimacy, soft morning light through sheer curtains. Soft smile, messy hair, warm skin tones, realistic pores and glow. Intimate, tender, photoreal, gentle.",
   dual: PHOTO_BASE + " Two adult women together, soft shared warm lighting, both looking at viewer. Natural skin texture on both, warm bedroom atmosphere, photoreal, intimate, 21+.",
@@ -135,9 +136,9 @@ async function tryHomeEngineImage(
   }
 }
 
-export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, _mood: MediaMood = "beauty", _extra = "", _opts?: { seedOverride?: number; preferStatic?: boolean }): string {
-  // Static safe portrait reference
-  return staticPortraitUrl(character.id || "chloe");
+export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age"> & Partial<Pick<Character, "avatar">>, _mood: MediaMood = "beauty", _extra = "", _opts?: { seedOverride?: number; preferStatic?: boolean }): string {
+  // Prefer safe self-owned raster thumbnails for imported/custom characters.
+  return safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id || "chloe");
 }
 
 export async function resolveBestMediaUrl(
@@ -154,9 +155,11 @@ export async function resolveBestMediaUrl(
   const prompt = buildPrompt(character, mood, extra);
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
   // A shared face seed keeps companion identity more stable across generations.
-  const seed = settings?.aggressiveFaceLock
+  const base = settings?.aggressiveFaceLock
     ? Math.max(1, faceSeed(character))
     : randomGenerationSeed();
+  // Add a random offset so each generation differs even with face lock on.
+  const seed = (base + Math.floor(Math.random() * 999_999)) % 2_000_000_000 || 1;
   // Never route mature requests through the general-purpose, SFW-only worker.
   const requiresAdultEngine = NSFW_MOODS.has(mood) || /\b(nude|nudity|explicit|nsfw|sexual)\b/i.test(extra);
   const routerSettings = typeof window !== "undefined" ? loadRouterSettings() : { provider: "auto" as const };
@@ -172,7 +175,42 @@ export async function resolveBestMediaUrl(
     // Priority 1A: Local ComfyUI Bridge (:8188 SFW creative outfit/scene portraits) when online
     const comfyBase = (settings?.localImageBase || "http://127.0.0.1:8188").trim();
     const comfyProbe = await probeComfyUi(comfyBase);
-    if (comfyProbe.online && !requiresAdultEngine) {
+
+    // MyGirlGPT-style: Stable Diffusion web UI on :7860
+    let sdOnline = false;
+    try {
+      const sd = await fetch("http://127.0.0.1:7860/sdapi/v1/options", { signal: AbortSignal.timeout(800) });
+      sdOnline = sd.ok;
+    } catch { /* offline */ }
+    if (sdOnline && requiresAdultEngine) {
+      try {
+        const body = {
+          prompt,
+          negative_prompt: "clothes, clothing, dress, shirt, bra, underwear, censored, blurry, low quality",
+          steps: 20,
+          width: 512,
+          height: 768,
+          cfg_scale: 7,
+          seed,
+        };
+        const res = await fetch("http://127.0.0.1:7860/sdapi/v1/txt2img", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const data = await res.json() as { images?: string[] };
+          if (data.images?.[0]) {
+            const dataUrl = `data:image/png;base64,${data.images[0]}`;
+            reportImg("sd-webui");
+            return { url: dataUrl, note: "Local SD web UI (:7860)", seed, engine: "sd-webui" };
+          }
+        }
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : "SD web UI failed");
+      }
+    }
+    if (comfyProbe.online) {
       try {
         const blobUrl = await generateComfySfwPortrait({
           comfyUrl: comfyBase,
@@ -251,6 +289,27 @@ export async function resolveBestMediaUrl(
       }
     } catch (e) {
       errors.push(e instanceof Error ? e.message : "AI Horde failed");
+    }
+
+    // Priority 4: Pollinations classic (safe=false) for NSFW when Horde censors
+    if (requiresAdultEngine) {
+      try {
+        const p = encodeURIComponent(prompt.slice(0, 400));
+        const url = `https://image.pollinations.ai/prompt/${p}?width=512&height=768&seed=${seed}&safe=false&nologo=true`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (res.ok && res.headers.get("content-type")?.includes("image")) {
+          const blob = await res.blob();
+          const dataUrl = await new Promise<string>((resolve) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.readAsDataURL(blob);
+          });
+          reportImg("pollinations-nsfw");
+          return { url: dataUrl, note: "Pollinations (uncensored)", seed, engine: "pollinations-nsfw" };
+        }
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : "Pollinations failed");
+      }
     }
 
     const reason = errors.join(" · ") || "All compatible image generators are offline, unsupported, or rate-limited";

@@ -14,7 +14,7 @@ import {
 } from '@/lib/canvasVideoExporter';
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
-import { getMediaSettings } from '@/lib/mediaSettings';
+import { getMediaSettings, saveMediaSettings } from '@/lib/mediaSettings';
 import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
 import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
@@ -184,7 +184,7 @@ export default function MediaStudioModal({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const localEngine = useLocalEngineStatus();
   const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([]);
-  const [comfyCheckpoint, setComfyCheckpoint] = useState('');
+  const [comfyCheckpoint, setComfyCheckpoint] = useState(() => getMediaSettings().comfyCheckpoint);
 
   useEffect(() => {
     if (!isOpen && !standalone) return;
@@ -374,15 +374,17 @@ export default function MediaStudioModal({
           setComfyCheckpoints(comfyInfo.checkpoints);
           try {
             const t0 = performance.now();
+            const activeCheckpoint = comfyInfo.checkpoints.includes(comfyCheckpoint)
+              ? comfyCheckpoint : comfyInfo.checkpoints[0];
             const blobUrl = await generateComfySfwPortrait({
               prompt,
-              checkpointName: comfyCheckpoint || comfyInfo.checkpoints[0],
+              checkpointName: activeCheckpoint,
               width: photoWidth,
               height: photoHeight,
               seed: parsedSeed,
             });
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
-            const engineLabel = `ComfyUI (${comfyCheckpoint || comfyInfo.checkpoints[0] || 'Local :8188'})`;
+            const engineLabel = `ComfyUI (${activeCheckpoint || 'Local :8188'})`;
             await finishPhoto(request, { imageUrl: blobUrl, engine: engineLabel, elapsedSec, seed: parsedSeed });
             return;
           } catch {
@@ -511,6 +513,7 @@ export default function MediaStudioModal({
         signal: request.signal,
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: getMediaSettings().img2vidUrl || videoBackendUrl,
+        onProgress: (stage) => setStatusMsg(stage),
       });
       if (request.signal.aborted) {
         if (res.videoUrl.startsWith('blob:')) URL.revokeObjectURL(res.videoUrl);
@@ -977,7 +980,10 @@ export default function MediaStudioModal({
 
           {comfyCheckpoints.length > 0 && (
             <label className="block text-xs text-zinc-300">ComfyUI checkpoint
-              <select value={comfyCheckpoint || comfyCheckpoints[0]} onChange={(event) => setComfyCheckpoint(event.target.value)}
+              <select value={comfyCheckpoints.includes(comfyCheckpoint) ? comfyCheckpoint : comfyCheckpoints[0]} onChange={(event) => {
+                setComfyCheckpoint(event.target.value);
+                saveMediaSettings({ comfyCheckpoint: event.target.value });
+              }}
                 className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white">
                 {comfyCheckpoints.map((checkpoint) => <option key={checkpoint} value={checkpoint}>{checkpoint}</option>)}
               </select>

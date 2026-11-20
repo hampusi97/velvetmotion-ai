@@ -9,6 +9,7 @@ import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
 import { useFirebaseCloudSync } from "@/lib/firebaseSync";
 import { googleSignIn, signInAnonymousGuest } from "@/lib/firebase";
 import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
+import { COMPANION_TEXT_MODELS, installedModelNames, isModelInstalled } from "@/data/companionTextModels";
 import { getPreferredVoiceEngine, setPreferredVoiceEngine, type VoiceEngineId } from "@/lib/kokoroTts";
 import {
   DAVIDAU_RECOMMENDED_GGUFS,
@@ -37,6 +38,8 @@ export function SettingsAndBackupDrawer({
   const [customApiKey, setCustomApiKey] = useState(initialRouter.customApiKey || "");
   const [homeEngineUrl, setHomeEngineUrl] = useState(initialRouter.homeEngineUrl || "");
   const [ollamaModel, setOllamaModel] = useState(initialRouter.ollamaModel || "llama3.1:8b");
+  const [installedOllama, setInstalledOllama] = useState<string[] | null>(null);
+  const [checkingOllama, setCheckingOllama] = useState(false);
   const [stealthNotif, setStealthNotif] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("vm-stealth-notif") !== "false";
@@ -90,6 +93,30 @@ export function SettingsAndBackupDrawer({
     const text = await file.text();
     const res = await importFullBackupJson(text);
     setStatusMsg(`Restored ${res.restoredKeys} settings & ${res.restoredRows} IndexedDB records.`);
+  };
+
+  const checkInstalledOllama = async () => {
+    setCheckingOllama(true);
+    try {
+      const rawBase = loadRouterSettings().ollamaUrl || "http://127.0.0.1:11434";
+      const base = new URL(rawBase);
+      if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) {
+        throw new Error("Configure a valid HTTP(S) Ollama URL.");
+      }
+      const response = await fetch(new URL("/api/tags", base).toString(), {
+        signal: AbortSignal.timeout(4000),
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Ollama replied HTTP " + response.status);
+      const installed = installedModelNames(await response.json());
+      setInstalledOllama(installed);
+      setStatusMsg("Found " + installed.length + " locally installed Ollama model(s). Selecting a preset does not install it.");
+    } catch {
+      setInstalledOllama(null);
+      setStatusMsg("Could not list Ollama models. Start Ollama locally, allow browser access, then retry. The website cannot install models for you.");
+    } finally {
+      setCheckingOllama(false);
+    }
   };
 
   const saveModelSettings = () => {
@@ -556,6 +583,13 @@ export function SettingsAndBackupDrawer({
             className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
           />
           <input
+            value={customModel}
+            onChange={(e) => setCustomModel(e.target.value)}
+            placeholder="Custom server model ID (e.g. internlm/internlm2_5-7b-chat)"
+            aria-label="Custom OpenAI-compatible model identifier"
+            className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
+          />
+          <input
             value={homeEngineUrl}
             onChange={(e) => setHomeEngineUrl(e.target.value)}
             placeholder="Home Engine / Tunnel URL (http://127.0.0.1:8787 or https://...trycloudflare.com)"
@@ -575,6 +609,82 @@ export function SettingsAndBackupDrawer({
               className="rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none"
             />
           </div>
+          <div className="rounded-xl border border-fuchsia-300/20 bg-fuchsia-500/[0.05] p-3 space-y-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-fuchsia-100">Companion language models</p>
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Optional model presets. Models are installed separately and never shipped with VelvetMotion.
+                </p>
+              </div>
+              <button type="button" disabled={checkingOllama} onClick={() => void checkInstalledOllama()}
+                className="shrink-0 rounded-lg border border-fuchsia-300/30 px-2.5 py-1.5 text-[10px] font-semibold text-fuchsia-100 hover:bg-fuchsia-500/20 disabled:opacity-50">
+                {checkingOllama ? "Checking…" : "Check installed"}
+              </button>
+            </div>
+            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              {COMPANION_TEXT_MODELS.map((model) => (
+                <div key={model.id} className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-white">{model.name}</p>
+                    {model.ollamaTag && installedOllama !== null && (
+                      <span className={"text-[10px] " + (isModelInstalled(model.ollamaTag, installedOllama)
+                        ? "text-emerald-300" : "text-amber-200")}>
+                        {isModelInstalled(model.ollamaTag, installedOllama) ? "Installed" : "Not installed"}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-300">{model.purpose}</p>
+                  <p className="text-[10px] text-zinc-400">{model.estimatedDownload || model.ramGuidance}</p>
+                  <p className="text-[10px] text-amber-100/80">{model.licenseNote}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <a href={model.modelPage} target="_blank" rel="noopener noreferrer"
+                      className="text-[10px] underline text-fuchsia-200">Model card</a>
+                    {model.ollamaTag && model.setupCommand ? (
+                      <>
+                        <button type="button" onClick={() => copyCommand(model.id, model.setupCommand!)}
+                          className="rounded-md border border-white/15 px-2 py-1 text-[10px] text-zinc-200 hover:bg-white/10">
+                          Copy install command
+                        </button>
+                        <button type="button" onClick={() => {
+                          setOllamaModel(model.ollamaTag!);
+                          saveRouterSettings({ provider: "local", preferredLocalRuntime: "ollama", ollamaModel: model.ollamaTag });
+                          setStatusMsg("Selected " + model.name + " for local chat. Start Ollama with the model installed, then test it. No download was started.");
+                        }} className="rounded-md bg-fuchsia-600/70 px-2 py-1 text-[10px] font-semibold text-white hover:bg-fuchsia-500">
+                          Use locally
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => {
+                        const id = model.serverModelId || "";
+                        setCustomModel(id);
+                        if (!customUrl.trim()) {
+                          setStatusMsg("Enter an OpenAI-compatible server URL above, then select the model again. No connection was made.");
+                          return;
+                        }
+                        try {
+                          const url = new URL(customUrl.trim());
+                          if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+                            throw new Error("Invalid custom endpoint.");
+                          }
+                          saveRouterSettings({
+                            provider: "custom", customBaseUrl: customUrl.trim(), customModel: id,
+                          });
+                          setStatusMsg("Selected " + model.name + " on your custom server. Confirm the model is running before chatting.");
+                        } catch {
+                          setStatusMsg("Enter a valid custom HTTP(S) model server URL (for example http://127.0.0.1:8000/v1).");
+                        }
+                      }} className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/10">
+                        Use custom server
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-zinc-500">RAM requirements vary by quantization, context length, and GPU. A detected Ollama service does not prove that a particular model is installed.</p>
+          </div>
+
           <label className="flex items-center gap-2 text-xs text-[#a6a6c4] cursor-pointer">
             <input
               type="checkbox"

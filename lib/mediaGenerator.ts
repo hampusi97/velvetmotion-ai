@@ -44,9 +44,9 @@ async function tryKoboldSdTxt2Img(
   seed: number,
   negativePrompt?: string,
 ): Promise<string | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 35000);
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 35000);
     const res = await fetch("http://127.0.0.1:5001/sdapi/v1/txt2img", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -60,7 +60,6 @@ async function tryKoboldSdTxt2Img(
       }),
       signal: ctrl.signal,
     });
-    clearTimeout(timer);
     if (!res.ok) return null;
     const data = (await res.json()) as { images?: string[] };
     const b64 = data.images?.[0];
@@ -68,6 +67,8 @@ async function tryKoboldSdTxt2Img(
     return b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -84,13 +85,15 @@ export async function generateStudioPicture(
   const requiresAdultEngine = Boolean(req.nsfw) || /\b(nsfw|nude|nudity|explicit|sexual|lingerie)\b/i.test(req.prompt);
   const parsedSeed = req.seed ?? Math.floor(Math.random() * 90000 + 1000);
   const t0 = performance.now();
+  const settings = getMediaSettings();
+  const failures: string[] = [];
   let imageUrl: string | null = null;
   let galleryImageUrl: string | undefined;
   let localError: string | undefined;
   let engine = "Cloud Free";
 
   // 1A. Local Ultra ComfyUI (:8188)
-  const configuredImageEndpoint = getMediaSettings().localImageBase.trim();
+  const configuredImageEndpoint = settings.localImageBase.trim();
   if (configuredImageEndpoint || req.localEngine?.comfyOnline) {
     const localRes = await generateLocalImage({
       prompt: req.prompt,
@@ -106,15 +109,19 @@ export async function generateStudioPicture(
       engine = localRes.note || "Configured local image model";
     } else {
       localError = localRes.note;
+      failures.push(`Local image model: ${localRes.note}`);
     }
   }
 
-  // 1B. Local KoboldCpp SD / FLUX (:5001)
+  // Some KoboldCpp instances support text-only inference, not SD. Test the
+  // actual image route rather than assuming a listening port is sufficient.
   if (!imageUrl && req.localEngine?.koboldOnline) {
     const koboldImg = await tryKoboldSdTxt2Img(req.prompt, req.width, req.height, parsedSeed, req.negativePrompt);
     if (koboldImg) {
       imageUrl = koboldImg;
       engine = "Local KoboldCpp SD";
+    } else {
+      failures.push("KoboldCpp: image endpoint unavailable");
     }
   }
 
@@ -133,21 +140,37 @@ export async function generateStudioPicture(
       imageUrl = cf.originalUrl || cf.url;
       galleryImageUrl = cf.url;
       engine = "Cloudflare Flux";
+    } else {
+      failures.push("Cloudflare image model: " + (cf.reason === "quota" ? "quota exhausted" : cf.reason));
     }
   }
 
-  // 3. AI Horde Free Fallback
+  // Only report success when a provider returned an actual image.
   if (!imageUrl) {
-    const horde = await generateHordeImage({
-      prompt: req.prompt,
-      seed: parsedSeed,
-      nsfw: requiresAdultEngine,
-      width: req.width,
-      height: req.height,
-      steps: 25,
-    });
-    imageUrl = await remoteImageToStableDataUrl(horde.url).catch(() => horde.url);
-    engine = "AI Horde Cloud Free";
+    try {
+      const horde = await generateHordeImage({
+        prompt: req.prompt,
+        seed: parsedSeed,
+        nsfw: requiresAdultEngine,
+        width: req.width,
+        height: req.height,
+        steps: 20,
+      });
+      if (!/^https:\/\/|^data:image\//i.test(horde.url)) {
+        throw new Error("Provider returned an invalid image URL");
+      }
+      imageUrl = await remoteImageToStableDataUrl(horde.url).catch(() => horde.url);
+      engine = horde.note;
+    } catch (error) {
+      failures.push("AI Horde: " + (error instanceof Error ? error.message : "unavailable"));
+    }
+  }
+
+  if (!imageUrl) {
+    throw new Error(
+      "No image was generated. " + failures.join("; ").slice(0, 500) +
+      ". Check your model connection or try again when the cloud provider is available.",
+    );
   }
 
   const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
