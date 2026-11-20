@@ -65,6 +65,9 @@ export interface StudioVideoRequest {
   durationSec: 3 | 5 | 8;
   speed: 0.75 | 1 | 1.25;
   prompt?: string;
+  /** Upload source classification. Also enforce this server-side in production. */
+  sourceType?: "fictional" | "real-person" | "unspecified";
+  adultMode?: boolean;
   comfyOnline?: boolean;
   videoBackendUrl?: string;
 }
@@ -186,6 +189,9 @@ export async function renderCanvasMotionWebm(
 export async function generateStudioVideoClip(
   req: StudioVideoRequest,
 ): Promise<StudioVideoResult> {
+  if (req.adultMode && req.sourceType !== "fictional") {
+    throw new Error("Adult video mode requires original fictional adult artwork. Real photographs are limited to nonsexual animation.");
+  }
   if (req.prompt) {
     const compliance = assertCompliance(req.prompt);
     if (!compliance.ok) throw new Error(compliance.reason);
@@ -211,6 +217,8 @@ export async function generateStudioVideoClip(
           motion: motion.id,
           durationSec: req.durationSec,
           speed: req.speed,
+          adultMode: Boolean(req.adultMode && req.sourceType === "fictional"),
+          sourceType: req.sourceType || "unspecified",
         }),
         signal: ctrl.signal,
       });
