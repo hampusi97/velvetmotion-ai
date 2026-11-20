@@ -367,7 +367,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
     }
 
     setBusy(true);
-    setGenNote(photoDataUrl ? "Locking face from your photo…" : "Locking her Hyper-Neon profile & preview…");
+    setGenNote(photoDataUrl ? "Saving original portrait reference…" : "Saving companion profile and portrait preview…");
 
     const finalId = `custom-${Date.now()}`;
     const displayName = name.trim() || "Your Girl";
@@ -545,7 +545,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
             <div className="truncate text-xs text-pink-300/90">{look}</div>
             <div className="mt-0.5 text-[11px] text-zinc-500">
               {style} · {personality}
-              {!photoDataUrl && <span className="text-emerald-400/90"> · AI generating</span>}
+              {!photoDataUrl && <span className="text-emerald-400/90"> · Curated preview · not a new generation</span>}
               {photoDataUrl && <span className="text-fuchsia-300"> · photo ref</span>}
             </div>
           </div>
@@ -621,7 +621,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
             {permHint && <p className="text-xs text-rose-300">{permHint}</p>}
           </div>
 
-          <p className="text-sm text-mist">Art style — AI adapts her face &amp; scenes to match</p>
+          <p className="text-sm text-mist">Art style — generated variations require a compatible connected model</p>
           <div className="grid grid-cols-3 gap-2">
             {STYLES.map((s) => (
               <button
