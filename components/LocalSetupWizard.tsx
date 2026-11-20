@@ -75,7 +75,7 @@ export function LocalSetupWizard({
     ? status.ollamaOnline || status.koboldOnline
     : selection === "picture"
       ? status.comfyOnline
-      : status.fishOnline;
+      : status.kokoroOnline || status.fishOnline;
   const iconMap = { chat: Cpu, picture: ImageIcon, voice: Mic2 };
 
   const check = async () => {
