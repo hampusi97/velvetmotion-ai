@@ -92,54 +92,15 @@ jobs:
           npm run audit:companions
           npm run build
 
-      - name: Determine signing flags
-        id: sign
-        shell: bash
-        env:
-          HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
-        run: |
-          if [ "$HAS_SIGNING_KEY" = "true" ]; then
-            echo "extra_args=" >> "$GITHUB_OUTPUT"
-          else
-            echo '{"bundle":{"createUpdaterArtifacts":false}}' > src-tauri/tauri.nosign.json
-            echo "extra_args=--config src-tauri/tauri.nosign.json" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build Tauri Bundles & Updater Manifest (latest.json)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ needs.prepare.outputs.tag }}
           releaseName: 'VelvetMotion Desktop ${{ needs.prepare.outputs.tag }}'
-          releaseBody: 'Hybrid Tauri v2 release with Local Ultra RAM/GPU detection, Boss-Key stealth (CmdOrCtrl+Shift+H), and 3-layer instant web + native auto-updates.'
+          releaseBody: 'Native VelvetMotion Private Atelier desktop release. Includes the bundled interface, opt-in local AI connection diagnostics, and manual installer updates through official GitHub Releases. AI model weights are not bundled.'
           releaseDraft: false
           prerelease: false
-          includeUpdaterJson: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
-          args: ${{ matrix.args }} ${{ steps.sign.outputs.extra_args }}
+          args: ${{ matrix.args }}
 
-  mirror-public-release:
-    needs: [prepare, publish-tauri]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Mirror release assets & latest.json to public repo
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MIRROR_TOKEN: ${{ secrets.PUBLIC_RELEASES_TOKEN }}
-          TARGET_REPO: ${{ vars.PUBLIC_RELEASES_REPO || secrets.PUBLIC_RELEASES_REPO || 'hampusi97/velvetmotion-releases' }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-          R2_BUCKET_URL: ${{ vars.R2_BUCKET_URL || secrets.R2_BUCKET_URL }}
-        run: |
-          if [ -z "$TARGET_REPO" ] || [ -z "$MIRROR_TOKEN" ]; then
-            echo "Public mirror skipped (PUBLIC_RELEASES_REPO / PUBLIC_RELEASES_TOKEN not configured)."
-            exit 0
-          fi
-          mkdir -p mirror-assets
-          gh release download "$TAG" -R "${{ github.repository }}" -D mirror-assets
-          if [ -n "$R2_BUCKET_URL" ] && [ -f mirror-assets/latest.json ]; then
-            sed -i "s|https://github.com/${{ github.repository }}/releases/download/${TAG}|${R2_BUCKET_URL%/}/releases/${TAG}|g" mirror-assets/latest.json
-          fi
-          GH_TOKEN="$MIRROR_TOKEN" gh release create "$TAG" mirror-assets/* -R "$TARGET_REPO" --title "VelvetMotion Desktop $TAG" --notes "Public installer & signed auto-updater mirror for VelvetMotion AI Desktop." --latest || \
-          GH_TOKEN="$MIRROR_TOKEN" gh release upload "$TAG" mirror-assets/* -R "$TARGET_REPO" --clobber
