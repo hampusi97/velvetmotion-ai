@@ -26,16 +26,16 @@ function png(...chunks: Uint8Array[]): ArrayBuffer {
   return result.buffer;
 }
 test("reads valid V3 tEXt card", () => {
-  const payload = new TextEncoder().encode("ccv3\\0" + btoa(JSON.stringify({ spec: "chara_card_v3", data: { name: "Ada" } })));
+  const payload = new TextEncoder().encode("ccv3\0" + btoa(JSON.stringify({ spec: "chara_card_v3", data: { name: "Ada" } })));
   assert.deepEqual(parseCharacterFromPngBuffer(png(chunk("tEXt", payload))), { spec: "chara_card_v3", data: { name: "Ada" } });
 });
 test("reads uncompressed iTXt character metadata", () => {
   const value = btoa(JSON.stringify({ data: { name: "Ada" } }));
-  const payload = new TextEncoder().encode("chara\\0\\0\\0\\0\\0" + value);
+  const payload = new TextEncoder().encode("chara\0\0\0\0\0" + value);
   assert.deepEqual(parseCharacterFromPngBuffer(png(chunk("iTXt", payload))), { data: { name: "Ada" } });
 });
 test("rejects corrupted CRC and oversized files", () => {
-  const c = chunk("tEXt", new TextEncoder().encode("chara\\0" + btoa("{}")));
+  const c = chunk("tEXt", new TextEncoder().encode("chara\0" + btoa("{}")));
   c[c.length - 1] ^= 1;
   assert.equal(parseCharacterFromPngBuffer(png(c)), null);
   assert.deepEqual(extractPngTextChunks(new ArrayBuffer(12 * 1024 * 1024 + 1)), {});
