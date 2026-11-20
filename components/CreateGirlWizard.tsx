@@ -5,6 +5,7 @@ import type { Character } from "@/lib/characters";
 import { saveCustomCompanionToFirestore } from "@/lib/firebase";
 import { CreatePostActions } from "@/components/CreatePostActions";
 import { SafeImage } from "@/components/SafeImage";
+import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from "@/components/VoiceDesigner";
 import { validateCharacterCompliance } from "@/lib/complianceFilter";
 import { encodeSharedCharacterUrl } from "@/lib/shareCardUrl";
 import { exportCharacterToCardV2 } from "@/lib/characterCardV2";
@@ -232,6 +233,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [style, setStyle] = useState<(typeof STYLES)[number]>("Realistic");
+  const [voiceDesign, setVoiceDesign] = useState<VoiceDesign>(DEFAULT_VOICE_DESIGN);
   const [ethnicity, setEthnicity] = useState<(typeof ETHNICITIES)[number]>("Caucasian");
   const [body, setBody] = useState<(typeof BODIES)[number]>("Curvy");
   const [chest, setChest] = useState<(typeof CHESTS)[number]>("Full");
@@ -332,12 +334,12 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
       tags: [personality, relationship, style, "Custom", "Fictional 18+"],
       intimacy: 55,
       voice: {
-        label: personality.includes("Dominant") ? "Low command" : "Warm",
-        pitch: personality.includes("Dominant") ? 0.9 : 1.05,
-        rate: 0.95,
+        label: voiceDesign.voiceId,
+        pitch: voiceDesign.pitch,
+        rate: voiceDesign.rate,
         style: `${personality} energy. Speaks like a real adult partner.`,
       },
-      voiceId: personality.includes("Dominant") ? "bf_emma" : personality.includes("Shy") ? "af_sarah" : "af_heart",
+      voiceId: voiceDesign.voiceId,
       visualDna: `${figure}, ${moodContext}, 6-scene consistent fictional 18+ persona`,
       personality,
       traits: [personality, relationship, style],
@@ -438,8 +440,8 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
         <h2 className="text-2xl font-extrabold text-cream">{created.name} is ready</h2>
         <p className="text-sm text-mist">
           {photoDataUrl
-            ? "Face locked from your photo. She stays consistent in chat, nudes, and 3D."
-            : "AI-built from your choices — face seed locked for chat, nudes, and 3D."}
+            ? "Your original fictional artwork is saved as her portrait. Consistent generated images require a compatible reference-aware model."
+            : "Saved from your choices with a curated portrait preview. AI image generation requires a connected model."}
         </p>
         <div className="aspect-[3/4] max-w-[220px] rounded-2xl overflow-hidden border border-pink-500/40 shadow-lg shadow-pink-500/20">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -496,7 +498,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
           on3D={onOpen3D ? () => onOpen3D(created) : undefined}
         />
         <p className="text-xs text-zinc-500 text-center">
-          Nudify · explicit · sex sequence from the chips above — then pin favorites to your vault.
+          Try the Studio for new media. Only original fictional adults may be used for mature visual generation; results depend on your model.
         </p>
       </div>
     );
@@ -513,7 +515,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
       <p className="text-sm text-zinc-400 mt-1">
         Step {step + 1} of {steps.length} · {steps[step]}
         {step < 4 && (
-          <span className="text-zinc-500"> · AI builds her look as you go</span>
+          <span className="text-zinc-500"> · Curated preview; actual generation requires a model</span>
         )}
       </p>
 
@@ -717,6 +719,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
             <label className="text-xs text-zinc-500">Favorite heat / kink</label>
             <input value={kink} onChange={(e) => setKink(e.target.value)} className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm outline-none focus:border-pink-500" />
           </div>
+          <VoiceDesigner value={voiceDesign} onChange={setVoiceDesign} sample={`Hey, it’s ${name.trim() || "your new companion"}. I’m so glad we met.`} />
           <div>
             <label className="text-xs text-zinc-500">First message (optional)</label>
             <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="mt-1 w-full rounded-2xl bg-zinc-900 border border-white/10 px-4 py-3 text-sm resize-none outline-none focus:border-pink-500" placeholder="How she opens the chat…" />
@@ -727,17 +730,17 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
       {step === 4 && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            <strong className="font-medium">Photo is optional.</strong> Skip this step and AI still generates her
-            fully from style + look. Upload only if you want a specific face locked.
+            <strong className="font-medium">Photo is optional.</strong> Without a reference, your companion uses a curated portrait preview.
+            Upload only original artwork of a fictional adult to use as her reference.
           </div>
           <p className="text-sm text-mist">
-            Optional reference photo → stronger face consistency in nudes / JOI. Stored only on this device.{" "}
-            <span className="text-zinc-500">Do not upload real people without consent.</span>
+            Original fictional-adult artwork can become her portrait and reference for compatible models.{" "}
+            <span className="text-zinc-500">For your own real-life selfie and nonsexual animation, use Media Studio instead.</span>
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-pink-500/40 bg-pink-500/5 py-10 cursor-pointer hover:bg-pink-500/10 transition">
               <span className="text-3xl">🖼️</span>
-              <span className="text-xs text-pink-200 text-center px-2">Gallery / Photos</span>
+              <span className="text-xs text-pink-200 text-center px-2">Fictional adult artwork</span>
               <input
                 type="file"
                 accept="image/*"
@@ -745,17 +748,10 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
                 onChange={(e) => onFile(e.target.files?.[0] || null)}
               />
             </label>
-            <label className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-fuchsia-500/40 bg-fuchsia-500/5 py-10 cursor-pointer hover:bg-fuchsia-500/10 transition">
+            <a href="/studio/" className="flex flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-fuchsia-500/40 bg-fuchsia-500/5 py-10 text-center transition hover:bg-fuchsia-500/10">
               <span className="text-3xl">📷</span>
-              <span className="text-xs text-fuchsia-200 text-center px-2">Camera</span>
-              <input
-                type="file"
-                accept="image/*"
-                capture="user"
-                className="hidden"
-                onChange={(e) => onFile(e.target.files?.[0] || null)}
-              />
-            </label>
+              <span className="text-xs text-fuchsia-200 px-2">Animate your own selfie in Studio (nonsexual)</span>
+            </a>
           </div>
           {permHint && <p className="text-xs text-amber-300">{permHint}</p>}
           {photoDataUrl && (
@@ -769,7 +765,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
           )}
           {!photoDataUrl && (
             <div className="rounded-2xl border border-white/10 overflow-hidden">
-              <p className="text-[11px] text-zinc-500 px-3 pt-2">AI preview from your choices</p>
+              <p className="text-[11px] text-zinc-500 px-3 pt-2">Curated portrait preview (not generated yet)</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={aiPreviewSrc} alt="AI preview" className="w-full max-h-64 object-cover object-top" />
             </div>
@@ -779,7 +775,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
             onClick={() => setStep(5)}
             className="w-full py-3 rounded-2xl border border-pink-500/40 text-sm text-pink-100 hover:bg-pink-500/10"
           >
-            Skip photo · generate with AI →
+            Continue without a photo →
           </button>
         </div>
       )}
@@ -795,7 +791,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
             <div className="text-sm text-pink-300 mt-1">{personality} · {relationship}</div>
             <p className="text-xs text-zinc-400 mt-2 max-w-xs mx-auto">{look}</p>
             <p className="text-[11px] text-emerald-400/90 mt-2">
-              {photoDataUrl ? "Using your photo + AI for later moods" : "No photo — AI generates her completely"}
+              {photoDataUrl ? "Original fictional portrait selected · model reference support varies" : "Using a curated portrait until you generate new media"}
             </p>
           </div>
               {photoDataUrl && (
@@ -807,7 +803,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
                     className="mt-0.5 accent-[#ff5678]"
                   />
                   <span>
-                    I confirm this is a fictional/AI-generated 18+ character or my own authorized artwork — NOT a real third-party person.
+                    I confirm I own or have permission to use this original fictional adult artwork. It does not depict a real person.
                   </span>
                 </label>
               )}
@@ -828,7 +824,7 @@ export function CreateGirlWizard({ onDone, onHome, onOpen3D }: WizardProps) {
           </button>
         ) : (
           <button type="button" disabled={busy} onClick={() => void finish()} className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 to-fuchsia-600 font-semibold shadow-lg shadow-pink-500/25 disabled:opacity-50">
-            {busy ? "Generating…" : photoDataUrl ? "Create girl" : "Generate with AI"}
+            {busy ? "Saving companion…" : "Create companion"}
           </button>
         )}
       </div>
