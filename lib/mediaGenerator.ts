@@ -72,6 +72,9 @@ export async function generateStudioPicture(
     throw new Error(compliance.reason);
   }
 
+  // Detect adult requests even when the user types a custom prompt without
+  // enabling Studio's mature-content switch; the generic worker is not suitable.
+  const requiresAdultEngine = Boolean(req.nsfw) || /\b(nsfw|nude|nudity|explicit|sexual|lingerie)\b/i.test(req.prompt);
   const parsedSeed = req.seed ?? Math.floor(Math.random() * 90000 + 1000);
   const t0 = performance.now();
   let imageUrl: string | null = null;
@@ -102,7 +105,7 @@ export async function generateStudioPicture(
   }
 
   // 2. Cloudflare Flux Image Worker
-  if (!imageUrl && !req.nsfw) {
+  if (!imageUrl && !requiresAdultEngine) {
     const cf = await fetchWorkerImage(req.prompt, {
       baseUrl: req.imageWorkerUrl,
       seed: parsedSeed,
@@ -118,7 +121,7 @@ export async function generateStudioPicture(
     const horde = await generateHordeImage({
       prompt: req.prompt,
       seed: parsedSeed,
-      nsfw: Boolean(req.nsfw),
+      nsfw: requiresAdultEngine,
       width: req.width,
       height: req.height,
       steps: 25,
