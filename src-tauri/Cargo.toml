@@ -1,7 +1,7 @@
 [package]
 name = "velvetmotion-desktop"
 version = "1.0.4"
-description = "VelvetMotion AI Hybrid Hyper-Neon Companion Desktop App"
+description = "VelvetMotion AI Private Atelier Desktop"
 authors = ["VelvetMotion"]
 edition = "2021"
 
@@ -10,7 +10,6 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
-tauri-plugin-updater = "2"
 tauri-plugin-http = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-os = "2"
