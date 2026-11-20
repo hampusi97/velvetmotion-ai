@@ -72,6 +72,13 @@ const SCENARIOS: Scenario[] = [
     starter: "Begin a fictional interracial adult romance with independent characters, rich personalities, and clear mutual respect; never use racial dehumanization or stereotypes.",
   },
   {
+    id: "bnwo-inspired",
+    label: "BNWO-inspired drama",
+    category: "Fantasy",
+    description: "Fictional interracial relationship tension; no racial stereotypes",
+    starter: "Begin a fictional adult interracial relationship drama centered on independently motivated characters, mutual agreement, and nuanced power dynamics. Avoid racial stereotypes, degradation, and dehumanization.",
+  },
+  {
     id: "luxury",
     label: "After-hours penthouse",
     category: "Fantasy",
