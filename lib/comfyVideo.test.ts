@@ -68,3 +68,70 @@ test("does not upload user images if video workflow validation fails", async () 
     assert.equal(called,false);
   } finally { globalThis.fetch=old; }
 });
+
+test("pre-canceled generation never uploads a user source image", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  controller.abort();
+  let called = false;
+  globalThis.fetch = async () => { called = true; throw new Error("Should never fetch"); };
+  try {
+    await assert.rejects(() => generateComfyVideo({
+      baseUrl:"http://127.0.0.1:8188",workflowJson:workflow,imageNodeId:"1",
+      sourceImageUrl:"data:image/png;base64,AQID",prompt:"test",signal:controller.signal,
+    }), (error: unknown) => error instanceof Error && error.name === "AbortError");
+    assert.equal(called, false);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("canceling after a queued workflow stops client polling without pretending it canceled the GPU job", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  const calls: string[] = [];
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.startsWith("data:image/")) return new Response(new Uint8Array([1,2,3]),{headers:{"content-type":"image/png"}});
+    if (url.endsWith("/upload/image")) return Response.json({name:"source.png"});
+    if (url.endsWith("/prompt")) {
+      // The server has accepted the GPU task. Abort during the response.
+      controller.abort();
+      return Response.json({prompt_id:"queued123"});
+    }
+    throw new Error("Canceled operation should not poll Comfy history: "+url);
+  };
+  try {
+    await assert.rejects(() => generateComfyVideo({
+      baseUrl:"http://127.0.0.1:8188",workflowJson:workflow,imageNodeId:"1",
+      sourceImageUrl:"data:image/png;base64,AQID",prompt:"test",signal:controller.signal,
+    }), (error: unknown) => error instanceof Error && error.name === "AbortError");
+    assert.deepEqual(calls.map(url => new URL(url).pathname), [
+      "image/png;base64,AQID", "/upload/image", "/prompt",
+    ].map((v, i) => i === 0 ? "image/png;base64,AQID" : v));
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("canceling during video history polling exits without waiting for the entire job timeout", async () => {
+  const originalFetch = globalThis.fetch;
+  const controller = new AbortController();
+  let checks = 0;
+  globalThis.fetch = async (input) => {
+    const url = String(input);
+    if (url.startsWith("data:image/")) return new Response(new Uint8Array([1,2,3]),{headers:{"content-type":"image/png"}});
+    if (url.endsWith("/upload/image")) return Response.json({name:"source.png"});
+    if (url.endsWith("/prompt")) return Response.json({prompt_id:"job123"});
+    if (url.endsWith("/history/job123")) {
+      checks++;
+      controller.abort();
+      return Response.json({});
+    }
+    throw new Error("Unexpected URL "+url);
+  };
+  try {
+    await assert.rejects(() => generateComfyVideo({
+      baseUrl:"http://127.0.0.1:8188",workflowJson:workflow,imageNodeId:"1",
+      sourceImageUrl:"data:image/png;base64,AQID",prompt:"test",signal:controller.signal,
+    }), (error: unknown) => error instanceof Error && error.name === "AbortError");
+    assert.equal(checks, 1);
+  } finally { globalThis.fetch = originalFetch; }
+});
