@@ -64,7 +64,10 @@ export function parseCardV2Json(rawText: string, avatarDataUrl?: string): { ok: 
     if (!name) return { ok: false, error: "Character card is missing a name." };
 
     const ext = (d.extensions as Record<string, unknown> | undefined)?.velvetmotion as Record<string, unknown> | undefined;
-    const age = Math.max(18, Number(ext?.age || 23));
+    const age = ext?.age === undefined || ext.age === null ? 23 : Number(ext.age);
+    if (!Number.isFinite(age) || !Number.isInteger(age) || age < 18 || age > 120) {
+      return { ok: false, error: "Character cards must declare a valid adult age of at least 18. Underage ages cannot be converted into adult companions." };
+    }
     const description = String(d.description || `${name} · Imported V2 companion`).trim();
     const personality = String(d.personality || "Warm, confident, expressive").trim();
     const scenario = String(d.scenario || "Private evening conversation").trim();
