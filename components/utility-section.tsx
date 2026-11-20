@@ -16,7 +16,6 @@ import {
   clearGallery,
   getCoins,
   addCoins,
-  spendCoins,
   addToGallery,
   type GalleryItem,
 } from "@/lib/storage";
@@ -34,6 +33,12 @@ import {
 } from "@/lib/firebase";
 import { CHARACTERS } from "@/lib/characters";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
+import { generateStudioPicture } from "@/lib/mediaGenerator";
+import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
+import { generateFictionalReferenceVariation } from "@/lib/referenceImageGenerator";
+import { getMediaSettings } from "@/lib/mediaSettings";
+import { assertCompliance } from "@/lib/complianceFilter";
+import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 
 const STUDIO_TYPES = [
   { id: "portrait", label: "Portrait", cost: 8 },
@@ -78,6 +83,8 @@ export function UtilitySection({
   const [videoAspectRatio, setVideoAspectRatio] = useState<"9:16" | "16:9">("9:16");
   const [referencePhotoDataUrl, setReferencePhotoDataUrl] = useState<string | null>(null);
   const [studioBusy, setStudioBusy] = useState(false);
+  const [referenceRightsConfirmed, setReferenceRightsConfirmed] = useState(false);
+  const engine = useLocalEngineStatus();
   const [studioNotice, setStudioNotice] = useState<string | null>(null);
   const [importUrl, setImportUrl] = useState("");
   const [importOpen, setImportOpen] = useState(false);
@@ -162,6 +169,7 @@ export function UtilitySection({
     const reader = new FileReader();
     reader.onload = () => {
       setReferencePhotoDataUrl(String(reader.result || ""));
+      setReferenceRightsConfirmed(false);
     };
     reader.readAsDataURL(file);
   };
@@ -170,113 +178,73 @@ export function UtilitySection({
     if (studioBusy) return;
     const char = CHARACTERS.find((c) => c.id === studioCharId) || CHARACTERS[0];
     const dual = studioDualId ? CHARACTERS.find((c) => c.id === studioDualId) : null;
-    const meta = STUDIO_TYPES.find((t) => t.id === studioType) || STUDIO_TYPES[0];
-    const totalCost = meta.cost + (dual ? 10 : 0);
-
-    if (!spendCoins(totalCost)) {
-      setStudioNotice(`Need ${totalCost} coins (you have ${coins}). Click '+150 demo coins' below.`);
+    const prompt = [char.visualDna || char.figure, studioPose, studioExtra.trim(),
+      dual ? `fictional adult scene with ${dual.name}` : "", "cinematic portrait, fictional consenting adults 21+"].filter(Boolean).join(", ");
+    const compliance = assertCompliance(prompt);
+    if (!compliance.ok) { setStudioNotice(compliance.reason); return; }
+    if (referencePhotoDataUrl && !referenceRightsConfirmed) {
+      setStudioNotice("Confirm the reference is original fictional adult artwork you own. Real selfies can only be animated nonsexually in the main Media Studio.");
       return;
     }
-    setCoins(getCoins());
     setStudioBusy(true);
-    setStudioNotice(null);
-
-    const dualExtra = dual ? `, duo scene with ${dual.name}` : "";
+    setStudioNotice("Requesting a compatible AI provider…");
     try {
+      const characterName = dual ? `${char.name} & ${dual.name}` : char.name;
       if (studioType === "video") {
-        const res = await fetch("/api/generate-video", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId: char.id,
-            pose: studioPose,
-            aspectRatio: videoAspectRatio,
-            referenceImageBase64: referencePhotoDataUrl || undefined,
-            prompt: `${studioPose}${studioExtra ? `, ${studioExtra}` : ""}${dualExtra}`,
-          }),
+        const result = await generateStudioVideoClip({
+          imageUrl: referencePhotoDataUrl || char.avatar,
+          prompt, motionId: "slow-zoom-blink", durationSec: 5, speed: 1,
+          sourceType: "fictional", adultMode: true,
+          comfyOnline: engine.comfyOnline, videoBackendUrl: getMediaSettings().img2vidUrl,
         });
-        const data = await res.json();
-        const frames: string[] | undefined = Array.isArray(data.frames) ? data.frames : undefined;
-        const url = data.videoUrl || data.imageUrl || frames?.[0];
-        if (url) {
-          addToGallery({
-            characterId: char.id,
-            characterName: dual
-              ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}`
-              : char.name,
-            type: "video",
-            url,
-            frames,
-            prompt: data.promptUsed || studioPose,
-          });
+        if (!result.videoUrl.startsWith("blob:")) {
+          addToGallery({ characterId: char.id, characterName, type: "video", url: result.videoUrl, prompt });
           setGallery(getGallery());
-          setStudioNotice(
-            referencePhotoDataUrl
-              ? `Animated your uploaded photo into a ${videoAspectRatio} video sequence for ${char.name}.`
-              : `Generated ${videoAspectRatio} video sequence for ${char.name}.`,
-          );
         }
+        setStudioNotice(`${result.isGenerative ? "Generated AI video" : "Created animated still"} via ${result.engine}. ${result.videoUrl.startsWith("blob:") ? "Temporary clip: use main Video Studio to download a file." : "Added to Gallery."} ${result.warning || ""}`);
       } else {
-        const res = await fetch("/api/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId: char.id,
-            name: char.name,
-            figure: char.figure,
-            type: studioType,
-            pose: studioPose,
-            extra: `${studioExtra}${dualExtra}`,
-            referenceImageBase64: referencePhotoDataUrl || undefined,
-          }),
-        });
-        const data = await res.json();
-        if (data.url) {
-          addToGallery({
-            characterId: char.id,
-            characterName: dual
-              ? `${char.name.split(" ")[0]} & ${dual.name.split(" ")[0]}`
-              : char.name,
-            type: studioType,
-            url: data.url,
-            prompt: data.prompt || studioPose,
-          });
-          setGallery(getGallery());
-          setStudioNotice(
-            referencePhotoDataUrl
-              ? `Edited reference image with Nano Banana 2.1 for ${char.name} and saved to Gallery.`
-              : `Saved new ${studioType} scene of ${char.name} to Gallery.`,
-          );
-        }
+        const result = referencePhotoDataUrl
+          ? await generateFictionalReferenceVariation({
+              referenceImage: referencePhotoDataUrl, prompt,
+              sourceType: "fictional", adultMode: studioType !== "portrait",
+            })
+          : await generateStudioPicture({
+              prompt, width: 640, height: 960, characterId: char.id,
+              nsfw: studioType !== "portrait", localEngine: engine,
+            });
+        addToGallery({ characterId: char.id, characterName, type: studioType, url: result.imageUrl, prompt });
+        setGallery(getGallery());
+        setStudioNotice(`Generated image via ${result.engine}. No browser-demo coins charged; external provider fees may apply.`);
       }
-    } catch {
-      setStudioNotice("Could not generate media right now.");
+    } catch (error) {
+      setStudioNotice(error instanceof Error ? error.message : "No compatible generation backend responded.");
     } finally {
       setStudioBusy(false);
-      setCoins(getCoins());
     }
   };
 
   const handleGenerateLyriaMusic = async () => {
     if (lyriaBusy) return;
     setLyriaBusy(true);
+    setLyriaAudioUrl(null);
+    const endpoint = (process.env.NEXT_PUBLIC_MUSIC_WORKER_URL || "").trim();
+    if (!endpoint) {
+      setLyriaCaption("Music generation is not connected. No audio has been generated.");
+      setLyriaBusy(false);
+      return;
+    }
     try {
-      const res = await fetch("/api/generate-music", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: lyriaModel,
-          prompt: lyriaPrompt,
-          referenceImageBase64: referencePhotoDataUrl || undefined,
-        }),
+      const res = await fetch(endpoint, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: lyriaModel, prompt: lyriaPrompt.slice(0, 600) }),
       });
-      const data = await res.json();
-      if (data.audioUrl) {
-        setLyriaAudioUrl(data.audioUrl);
-        setLyriaCaption(data.lyrics || `Generated with ${lyriaModel}`);
-      }
-    } catch {
-      /* ignore */
+      if (!res.ok) throw new Error(`Music model HTTP ${res.status}`);
+      const data = (await res.json()) as { audioUrl?: string; title?: string };
+      if (!data.audioUrl || !data.audioUrl.startsWith("https://")) throw new Error("Music provider returned no valid HTTPS audio");
+      setLyriaAudioUrl(data.audioUrl);
+      setLyriaCaption(data.title || "Audio generated by configured service.");
+    } catch (error) {
+      setLyriaCaption(error instanceof Error ? error.message : "Music provider unavailable.");
     } finally {
       setLyriaBusy(false);
     }
