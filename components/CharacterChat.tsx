@@ -512,7 +512,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const send = async (overrideText?: string, bonusXp = 6) => {
-    const text = (overrideText ?? input).trim();
+    const domValue = inputRef.current?.value || "";
+    const text = (overrideText ?? (input || domValue)).trim();
     if (!text || busy) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
@@ -1546,7 +1547,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             />
             <button
               type="button"
-              disabled={busy || !input.trim()}
+              disabled={busy}
               onClick={() => void send()}
               className="px-4 sm:px-5 rounded-2xl neon-btn-primary font-bold text-sm text-white disabled:opacity-45"
             >
