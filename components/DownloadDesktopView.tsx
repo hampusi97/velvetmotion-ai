@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, Copy, Cpu, Download, ExternalLink, Laptop, RefreshCw, Shield, Smartphone, Sparkles, Volume2 } from "lucide-react";
 import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
+import { getLocalComputeMode, saveLocalComputeMode, LOCAL_COMPUTE_MODES, type LocalComputeMode } from "@/lib/localComputePreferences";
 import {
   DAVIDAU_RECOMMENDED_GGUFS,
   DAVIDAU_RESOURCES,
@@ -110,11 +111,13 @@ export function DownloadDesktopView() {
   const [releaseState, setReleaseState] = useState<"checking" | "live" | "pending">("checking");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [probeToast, setProbeToast] = useState<string | null>(null);
+  const [localMode, setLocalMode] = useState<LocalComputeMode>("balanced");
   const engine = useLocalEngineStatus();
   const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
 
   useEffect(() => {
     setOs(detectOs());
+    setLocalMode(getLocalComputeMode());
     let active = true;
     const repos = Array.from(
       new Set(
@@ -317,6 +320,44 @@ export function DownloadDesktopView() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className="space-y-4 rounded-3xl border border-white/10 bg-[#121017] p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-pink-300">Local-first performance</p>
+            <h2 className="mt-1 text-xl font-extrabold text-white">Choose your chat power mode</h2>
+            <p className="mt-1 max-w-xl text-xs text-zinc-400">
+              These controls tune how long the app waits and how much text your *own running* local model generates.
+              They do not automatically install models, change VRAM, or let the browser use arbitrary system RAM.
+            </p>
+          </div>
+          <Cpu className="h-6 w-6 text-[#ff91b4]" />
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {(Object.keys(LOCAL_COMPUTE_MODES) as LocalComputeMode[]).map((mode) => {
+            const preset = LOCAL_COMPUTE_MODES[mode];
+            return (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={localMode === mode}
+                onClick={() => { setLocalMode(mode); saveLocalComputeMode(mode); }}
+                className={`rounded-2xl border p-3 text-left transition ${localMode === mode
+                  ? "border-pink-400/75 bg-pink-500/15"
+                  : "border-white/10 bg-black/25 hover:border-white/30"}`}
+              >
+                <span className="text-sm font-bold text-white">{preset.title}</span>
+                <span className="mt-1 block text-[11px] leading-relaxed text-zinc-300">{preset.detail}</span>
+                <span className="mt-2 block text-[10px] text-pink-200">{preset.maxTokens} max output tokens</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          Your device's estimated memory tier is {ramCatalog.label}. Browser memory reports are approximate and sometimes unavailable.
+          For reliable local inference, install a compatible runtime and a model that fits your actual RAM and GPU memory.
+        </p>
       </section>
 
       {/* Detected RAM SOTA Nov 2026 Models + Port Tester */}
