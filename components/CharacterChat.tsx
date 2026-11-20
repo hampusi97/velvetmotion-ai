@@ -527,8 +527,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     try {
       const kinks = getKinks(character.id);
       const rawReply = (await requestReplyForHistory(next, text)) || fallbackReply(character, text, romanceMode);
-      const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
-      let replyText = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
+      const sanitized = sanitizeCompanionReply(rawReply, character.name) || rawReply;
+      const { cleanText, imagePrompts } = extractInlineImageRequests(sanitized);
+      let replyText = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : sanitized);
       if (kinks.length && Math.random() < 0.25) {
         replyText += `\n\n*She remembers.* “Still thinking about ${kinks[kinks.length - 1]}…”`;
       }
@@ -1484,7 +1485,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 key={chip}
                 type="button"
                 disabled={busy}
-                onClick={() => void send(chip)}
+                onClick={() => {
+                  const lower = chip.toLowerCase();
+                  if (lower.includes("selfie") || lower.includes("photo") || lower.includes("pic")) {
+                    void generate("seductive", "Selfie", 0, "candid selfie, phone camera, natural light");
+                  } else {
+                    void send(chip);
+                  }
+                }}
                 className="rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-3 py-1 text-left text-[11px] font-medium text-[#e6faff] hover:border-[#ff1e8e] hover:bg-[#ff1e8e]/15 transition disabled:opacity-45"
               >
                 {chip}
