@@ -1,11 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "@fontsource-variable/fraunces";
 import "@fontsource-variable/outfit";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-display", weight: ["600", "700", "800"], display: "swap" });
 
 const TITLE = "VelvetMotion AI";
 const TAGLINE =
@@ -80,7 +77,6 @@ export default function RootLayout({
     <html
       lang="en"
       data-neon="hyper"
-      className={`${inter.variable} ${plusJakarta.variable}`}
       suppressHydrationWarning
     >
       <head>
