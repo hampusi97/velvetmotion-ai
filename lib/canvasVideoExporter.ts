@@ -186,6 +186,57 @@ export async function renderCanvasMotionWebm(
   return done;
 }
 
+type VideoBackendResponse = {
+  videoUrl?: string;
+  url?: string;
+  video?: string;
+  output?: string | { url?: string; videoUrl?: string };
+  result?: { url?: string; videoUrl?: string };
+  statusUrl?: string;
+  status_url?: string;
+  state?: string;
+  status?: string;
+  error?: string;
+};
+
+function videoUrlFromResponse(data: VideoBackendResponse): string | null {
+  const url = data.videoUrl || data.url || data.video ||
+    (typeof data.output === "string" ? data.output : data.output?.videoUrl || data.output?.url) ||
+    data.result?.videoUrl || data.result?.url;
+  // A blob: URL created in a remote server process is not usable by a browser.
+  return typeof url === "string" && /^(https?:\/\/|data:video\/)/i.test(url) ? url : null;
+}
+
+/** Accept async video jobs only from the same origin as the configured API. */
+function safeVideoStatusUrl(value: string, endpoint: string): string {
+  const url = new URL(value, endpoint);
+  const configured = new URL(endpoint);
+  if (url.origin !== configured.origin || !["http:", "https:"].includes(url.protocol)) {
+    throw new Error("Video job polling URL must use the configured provider's origin.");
+  }
+  return url.toString();
+}
+
+async function pollVideoJob(initial: VideoBackendResponse, endpoint: string, signal: AbortSignal): Promise<string> {
+  const statusUrl = initial.statusUrl || initial.status_url;
+  if (!statusUrl) throw new Error("Video provider returned a job without a statusUrl. Configure an endpoint returning a completed video or a pollable job.");
+  const url = safeVideoStatusUrl(statusUrl, endpoint);
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (signal.aborted) throw new Error("Video generation timed out.");
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const response = await fetch(url, { signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`Video job status HTTP ${response.status}`);
+    const current = (await response.json()) as VideoBackendResponse;
+    const finished = videoUrlFromResponse(current);
+    if (finished) return finished;
+    const status = (current.state || current.status || "").toLowerCase();
+    if (["failed", "error", "cancelled", "canceled"].includes(status) || current.error) {
+      throw new Error(current.error || "Video job failed at the provider.");
+    }
+  }
+  throw new Error("Video job did not finish within the polling window.");
+}
+
 export async function generateStudioVideoClip(
   req: StudioVideoRequest,
 ): Promise<StudioVideoResult> {
@@ -234,12 +285,18 @@ export async function generateStudioVideoClip(
           videoFormat: contentType.includes("webm") ? "webm" : contentType.includes("mp4") ? "mp4" : "unknown",
         };
       }
-      const data = (await res.json()) as { videoUrl?: string; url?: string; video?: string; output?: string; error?: string };
-      const url = data.videoUrl || data.url || data.video || data.output;
-      if (url && /^(https?:\/\/|blob:|data:video\/)/i.test(url)) {
-        return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true, videoFormat: /\.webm(?:$|[?#])/i.test(url) ? "webm" : /\.mp4(?:$|[?#])/i.test(url) ? "mp4" : "unknown" };
+      const data = (await res.json()) as VideoBackendResponse;
+      const url = videoUrlFromResponse(data) ||
+        ((data.statusUrl || data.status_url) ? await pollVideoJob(data, endpoint, ctrl.signal) : null);
+      if (url) {
+        return {
+          videoUrl: url,
+          engine: "Configured AI video backend",
+          isGenerative: true,
+          videoFormat: /\.webm(?:$|[?#])/i.test(url) ? "webm" : /\.mp4(?:$|[?#])/i.test(url) ? "mp4" : "unknown",
+        };
       }
-      backendError = data.error || "Video service returned no playable video URL";
+      backendError = data.error || "Video provider returned neither playable video nor a statusUrl for polling.";
     } catch (err) {
       backendError = err instanceof Error ? err.message : "Video service unavailable";
     } finally {
