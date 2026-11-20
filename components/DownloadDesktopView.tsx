@@ -8,6 +8,7 @@ import {
   Pause, Play, RefreshCw, ShieldCheck, Sparkles, Waves,
 } from "lucide-react";
 import { SafeImage } from "@/components/SafeImage";
+import { LocalSetupWizard } from "@/components/LocalSetupWizard";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import {
   getLocalComputeMode, saveLocalComputeMode, LOCAL_COMPUTE_MODES, type LocalComputeMode,
@@ -276,6 +277,8 @@ export function DownloadDesktopView() {
           disables cloud fallback and returns clear errors if no model is installed.
         </p>
       </section>
+
+      <LocalSetupWizard status={engine} onRefresh={engine.refresh} />
 
       <section className="grid gap-3 md:grid-cols-3">
         {[
