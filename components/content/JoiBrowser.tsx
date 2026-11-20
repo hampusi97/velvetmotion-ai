@@ -34,6 +34,7 @@ import {
 } from "@/lib/audioEngine";
 import { runGenerativePrompt } from "@/lib/chatRouter";
 import { buildGuidedSession } from "@/lib/guidedSession";
+import { HER_CHOICE_SCENES } from "@/lib/herChoiceScenes";
 import { speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
 import {
   COMPANION_SESSION_THEMES,
@@ -254,14 +255,16 @@ export function JoiBrowser({
     summary: companion.tagline,
     voiceId: companion.voiceId,
   };
+  const companionScene = sessionTheme === "her-choice" ? HER_CHOICE_SCENES[companion.id] : undefined;
 
   function loadCompanionScript() {
     setSessionError(null);
     try {
-      const themedCues = THEMED_GUIDED_CUES[sessionTheme];
+      const themedCues = companionScene?.cues ?? THEMED_GUIDED_CUES[sessionTheme];
       setDraft(buildGuidedSession(
         JSON.stringify(themedCues ?? companion.guidedPaceStages), companionPersona,
-        themedCues ? COMPANION_SESSION_THEMES[sessionTheme].label : "Companion pace", sessionMinutes, "companion",
+        companionScene?.title ?? (themedCues ? COMPANION_SESSION_THEMES[sessionTheme].label : "Companion pace"),
+        sessionMinutes, "companion",
       ));
     } catch (error) {
       setSessionError(error instanceof Error ? error.message : "This companion's script could not be loaded.");
@@ -286,7 +289,7 @@ export function JoiBrowser({
         "Write three spoken cues for a private JOI session between consenting, unrelated fictional adults. Speak directly to the listener in first or second person. Bring in a specific detail from the chosen direction, give the build cue a fresh beat, and close with a supportive wind-down. Respect the user's limits and offer a way to slow down or stop. Treat identities with equal respect and avoid racial stereotypes or degradation. Return only a JSON array of three strings in order: warm-up, build, wind-down. Each cue contains at most two short sentences of exact spoken words. Omit narration, labels, dialogue tags, and stage directions.",
         `Fictional persona: ${companion.name}, age ${companion.age}. ${companion.personality}
 Theme: ${theme.label}. ${theme.direction}
-Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes.
+${companionScene ? `Companion scene: ${companionScene.direction}\n` : ""}Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes.
 Direction and limits: ${direction || "No additional directions."}`,
         companion.name,
       );
@@ -328,7 +331,10 @@ Direction and limits: ${direction || "No additional directions."}`,
                   setDraft(null);
                   setSessionError(null);
                 }} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
-                  {FLAGSHIP_COMPANIONS.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+                  {FLAGSHIP_COMPANIONS.map((profile) => {
+                    const scene = sessionTheme === "her-choice" ? HER_CHOICE_SCENES[profile.id] : undefined;
+                    return <option key={profile.id} value={profile.id}>{profile.name}{scene ? ` · ${scene.title}` : ""}</option>;
+                  })}
                 </select>
               </label>
               <label className="text-xs text-rose-100">Kink or theme
@@ -374,6 +380,7 @@ Direction and limits: ${direction || "No additional directions."}`,
           {draft && (
             <div className="mt-5 border-t border-white/15 pt-4">
               <h4 className="text-sm font-semibold">{draft.label} · {draft.summary}</h4>
+              {companionScene && <p className="mt-1 text-sm text-rose-200">{companionScene.title}</p>}
               <ol className="mt-2 space-y-3 text-sm text-zinc-200">
                 {draft.steps.map((cue) => <li key={cue.id}><strong>{cue.title}</strong> · {cue.instruction}</li>)}
               </ol>

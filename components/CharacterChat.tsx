@@ -33,6 +33,7 @@ import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } f
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { continueCompanionScene, generateCompanionReply, sanitizeCompanionReply, type ChatStreamOptions } from "@/lib/chatRouter";
 import { assertCompliance } from "@/lib/complianceFilter";
+import { HER_CHOICE_SCENES } from "@/lib/herChoiceScenes";
 import { COMPANION_SESSION_THEMES, COMPANION_THEME_KEYS, parseCompanionSessionTheme, type CompanionSessionTheme } from "@/lib/companionSessionThemes";
 import {
   listChatBranchesDB,
@@ -391,6 +392,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       extraSceneContext: [
         SCENE_TONES[sceneTone],
         roleplayTheme ? COMPANION_SESSION_THEMES[roleplayTheme].direction : "",
+        roleplayTheme === "her-choice" ? HER_CHOICE_SCENES[character.id]?.direction : "",
         kinks.length ? `User-selected fantasy themes, only when relevant: ${kinks.join(", ")}.`
           : "",
       ].filter(Boolean).join(" "),

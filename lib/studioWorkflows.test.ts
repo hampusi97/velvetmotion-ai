@@ -13,6 +13,7 @@ import { parseVideoSceneDraft, videoSceneDraftKey, type VideoSceneDraft } from "
 import { buildGuidedSession } from "./guidedSession";
 import { generateStudioPicture } from "./mediaGenerator";
 import { LOCAL_COMFY_VIDEO_URL, localComfyVideoHealthUrl } from "./mediaSettings";
+import { HER_CHOICE_SCENES } from "./herChoiceScenes";
 import { readChatEventStream } from "./chatStream";
 
 const videoRequest: StudioVideoRequest = {
@@ -92,6 +93,24 @@ test("each selectable mature roleplay theme has a playable companion script", ()
     assert.equal(session.persona.voiceId, companion.voiceId);
   }
   assert.equal(parseCompanionSessionTheme("unknown"), null);
+});
+
+test("each Her Choice cast scene uses its companion's own cues and voice", () => {
+  const openingCues = new Set<string>();
+  for (const [id, scene] of Object.entries(HER_CHOICE_SCENES)) {
+    const companion = FLAGSHIP_COMPANIONS.find((profile) => profile.id === id);
+    assert.ok(companion && scene, id);
+    assert.ok(companion.age >= 21 && companion.voiceId, id);
+    const session = buildGuidedSession(JSON.stringify(scene.cues), {
+      name: companion.name, age: companion.age, summary: companion.tagline, voiceId: companion.voiceId,
+    }, scene.title, 2, "companion");
+    assert.equal(session.tone, scene.title);
+    assert.equal(session.persona.voiceId, companion.voiceId);
+    const opening = session.steps[0].instruction;
+    assert.ok(!openingCues.has(opening), id);
+    openingCues.add(opening);
+  }
+  assert.equal(openingCues.size, Object.keys(HER_CHOICE_SCENES).length);
 });
 
 test("local video health probes use the configured loopback bridge", () => {

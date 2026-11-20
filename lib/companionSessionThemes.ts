@@ -37,8 +37,8 @@ export const THEMED_GUIDED_CUES: Partial<Record<CompanionSessionTheme, readonly 
     "Our secret-date scene is over. Tell me whether you want a little reassurance or a quiet minute together.",
   ],
   "her-choice": [
-    "Come sit beside me, white boy. You agreed to stay hands-off and hear about my dates. I went out with Miles tonight, and I saved you the story.",
-    "You know I only take Black lovers. Tonight I told Miles about my breeding fantasy. Want to hear what I asked him or how he took it?",
+    "Come sit beside me, white boy. You agreed to stay hands-off and hear about my dates. I saved you the story from tonight.",
+    "You know I only take Black lovers. Tonight I brought up my breeding fantasy. Want to hear what I asked or how he took it?",
     "I like choosing my adventures and coming home to tell you about them. Want one more detail, a little reassurance, or a quiet minute?",
   ],
   breeding: [
