@@ -50,6 +50,7 @@ import { SettingsAndBackupDrawer } from "@/components/SettingsAndBackupDrawer";
 import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
+import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
 import { ProactiveToast } from "@/components/ProactiveToast";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { Joi3DStage } from "@/components/Joi3DStage";
@@ -570,6 +571,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <MobileBottomNav active={view} onNavigate={navigate} />
       <InstallPrompt />
       <LiveUpdateBanner />
+      <DesktopAutoUpdater />
       <SettingsAndBackupDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
