@@ -118,15 +118,16 @@ export function parseCardFileText(text: string): Character | null {
 
 const IMPORTED_KEY = "vm-imported-cards";
 
-export function saveImportedCharacter(c: Character) {
-  if (typeof window === "undefined") return;
+export function saveImportedCharacter(c: Character): boolean {
+  if (typeof window === "undefined") return false;
   try {
     const raw = localStorage.getItem(IMPORTED_KEY);
     const list: Character[] = raw ? JSON.parse(raw) : [];
     const next = [c, ...list.filter((x) => x.id !== c.id)].slice(0, 40);
     localStorage.setItem(IMPORTED_KEY, JSON.stringify(next));
+    return true;
   } catch {
-    /* */
+    return false;
   }
 }
 
