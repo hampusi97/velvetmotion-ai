@@ -14,6 +14,7 @@ import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
 import { getMediaSettings } from '@/lib/mediaSettings';
 import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
+import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { useLocalEngineStatus } from '@/lib/localEngineBridge';
 import { addToGallery, getGallery, loadChat, saveChat } from '@/lib/storage';
@@ -125,6 +126,8 @@ export default function MediaStudioModal({
   const [uploadSourceKind, setUploadSourceKind] = useState<'fictional' | 'self' | null>(null);
   const [uploadedAdultMode, setUploadedAdultMode] = useState(false);
   const [customVoice, setCustomVoice] = useState<VoiceDesign>(DEFAULT_VOICE_DESIGN);
+  const [referenceBusy, setReferenceBusy] = useState(false);
+  const [referenceResult, setReferenceResult] = useState<string | null>(null);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const [videoIsGenerative, setVideoIsGenerative] = useState(false);
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm' | 'unknown'>('unknown');
@@ -224,6 +227,32 @@ export default function MediaStudioModal({
     }
   }
 
+  async function handleGenerateReferenceVariant() {
+    if (!uploadedPreview || uploadSourceKind !== 'fictional' || !uploadRightsConfirmed) {
+      setErrorMsg('This feature requires an original fictional adult image and confirmed usage rights.');
+      return;
+    }
+    setReferenceBusy(true);
+    setErrorMsg(null);
+    setStatusMsg('Requesting a reference-aware variation from your configured image model...');
+    try {
+      const response = await generateFictionalReferenceVariation({
+        referenceImage: uploadedPreview,
+        prompt: customPrompt.trim() || charVibe.trim() || 'cinematic portrait with soft evening lighting',
+        adultMode: uploadedAdultMode,
+        sourceType: 'fictional',
+      });
+      setReferenceResult(response.imageUrl);
+      setVideoSourceUrl(response.imageUrl);
+      setStatusMsg(`New fictional portrait generated with ${response.engine}. You can animate it or use it as this companion’s avatar.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Reference image generation failed.');
+      setStatusMsg(null);
+    } finally {
+      setReferenceBusy(false);
+    }
+  }
+
   async function handleGenerateVideo() {
     if (uploadedPreview && videoSourceUrl === uploadedPreview &&
         (!uploadSourceKind || !uploadRightsConfirmed)) {
@@ -299,6 +328,7 @@ export default function MediaStudioModal({
     try {
       const webpData = await compressUploadToWebp(file);
       setUploadedPreview(webpData);
+      setReferenceResult(null);
       setVideoSourceUrl(webpData);
       setUploadSourceKind(null);
       setUploadRightsConfirmed(false);
@@ -889,6 +919,53 @@ export default function MediaStudioModal({
                   <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="h-4 w-4 accent-[#dc789c]" />
                 </label>
               )}
+              {uploadSourceKind === 'fictional' && (
+                <div className="space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
+                  <label className="block text-[11px] text-zinc-300">
+                    Change the setting, outfit, composition, or mood
+                    <textarea
+                      rows={2}
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      placeholder="For example: cinematic portrait, satin evening dress, warm lantern glow"
+                      className="mt-1 w-full rounded-xl border border-white/15 bg-[#0b0910] px-3 py-2 text-xs text-white"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!uploadRightsConfirmed || referenceBusy}
+                    onClick={() => void handleGenerateReferenceVariant()}
+                    className="w-full rounded-full border border-[#e8b9ba]/40 bg-[#ad4969]/25 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    {referenceBusy ? 'Generating with reference model...' : 'Generate new fictional portrait'}
+                  </button>
+                  <p className="text-[10px] text-zinc-500">
+                    Requires an img2img endpoint in Advanced Media or compatible local ComfyUI reference nodes. Your original source image is sent only to that chosen provider when you click Generate.
+                  </p>
+                  {referenceResult && (
+                    <div className="space-y-2">
+                      <SafeImage src={referenceResult} alt="New fictional portrait from your selected model" className="mx-auto h-52 w-40 rounded-xl object-cover" />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button"
+                          onClick={() => {
+                            setUploadedPreview(referenceResult);
+                            setVideoSourceUrl(referenceResult);
+                            setReferenceResult(null);
+                            setStatusMsg('Generated image selected as the fictional companion portrait.');
+                          }}
+                          className="rounded-full border border-pink-300/40 px-3 py-2 text-xs font-semibold text-pink-100">
+                          Use as companion portrait
+                        </button>
+                        <button type="button" onClick={() => { setVideoSourceUrl(referenceResult); setTab('video'); }}
+                          className="rounded-full border border-white/25 px-3 py-2 text-xs text-white">
+                          Animate generated image
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
                 disabled={!uploadSourceKind || !uploadRightsConfirmed}
