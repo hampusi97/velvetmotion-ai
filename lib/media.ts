@@ -174,7 +174,7 @@ export async function resolveBestMediaUrl(
     // Priority 1A: Local ComfyUI Bridge (:8188 SFW creative outfit/scene portraits) when online
     const comfyBase = (settings?.localImageBase || "http://127.0.0.1:8188").trim();
     const comfyProbe = await probeComfyUi(comfyBase);
-    if (comfyProbe.online && !requiresAdultEngine) {
+    if (comfyProbe.online) {
       try {
         const blobUrl = await generateComfySfwPortrait({
           comfyUrl: comfyBase,
