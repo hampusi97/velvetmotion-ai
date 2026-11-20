@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Character } from "@/lib/charactersTypes";
 import { speak, stopSpeaking } from "@/lib/speech";
 import { characterMediaUrl, joiSequenceFrames } from "@/lib/media";
-import { fallbackReply } from "@/lib/characters";
+import { generateCompanionReply } from "@/lib/chatRouter";
 import { pushShort, memoryPromptBlock } from "@/lib/memoryTiers";
 import { bumpIntimacy, getIntimacy } from "@/lib/storage";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
@@ -98,90 +98,51 @@ export function VoiceCallUI({ character, onClose }: Props) {
   const replyTo = async (userText: string) => {
     pushShort(character.id, "user", userText);
     append(`You: ${userText}`);
-    setStatus("She is thinking…");
-    let reply = "";
-    let liveAudioUrl = "";
+    setStatus("Connecting to your selected AI model…");
     try {
-      const liveRes = await fetch("/api/live-voice", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          characterId: character.id,
-          transcript: userText,
-          romanceMode: false,
-          intimacy: getIntimacy(character.id, character.intimacy),
-        }),
-      });
-      if (liveRes.ok) {
-        const liveData = await liveRes.json();
-        if (liveData.audioUrl) liveAudioUrl = liveData.audioUrl;
-        if (liveData.reply && liveData.modelUsed === "gemini-3.8-live") {
-          reply = liveData.reply;
-        }
-      }
-    } catch {
-      /* fall through to /api/chat */
-    }
-    if (!reply) {
-      try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            characterId: character.id,
-            customCharacter: character,
-            messages: [{ role: "user", content: userText }],
-            romanceMode: false,
-            intimacy: getIntimacy(character.id, character.intimacy),
-            memoryBlock: memoryPromptBlock(character.id),
-          }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          reply = data.reply || "";
-        }
-      } catch {
-        /* */
-      }
-    }
-    if (!reply) reply = fallbackReply(character, userText, false);
-    // Keep voice replies short
-    reply = reply.replace(/\*[^]*?\*/g, " ").replace(/\s+/g, " ").trim().slice(0, 220);
-    pushShort(character.id, "assistant", reply);
-    bumpIntimacy(character.id, 2);
-    append(`${character.name.split(" ")[0]}: ${reply}`);
-    setSpeaking(true);
-    setStatus("She is speaking…");
-    if (liveAudioUrl) {
-      try {
-        const audio = new Audio(liveAudioUrl);
-        audioRef.current = audio;
-        audio.onended = () => {
-          setSpeaking(false);
-          if (activeRef.current) startListen();
-          else setStatus("Call ended");
-        };
-        audio.onerror = () => {
-          setSpeaking(false);
-          if (activeRef.current) startListen();
-        };
-        void audio.play();
+      // This is a static-export desktop/browser frontend. There are no
+      // built-in /api/live-voice or /api/chat routes; use the same tested
+      // user-selected model router as companion chat and voice calls.
+      const result = await generateCompanionReply(
+        [{ role: "user", text: userText }],
+        {
+          id: character.id,
+          name: character.name,
+          age: character.age,
+          tagline: character.tagline,
+          personality: character.personality,
+          backstory: character.background,
+          memoryBlock: memoryPromptBlock(character.id),
+          relationshipLevel: getIntimacy(character.id, character.intimacy),
+        },
+      );
+      if (result.providerUsed === "provider-unavailable" || result.providerUsed === "compliance-guard") {
+        setStatus(result.text);
+        append(result.text);
+        setSpeaking(false);
         return;
-      } catch {
-        /* fall back to Web Speech */
       }
-    }
-    speak(
-      reply,
-      { ...character.voice },
-      {
+      const reply = result.text.replace(/\\*[^]*?\\*/g, " ").replace(/\\s+/g, " ").trim().slice(0, 350);
+      if (!reply) {
+        setStatus("The AI provider returned an empty reply. Check Settings and retry.");
+        return;
+      }
+      pushShort(character.id, "assistant", reply);
+      bumpIntimacy(character.id, 2);
+      append(`${character.name.split(" ")[0]}: ${reply}`);
+      setSpeaking(true);
+      setStatus("Companion voice is playing…");
+      speak(reply, { ...character.voice }, {
         onEnd: () => {
           setSpeaking(false);
           if (activeRef.current) startListen();
           else setStatus("Call ended");
         },
-      },
-    );
+      });
+    } catch {
+      setSpeaking(false);
+      setStatus("Your AI model could not respond. Verify the chosen local or online provider.");
+    }
   };
 
   const startListen = () => {
