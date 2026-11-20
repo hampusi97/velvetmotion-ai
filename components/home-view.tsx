@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, Lock, Search, Sparkles } from "lucide-react";
+import { ChevronRight, Heart, Lock, Search, Sparkles } from "lucide-react";
 import { riseContainer, riseItem } from "@/lib/motion";
 import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
@@ -16,7 +16,6 @@ import { CinematicPortraitShowcase } from "./CinematicPortraitShowcase";
 import { SafeImage } from "./SafeImage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { claimDailyDropReward, getDailyDropClaimState } from "@/lib/progression";
-import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { getTimeMood } from "@/lib/timeMood";
@@ -64,20 +63,26 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
   onOpenCustomCharacter?: (character: Character) => void;
 }) {
   const reduce = useReducedMotion();
-  const { coins, refresh } = useCoinsStore();
+  const { refresh } = useCoinsStore();
   const [dailyDrop, setDailyDrop] = useState<DailyDropEntry | null>(null);
   const [spotlight, setSpotlight] = useState<CommunitySpotlightItem[]>([]);
   const [timeMood] = useState(() => getTimeMood());
   const [dropState, setDropState] = useState({ streak: 0, claimedToday: false });
   const [claimMsg, setClaimMsg] = useState("");
-  const [streak, setStreak] = useState(0);
   const [homeCategory, setHomeCategory] = useState("All");
   const [privateOnly, setPrivateOnly] = useState(false);
   const [homeQuery, setHomeQuery] = useState("");
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
+  const [showAllCompanions, setShowAllCompanions] = useState(false);
+  const [rosterSort, setRosterSort] = useState<"featured" | "name">("featured");
   const [heroIdx, setHeroIdx] = useState(0);
 
   useEffect(() => {
-    setStreak(getEdgeStreak());
+    try {
+      const saved = JSON.parse(localStorage.getItem("vm:favorite-companions") || "[]") as unknown;
+      setFavoriteIds(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : []);
+    } catch { setFavoriteIds([]); }
     setDropState(getDailyDropClaimState());
     void fetch("/data/daily-drops.json")
       .then((r) => (r.ok ? r.json() : []))
@@ -97,7 +102,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
   }, []);
 
   useEffect(() => {
-    const t = setInterval(() => setHeroIdx((i) => (i + 1) % Math.min(CHARACTERS.length, 6)), 6000);
+    const t = reduce ? null : setInterval(() => setHeroIdx((i) => (i + 1) % Math.min(CHARACTERS.length, 6)), 6000);
     const onStyleTab = (e: Event) => {
       const tab = (e as CustomEvent<"girls" | "anime" | "all">).detail;
       if (tab === "anime") {
@@ -110,10 +115,10 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
     };
     window.addEventListener("vm:style-tab", onStyleTab);
     return () => {
-      clearInterval(t);
+      if (t) clearInterval(t);
       window.removeEventListener("vm:style-tab", onStyleTab);
     };
-  }, []);
+  }, [reduce]);
 
   const claimDrop = () => {
     const res = claimDailyDropReward(dailyDrop?.bonusCoins || 25);
@@ -125,13 +130,25 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
   };
 
   const categories = useMemo(() => ["All", ...characterCategories()], []);
-  const featured = useMemo(() => {
-    const list = filterCharacters({ query: homeQuery, category: homeCategory });
+  const filteredRoster = useMemo(() => {
+    let list = filterCharacters({ query: homeQuery, category: homeCategory });
     if (privateOnly) {
-      return list.filter((c) => c.intimacy >= 50 || /suite|private|boudoir|after/i.test(c.kink + c.tagline)).slice(0, 22);
+      list = list.filter((c) => c.intimacy >= 50 || /suite|private|boudoir|after/i.test(c.kink + c.tagline));
     }
-    return list.slice(0, 22);
-  }, [homeQuery, homeCategory, privateOnly]);
+    if (favoriteOnly) list = list.filter((c) => favoriteIds.includes(c.id));
+    if (rosterSort === "name") {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  }, [homeQuery, homeCategory, privateOnly, favoriteOnly, favoriteIds, rosterSort]);
+  const featured = showAllCompanions ? filteredRoster : filteredRoster.slice(0, 18);
+  const toggleFavorite = (id: string) => {
+    setFavoriteIds((old) => {
+      const next = old.includes(id) ? old.filter((x) => x !== id) : [...old, id];
+      try { localStorage.setItem("vm:favorite-companions", JSON.stringify(next)); } catch { /* private mode */ }
+      return next;
+    });
+  };
   const hero = CHARACTERS[heroIdx % CHARACTERS.length];
   const heroImage = heroIdx % 6 === 0 ? "/promos/hero-banner.webp" : staticPortraitUrl(hero.id);
 
@@ -140,7 +157,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
     featured.forEach((c, idx) => {
       if (idx === 2) cells.push({ kind: "shorts" });
       if (idx === 8) cells.push({ kind: "private" });
-      cells.push({ kind: "char", character: c, isNew: idx < 5 });
+      cells.push({ kind: "char", character: c, isNew: (c.tags || []).some((t) => t.toUpperCase() === "NEW") });
     });
     if (featured.length < 3) cells.push({ kind: "shorts" });
     if (featured.length < 9) cells.push({ kind: "private" });
@@ -233,13 +250,13 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
         <motion.section variants={riseItem} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-1.5">
-              <span className="text-[#ff5c7c]">Explore</span>
-              <span className="text-white">Featured Characters</span>
+              <span className="text-[#e8b6c0]">Explore</span>
+              <span className="text-white">The Atelier</span>
               <ChevronRight className="h-5 w-5 text-zinc-400" />
             </h2>
             <div className="flex items-center gap-2 text-xs">
-              <span className="rounded-full border border-white/10 bg-[#1a1a1f] px-2.5 py-1 text-[11px] font-semibold text-zinc-300 tabular-nums">
-                🔥 {Math.max(streak, dropState.streak)}d streak · 🪙 {coins}
+              <span className="rounded-full border border-white/10 bg-[#241b26] px-3 py-1 text-[11px] font-semibold text-[#e8c7d3] tabular-nums">
+                {filteredRoster.length} fictional adult companions
               </span>
               <Link href="/discover/" className="rounded-full border border-[#ff5678]/40 bg-[#2a1820] px-3 py-1 text-[11px] font-bold text-[#ff8aa1] hover:bg-[#ff5678]/25">
                 Swipe Discover →
@@ -284,6 +301,12 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
               <Lock className="h-3 w-3 text-[#ff5678]" /> Private Content
             </button>
 
+            <button type="button" aria-pressed={favoriteOnly}
+              onClick={() => setFavoriteOnly((v) => !v)}
+              className={"shrink-0 inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition " + (favoriteOnly ? "border-[#e6a6b9] bg-[#8d3e61]/25 text-pink-100" : "border-white/10 bg-[#241c28] text-zinc-300 hover:border-white/25")}>
+              <Heart className="h-3 w-3" /> Saved ({favoriteIds.length})
+            </button>
+
             {categories
               .filter((c) => c !== "All")
               .map((cat) => (
@@ -305,7 +328,22 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
             <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-[#111114] to-transparent" />
           </div>
 
-          {/* 6-Column Editorial Photo Grid with Interleaved SHORTS & Private Content Promo Tiles */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[11px] text-zinc-400">
+              Showing {featured.length} of {filteredRoster.length} companions · Tap a portrait to enter her world
+            </p>
+            <label className="flex items-center gap-2 text-[11px] text-zinc-300">
+              Sort
+              <select aria-label="Sort companions" value={rosterSort}
+                onChange={(e) => setRosterSort(e.target.value as "featured" | "name")}
+                className="rounded-xl border border-white/10 bg-[#241b26] px-3 py-2 text-xs text-white">
+                <option value="featured">Featured</option>
+                <option value="name">Name A–Z</option>
+              </select>
+            </label>
+          </div>
+
+          {/* Responsive Atelier character portraits and experience tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
             {exploreCells.map((cell) => {
               if (cell.kind === "shorts") {
@@ -364,10 +402,25 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
                   character={cell.character}
                   onSelect={() => onOpenGirl(cell.character.id)}
                   isNew={cell.isNew}
+                  isFavorite={favoriteIds.includes(cell.character.id)}
+                  onToggleFavorite={() => toggleFavorite(cell.character.id)}
                 />
               );
             })}
           </div>
+          {filteredRoster.length === 0 && (
+            <div className="rounded-2xl border border-white/10 bg-[#211923] p-8 text-center text-sm text-zinc-300">
+              No companions match these filters. Try another category or clear your search.
+            </div>
+          )}
+          {filteredRoster.length > 18 && (
+            <div className="flex justify-center pt-3">
+              <button type="button" onClick={() => setShowAllCompanions((v) => !v)}
+                className="rounded-full border border-[#e5a9b8]/40 bg-[#9b4a6d]/15 px-6 py-3 text-sm font-semibold text-[#f7d7df] transition hover:border-[#e5a9b8]/80 hover:bg-[#9b4a6d]/25">
+                {showAllCompanions ? "Show fewer companions" : "Explore all " + filteredRoster.length + " companions"}
+              </button>
+            </div>
+          )}
         </motion.section>
       )}
 
