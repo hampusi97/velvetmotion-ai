@@ -11,6 +11,7 @@ import { DailyFeed } from "./DailyFeed";
 import { FeaturedPair } from "./FeaturedPair";
 import { ProactiveInbox } from "./ProactiveInbox";
 import { CandyGirlCard } from "./CandyGirlCard";
+import { ExperienceRail } from "./ExperienceRail";
 import { SafeImage } from "./SafeImage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { claimDailyDropReward, getDailyDropClaimState } from "@/lib/progression";
@@ -152,7 +153,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
 
   return (
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show" className="space-y-6">
-      {/* candy.ai-inspired Obsidian Editorial Hero Carousel */}
+      {/* Original VelvetMotion editorial hero carousel */}
       <motion.section variants={riseItem} className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#16161b] shadow-2xl">
         <div className="relative aspect-[16/7] sm:aspect-[16/5] min-h-[185px]">
           <SafeImage
@@ -169,11 +170,11 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
               <span className="text-[11px] font-semibold text-zinc-300">{timeMood.badge}</span>
             </div>
             <h1 className="font-display text-3xl sm:text-5xl font-black text-white leading-none tracking-tight">
-              {heroIdx % 6 === 0 ? "Your Free AI Companion Studio" : hero.name}
+              {heroIdx % 6 === 0 ? "Meet. Create. Connect." : hero.name}
             </h1>
             <p className="mt-1.5 text-xs sm:text-sm text-zinc-300 line-clamp-2">
               {heroIdx % 6 === 0
-                ? "Zero daily caps · Editable Memory Vault · Voice calls & downloadable Local GPU Ultra desktop app."
+                ? "Make your own companions, build an ongoing story, and animate portraits with compatible AI engines. Local mode available."
                 : hero.tagline}
             </p>
             <div className="mt-4 flex flex-wrap gap-2.5">
@@ -193,7 +194,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
             </div>
           </div>
 
-          {/* Centered Hero Pagination Dots matching candy.ai */}
+          {/* Editorial hero carousel pagination */}
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
             {Array.from({ length: 6 }).map((_, i) => (
               <button
@@ -208,7 +209,11 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
         </div>
       </motion.section>
 
-      {/* Explore Featured Characters > (candy.ai Primary Grid + Interleaved SHORTS & Private Content Cards) */}
+      <motion.section variants={riseItem}>
+        <ExperienceRail />
+      </motion.section>
+
+      {/* Explore characters and original VelvetMotion experiences */}
       {onOpenGirl && (
         <motion.section variants={riseItem} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
