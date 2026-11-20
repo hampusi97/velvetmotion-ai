@@ -7,6 +7,10 @@ export type MediaBackendSettings = {
   localImageMode: "comfy" | "forge" | "prompt-url";
   /** Optional installed CheckpointLoaderSimple model selected in the Studio. */
   comfyCheckpoint: string;
+  /** Selected per-request Stable Diffusion WebUI / Forge checkpoint title. */
+  a1111Checkpoint: string;
+  /** Denoise strength for reference-based img2img, from 0.05 to 0.95. */
+  a1111Denoise: number;
   /** Optional img2vid endpoint that accepts image URL + prompt */
   img2vidUrl: string;
   /** Optional reference-aware img2img bridge URL for original fictional artwork. */
@@ -25,6 +29,8 @@ const DEFAULTS: MediaBackendSettings = {
   localImageBase: "",
   localImageMode: "prompt-url",
   comfyCheckpoint: "",
+  a1111Checkpoint: "",
+  a1111Denoise: 0.55,
   img2vidUrl: "",
   img2imgUrl: "",
   pollinationsKey: "",
