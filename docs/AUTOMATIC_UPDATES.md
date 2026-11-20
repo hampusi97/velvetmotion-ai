@@ -39,8 +39,7 @@ A new GitHub release **does not magically replace applications that are already 
 The app's Tauri code has a separate `signed-updater` feature. It is enabled **only when the trusted signing public key and private key are configured**, and update packages are validated before installation. Unsigned builds never turn on this feature or install arbitrary binaries.
 
 **One-time secure setup:**
-1. Install the [Tauri CLI](https://v2.tauri.app/). On a trusted local computer, generate a signing key pair using the official Tauri 2 signer:
-   `npm run tauri signer generate -- -w ~/.tauri/velvetmotion.key` (or equivalent `cargo tauri signer generate -w ...`).
+1. Install the [Tauri CLI](https://v2.tauri.app/) on a trusted local computer (for example, `cargo install tauri-cli --version "^2.0" --locked`). Generate a signing key pair with `cargo tauri signer generate -w ~/.tauri/velvetmotion.key`. Keep the private key in secure personal storage as well as GitHub Secrets.
 2. Store the private key in GitHub repository **Actions secret** `TAURI_SIGNING_PRIVATE_KEY`. If the key is passphrase-protected, store the passphrase in Actions secret `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Never put the private key into Git.
 3. Store the matching **public key content**, not a filesystem path, as GitHub repository **Actions variable** `TAURI_UPDATER_PUBKEY`.
 4. Merge a vetted commit to `main` or trigger the workflow with a fresh release version. GitHub now produces signed update artifacts and `latest.json` at `https://github.com/hampusi97/velvetmotion-ai/releases/latest/download/latest.json`.
