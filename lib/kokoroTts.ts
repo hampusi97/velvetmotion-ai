@@ -267,7 +267,7 @@ export async function generateLocalNeuralVoiceSample(
     });
     if (!res.ok) throw new Error(`Local neural voice service returned HTTP ${res.status}`);
     const type = res.headers.get("content-type") || "";
-    if (!/audio\\/(?:mpeg|mp3|x-mpeg)/i.test(type)) {
+    if (!type.toLowerCase().startsWith("audio/")) {
       throw new Error("The configured service returned data rather than an MP3 audio file.");
     }
     const blob = await res.blob();
