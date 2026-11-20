@@ -17,6 +17,50 @@ const SHORT_MAX = 24;
 const MID_MAX = 40;
 const LONG_MAX = 30;
 
+function cleanNotes(value: unknown, limit: number): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const notes: string[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "string") continue;
+    const note = entry.trim().slice(0, 200);
+    const key = note.toLocaleLowerCase();
+    if (!note || seen.has(key)) continue;
+    seen.add(key);
+    notes.push(note);
+  }
+  return notes.slice(-limit);
+}
+
+export function normalizeMemory(value: unknown): MemoryTier {
+  if (!value || typeof value !== "object") return empty();
+  const parsed = value as Partial<MemoryTier>;
+  const short = Array.isArray(parsed.short) ? parsed.short.filter(
+    (turn): turn is { role: "user" | "assistant"; content: string } =>
+      !!turn && (turn.role === "user" || turn.role === "assistant") && typeof turn.content === "string",
+  ).slice(-SHORT_MAX).map(turn => ({ role: turn.role, content: turn.content.slice(0, 500) })) : [];
+  return {
+    short,
+    mid: cleanNotes(parsed.mid, MID_MAX),
+    long: cleanNotes(parsed.long, LONG_MAX),
+    updatedAt: typeof parsed.updatedAt === "number" && Number.isFinite(parsed.updatedAt)
+      ? parsed.updatedAt : Date.now(),
+  };
+}
+
+/** Portable JSON backup; no browser APIs required. */
+export function exportMemoryBackup(memory: MemoryTier): string {
+  return JSON.stringify({ version: 1, memory: normalizeMemory(memory) }, null, 2);
+}
+
+export function importMemoryBackup(json: string): MemoryTier {
+  if (json.length > 256_000) throw new Error("Memory backup exceeds 256 KB.");
+  const data: unknown = JSON.parse(json);
+  if (!data || typeof data !== "object" || (data as { version?: unknown }).version !== 1 ||
+      !("memory" in data)) throw new Error("Unsupported memory backup format.");
+  return normalizeMemory((data as { memory: unknown }).memory);
+}
+
 function empty(): MemoryTier {
   return { short: [], mid: [], long: [], updatedAt: Date.now() };
 }
@@ -26,13 +70,7 @@ export function loadMemory(characterId: string): MemoryTier {
   try {
     const raw = localStorage.getItem(PREFIX + characterId);
     if (!raw) return empty();
-    const parsed = JSON.parse(raw) as MemoryTier;
-    return {
-      short: Array.isArray(parsed.short) ? parsed.short.slice(-SHORT_MAX) : [],
-      mid: Array.isArray(parsed.mid) ? parsed.mid.slice(-MID_MAX) : [],
-      long: Array.isArray(parsed.long) ? parsed.long.slice(-LONG_MAX) : [],
-      updatedAt: parsed.updatedAt || Date.now(),
-    };
+    return normalizeMemory(JSON.parse(raw));
   } catch {
     return empty();
   }
@@ -43,7 +81,7 @@ export function saveMemory(characterId: string, mem: MemoryTier) {
   try {
     localStorage.setItem(
       PREFIX + characterId,
-      JSON.stringify({ ...mem, updatedAt: Date.now() }),
+      JSON.stringify(normalizeMemory({ ...mem, updatedAt: Date.now() })),
     );
   } catch {
     /* quota */
@@ -61,7 +99,7 @@ export function pushShort(
   if (role === "user") {
     const lower = content.toLowerCase();
     if (/(my name is|call me|i like|i hate|i prefer|don't|dont)/.test(lower)) {
-      mem.mid = [...mem.mid, content.slice(0, 160)].slice(-MID_MAX);
+      mem.mid = cleanNotes([...mem.mid, content.slice(0, 160)], MID_MAX);
     }
   }
   saveMemory(characterId, mem);
@@ -70,7 +108,7 @@ export function pushShort(
 
 export function pinLong(characterId: string, note: string) {
   const mem = loadMemory(characterId);
-  mem.long = [...mem.long, note.slice(0, 200)].slice(-LONG_MAX);
+  mem.long = cleanNotes([...mem.long, note], LONG_MAX);
   saveMemory(characterId, mem);
   return mem;
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BookmarkCheck, Pencil, Pin, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { BookmarkCheck, Download, Pencil, Pin, Plus, Trash2, Upload, X } from "lucide-react";
 import { saveMemoryDB } from "@/lib/db";
+import { exportMemoryBackup, importMemoryBackup, loadMemory, saveMemory } from "@/lib/memoryTiers";
 
 export type MemoryCategory = "About You" | "Preferences" | "Inside Jokes" | "Pinned Rules";
 
@@ -79,6 +80,8 @@ export function MemoryVaultPanel({
   onClose?: () => void;
 }) {
   const [items, setItems] = useState<VaultMemoryItem[]>(() => loadCategorizedMemories(characterId));
+  const importInput = useRef<HTMLInputElement>(null);
+  const [backupError, setBackupError] = useState("");
   const [category, setCategory] = useState<MemoryCategory>("About You");
   const [draft, setDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -87,6 +90,59 @@ export function MemoryVaultPanel({
   useEffect(() => {
     setItems(loadCategorizedMemories(characterId));
   }, [characterId]);
+
+  const downloadBackup = () => {
+    const backup = JSON.stringify({
+      version: 1,
+      memory: JSON.parse(exportMemoryBackup(loadMemory(characterId))).memory,
+      vault: items,
+    }, null, 2);
+    const url = URL.createObjectURL(new Blob([backup], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "velvetmotion-memory-backup.json";
+    link.click();
+    URL.revokeObjectURL(url);
+    setBackupError("");
+  };
+
+  const uploadBackup = async (file?: File) => {
+    if (!file) return;
+    try {
+      if (file.size > 256_000) throw new Error("Backup must be under 256 KB.");
+      const raw = await file.text();
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || !("vault" in parsed) ||
+          !Array.isArray((parsed as { vault: unknown }).vault)) {
+        throw new Error("Invalid memory vault backup.");
+      }
+      const restored = importMemoryBackup(raw);
+      const vault = (parsed as { vault: unknown[] }).vault;
+      if (vault.length > 200) throw new Error("Too many saved vault notes.");
+      const categories: MemoryCategory[] = ["About You", "Preferences", "Inside Jokes", "Pinned Rules"];
+      const clean: VaultMemoryItem[] = vault.map((item, index) => {
+        if (!item || typeof item !== "object") throw new Error("Invalid vault note.");
+        const note = item as Partial<VaultMemoryItem>;
+        if (typeof note.text !== "string" || !note.text.trim() || note.text.length > 2000 ||
+            !categories.includes(note.category as MemoryCategory)) throw new Error("Invalid vault note.");
+        return {
+          id: typeof note.id === "string" ? note.id.slice(0, 100) : `restored-${index}`,
+          category: note.category as MemoryCategory,
+          text: note.text.trim(),
+          pinned: Boolean(note.pinned),
+          updatedAt: typeof note.updatedAt === "number" && Number.isFinite(note.updatedAt)
+            ? note.updatedAt : Date.now(),
+        };
+      });
+      saveMemory(characterId, restored);
+      commit(clean);
+      setBackupError("");
+    } catch (error) {
+      setBackupError(error instanceof Error ? error.message : "Could not import backup.");
+    } finally {
+      if (importInput.current) importInput.current.value = "";
+    }
+  };
 
   const commit = (next: VaultMemoryItem[]) => {
     setItems(next);
@@ -148,6 +204,20 @@ export function MemoryVaultPanel({
           </button>
         )}
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={downloadBackup}
+          className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-2.5 py-1.5 text-xs text-white hover:border-[#00f5ff]">
+          <Download className="h-3.5 w-3.5" /> Export memories
+        </button>
+        <button type="button" onClick={() => importInput.current?.click()}
+          className="inline-flex items-center gap-1 rounded-lg border border-white/20 px-2.5 py-1.5 text-xs text-white hover:border-[#00f5ff]">
+          <Upload className="h-3.5 w-3.5" /> Import memories
+        </button>
+        <input ref={importInput} type="file" accept=".json,application/json" className="hidden"
+          aria-label="Select memory backup" onChange={(event) => { void uploadBackup(event.target.files?.[0]); }} />
+      </div>
+      {backupError && <p role="alert" className="text-xs text-rose-300">{backupError}</p>}
 
       <div className="flex flex-wrap gap-1.5">
         {CATEGORIES.map((cat) => (
