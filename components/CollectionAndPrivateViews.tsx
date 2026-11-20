@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download, Heart, Lock, Search, Sparkles, Tags, Trash2 } from "lucide-react";
 import { getGallery, removeGalleryItem, type GalleryItem } from "@/lib/storage";
-import { deltype GalleryMeta = Record<string, { favorite?: boolean; tags?: string[] }>;
+import { deleteGalleryDB, exportFullBackupJson } from "@/lib/db";
+import { deleteMediaFromFirestore } from "@/lib/firebase";
+import { SafeImage } from "@/components/SafeImage";
+
+type GalleryMeta = Record<string, { favorite?: boolean; tags?: string[] }>;
 const GALLERY_META_KEY = "vm-gallery-meta-v1";
 function readGalleryMeta(): GalleryMeta {
   if (typeof window === "undefined") return {};
