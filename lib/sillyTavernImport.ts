@@ -4,6 +4,7 @@
  */
 
 import type { Character } from "./charactersTypes";
+import { validateCharacterCompliance } from "./complianceFilter";
 
 type STCard = {
   name?: string;
@@ -39,7 +40,7 @@ export function parseSillyTavernCard(raw: unknown): Character | null {
   const root = raw as STCard;
   const card = root.data && typeof root.data === "object" ? { ...root, ...root.data } : root;
 
-  const name = stripHtml(card.name || card.char_name || "Imported Girl");
+  const name = stripHtml(card.name || card.char_name || "");
   if (!name) return null;
 
   const personality = stripHtml(
@@ -51,15 +52,19 @@ export function parseSillyTavernCard(raw: unknown): Character | null {
     ? card.tags.map(String).slice(0, 12)
     : ["Imported", "SillyTavern"];
 
-  const ageMatch = personality.match(/\b(1[8-9]|[2-5][0-9])\s*(years?|yo|yrs)/i);
-  const age = ageMatch ? parseInt(ageMatch[1], 10) : 24;
+  const ext = (card as STCard & { extensions?: { velvetmotion?: { age?: unknown } } }).extensions?.velvetmotion;
+  const explicitAge = ext?.age;
+  const ageMatch = [personality, scenario, card.description || ""].join(" ").match(/\b(\d{1,3})\s*(?:years?\s*old|yo|yrs?)\b/i);
+  const age = explicitAge !== undefined ? Number(explicitAge) : ageMatch ? Number(ageMatch[1]) : 24;
+  if (!Number.isInteger(age) || age < 18 || age > 120) return null;
+  if (!validateCharacterCompliance({ name, age, personality, backstory: scenario, tagline: card.description || "" }).ok) return null;
 
   const id = hashId(name);
 
   const character: Character = {
     id,
     name,
-    age: Math.max(21, age),
+    age,
     tagline: (scenario || personality).slice(0, 120) || "Imported companion",
     category: tags.includes("Dominant")
       ? "Dominant"
