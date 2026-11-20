@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: node --test scripts/verify-desktop-release.test.mjs
       - run: npx tsx --test lib/storyboard.test.ts
+      - run: npx tsx --test lib/mediaGenerator.test.ts
       - run: npx tsx --test lib/characterCardV2.test.ts
       - run: node --check scripts/setup-signing.mjs
       - run: npm run build
