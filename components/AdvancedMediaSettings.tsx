@@ -205,7 +205,7 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
               Checkpoint (per-request; does not permanently switch the WebUI)
               <select value={s.a1111Checkpoint} onChange={(event) => update({a1111Checkpoint:event.target.value})}
                 className="mt-1 w-full rounded-lg border border-white/15 bg-black px-3 py-2 text-xs text-white">
-                <option value="">Use WebUI's active checkpoint</option>
+                <option value="">Use the active WebUI checkpoint</option>
                 {webuiCheckpoints.map(model => <option key={model.title} value={model.title}>{model.title}</option>)}
                 {s.a1111Checkpoint && !webuiCheckpoints.some(x=>x.title===s.a1111Checkpoint) &&
                   <option value={s.a1111Checkpoint}>{s.a1111Checkpoint} (not verified)</option>}
