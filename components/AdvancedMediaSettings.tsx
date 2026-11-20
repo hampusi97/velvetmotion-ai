@@ -68,7 +68,7 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
       probe(
         "comfy",
         "ComfyUI image engine (:8188)",
-        `${(settings.localImageBase || "http://127.0.0.1:8188").replace(/\\/+$/, "")}/system_stats`,
+        `${(settings.localImageBase || "http://127.0.0.1:8188").replace(/\/+$/, "")}/system_stats`,
       ),
     ]);
     checks.push({
