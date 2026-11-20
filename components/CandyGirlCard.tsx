@@ -3,6 +3,7 @@
 import { ArrowUpRight, Heart, Mic2, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
 import { SafeImage } from "@/components/SafeImage";
 
 /** Premium discover card with honest feature labels and independently interactive favorites. */
@@ -26,7 +27,7 @@ export function CandyGirlCard({
         aria-label={"Meet " + character.name + ", fictional companion"}
         className="absolute inset-0 z-10 block h-full w-full overflow-hidden text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0b6c7]">
         <SafeImage
-          src={staticPortraitUrl(character.id)}
+          src={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
           alt={"Portrait of " + character.name}
           loading="lazy"
           className="h-full w-full object-cover object-top transition duration-700 ease-out group-hover:scale-[1.09] motion-reduce:transform-none"
