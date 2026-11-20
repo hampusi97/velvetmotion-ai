@@ -52,7 +52,7 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
   const visible = ALL_STORY_PACKS.filter((p) => tag === "ALL" || p.tag === tag);
   const pack = packId ? getStoryPack(packId) : undefined;
   const scene: StoryScene | undefined = pack && sceneId ? pack.scenes.find((s) => s.id === sceneId) : undefined;
-  const face = pack ? faceFor(pack.id) : "chloe";
+  const face = pack ? pack.character.companionId ?? faceFor(pack.id) : "chloe";
   const portrait = staticPortraitUrl(face);
 
   useEffect(() => {
@@ -105,7 +105,7 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
         </div>
         <div className="grid grid-cols-2 gap-2.5">
           {visible.map((item) => {
-            const f = faceFor(item.id);
+            const f = item.character.companionId ?? faceFor(item.id);
             const expanded = EXPANDED_STORY_IDS.includes(item.id);
             return (
               <button

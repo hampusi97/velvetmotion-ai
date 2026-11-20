@@ -95,6 +95,17 @@ export const VIDEO_SCENE_PRESETS = [
     },
   },
   {
+    id: "her-choice",
+    label: "Her Choice · Last dance",
+    adult: true,
+    scene: {
+      action: "She takes her date's hand and leads him into one last dance. When the music stops, she leans in for a kiss. Consenting adults in an open relationship.",
+      setting: "a private club after the last show",
+      camera: "slow two-shot, then close on her smile",
+      lighting: "soft amber stage lights and velvet shadows",
+    },
+  },
+  {
     id: "sph-night-in",
     label: "SPH · Night in",
     adult: true,

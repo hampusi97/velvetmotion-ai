@@ -5,6 +5,7 @@ import { FETISH_JOI } from "./joi/fetish";
 import { ADDED_STORY_PACKS } from "./story/added";
 import { BNWO_SPH_PACKS } from "./story/bnwo";
 import { EXPANDED_STORY_PACKS } from "./story/expanded";
+import { HER_CHOICE_STORY } from "./story/herChoice";
 import type { JoiScenario, StoryPack } from "./types";
 
 /**
@@ -16,6 +17,7 @@ import type { JoiScenario, StoryPack } from "./types";
  * can be played instead of only announced.
  */
 export const STORY_PACKS: StoryPack[] = [
+  HER_CHOICE_STORY,
   ...EXPANDED_STORY_PACKS,
   ...ADDED_STORY_PACKS,
 ];

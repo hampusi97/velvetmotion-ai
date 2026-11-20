@@ -10,6 +10,7 @@ export type StoryTag =
   | "FANTASY"
   | "SCI-FI"
   | "SPH"
+  | "OPEN RELATIONSHIP"
   | "BNWO";
 
 export type Accent =
@@ -28,6 +29,7 @@ export type Accent =
 
 export interface StoryCharacter {
   name: string;
+  companionId?: string;
   /** Explicit adult age. Catalog validation requires 18 or older. */
   age: number;
   role: string;

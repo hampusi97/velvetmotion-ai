@@ -82,7 +82,7 @@ test("JOI drafts map model cues to the selected session length", () => {
 
 test("each selectable mature roleplay theme has a playable companion script", () => {
   const companion = FLAGSHIP_COMPANIONS.find(({ id }) => id === "juno-aimes")!;
-  for (const key of ["bnwo", "bnwo-sph", "bnwo-cheating", "bnwo-breeding", "cheating", "breeding", "sph"] as const) {
+  for (const key of ["bnwo", "bnwo-sph", "bnwo-cheating", "bnwo-breeding", "cheating", "her-choice", "breeding", "sph"] as const) {
     assert.equal(parseCompanionSessionTheme(key), key);
     const session = buildGuidedSession(JSON.stringify(THEMED_GUIDED_CUES[key]), {
       name: companion.name, age: companion.age, summary: companion.tagline, voiceId: companion.voiceId,

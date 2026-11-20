@@ -133,6 +133,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   const [view, setView] = useState<ShellRouteView>(initialView);
   const [studioInitialTab, setStudioInitialTab] = useState<"photo" | "video">("photo");
   const [joiTheme, setJoiTheme] = useState<CompanionSessionTheme | null>(null);
+  const [storyPackId, setStoryPackId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
@@ -198,6 +199,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       setAdult(localStorage.getItem("velvet-age") === "true");
       const qView = params.get("view") as ShellRouteView | null;
       if (qView && pathname === "/") setView(qView);
+      setStoryPackId(pathname === "/" && qView === "packs" ? params.get("pack") : null);
       if (pathname.startsWith("/studio")) setStudioInitialTab(params.get("mode") === "video" ? "video" : "photo");
       setJoiTheme(pathname.startsWith("/joi") ? parseCompanionSessionTheme(params.get("theme")) : null);
       const qId = params.get("companion") || params.get("id");
@@ -526,7 +528,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "edge" && <EdgeTimer onHome={() => setView("home")} />}
           {view === "scenario" && <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id, p) => openChatById(id, p)} />}
           {view === "tribute" && <TributeBrowser />}
-          {view === "packs" && <StoryPackBrowser />}
+          {view === "packs" && <StoryPackBrowser initialPackId={storyPackId} />}
           {view === "joi" && <JoiBrowser key={`${selected?.id}:${joiTheme}`} initialCompanionId={selected?.id} initialTheme={joiTheme} />}
           {view === "import" && <CardImport onHome={() => setView("home")} onOpen={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "share" && <ShareImport onHome={() => setView("home")} onImport={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}

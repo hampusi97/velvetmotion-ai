@@ -9,6 +9,7 @@ export const COMPANION_SESSION_THEMES = {
   interracial: { label: "Interracial romance", direction: "Focus on mutual attraction and equal agency between fictional adults from different backgrounds. Leave their identities to the user." },
   sph: { label: "SPH · Size teasing", direction: "Use consensual, private size teasing with the listener's agreed words and limits. Check in before raising the intensity." },
   cheating: { label: "Cheating fantasy", direction: "Set up a fictional jealousy or secret-date roleplay agreed to by all adult participants. Let the listener choose whether to hear the confession, ask a question, or stop." },
+  "her-choice": { label: "Her Choice · Open relationship", direction: "The fictional adult companion chooses who she dates and what she wants in an openly agreed nonexclusive relationship. Let her tell the story in her own words. The listener chooses how much to hear and can pause or ask for reassurance." },
   breeding: { label: "Breeding fantasy", direction: "Keep the breeding theme within an agreed fictional fantasy. Check what language the listener wants and finish with aftercare." },
   bnwo: { label: "BNWO roleplay", direction: "Use an explicitly agreed fictional scene centered on attraction to a Black adult partner. Let every character express their own wants and limits." },
   "bnwo-sph": { label: "BNWO · SPH", direction: "Combine attraction between fictional adult partners with opt-in size teasing. Direct teasing to the agreed role and individual preferences. Keep racial identity separate from ratings or insults." },
@@ -34,6 +35,11 @@ export const THEMED_GUIDED_CUES: Partial<Record<CompanionSessionTheme, readonly 
     "We both agreed to play out a secret date. Say pause whenever you want me to step out of character.",
     "I saved you a seat and a confession. Do you want to hear what caught my eye or guess first?",
     "Our secret-date scene is over. Tell me whether you want a little reassurance or a quiet minute together.",
+  ],
+  "her-choice": [
+    "I asked him to dance because I wanted to. Come sit beside me if you'd like to hear how my night went.",
+    "I chose the last song. I chose the kiss, too. You can ask me for the delicious little details or let me keep a few for myself.",
+    "I like that I can want things and tell you about them. How are you feeling now? We can talk, get closer, or take a little space.",
   ],
   breeding: [
     "Tell me how bold you want tonight's breeding fantasy to feel. We can change the scene whenever you like.",

@@ -1437,6 +1437,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 </select>
               </label>
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                {roleplayTheme === "her-choice" && (
+                  <Link href="/?view=packs&pack=her-choice" className="shrink-0 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
+                    Read Juno’s story
+                  </Link>
+                )}
                 {flagshipProfile && (
                   <>
                     <Link href={`/studio/?companion=${encodeURIComponent(character.id)}&mode=video`}
