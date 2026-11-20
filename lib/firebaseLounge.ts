@@ -1,10 +1,10 @@
 /**
  * VelvetMotion Live Lounge Transport:
  * 1. Primary: Firebase Firestore (`loungeRooms/{roomId}/messages`) obeying `firestore.rules`
- * 2. Cloud Relay & Multi-Tab Live Sync: `/api/lounge` + `BroadcastChannel("vm-lounge-live")`
+ * 2. Optional local tab notification: `BroadcastChannel("vm-lounge-live")`.
  *
- * Ensures lounge writes and real-time room updates work in production whether the user
- * signed in via Google Auth, anonymous Firebase Auth, or local username auth.
+ * A connected Firebase session and rules are required for actual cross-device rooms.
+ * The static-export frontend has NO `/api/lounge` fallback endpoint.
  */
 
 export type LoungeMessage = {
@@ -27,7 +27,7 @@ async function ensureFirebaseAuthSession(): Promise<void> {
     const { signInAnonymously } = await import("firebase/auth");
     await signInAnonymously(auth);
   } catch {
-    /* Anonymous auth may be disabled in Firebase Console; cloud relay fallback will handle writes */
+    /* Anonymous auth may be disabled; caller reports Firestore write failure. */
   }
 }
 
@@ -80,34 +80,15 @@ export async function postLoungeMessage(
     wroteFirestore = false;
   }
 
-  // 2. Also post to `/api/lounge` cloud relay so production rooms stay live for all visitors
-  let wroteRelay = false;
-  if (typeof fetch !== "undefined") {
-    try {
-      const res = await fetch("/api/lounge", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          roomId: cleanRoom,
-          from: cleanFrom,
-          text: cleanText,
-          at: cleanAt,
-          ...(cleanShareCode ? { shareCode: cleanShareCode } : {}),
-        }),
-      });
-      if (res.ok) {
-        wroteRelay = true;
-        const data = await res.json();
-        if (data?.message) {
-          broadcastLocalChannel(data.message as LoungeMessage);
-        }
-      }
-    } catch {
-      /* ignore */
-    }
+  // Static-export builds cannot provide /api/lounge. Firestore is the only
+  // cross-device delivery transport. Report a failed write honestly.
+  if (wroteFirestore) {
+    broadcastLocalChannel({
+      id: `local-${Date.now()}`, roomId: cleanRoom, from: cleanFrom,
+      text: cleanText, at: cleanAt, ...(cleanShareCode ? { shareCode: cleanShareCode } : {}),
+    });
   }
-
-  return wroteFirestore || wroteRelay;
+  return wroteFirestore;
 }
 
 export async function subscribeLounge(
@@ -115,46 +96,8 @@ export async function subscribeLounge(
   onMsgs: (msgs: LoungeMessage[], mode?: LoungeTransportMode) => void,
 ): Promise<() => void> {
   const cleanRoom = roomId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "public";
-  let firestoreActive = false;
   let unsubFirestore = () => {};
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let bc: BroadcastChannel | null = null;
-
-  const fetchRelayMessages = async () => {
-    if (firestoreActive || typeof fetch === "undefined") return;
-    try {
-      const res = await fetch(`/api/lounge?room=${encodeURIComponent(cleanRoom)}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data?.messages) && data.messages.length > 0 && !firestoreActive) {
-        onMsgs(data.messages as LoungeMessage[], "cloud-relay");
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-
-  // Start immediate cloud-relay fetch so room is populated right away
-  void fetchRelayMessages();
-  if (typeof window !== "undefined") {
-    pollTimer = setInterval(() => {
-      void fetchRelayMessages();
-    }, 4500);
-
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        bc = new BroadcastChannel(CHANNEL_NAME);
-        bc.onmessage = () => {
-          void fetchRelayMessages();
-        };
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
+  // No phantom cloud relay: a web static export has no backend route to poll.
   // Subscribe to Firestore `loungeRooms/{roomId}/messages`
   try {
     await ensureFirebaseAuthSession();
@@ -172,28 +115,18 @@ export async function subscribeLounge(
           const data = d.data() as LoungeMessage;
           return { ...data, id: d.id, roomId: cleanRoom };
         });
-        if (list.length > 0) {
-          firestoreActive = true;
-          onMsgs(list, "firestore");
-        }
+        onMsgs(list, "firestore");
       },
       () => {
-        /* Firestore rules not yet deployed or anonymous auth restricted; cloud-relay remains active */
+        onMsgs([], "local"); // Local-only; a remote room cannot be reached.
       },
     );
   } catch {
-    /* Cloud relay remains active */
+    onMsgs([], "local"); // Failed to authenticate / subscribe to Firestore.
   }
 
   return () => {
     unsubFirestore();
-    if (pollTimer) clearInterval(pollTimer);
-    if (bc) {
-      try {
-        bc.close();
-      } catch {
-        /* ignore */
-      }
-    }
+
   };
 }
