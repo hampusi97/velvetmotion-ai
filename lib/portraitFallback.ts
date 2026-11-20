@@ -26,6 +26,9 @@ export const PORTRAIT_BY_ID: Record<string, string> = {
   "rowan-mercer": "/portraits/rowan-mercer.webp",
   "jade-aster": "/portraits/jade-aster.webp",
   "morgan-ellis": "/portraits/morgan-ellis.webp",
+  "veda-kane": "/portraits/veda-kane.webp",
+  "noor-mansour": "/portraits/noor-mansour.webp",
+  "juno-aimes": "/portraits/juno-aimes.webp",
 
   // 36 Distinct Roster Companions (.jpg)
   "nova-g": "/portraits/nova-g.jpg",

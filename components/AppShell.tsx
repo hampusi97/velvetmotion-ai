@@ -523,7 +523,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "scenario" && <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id, p) => openChatById(id, p)} />}
           {view === "tribute" && <TributeBrowser />}
           {view === "packs" && <StoryPackBrowser />}
-          {view === "joi" && <JoiBrowser />}
+          {view === "joi" && <JoiBrowser key={selected?.id} initialCompanionId={selected?.id} />}
           {view === "import" && <CardImport onHome={() => setView("home")} onOpen={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "share" && <ShareImport onHome={() => setView("home")} onImport={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}

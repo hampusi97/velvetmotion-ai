@@ -7,6 +7,7 @@ import { HOT_CAST } from "./hotCast";
 import { applyFaceSeed } from "./faceSeeds";
 import { ROLE_CHARACTERS } from "./charactersRoles";
 import { CANDY_CAST } from "./candyCast";
+import { COMPANION_SESSION_THEMES, recommendedCompanionThemes } from "./companionSessionThemes";
 import { FLAGSHIP_COMPANIONS } from "@/data/companions";
 import { PORTRAIT_BY_ID } from "./portraitFallback";
 
@@ -210,7 +211,7 @@ const FLAGSHIP_AS_CHARACTERS: Character[] = FLAGSHIP_COMPANIONS.map((f) => ({
   figure: f.visualDna,
   visualDna: f.visualDna,
   voiceId: f.voiceId,
-  kink: f.archetype,
+  kink: recommendedCompanionThemes(f.category).map((theme) => COMPANION_SESSION_THEMES[theme].label).join(", "),
   reply: f.greeting,
 }));
 

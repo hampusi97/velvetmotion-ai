@@ -98,3 +98,9 @@ Next priorities are a one-tap path from a character's chat to a scene draft, pri
 | [CandyShorts' blended-family setup](https://candy.ai/candy-shorts/series/darkangel666) | Adapt the tension around a family gathering into an original storyline. Rowan is the bride’s adult stepdaughter. Morgan is the bookstore owner’s adult stepdaughter. The user meets them as an unrelated wedding guest or local collector. |
 
 The public Character.AI listing displayed about 209,000 interactions. Other sites use different counters and promotion strategies. The references establish that these archetypes are visible, while opt-in VelvetMotion usage can show which new characters people actually return to.
+
+### Mature scene and guided audio follow-up
+
+[Character.AI's goth tattoo artist listing](https://character.ai/character/AVd7dXt6/flirty-goth-tattoo-artist-ella) displayed about 568,000 interactions. [Candy AI's public catalog](https://candy.ai/ai-girlfriend) emphasizes different personalities and conversation styles. Veda uses the tattoo-studio archetype with an original botanical art background. Noor and Juno add a luxury perfumer and a burlesque choreographer to test different kinds of confident, creative adult characters.
+
+Every flagship companion has at least one 18+ Studio photo preset and a three-cue guided script. The JOI builder has optional kink themes for AI-generated drafts. The interracial romance theme focuses on mutual attraction and equal agency. The mature portrait and guided-session settings use unrelated fictional adult participants.

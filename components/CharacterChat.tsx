@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FLAGSHIP_COMPANIONS } from "@/data/companions";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -166,6 +167,7 @@ const SEQUENCE_LINES: Record<SequenceKind, string> = {
 };
 
 export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSelectCompanion }: CharacterChatProps) {
+  const flagshipProfile = FLAGSHIP_COMPANIONS.some(({ id }) => id === character.id);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1374,6 +1376,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           {showActions && (
             <div className="space-y-1.5 px-1 pb-1">
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+                {flagshipProfile && (
+                  <Link href={`/joi/?companion=${encodeURIComponent(character.id)}`}
+                    className="shrink-0 inline-flex items-center gap-1 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
+                    <Volume2 className="h-3 w-3" aria-hidden="true" /> JOI with {character.name}
+                  </Link>
+                )}
                 {NSFW_CHIPS.map((chip) => (
                   <button
                     key={chip.id}

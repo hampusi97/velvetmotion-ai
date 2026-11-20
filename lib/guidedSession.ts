@@ -12,6 +12,7 @@ export function buildGuidedSession(
   persona: JoiScenario["persona"],
   tone: string,
   minutes: 2 | 4 | 6,
+  source: "generated" | "companion" = "generated",
 ): JoiScenario {
   const text = raw.trim().replace(/^\x60\x60\x60(?:json)?\s*|\s*\x60\x60\x60$/gi, "");
   let lines: unknown;
@@ -30,11 +31,11 @@ export function buildGuidedSession(
     if (!check.ok) throw new Error(check.reason);
   }
   return {
-    id: "generated-session",
+    id: `${source}-session`,
     label: `A session with ${persona.name}`,
     persona,
     tone,
-    summary: `${minutes}-minute generated session`,
+    summary: `${minutes}-minute ${source === "companion" ? "companion script" : "generated session"}`,
     accent: "rose",
     steps: SESSION_PHASES.map(({ phase, title, weight }, index) => ({
       id: phase,

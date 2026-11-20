@@ -19,7 +19,7 @@ import {
   EXPANDED_JOI_IDS,
   getJoiScenario,
 } from "@/lib/content";
-import { JOI_PHASES, type JoiScenario } from "@/lib/content/types";
+import { JOI_PHASES, type JoiScenario, type JoiStep } from "@/lib/content/types";
 import {
   JOI_DIRTY_TRACKS,
   speak,
@@ -34,6 +34,13 @@ import {
 } from "@/lib/audioEngine";
 import { runGenerativePrompt } from "@/lib/chatRouter";
 import { buildGuidedSession } from "@/lib/guidedSession";
+import { speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
+import {
+  COMPANION_SESSION_THEMES,
+  COMPANION_THEME_KEYS,
+  recommendedCompanionThemes,
+  type CompanionSessionTheme,
+} from "@/lib/companionSessionThemes";
 import { assertCompliance } from "@/lib/complianceFilter";
 import { FLAGSHIP_COMPANIONS } from "@/data/companions";
 import { SafeImage } from "@/components/SafeImage";
@@ -55,9 +62,31 @@ const BPM_MODES = [
   { label: "Frenzy", bpm: 160 },
 ] as const;
 
-export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: string | null }) {
+function playCue(step: JoiStep, voiceId: string | undefined, whispery: boolean) {
+  const text = `${step.title}. ${step.instruction}`;
+  const tuning = { pitch: 1.04, rate: 0.92, whispery };
+  if (voiceId) {
+    void speakWithNeuralVoice(text, { ...tuning, voiceId });
+  } else {
+    speak(text, tuning);
+  }
+}
+
+export function JoiBrowser({
+  initialScenarioId = null,
+  initialCompanionId,
+}: {
+  initialScenarioId?: string | null;
+  initialCompanionId?: string;
+}) {
+  const initialCompanion = FLAGSHIP_COMPANIONS.find(({ id }) => id === initialCompanionId) ?? FLAGSHIP_COMPANIONS[0];
   const [draft, setDraft] = useState<JoiScenario | null>(null);
-  const [selectedCompanion, setSelectedCompanion] = useState(FLAGSHIP_COMPANIONS[0].id);
+  const [selectedCompanion, setSelectedCompanion] = useState(initialCompanion.id);
+  const companion = FLAGSHIP_COMPANIONS.find(({ id }) => id === selectedCompanion) ?? initialCompanion;
+  const recommendedThemes = recommendedCompanionThemes(companion.category);
+  const [sessionTheme, setSessionTheme] = useState<CompanionSessionTheme>(
+    recommendedCompanionThemes(initialCompanion.category)[0],
+  );
   const [sessionTone, setSessionTone] = useState("playful");
   const [sessionMinutes, setSessionMinutes] = useState<2 | 4 | 6>(4);
   const [sessionDirection, setSessionDirection] = useState("");
@@ -84,20 +113,24 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
     ? scenarioId === draft?.id ? draft : getJoiScenario(scenarioId)
     : undefined;
   const step = scenario?.steps[stepIndex];
+  const sessionVoiceId = scenario?.persona.voiceId;
 
   useEffect(() => {
     setRemaining(null);
-    if (autoVoice && step) {
-      speak(`${step.title}. ${step.instruction}`, {
-        pitch: 1.04,
-        rate: 0.92,
-        whispery: whisperMode,
-      });
-    }
-  }, [scenarioId, stepIndex, autoVoice, step, whisperMode]);
+  }, [step]);
+
+  useEffect(() => {
+    if (!autoVoice || !step) return;
+    playCue(step, sessionVoiceId, whisperMode);
+    return () => {
+      if (sessionVoiceId) stopNeuralSpeech();
+      else stopSpeaking();
+    };
+  }, [autoVoice, sessionVoiceId, step, whisperMode]);
 
   useEffect(() => {
     return () => {
+      stopNeuralSpeech();
       stopSpeaking();
       stopJoiBeat();
       stopIntimacyAudio();
@@ -166,9 +199,26 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
     });
   };
 
+  const companionPersona: JoiScenario["persona"] = {
+    name: companion.name,
+    age: companion.age,
+    summary: companion.tagline,
+    voiceId: companion.voiceId,
+  };
+
+  function loadCompanionScript() {
+    setSessionError(null);
+    try {
+      setDraft(buildGuidedSession(
+        JSON.stringify(companion.guidedPaceStages), companionPersona, "Companion pace", sessionMinutes, "companion",
+      ));
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "This companion's script could not be loaded.");
+    }
+  }
+
   async function generateDraft() {
-    const companion = FLAGSHIP_COMPANIONS.find((profile) => profile.id === selectedCompanion);
-    if (!companion || sessionBusy) return;
+    if (sessionBusy) return;
     const direction = sessionDirection.trim();
     const safety = assertCompliance(direction);
     setSessionError(null);
@@ -179,15 +229,18 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
 
     setSessionBusy(true);
     setDraft(null);
+    const theme = COMPANION_SESSION_THEMES[sessionTheme];
     try {
       const raw = await runGenerativePrompt(
-        "Write cues for a private JOI session between consenting fictional adults only. Respect the user's boundaries, make it easy to pause or stop, and close with a supportive wind-down. Return only a JSON array with exactly three short speech-ready strings, for warm-up, build, and wind-down. No markdown or stage directions.",
+        "Write cues for a private JOI session between consenting fictional adults who are unrelated. Respect the user's limits, include a way to slow down or stop, and close with a supportive wind-down. Treat identities with equal respect and avoid racial stereotypes or degradation. Return only a JSON array of three short speech-ready strings for warm-up, build, and wind-down.",
         `Fictional persona: ${companion.name}, age ${companion.age}. ${companion.personality}
-Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits: ${direction || "No additional directions."}`,
+Theme: ${theme.label}. ${theme.direction}
+Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes.
+Direction and limits: ${direction || "No additional directions."}`,
         companion.name,
       );
-      if (!raw) throw new Error("No draft came back. Check your chat model in Settings or choose a ready-made session.");
-      setDraft(buildGuidedSession(raw, { name: companion.name, age: companion.age, summary: companion.tagline }, sessionTone, sessionMinutes));
+      if (!raw) throw new Error("No draft came back. Check your chat model in Settings or use the companion script.");
+      setDraft(buildGuidedSession(raw, companionPersona, `${sessionTone} · ${theme.label}`, sessionMinutes));
     } catch (error) {
       setSessionError(error instanceof Error ? error.message : "Could not generate a session.");
     } finally {
@@ -207,7 +260,7 @@ Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits:
 
         <div className="overflow-hidden rounded-3xl border border-rose-200/20 bg-gradient-to-br from-[#2e1a27] to-[#141019] p-5 sm:p-7">
           <div className="flex gap-4">
-            <SafeImage src={FLAGSHIP_COMPANIONS.find((profile) => profile.id === selectedCompanion)?.portraitUrl || FLAGSHIP_COMPANIONS[0].portraitUrl}
+            <SafeImage src={companion.portraitUrl}
               alt="" className="h-24 w-20 rounded-xl object-cover object-top" />
             <div>
               <h3 className="font-serif text-2xl text-rose-50">Build a private JOI session</h3>
@@ -215,35 +268,57 @@ Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits:
             </div>
           </div>
           <form className="mt-5 space-y-3" onSubmit={(event) => { event.preventDefault(); void generateDraft(); }}>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <fieldset disabled={sessionBusy} className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs text-rose-100">Companion
-                <select value={selectedCompanion} onChange={(event) => setSelectedCompanion(event.target.value)}
-                  className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
+                <select value={selectedCompanion} onChange={(event) => {
+                  const profile = FLAGSHIP_COMPANIONS.find(({ id }) => id === event.target.value);
+                  if (!profile) return;
+                  setSelectedCompanion(profile.id);
+                  setSessionTheme(recommendedCompanionThemes(profile.category)[0]);
+                  setDraft(null);
+                  setSessionError(null);
+                }} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
                   {FLAGSHIP_COMPANIONS.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
                 </select>
               </label>
+              <label className="text-xs text-rose-100">Kink or theme
+                <select value={sessionTheme} onChange={(event) => {
+                  setSessionTheme(event.target.value as CompanionSessionTheme);
+                  setDraft(null);
+                }} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
+                  {COMPANION_THEME_KEYS.map((key) => (
+                    <option key={key} value={key}>{COMPANION_SESSION_THEMES[key].label}{recommendedThemes.includes(key) ? " · Suggested" : ""}</option>
+                  ))}
+                </select>
+              </label>
               <label className="text-xs text-rose-100">Tone
-                <select value={sessionTone} onChange={(event) => setSessionTone(event.target.value)}
+                <select value={sessionTone} onChange={(event) => { setSessionTone(event.target.value); setDraft(null); }}
                   className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
                   <option value="playful">Playful</option><option value="gentle">Gentle</option><option value="confident">Confident</option>
                 </select>
               </label>
               <label className="text-xs text-rose-100">Duration
-                <select value={sessionMinutes} onChange={(event) => setSessionMinutes(Number(event.target.value) as 2 | 4 | 6)}
+                <select value={sessionMinutes} onChange={(event) => { setSessionMinutes(Number(event.target.value) as 2 | 4 | 6); setDraft(null); }}
                   className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
                   <option value={2}>2 minutes</option><option value={4}>4 minutes</option><option value={6}>6 minutes</option>
                 </select>
               </label>
-            </div>
+            </fieldset>
             <label className="block text-xs text-rose-100">Direction and limits
-              <textarea value={sessionDirection} onChange={(event) => setSessionDirection(event.target.value)}
+              <textarea value={sessionDirection} disabled={sessionBusy} onChange={(event) => { setSessionDirection(event.target.value); setDraft(null); }}
                 maxLength={500} rows={2} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm"
                 placeholder="Slow and playful, with a gentle wind-down" />
             </label>
-            <p className="text-xs text-zinc-400">Uses your selected chat model. If it’s hosted, your directions are sent to that provider.</p>
-            <button type="submit" disabled={sessionBusy} className="rounded-full bg-rose-200 px-4 py-2 text-sm font-semibold text-[#27121e] disabled:opacity-60">
-              {sessionBusy ? "Writing session…" : "Generate draft"}
-            </button>
+            <p className="text-xs text-zinc-400">Your selected chat model receives your theme, tone, and directions. The companion script uses built-in cues.</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" disabled={sessionBusy} className="rounded-full bg-rose-200 px-4 py-2 text-sm font-semibold text-[#27121e] disabled:opacity-60">
+                {sessionBusy ? "Writing session…" : "Generate draft"}
+              </button>
+              <button type="button" disabled={sessionBusy} onClick={loadCompanionScript}
+                className="rounded-full border border-rose-200/30 px-4 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-200/10 disabled:opacity-60">
+                Use companion script
+              </button>
+            </div>
           </form>
           {sessionError && <p role="alert" className="mt-3 text-sm text-rose-200">{sessionError}</p>}
           {draft && (
@@ -421,6 +496,7 @@ Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits:
         <button
           onClick={() => {
             stopSpeaking();
+            stopNeuralSpeech();
             stopJoiBeat();
             setBeatBpm(null);
             stopIntimacyAudio();
@@ -447,15 +523,11 @@ Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits:
           <button
             type="button"
             onClick={() => {
-              const next = !autoVoice;
-              setAutoVoice(next);
-              if (!next) stopSpeaking();
-              else
-                speak(`${step.title}. ${step.instruction}`, {
-                  pitch: 1.04,
-                  rate: 0.92,
-                  whispery: whisperMode,
-                });
+              if (autoVoice) {
+                stopSpeaking();
+                stopNeuralSpeech();
+              }
+              setAutoVoice(!autoVoice);
             }}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
               autoVoice
@@ -548,13 +620,7 @@ Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits:
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() =>
-                speak(`${step.title}. ${step.instruction}`, {
-                  pitch: 1.04,
-                  rate: 0.92,
-                  whispery: whisperMode,
-                })
-              }
+              onClick={() => playCue(step, sessionVoiceId, whisperMode)}
               className="inline-flex items-center gap-1 rounded-lg border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 text-xs text-pink-200 hover:bg-pink-500/20"
             >
               <Volume2 className="h-3.5 w-3.5" /> Speak Step

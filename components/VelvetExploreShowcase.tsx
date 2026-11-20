@@ -28,7 +28,7 @@ export interface ShowcaseCompanion {
   portrait: string;
   fallbackPortrait?: string;
   category?: 'Caucasian' | 'Black' | 'Latina' | 'Asian' | 'European' | 'South Asian' | 'Mixed';
-  hair: 'Blonde' | 'Brunette' | 'Black' | 'Red' | 'Colorful';
+  hair?: 'Blonde' | 'Brunette' | 'Black' | 'Red' | 'Colorful';
   isNew?: boolean;
   hasPrivate?: boolean;
   tagline: string;
@@ -40,7 +40,7 @@ const FALLBACK_PORTRAIT = '/portraits/nova.jpg';
 
 function toShowcaseCard(
   profile: CompanionProfile,
-  hair: ShowcaseCompanion['hair'],
+  hair?: ShowcaseCompanion['hair'],
   category?: ShowcaseCompanion['category'],
 ): ShowcaseCompanion {
   return {
@@ -70,6 +70,9 @@ const ARCHETYPE_HAIR: Record<string, ShowcaseCompanion['hair']> = {
   'rowan-mercer': 'Black',
   'jade-aster': 'Black',
   'morgan-ellis': 'Red',
+  'veda-kane': 'Black',
+  'noor-mansour': 'Black',
+  'juno-aimes': 'Black',
 };
 const newArchetypeCards = ARCHETYPE_COMPANIONS.map((profile) => toShowcaseCard(profile, ARCHETYPE_HAIR[profile.id]));
 const includedProfileIds = new Set([...AFTER_DARK_CARDS, ...newArchetypeCards].map(({ id }) => id));
@@ -205,6 +208,10 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
   },
 ];
 
+const ADULT_SCENE_CARDS = FLAGSHIP_COMPANIONS
+  .filter((profile) => profile.sceneSelfiePresets.some((scene) => scene.nsfw))
+  .map((profile) => SHOWCASE_COMPANIONS.find(({ id }) => id === profile.id) ?? toShowcaseCard(profile));
+
 const HERO_SLIDES = [
   {
     id: 'nova',
@@ -331,7 +338,7 @@ const SHORTS_EPISODES = [
   },
 ];
 
-const FILTER_PILLS = ['All', ...COMPANION_ARCHETYPE_FILTERS, 'After Hours', 'New arrivals', 'Private Content', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
+const FILTER_PILLS = ['All', '18+ Scenes', ...COMPANION_ARCHETYPE_FILTERS, 'After Hours', 'New arrivals', 'Private Content', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
 
 function SafePortrait({
   src,
@@ -370,11 +377,12 @@ export default function VelvetExploreShowcase() {
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase().replace(/\bstep[- ]*daughters?\b/g, 'stepdaughter');
-    return SHOWCASE_COMPANIONS.filter((c) => {
+    const cards = activeFilter === '18+ Scenes' ? ADULT_SCENE_CARDS : SHOWCASE_COMPANIONS;
+    return cards.filter((c) => {
       const matchesQuery = !search ||
         [c.name, c.tagline, c.role, c.archetypeCategory].some((value) => value?.toLowerCase().includes(search));
       if (!matchesQuery) return false;
-      if (activeFilter === 'All') return true;
+      if (activeFilter === 'All' || activeFilter === '18+ Scenes') return true;
       if (activeFilter === 'New arrivals') return Boolean(c.isNew);
       if (activeFilter === 'After Hours') return AFTER_DARK_CARDS.some(({ id }) => id === c.id);
       if (activeFilter === 'Private Content') return Boolean(c.hasPrivate);

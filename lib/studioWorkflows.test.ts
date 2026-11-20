@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { FLAGSHIP_COMPANIONS } from "@/data/companions";
+import { COMPANION_SESSION_THEMES, recommendedCompanionThemes } from "./companionSessionThemes";
 import { test } from "node:test";
 import { generateStudioVideoClip, type StudioVideoRequest } from "./canvasVideoExporter";
 import {
@@ -95,4 +97,21 @@ test("a fully filled scene fits the local video bridge", () => {
     lighting: "d".repeat(200),
   }, true, true);
   assert.ok(prompt.length <= 600);
+});
+
+test("every flagship adult has a mature photo preset and three playable guided cues", () => {
+  for (const profile of FLAGSHIP_COMPANIONS) {
+    assert.ok(profile.age >= 21, profile.id);
+    assert.ok(profile.sceneSelfiePresets.some((scene) => scene.nsfw), profile.id);
+    assert.ok(recommendedCompanionThemes(profile.category).every((theme) => COMPANION_SESSION_THEMES[theme]), profile.id);
+    const session = buildGuidedSession(JSON.stringify(profile.guidedPaceStages), {
+      name: profile.name,
+      age: profile.age,
+      summary: profile.tagline,
+      voiceId: profile.voiceId,
+    }, "gentle", 4, "companion");
+    assert.equal(session.steps.length, 3, profile.id);
+    assert.equal(session.persona.voiceId, profile.voiceId, profile.id);
+    assert.equal(session.summary, "4-minute companion script", profile.id);
+  }
 });

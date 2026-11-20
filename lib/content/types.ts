@@ -77,6 +77,7 @@ export interface JoiPersona {
   name: string;
   age: number;
   summary: string;
+  voiceId?: string;
 }
 
 export interface JoiStep {
