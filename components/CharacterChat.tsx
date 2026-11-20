@@ -30,7 +30,8 @@ import {
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } from "@/lib/audioEngine";
 import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
-import { continueCompanionScene, generateCompanionReply, sanitizeCompanionReply } from "@/lib/chatRouter";
+import { chatDebugBadgeEnabled, continueCompanionScene, ensureVisibleReply, generateCompanionReply, sanitizeCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { createChatTurnGuard, shouldCommitTurnToActiveView, type ChatTurnOutcome } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
 import {
   listChatBranchesDB,
@@ -85,6 +86,7 @@ import { VoiceCallModal } from "@/components/VoiceCallModal";
 import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories, type MemoryCategory } from "@/components/MemoryVaultDrawer";
 import {
   buildProactiveFollowUp,
+  detectExplicitMediaIntent,
   extractInlineImageRequests,
   extractMemoriesFromMessage as extractDynamicMemories,
   generateQuickReplySuggestions,
@@ -123,6 +125,7 @@ type ChatMessage = StoredMessage & {
   id?: string;
   note?: string;
   isFallback?: boolean;
+  providerUsed?: string;
   error?: string;
   retrySpec?: { mood: MediaMood; label: string; cost: number; extra?: string };
 };
@@ -170,7 +173,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [awaitingReply, setAwaitingReply] = useState(false);
+  const [transcriptReady, setTranscriptReady] = useState(false);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
+  const [activeCharacterId, setActiveCharacterId] = useState(character.id);
+  const guardRef = useRef(createChatTurnGuard(character.id));
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
   const [speakingId, setSpeakingId] = useState<number | null>(null);
@@ -226,6 +235,18 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  if (character.id !== activeCharacterId) {
+    setActiveCharacterId(character.id);
+    setMessages([]);
+    setTranscriptReady(false);
+    setAwaitingReply(false);
+    setBusy(false);
+    setGeneratingPhoto(false);
+    setSafetyError(null);
+    setActiveBranchId("main");
+    guardRef.current.switchConversation(character.id);
+  }
+
   useDelayedLingerieDrop(character, intimacy, messages.length, (msg) => {
     setMessages((prev) => {
       const next = [...prev, msg];
@@ -250,22 +271,38 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const requestedId = character.id;
     proactiveSentRef.current = false;
-    setProgression(getCompanionProgression(character.id));
-    setGifts(getGiftsFor(character.id));
-    setIntimacy(getIntimacy(character.id, character.intimacy));
+    setProgression(getCompanionProgression(requestedId));
+    setGifts(getGiftsFor(requestedId));
+    setIntimacy(getIntimacy(requestedId, character.intimacy));
     setActiveBranchId("main");
     refreshDiary();
-    void listChatBranchesDB(character.id).then(setBranches);
+    void listChatBranchesDB(requestedId).then((rows) => {
+      if (!cancelled && guardRef.current.snapshot().conversationId === requestedId) setBranches(rows);
+    });
     void (async () => {
-      const dbLoaded = await loadChatDB(character.id);
-      const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
-      if (loaded.length > 0) setMessages(loaded);
-      else {
-        const adapted = `${character.initialMessage}\n\n*${timeMood.label}:* ${timeMood.greetingLine(character.name.split(" ")[0])}`;
-        setMessages([{ role: "assistant", content: adapted }]);
-      }
+      const dbLoaded = await loadChatDB(requestedId);
+      if (cancelled || guardRef.current.snapshot().conversationId !== requestedId) return;
+      if (guardRef.current.snapshot().locked) return;
+      const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(requestedId);
+      const next =
+        loaded.length > 0
+          ? loaded
+          : [
+              {
+                role: "assistant" as const,
+                content: `${character.initialMessage}\n\n*${timeMood.label}:* ${timeMood.greetingLine(character.name.split(" ")[0])}`,
+              },
+            ];
+      messagesRef.current = next;
+      setMessages(next);
+      setTranscriptReady(true);
     })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [character.id, character.initialMessage, character.intimacy]);
 
@@ -275,21 +312,77 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
   useEffect(() => () => stopIntimacyAudio(), []);
 
-  const persist = (next: ChatMessage[]) => {
-    setMessages(next);
-    if (activeBranchId === "main") {
-      void saveChatDB(character.id, next);
-      saveChat(character.id, next);
-    } else {
-      const active = branches.find((b) => b.branchId === activeBranchId);
-      void saveChatBranchDB({
-        characterId: character.id,
-        branchId: activeBranchId,
-        label: active?.label || `Timeline ${activeBranchId}`,
-        messages: next,
-        createdAt: active?.createdAt || Date.now(),
-      }).then(() => listChatBranchesDB(character.id).then(setBranches));
+  const writeTranscript = (characterId: string, branchId: string, next: ChatMessage[]) => {
+    if (branchId === "main") {
+      void saveChatDB(characterId, next);
+      saveChat(characterId, next);
+      return;
     }
+    const active = branches.find((b) => b.branchId === branchId);
+    void saveChatBranchDB({
+      characterId,
+      branchId,
+      label: active?.label || `Timeline ${branchId}`,
+      messages: next,
+      createdAt: active?.createdAt || Date.now(),
+    }).then(() => {
+      if (guardRef.current.snapshot().conversationId === characterId) {
+        void listChatBranchesDB(characterId).then((rows) => {
+          if (guardRef.current.snapshot().conversationId === characterId) setBranches(rows);
+        });
+      }
+    });
+  };
+
+  const persist = (next: ChatMessage[]) => {
+    messagesRef.current = next;
+    setMessages(next);
+    writeTranscript(character.id, activeBranchId, next);
+  };
+
+  const beginTurn = (opts?: { thinking?: boolean }) => {
+    if (!transcriptReady) return null;
+    const generation = guardRef.current.tryStart();
+    if (generation === null) return null;
+    const originId = character.id;
+    const originBranch = activeBranchId;
+    setBusy(true);
+    if (opts?.thinking !== false) setAwaitingReply(true);
+    let finished = false;
+    const isCurrent = () => {
+      const snap = guardRef.current.snapshot();
+      return (
+        mountedRef.current &&
+        shouldCommitTurnToActiveView({
+          activeConversationId: snap.conversationId,
+          originConversationId: originId,
+          generation,
+          currentGeneration: snap.generation,
+        })
+      );
+    };
+    return {
+      isCurrent,
+      commit: (next: ChatMessage[]) => {
+        writeTranscript(originId, originBranch, next);
+        if (!isCurrent()) return;
+        messagesRef.current = next;
+        setMessages(next);
+      },
+      clearThinking: () => {
+        if (!guardRef.current.clearThinking(generation)) return;
+        if (isCurrent()) setAwaitingReply(false);
+      },
+      finish: (outcome: ChatTurnOutcome = "success") => {
+        if (finished) return;
+        finished = true;
+        const settled = guardRef.current.settle(generation, outcome);
+        if (!settled || guardRef.current.snapshot().conversationId !== originId) return;
+        setBusy(false);
+        setAwaitingReply(false);
+        setGeneratingPhoto(false);
+      },
+    };
   };
 
   const quickReplies = useMemo(() => {
@@ -395,6 +488,10 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       tagline: character.tagline,
       personality: progression.customPromptOverride || character.personality,
       backstory: character.background,
+      traits: character.traits,
+      kink: character.kink,
+      voiceStyle: character.voice?.style,
+      voiceLine: character.reply,
       memoryBlock,
       memories: dynamicMemories,
       relationshipLevel: progStats.level,
@@ -440,13 +537,22 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       /* ignore */
     }
 
-    const routed = await generateCompanionReply(
-      historyMsgs.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
-      buildPersonaPayload(userPrompt),
-    );
+    const history: RouterMessage[] = historyMsgs
+      .slice(-16)
+      .map((m) => ({ role: m.role as "user" | "assistant", text: m.content }));
+    const persona = buildPersonaPayload(userPrompt);
+    let routedText = "";
+    let providerUsed = "character-voice-fallback";
+    try {
+      const routed = await generateCompanionReply(history, persona);
+      providerUsed = routed.providerUsed;
+      routedText = ensureVisibleReply(routed.text, history, persona);
+    } catch {
+      routedText = "";
+    }
 
-    const sanitized = sanitizeCompanionReply(routed.text, character.name);
-    if (sanitized) return sanitized;
+    const sanitized = sanitizeCompanionReply(routedText, character.name);
+    if (sanitized) return { text: sanitized, providerUsed };
 
     const mood = computeMoodState?.({
       character,
@@ -456,10 +562,17 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       romanceMode,
       giftCount: gifts.length,
     });
-    return fallbackReply(character, userPrompt, romanceMode, mood);
+    return { text: fallbackReply(character, userPrompt, romanceMode, mood), providerUsed: "character-voice-fallback" };
   };
 
-  const attachInlinePhotoAt = async (baseBatch: ChatMessage[], targetIdx: number, scenePrompt: string) => {
+  const attachInlinePhotoAt = async (
+    baseBatch: ChatMessage[],
+    targetIdx: number,
+    scenePrompt: string,
+    commit: (next: ChatMessage[]) => void = persist,
+    alive: () => boolean = () => mountedRef.current,
+  ) => {
+    if (!alive()) return;
     setGeneratingPhoto(true);
     try {
       const resolved = await resolveBestMediaUrl(character, "scene", scenePrompt);
@@ -469,7 +582,6 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         resolved.url.startsWith("blob:") ||
         (resolved.url.startsWith("data:image/") && resolved.url.length > 64);
 
-      if (!mountedRef.current) return;
       const updated = baseBatch.map((msg, idx) => {
         if (idx !== targetIdx) return msg;
         if (resolved.isFallback || !valid) {
@@ -488,8 +600,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           note: resolved.note,
         };
       });
-      persist(updated);
-      if (!resolved.isFallback && valid) {
+      commit(updated);
+      if (!resolved.isFallback && valid && alive()) {
         addToGallery({
           characterId: character.id,
           characterName: character.name,
@@ -504,97 +616,161 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           mood: "scene",
           createdAt: Date.now(),
         }).then(refreshDiary);
-        setRevealed((s) => new Set(s).add(targetIdx));
+        if (alive()) setRevealed((s) => new Set(s).add(targetIdx));
       }
+    } catch {
+      commit(
+        baseBatch.map((msg, idx) =>
+          idx === targetIdx
+            ? {
+                ...msg,
+                isFallback: true,
+                error: "Scene photo generator unavailable",
+                mediaType: "scene",
+              }
+            : msg,
+        ),
+      );
     } finally {
-      if (mountedRef.current) setGeneratingPhoto(false);
+      if (alive()) setGeneratingPhoto(false);
     }
   };
 
   const send = async (overrideText?: string, bonusXp = 6) => {
     const text = (overrideText ?? input).trim();
-    if (!text || busy) return;
+    if (!text || !transcriptReady) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
       setSafetyError(guard.reason);
       return;
     }
+    const turn = beginTurn();
+    if (!turn) return;
 
     if (!overrideText) setInput("");
     const userMsg: ChatMessage = { role: "user", content: text };
-    const next = [...messages, userMsg];
-    persist(next);
-    setBusy(true);
-    // Force a paint so the user bubble is visible before the reply
-    await new Promise((r) => setTimeout(r, 40));
+    const next = [...messagesRef.current, userMsg];
+    turn.commit(next);
+    const mediaIntent = detectExplicitMediaIntent(text);
+    let replied = false;
 
     try {
       const kinks = getKinks(character.id);
-      const rawReply = (await requestReplyForHistory(next, text)) || fallbackReply(character, text, romanceMode);
-      const sanitized = sanitizeCompanionReply(rawReply, character.name) || rawReply;
+      const routedTurn = await requestReplyForHistory(next, text);
+      const rawReply = routedTurn?.text || fallbackReply(character, text, romanceMode);
+      const providerUsed = routedTurn?.providerUsed || "character-voice-fallback";
+      const sanitized = sanitizeCompanionReply(rawReply, character.name) || rawReply || fallbackReply(character, text, romanceMode);
       const { cleanText, imagePrompts } = extractInlineImageRequests(sanitized);
-      let replyText = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : sanitized);
+      let replyText = cleanText.trim();
+      if (!replyText) {
+        replyText =
+          mediaIntent?.kind === "image"
+            ? "*Sends you a quick photo...*"
+            : fallbackReply(character, text, romanceMode);
+      }
       if (kinks.length && Math.random() < 0.25) {
         replyText += `\n\n*She remembers.* “Still thinking about ${kinks[kinks.length - 1]}…”`;
       }
 
       pushShort(character.id, "assistant", replyText);
-      const bubbles = splitIntoNaturalBubbles(replyText);
-      let latestBatch: ChatMessage[] = [...next, { role: "assistant", content: bubbles[0] || replyText }];
-      persist(latestBatch);
+      const bubbles = splitIntoNaturalBubbles(replyText).map((bubble) => bubble.trim()).filter(Boolean);
+      if (bubbles.length === 0) bubbles.push(fallbackReply(character, text, romanceMode));
+      let latestBatch: ChatMessage[] = [...next, { role: "assistant", content: bubbles[0], providerUsed }];
+      turn.commit(latestBatch);
+      replied = true;
+      turn.clearThinking();
 
       if (bubbles.length > 1) {
         await new Promise((r) => setTimeout(r, 750));
-        if (mountedRef.current) {
+        if (turn.isCurrent()) {
           latestBatch = [...latestBatch, { role: "assistant", content: bubbles.slice(1).join(" ") }];
-          persist(latestBatch);
+          turn.commit(latestBatch);
         }
       }
 
-      if (imagePrompts.length > 0 && mountedRef.current) {
-        await attachInlinePhotoAt(latestBatch, latestBatch.length - 1, imagePrompts[0]);
+      if (mediaIntent?.kind === "image" && turn.isCurrent()) {
+        await attachInlinePhotoAt(
+          latestBatch,
+          latestBatch.length - 1,
+          imagePrompts[0] || mediaIntent.prompt,
+          turn.commit,
+          turn.isCurrent,
+        );
       }
 
-      const newInt = bumpIntimacy(character.id, 3);
-      setIntimacy(newInt);
-      const { progression: nextProg, leveledUp } = earnCompanionXp(character.id, bonusXp);
-      setProgression(nextProg);
-      if (leveledUp) {
-        playLevelUpSwell();
-        hapticLevelUp();
-        notifySaved(`Level ${nextProg.level} Unlocked! +15 🪙`);
+      if (turn.isCurrent()) {
+        const newInt = bumpIntimacy(character.id, 3);
+        setIntimacy(newInt);
+        const { progression: nextProg, leveledUp } = earnCompanionXp(character.id, bonusXp);
+        setProgression(nextProg);
+        if (leveledUp) {
+          playLevelUpSwell();
+          hapticLevelUp();
+          notifySaved(`Level ${nextProg.level} Unlocked! +15 🪙`);
+        }
+        if (voiceOn) {
+          void speakWithNeuralVoice(cleanSpeechText(replyText).slice(0, 280), {
+            voiceId: character.voiceId,
+            whispery: progression.level >= 4 || timeMood.whisperBias,
+            pitch: character.voice?.pitch,
+            rate: character.voice?.rate,
+          });
+        }
+        updateIntimacyAudioIntensity?.(Math.min(100, newInt));
       }
 
-      if (voiceOn) {
-        void speakWithNeuralVoice(cleanSpeechText(replyText).slice(0, 280), {
-          voiceId: character.voiceId,
-          whispery: progression.level >= 4 || timeMood.whisperBias,
-          pitch: character.voice?.pitch,
-          rate: character.voice?.rate,
-        });
+      const wantsVideo = mediaIntent?.kind === "video" && turn.isCurrent();
+      turn.finish("success");
+      if (wantsVideo) await generateSequence(/joi/i.test(text) ? "joi" : "sex");
+    } catch {
+      if (!replied) {
+        turn.commit([
+          ...next,
+          { role: "assistant", content: fallbackReply(character, text, romanceMode) },
+        ]);
       }
-      updateIntimacyAudioIntensity?.(Math.min(100, newInt));
-    } finally {
-      setBusy(false);
+      turn.finish("error");
     }
   };
 
   const regenerateAt = async (assistantIndex: number) => {
-    if (busy) return;
-    const prior = messages.slice(0, assistantIndex);
+    const turn = beginTurn();
+    if (!turn) return;
+    const prior = messagesRef.current.slice(0, assistantIndex);
     const lastUser = [...prior].reverse().find((m) => m.role === "user")?.content || "Continue right where we left off";
-    setBusy(true);
+    const mediaIntent = detectExplicitMediaIntent(lastUser);
     try {
-      const rawReply = (await requestReplyForHistory(prior, lastUser)) || fallbackReply(character, lastUser, romanceMode);
-      const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
-      const nextReply = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
-      const updated = [...prior, { role: "assistant" as const, content: nextReply }, ...messages.slice(assistantIndex + 1)];
-      persist(updated);
-      if (imagePrompts.length > 0 && mountedRef.current) {
-        await attachInlinePhotoAt(updated, prior.length, imagePrompts[0]);
+      const routedTurn = await requestReplyForHistory(prior, lastUser);
+      const rawReply = routedTurn?.text || fallbackReply(character, lastUser, romanceMode);
+      const sanitized = sanitizeCompanionReply(rawReply, character.name) || rawReply || fallbackReply(character, lastUser, romanceMode);
+      const { cleanText, imagePrompts } = extractInlineImageRequests(sanitized);
+      const nextReply =
+        cleanText.trim() ||
+        (mediaIntent?.kind === "image" ? "*Sends you a quick photo...*" : fallbackReply(character, lastUser, romanceMode));
+      const updated = [
+        ...prior,
+        { role: "assistant" as const, content: nextReply },
+        ...messagesRef.current.slice(assistantIndex + 1),
+      ];
+      turn.commit(updated);
+      turn.clearThinking();
+      if (mediaIntent?.kind === "image" && turn.isCurrent()) {
+        await attachInlinePhotoAt(
+          updated,
+          prior.length,
+          imagePrompts[0] || mediaIntent.prompt,
+          turn.commit,
+          turn.isCurrent,
+        );
       }
-    } finally {
-      setBusy(false);
+      turn.finish("success");
+    } catch {
+      turn.commit([
+        ...prior,
+        { role: "assistant", content: fallbackReply(character, lastUser, romanceMode) },
+        ...messagesRef.current.slice(assistantIndex + 1),
+      ]);
+      turn.finish("error");
     }
   };
 
@@ -625,13 +801,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const continueAt = async (assistantIndex: number) => {
-    if (busy) return;
     const baseMessages =
       editingIndex === assistantIndex && editDraft.trim()
-        ? messages.map((msg, idx) =>
+        ? messagesRef.current.map((msg, idx) =>
             idx === assistantIndex ? { ...msg, content: editDraft.trim() } : msg,
           )
-        : messages;
+        : messagesRef.current;
     const target = baseMessages[assistantIndex];
     if (!target || target.role !== "assistant") return;
 
@@ -641,28 +816,38 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       return;
     }
     setSafetyError(null);
+    const turn = beginTurn();
+    if (!turn) return;
     setEditingIndex(null);
-    if (editingIndex === assistantIndex) persist(baseMessages);
+    if (editingIndex === assistantIndex) turn.commit(baseMessages);
 
-    setBusy(true);
     try {
       const slice = baseMessages.slice(0, assistantIndex + 1);
       const routed = await continueCompanionScene(
         slice.map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
         buildPersonaPayload(),
       );
-      const cont = sanitizeCompanionReply(routed.text, character.name) || routed.text.trim();
-      if (!cont) return;
+      const cont =
+        sanitizeCompanionReply(routed.text, character.name) ||
+        routed.text.trim() ||
+        fallbackReply(character, "Continue the scene", romanceMode);
       const baseText = target.content.trim();
-      const joiner = /[.!?…"\u201D*]$/.test(baseText) ? " " : " ";
-      const nextContent = `${baseText}${joiner}${cont}`.trim();
+      const nextContent = `${baseText} ${cont}`.trim();
       const updated = baseMessages.map((msg, idx) =>
         idx === assistantIndex ? { ...msg, content: nextContent } : msg,
       );
-      persist(updated);
-      notifySaved("Continued scene");
-    } finally {
-      setBusy(false);
+      turn.commit(updated);
+      turn.clearThinking();
+      if (turn.isCurrent()) notifySaved("Continued scene");
+      turn.finish("success");
+    } catch {
+      const cont = fallbackReply(character, "Continue the scene", romanceMode);
+      turn.commit(
+        baseMessages.map((msg, idx) =>
+          idx === assistantIndex ? { ...msg, content: `${target.content.trim()} ${cont}`.trim() } : msg,
+        ),
+      );
+      turn.finish("error");
     }
   };
 
@@ -674,8 +859,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     }
     setSafetyError(null);
 
-    setBusy(true);
+    const turn = beginTurn({ thinking: false });
+    if (!turn) return;
     setGeneratingPhoto(true);
+    const seed = messagesRef.current;
+    let posted = false;
     try {
       const themedExtra = [extra, timeMood.sceneLightingBias].filter(Boolean).join(", ");
       const resolved = await resolveBestMediaUrl(character, mood, themedExtra);
@@ -697,8 +885,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           note: reason,
           retrySpec: { mood, label, cost, extra },
         };
-        persist([...messages, errMsg]);
-        setSafetyError(null);
+        turn.commit([...seed, errMsg]);
+        posted = true;
+        if (turn.isCurrent()) setSafetyError(null);
         return;
       }
 
@@ -724,29 +913,46 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const isExplicit = ["nude", "explicit", "sex"].includes(mood);
       const caption = `*${label} · ${note}*`;
       const mediaMsg: ChatMessage = { role: "assistant", content: caption, imageUrl: url, mediaType: mood, note };
-      const next = [...messages, mediaMsg];
-      persist(next);
-      if (!isExplicit) {
-        setRevealed((s) => new Set(s).add(next.length - 1));
+      const next = [...seed, mediaMsg];
+      turn.commit(next);
+      posted = true;
+      if (turn.isCurrent()) {
+        if (!isExplicit) {
+          setRevealed((s) => new Set(s).add(next.length - 1));
+        }
+        setActiveMedia({ url, type: mood, note });
+        setIntimacy(bumpIntimacy(character.id, 5));
+        const { progression: nextProg } = earnCompanionXp(character.id, 8);
+        setProgression(nextProg);
       }
-      setActiveMedia({ url, type: mood, note });
-      setIntimacy(bumpIntimacy(character.id, 5));
-      const { progression: nextProg } = earnCompanionXp(character.id, 8);
-      setProgression(nextProg);
     } catch (err) {
-      setSafetyError(err instanceof Error ? err.message : "Could not generate Scene Selfie. Please try again.");
+      const reason = err instanceof Error ? err.message : "Could not generate Scene Selfie. Please try again.";
+      if (!posted) {
+        turn.commit([
+          ...seed,
+          {
+            role: "assistant",
+            content: `*${label} couldn't render cleanly right now.*`,
+            isFallback: true,
+            error: reason,
+            mediaType: mood,
+          },
+        ]);
+      }
+      if (turn.isCurrent()) setSafetyError(reason);
     } finally {
-      setGeneratingPhoto(false);
-      setBusy(false);
+      turn.finish(posted ? "success" : "error");
     }
   };
 
   const generateSequence = async (kind: SequenceKind) => {
-    setBusy(true);
-    setClipStatus("Checking compatible video generator...");
+    const turn = beginTurn({ thinking: false });
+    if (!turn) return;
+    const seed = messagesRef.current;
+    if (turn.isCurrent()) setClipStatus("Checking compatible video generator...");
     try {
       const result = runSequenceGeneration(character, kind);
-      const existingLiveImg = [...messages].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
+      const existingLiveImg = [...seed].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
       let baseImageUrl = existingLiveImg || "";
       if (!baseImageUrl) {
         const liveShot = await resolveBestMediaUrl(character, kind === "joi" ? "joi" : "seductive", "cinematic framing");
@@ -791,24 +997,37 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         mediaType: kind,
         note,
       };
-      persist([...messages, mediaMsg]);
-      setActiveMedia({
-        url,
-        frames,
-        videoUrl,
-        type: kind,
-        note,
-      });
-      setClipStatus(note);
-      setIntimacy(bumpIntimacy(character.id, 7));
-      const { progression: nextProg } = earnCompanionXp(character.id, 10);
-      setProgression(nextProg);
+      turn.commit([...seed, mediaMsg]);
+      if (turn.isCurrent()) {
+        setActiveMedia({
+          url,
+          frames,
+          videoUrl,
+          type: kind,
+          note,
+        });
+        setClipStatus(note);
+        setIntimacy(bumpIntimacy(character.id, 7));
+        const { progression: nextProg } = earnCompanionXp(character.id, 10);
+        setProgression(nextProg);
+      }
+      turn.finish("success");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Video generator failed";
-      setSafetyError(message);
-      setClipStatus(`Video unavailable: ${message}`);
-    } finally {
-      setBusy(false);
+      turn.commit([
+        ...seed,
+        {
+          role: "assistant",
+          content: `*The clip didn't render.* “${message} I'm still right here — talk to me, or try the clip button again.”`,
+          isFallback: true,
+          error: message,
+        },
+      ]);
+      if (turn.isCurrent()) {
+        setSafetyError(message);
+        setClipStatus(`Video unavailable: ${message}`);
+      }
+      turn.finish("error");
     }
   };
 
@@ -821,35 +1040,70 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const runFullScenePipeline = async () => {
-    if (busy) return;
     const promptText =
-      input.trim() || messages.filter((m) => m.role === "user").at(-1)?.content || "Pull me close into a private late-night scene.";
+      input.trim() || messagesRef.current.filter((m) => m.role === "user").at(-1)?.content || "Pull me close into a private late-night scene.";
+    const guard = assertCompliance(promptText);
+    if (!guard.ok) {
+      setSafetyError(guard.reason);
+      return;
+    }
+    const turn = beginTurn();
+    if (!turn) return;
     if (input.trim()) setInput("");
-    setBusy(true);
     setGeneratingPhoto(true);
-    setClipStatus("Running Client Director Pipeline (Mood → Reply → Selfie)...");
+    if (turn.isCurrent()) setClipStatus("Running Client Director Pipeline (Mood → Reply → Selfie)...");
+    const nextWithUser: ChatMessage[] = [...messagesRef.current, { role: "user", content: promptText }];
+    let replyText = fallbackReply(character, promptText, romanceMode);
     try {
-      const nextWithUser: ChatMessage[] = [...messages, { role: "user", content: promptText }];
-      const replyText = (await requestReplyForHistory(nextWithUser, promptText)) || fallbackReply(character, promptText, romanceMode);
+      replyText = (await requestReplyForHistory(nextWithUser, promptText))?.text || replyText;
+      const textBatch: ChatMessage[] = [...nextWithUser, { role: "assistant", content: replyText }];
+      turn.commit(textBatch);
+      turn.clearThinking();
       const mood: MediaMood = intimacy >= 60 ? "nude" : "lingerie";
       const photo = await resolveBestMediaUrl(character, mood, promptText.slice(0, 120));
-      addToGallery({
-        characterId: character.id,
-        characterName: character.name,
-        type: mood,
-        url: photo.url,
-        prompt: `${character.name} · ${promptText.slice(0, 60)}`,
-      });
-      const updated: ChatMessage[] = [
-        ...nextWithUser,
-        { role: "assistant", content: replyText, imageUrl: photo.url, mediaType: mood, note: photo.note },
-      ];
-      persist(updated);
-      setRevealed((s) => new Set(s).add(updated.length - 1));
-      setClipStatus("Scene pipeline complete");
-    } finally {
-      setGeneratingPhoto(false);
-      setBusy(false);
+      const rawUrl = photo?.url || "";
+      const valid =
+        rawUrl.startsWith("http://") ||
+        rawUrl.startsWith("https://") ||
+        rawUrl.startsWith("blob:") ||
+        (rawUrl.startsWith("data:image/") && rawUrl.length > 64);
+      if (photo.isFallback || !valid) {
+        turn.commit(
+          textBatch.map((msg, idx) =>
+            idx === textBatch.length - 1
+              ? {
+                  ...msg,
+                  isFallback: true,
+                  error: photo.error || photo.note || "Scene photo generator unavailable",
+                  mediaType: mood,
+                }
+              : msg,
+          ),
+        );
+        if (turn.isCurrent()) setClipStatus("Scene reply saved. The selfie generator was unavailable.");
+      } else {
+        addToGallery({
+          characterId: character.id,
+          characterName: character.name,
+          type: mood,
+          url: rawUrl,
+          prompt: `${character.name} · ${promptText.slice(0, 60)}`,
+        });
+        const updated: ChatMessage[] = [
+          ...nextWithUser,
+          { role: "assistant", content: replyText, imageUrl: rawUrl, mediaType: mood, note: photo.note },
+        ];
+        turn.commit(updated);
+        if (turn.isCurrent()) {
+          setRevealed((s) => new Set(s).add(updated.length - 1));
+          setClipStatus("Scene pipeline complete");
+        }
+      }
+      turn.finish("success");
+    } catch {
+      turn.commit([...nextWithUser, { role: "assistant", content: replyText }]);
+      if (turn.isCurrent()) setClipStatus("Scene reply saved. The selfie step failed.");
+      turn.finish("error");
     }
   };
 
@@ -1071,7 +1325,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               m.role === "assistant"
                 ? splitInnerThoughtAndReply(m.content)
                 : { innerThought: null, spokenReply: m.content };
-            const cleanDisplay = sanitizeCompanionReply(parsed.spokenReply, character.name) || parsed.spokenReply;
+            const cleanDisplay =
+              (sanitizeCompanionReply(parsed.spokenReply, character.name) || parsed.spokenReply || "").trim() ||
+              `${character.name.split(" ")[0]} is still here.`;
 
             return (
               <div key={i} className={`group flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
@@ -1109,7 +1365,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       </div>
                     </div>
                   ) : (
-                    <div className="whitespace-pre-wrap">{cleanDisplay}</div>
+                    <>
+                      <div className="whitespace-pre-wrap">{cleanDisplay}</div>
+                      {m.role === "assistant" && m.providerUsed && chatDebugBadgeEnabled() && (
+                        <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
+                          source: {m.providerUsed}
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {m.isFallback || m.error ? (
@@ -1303,9 +1566,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             </div>
           )}
 
-          {busy && (
-            <div className="flex items-center gap-2 text-xs text-[#00f5ff] animate-pulse px-2">
-              <Sparkles className="h-3.5 w-3.5" /> {character.name.split(" ")[0]} is thinking...
+          {!transcriptReady && (
+            <div className="px-2 text-xs text-zinc-500">Loading conversation…</div>
+          )}
+          {awaitingReply && (
+            <div role="status" aria-live="polite" className="flex items-center gap-2 text-xs text-[#00f5ff] animate-pulse px-2">
+              <Sparkles className="h-3.5 w-3.5" /> {character.name.split(" ")[0]} is thinking…
             </div>
           )}
           <div ref={bottomRef} />
@@ -1490,9 +1756,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 type="button"
                 disabled={busy}
                 onClick={() => {
-                  const lower = chip.toLowerCase();
-                  if (lower.includes("selfie") || lower.includes("photo") || lower.includes("pic")) {
-                    void generate("seductive", "Selfie", 0, "candid selfie, phone camera, natural light");
+                  const intent = detectExplicitMediaIntent(chip);
+                  if (intent?.kind === "image") {
+                    void generate("seductive", "Selfie", 0, intent.prompt);
+                  } else if (intent?.kind === "video") {
+                    void generateSequence(/joi/i.test(chip) ? "joi" : "sex");
                   } else {
                     void send(chip);
                   }
@@ -1547,12 +1815,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 }
               }}
               rows={1}
-              placeholder={`Message ${character.name.split(" ")[0]}...`}
+              placeholder={transcriptReady ? `Message ${character.name.split(" ")[0]}...` : "Loading conversation..."}
+              disabled={!transcriptReady}
               className="flex-1 rounded-2xl bg-[#0c0c16] border border-white/15 px-4 py-2.5 text-sm text-white resize-none outline-none focus:border-[#ff1e8e]"
             />
             <button
               type="button"
-              disabled={busy || !input.trim()}
+              disabled={busy || !transcriptReady || !input.trim()}
               onClick={() => void send()}
               className="px-4 sm:px-5 rounded-2xl neon-btn-primary font-bold text-sm text-white disabled:opacity-45"
             >

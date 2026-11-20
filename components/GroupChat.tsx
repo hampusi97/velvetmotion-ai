@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles, Users } from "lucide-react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { SafeImage } from "@/components/SafeImage";
-import { generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { buildContextAwareFallback, ensureVisibleReply, generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { createChatTurnGuard } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
 import { earnCompanionXp } from "@/lib/progression";
 
@@ -25,6 +26,16 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
   const [input, setInput] = useState("");
   const [typingSpeaker, setTypingSpeaker] = useState<{ name: string; slot: 0 | 1 } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const guardRef = useRef(createChatTurnGuard("group-setup"));
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    const guard = guardRef.current;
+    return () => {
+      mountedRef.current = false;
+      guard.switchConversation("group-unmounted");
+    };
+  }, []);
 
   const girls = selected
     .map((id) => CHARACTERS.find((c) => c.id === id))
@@ -40,6 +51,8 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
 
   const start = () => {
     if (girls.length < 2) return;
+    guardRef.current.switchConversation(`group-${Date.now()}`);
+    setTypingSpeaker(null);
     setStarted(true);
     const [a, b] = girls;
     setMessages([
@@ -62,80 +75,101 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
 
   const send = async () => {
     const text = input.trim();
-    if (!text || typingSpeaker || girls.length < 2) return;
+    if (!text || girls.length < 2) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
       setErrorMsg(guard.reason);
       return;
     }
+    const generation = guardRef.current.tryStart();
+    if (generation === null) return;
+    const originId = guardRef.current.snapshot().conversationId;
     setErrorMsg(null);
     setInput("");
 
     const [a, b] = girls;
     const next: Msg[] = [...messages, { role: "user", content: text }];
-    setMessages(next);
+    const isCurrent = () => mountedRef.current && guardRef.current.isCurrent(generation, originId);
+    if (isCurrent()) setMessages(next);
+    if (isCurrent()) setTypingSpeaker({ name: a.name.split(" ")[0], slot: 0 });
 
-    // Both turns use the same connected model router as solo chat. Recover
-    // safely from outages so the group composer never gets stuck "typing".
-    try {
-      setTypingSpeaker({ name: a.name.split(" ")[0], slot: 0 });
-      const historyA: RouterMessage[] = next.slice(-10).map((m) => ({
+    const personaA = {
+      id: a.id,
+      name: a.name,
+      age: a.age,
+      tagline: a.tagline,
+      personality: `${a.personality}. You are in a lively two-companion fictional-adult chat alongside ${b.name}. Respect everyone's boundaries and respond naturally.`,
+      backstory: a.background,
+      traits: a.traits,
+      kink: a.kink,
+      voiceStyle: a.voice?.style,
+      voiceLine: a.reply,
+    };
+    const personaB = {
+      id: b.id,
+      name: b.name,
+      age: b.age,
+      tagline: b.tagline,
+      personality: `${b.personality}. React directly to ${a.name} and the user in a fictional-adult two-companion conversation. Maintain your own motivations and voice.`,
+      backstory: b.background,
+      traits: b.traits,
+      kink: b.kink,
+      voiceStyle: b.voice?.style,
+      voiceLine: b.reply,
+    };
+    const toHistory = (turns: Msg[]): RouterMessage[] =>
+      turns.slice(-10).map((m) => ({
         role: m.role === "user" ? "user" : "assistant",
         text: m.name ? `[${m.name}]: ${m.content}` : m.content,
       }));
-      const resA = await generateCompanionReply(historyA, {
-        id: a.id,
-        name: a.name,
-        age: a.age,
-        tagline: a.tagline,
-        personality: `${a.personality}. You are in a lively two-companion fictional-adult chat alongside ${b.name}. Respect everyone's boundaries and respond naturally.`,
-      });
-      if (resA.providerUsed === "provider-unavailable") {
-        setErrorMsg(resA.text);
-        return;
-      }
 
+    try {
+      const historyA = toHistory(next);
+      const resA = await generateCompanionReply(historyA, personaA);
+      const textA = ensureVisibleReply(resA.text, historyA, personaA) || buildContextAwareFallback(historyA, personaA);
       const msgA: Msg = {
         role: "girl",
         characterId: a.id,
         name: a.name,
         slot: 0,
-        content: resA.text,
+        content: textA,
       };
       const afterA = [...next, msgA];
-      setMessages(afterA);
+      if (isCurrent()) setMessages(afterA);
       earnCompanionXp(a.id, 4);
 
-      setTypingSpeaker({ name: b.name.split(" ")[0], slot: 1 });
-      const historyB: RouterMessage[] = afterA.slice(-10).map((m) => ({
-        role: m.role === "user" ? "user" : "assistant",
-        text: m.name ? `[${m.name}]: ${m.content}` : m.content,
-      }));
-      const resB = await generateCompanionReply(historyB, {
-        id: b.id,
-        name: b.name,
-        age: b.age,
-        tagline: b.tagline,
-        personality: `${b.personality}. React directly to ${a.name} and the user in a fictional-adult two-companion conversation. Maintain your own motivations and voice.`,
-      });
-      if (resB.providerUsed === "provider-unavailable") {
-        setErrorMsg(`${a.name} replied, but the model is unavailable for ${b.name}. Check your provider in Settings.`);
-        return;
+      if (isCurrent()) setTypingSpeaker({ name: b.name.split(" ")[0], slot: 1 });
+      const historyB = toHistory(afterA);
+      const resB = await generateCompanionReply(historyB, personaB);
+      const textB = ensureVisibleReply(resB.text, historyB, personaB) || buildContextAwareFallback(historyB, personaB);
+      if (isCurrent()) {
+        setMessages([...afterA, {
+          role: "girl",
+          characterId: b.id,
+          name: b.name,
+          slot: 1,
+          content: textB,
+        }]);
       }
-      setMessages([...afterA, {
-        role: "girl",
-        characterId: b.id,
-        name: b.name,
-        slot: 1,
-        content: resB.text,
-      }]);
       earnCompanionXp(b.id, 4);
+      guardRef.current.settle(generation, "success");
     } catch {
-      setErrorMsg("The group AI provider failed. Check local/cloud model settings and retry.");
+      const historyA = toHistory(next);
+      const textA = buildContextAwareFallback(historyA, personaA);
+      const afterA: Msg[] = [...next, { role: "girl", characterId: a.id, name: a.name, slot: 0, content: textA }];
+      const textB = buildContextAwareFallback(toHistory(afterA), personaB);
+      if (isCurrent()) {
+        setMessages([...afterA, { role: "girl", characterId: b.id, name: b.name, slot: 1, content: textB }]);
+      }
+      guardRef.current.settle(generation, "error");
     } finally {
-      setTypingSpeaker(null);
+      if (guardRef.current.isCurrent(generation, originId)) {
+        guardRef.current.clearThinking(generation);
+        if (mountedRef.current) setTypingSpeaker(null);
+      } else if (mountedRef.current && guardRef.current.snapshot().conversationId === originId) {
+        setTypingSpeaker(null);
+      }
     }
-
   };
 
   if (!started) {
@@ -225,7 +259,11 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
         </div>
         <button
           type="button"
-          onClick={() => setStarted(false)}
+          onClick={() => {
+            guardRef.current.switchConversation(`group-setup-${Date.now()}`);
+            setTypingSpeaker(null);
+            setStarted(false);
+          }}
           className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-[#a6a6c4] hover:border-[#00f5ff]"
         >
           Swap Pair
@@ -262,13 +300,15 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
         })}
         {typingSpeaker && (
           <div
+            role="status"
+            aria-live="polite"
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs animate-pulse ${
               typingSpeaker.slot === 1
                 ? "border-[#00f5ff]/40 bg-[#00f5ff]/10 text-[#00f5ff]"
                 : "border-[#ff1e8e]/40 bg-[#ff1e8e]/10 text-[#ff1e8e]"
             }`}
           >
-            <Sparkles className="h-3 w-3" /> {typingSpeaker.name} is replying...
+            <Sparkles className="h-3 w-3" /> {typingSpeaker.name} is thinking…
           </div>
         )}
       </div>

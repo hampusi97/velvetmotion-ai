@@ -13,7 +13,7 @@
     "version:bump": "node scripts/bump-version.mjs",
     "audit:companions": "node scripts/audit-companions.mjs",
     "cloudshell": "bash scripts/cloudshell-setup.sh",
-    "test": "tsx --test lib/desktopRelease.test.ts firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts lib/safety.test.ts lib/apiRoutes.test.ts && tsx scripts/validate-content.ts && node scripts/smoke-test.mjs && python3 -B -m unittest workers/test_workers.py",
+    "test": "tsx --test lib/desktopRelease.test.ts firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts lib/safety.test.ts lib/apiRoutes.test.ts lib/chatReliability.test.ts && tsx scripts/validate-content.ts && node scripts/smoke-test.mjs && python3 -B -m unittest workers/test_workers.py",
     "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project ivory-sunset-mxq1s",
     "deploy:rules:cloudshell": "npx -y firebase-tools@latest login --no-localhost && npm run deploy:rules",
     "deploy:auth": "npx -y firebase-tools@latest deploy --only auth --project ivory-sunset-mxq1s",
