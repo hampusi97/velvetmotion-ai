@@ -6,6 +6,8 @@
  *  2. Cloud Free Instant Motion Engine: HTMLCanvasElement.captureStream() + MediaRecorder (.webm)
  */
 import { assertCompliance } from "./complianceFilter";
+import { getMediaSettings } from "./mediaSettings";
+import { generateComfyVideo } from "./comfyVideo";
 
 export interface VideoMotionPreset {
   id: "slow-zoom-blink" | "neon-hair-sway" | "balcony-breeze" | "club-light-pulse";
@@ -70,6 +72,7 @@ export interface StudioVideoRequest {
   adultMode?: boolean;
   comfyOnline?: boolean;
   videoBackendUrl?: string;
+  onProgress?: (message: string) => void;
 }
 
 export interface StudioVideoResult {
@@ -260,6 +263,27 @@ export async function generateStudioVideoClip(
   // Reaching ComfyUI /system_stats alone does NOT mean a video workflow exists.
   const endpoint = req.videoBackendUrl?.trim();
   let backendError: string | undefined;
+  const settings = getMediaSettings();
+  if (!endpoint && settings.comfyVideoEnabled) {
+    try {
+      if (!settings.comfyVideoWorkflowJson || !settings.comfyVideoImageNodeId) {
+        throw new Error("Import a ComfyUI API-format video workflow and select its LoadImage node in Advanced Media.");
+      }
+      const generated = await generateComfyVideo({
+        baseUrl: settings.comfyVideoBase || "http://127.0.0.1:8188",
+        workflowJson: settings.comfyVideoWorkflowJson,
+        imageNodeId: settings.comfyVideoImageNodeId,
+        promptNodeId: settings.comfyVideoPromptNodeId || undefined,
+        prompt: req.prompt || "",
+        sourceImageUrl: req.imageUrl,
+        onStatus: req.onProgress,
+      });
+      return { videoUrl: generated.videoUrl, videoFormat: generated.videoFormat, isGenerative: true,
+        engine: "ComfyUI video model (local)" };
+    } catch (error) {
+      backendError = error instanceof Error ? error.message : "ComfyUI video workflow did not generate a video.";
+    }
+  }
   if (endpoint) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 120000);
