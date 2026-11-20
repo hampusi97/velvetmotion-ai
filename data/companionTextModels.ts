@@ -10,6 +10,8 @@ export interface CompanionTextModel {
   modelPage: string;
   licenseNote: string;
   ollamaTag?: string;
+  /** Identifiers to use when a separately installed OpenAI-compatible server supports the weights. */
+  serverModelId?: string;
   setupCommand?: string;
   estimatedDownload?: string;
   ramGuidance: string;
@@ -46,6 +48,7 @@ export const COMPANION_TEXT_MODELS: readonly CompanionTextModel[] = [
     parameters: "7B",
     purpose: "General-purpose assistant; optional advanced local-server integration",
     modelPage: "https://huggingface.co/internlm/internlm2_5-7b-chat",
+    serverModelId: "internlm/internlm2_5-7b-chat",
     licenseNote: "Custom weight license — review commercial terms before use",
     ramGuidance: "16 GB+ RAM suggested; depends on runtime and quantization",
     installationNote: "No verified official Ollama tag provided here. Run a compatible model server and configure the custom OpenAI-compatible endpoint.",
@@ -56,6 +59,7 @@ export const COMPANION_TEXT_MODELS: readonly CompanionTextModel[] = [
     parameters: "8B",
     purpose: "Roleplay and character consistency; requires a separately configured runtime",
     modelPage: "https://huggingface.co/vicgalle/Humanish-Roleplay-Llama-3.1-8B",
+    serverModelId: "vicgalle/Humanish-Roleplay-Llama-3.1-8B",
     licenseNote: "Model card: Apache 2.0; also review upstream Llama licensing",
     ramGuidance: "16 GB RAM suggested; depends on runtime and quantization",
     installationNote: "No official Ollama tag verified. Configure a compatible server after downloading and reviewing the weights.",
