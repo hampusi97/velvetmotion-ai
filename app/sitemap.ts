@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-static";
 
 const BASE = "https://velvetmotion-ai.hampusi97.workers.dev";
-const ROUTES = ["", "/discover/", "/chat/", "/group/", "/shorts/", "/collection/", "/create/", "/studio/", "/download/", "/terms/", "/privacy/", "/policy/"];
+const ROUTES = ["", "/companions/", "/discover/", "/chat/", "/group/", "/shorts/", "/collection/", "/create/", "/studio/", "/download/", "/terms/", "/privacy/", "/policy/"];
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

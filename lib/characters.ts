@@ -9,6 +9,7 @@ import { ROLE_CHARACTERS } from "./charactersRoles";
 import { CANDY_CAST } from "./candyCast";
 import { FLAGSHIP_COMPANIONS } from "@/data/companions";
 import { PORTRAIT_BY_ID } from "./portraitFallback";
+import { loadSavedCompanions } from "./companionLibrary";
 
 export type { Character, CharacterVoice };
 
@@ -241,28 +242,10 @@ for (let i = 0; i < CHARACTERS.length; i++) {
 }
 
 function loadClientCustomCharacters(): Character[] {
-  if (typeof window === "undefined") return [];
-  const out: Character[] = [];
-  for (const key of ["velvet-custom-girls", "vm-imported-cards"]) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-          if (item && typeof item.id === "string" && typeof item.name === "string") {
-            out.push(item as Character);
-          }
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return out;
+  return loadSavedCompanions();
 }
 
-function allCharacters(): Character[] {
+export function allCharacters(): Character[] {
   const custom = loadClientCustomCharacters();
   if (custom.length === 0) return CHARACTERS;
   const seen = new Set<string>();

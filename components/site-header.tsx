@@ -15,6 +15,7 @@ import { emitVaultUpdated } from "@/lib/firebaseSync";
 
 const NAV_LINKS = [
   { href: "/", label: "Explore", id: "home" },
+  { href: "/companions/", label: "Companions", id: "girls" },
   { href: "/discover/", label: "Discover", id: "discover" },
   { href: "/chat/", label: "Chat", id: "chat" },
   { href: "/group/", label: "Group chat", id: "group" },
@@ -320,6 +321,7 @@ export function SiteHeader({
           <nav className="relative max-h-[80dvh] overflow-y-auto border-b border-white/10 bg-[#080812] p-3 space-y-1">
             {[
               { href: "/", label: "Home / Explore" },
+              { href: "/companions/", label: "Companions" },
               { href: "/discover/", label: "Discover" },
               { href: "/chat/", label: "Chat" },
               { href: "/group/", label: "Group chat" },

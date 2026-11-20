@@ -5,6 +5,7 @@ import { CHARACTERS, type Character } from "@/lib/characters";
 import { getGallery, loadChat, getIntimacy, type GalleryItem } from "@/lib/storage";
 import { encodeSharedCharacterUrl } from "@/lib/shareCardUrl";
 import { cn } from "@/lib/cn";
+import { COMPANION_LIBRARY_EVENT, loadSavedCompanions } from "@/lib/companionLibrary";
 
 type HubGirl = {
   character: Character;
@@ -16,20 +17,7 @@ type HubGirl = {
 };
 
 function loadCustomCharacters(): Character[] {
-  if (typeof window === "undefined") return [];
-  const combined: Character[] = [];
-  for (const k of ["velvet-custom-girls", "vm-custom-girls"]) {
-    try {
-      const raw = localStorage.getItem(k);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) combined.push(...parsed);
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  return combined;
+  return loadSavedCompanions();
 }
 
 export function MyGirlsHub({
@@ -54,8 +42,14 @@ export function MyGirlsHub({
   };
 
   useEffect(() => {
-    setCustoms(loadCustomCharacters());
-    setGallery(getGallery());
+    const refresh = () => { setCustoms(loadCustomCharacters()); setGallery(getGallery()); };
+    refresh();
+    window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   const rows = useMemo(() => {
@@ -128,9 +122,9 @@ export function MyGirlsHub({
         <ul className="space-y-3">
           {rows.map((row) => (
             <li key={row.character.id}>
-              <button
-                type="button"
-                onClick={() => onOpenChat(row.character)}
+              <div
+                role="group"
+                aria-label={row.character.name}
                 className={cn(
                   "w-full text-left rounded-2xl border border-white/10 bg-zinc-900/70 p-4 flex gap-4 hover:border-pink-500/40 transition",
                 )}
@@ -146,7 +140,7 @@ export function MyGirlsHub({
                     }}
                   />
                 </div>
-                <div className="min-w-0 flex-1">
+                <button type="button" onClick={() => onOpenChat(row.character)} className="min-w-0 flex-1 text-left">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white truncate">{row.character.name}</span>
                     {row.isCustom && (
@@ -163,7 +157,7 @@ export function MyGirlsHub({
                     <span>·</span>
                     <span>{row.galleryCount} media</span>
                   </div>
-                </div>
+                </button>
                 <div className="self-center flex items-center gap-2 shrink-0">
                   {row.isCustom && (
                     <button
@@ -176,7 +170,7 @@ export function MyGirlsHub({
                   )}
                   <span className="text-pink-300 text-sm font-medium">Continue →</span>
                 </div>
-              </button>
+              </div>
             </li>
           ))}
         </ul>

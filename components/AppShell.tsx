@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Cpu } from "lucide-react";
-import { CHARACTERS, characterCategories, getCharacter, type Character } from "@/lib/characters";
+import { CHARACTERS, getCharacter, type Character } from "@/lib/characters";
 import { containerClass } from "@/lib/cn";
 import { getUser, login, type LocalUser } from "@/lib/auth";
 import { loadChat, saveChat } from "@/lib/storage";
@@ -18,42 +19,47 @@ import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import VelvetExploreShowcase from "@/components/VelvetExploreShowcase";
 import { CharacterRoster } from "@/components/CharacterRoster";
-import { CharacterProfile } from "@/components/CharacterProfile";
-import { CharacterChat } from "@/components/CharacterChat";
-import { CreateGirlWizard } from "@/components/CreateGirlWizard";
-import DiscoverSwipe from "@/components/DiscoverSwipe";
-import { ShortsFeed } from "@/components/ShortsFeed";
-import { GroupChat } from "@/components/GroupChat";
-import { DualGirlChat } from "@/components/DualGirlChat";
-import { BlindfoldJoi } from "@/components/BlindfoldJoi";
-import { GoonRoom } from "@/components/GoonRoom";
-import { RouletteRoom } from "@/components/RouletteRoom";
-import { StripRoulette } from "@/components/StripRoulette";
-import { EdgeTimer } from "@/components/EdgeTimer";
-import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
-import { TributeBrowser } from "@/components/TributeBrowser";
-import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
-import { JoiBrowser } from "@/components/content/JoiBrowser";
-import { CardImport } from "@/components/CardImport";
-import { ShareImport } from "@/components/ShareImport";
-import { UserLounge } from "@/components/UserLounge";
-import { VaultPanel } from "@/components/VaultPanel";
-import { MyGirlsHub } from "@/components/MyGirlsHub";
-import { CoinWallet } from "@/components/CoinWallet";
-import { LegalPages } from "@/components/LegalPages";
-import { AdvancedMediaSettings } from "@/components/AdvancedMediaSettings";
-import MediaStudioModal from "@/components/MediaStudioModal";
 import { CollectionGalleryView, PrivateContentView } from "@/components/CollectionAndPrivateViews";
-import { DownloadDesktopView } from "@/components/DownloadDesktopView";
 import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
-import { SettingsAndBackupDrawer } from "@/components/SettingsAndBackupDrawer";
 import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
 import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
 import { ProactiveToast } from "@/components/ProactiveToast";
-import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
-import { Joi3DStage } from "@/components/Joi3DStage";
+
+function LoadingPanel() {
+  return <div role="status" className="rounded-2xl border border-white/10 bg-[#19121f] p-8 text-sm text-[#c6b5cf]">Opening your atelier…</div>;
+}
+
+const CharacterProfile = dynamic(() => import("@/components/CharacterProfile").then(m => m.CharacterProfile), { loading: LoadingPanel });
+const CharacterChat = dynamic(() => import("@/components/CharacterChat").then(m => m.CharacterChat), { loading: LoadingPanel });
+const CreateGirlWizard = dynamic(() => import("@/components/CreateGirlWizard").then(m => m.CreateGirlWizard), { loading: LoadingPanel });
+const DiscoverSwipe = dynamic(() => import("@/components/DiscoverSwipe"), { loading: LoadingPanel });
+const ShortsFeed = dynamic(() => import("@/components/ShortsFeed").then(m => m.ShortsFeed), { loading: LoadingPanel });
+const GroupChat = dynamic(() => import("@/components/GroupChat").then(m => m.GroupChat), { loading: LoadingPanel });
+const DualGirlChat = dynamic(() => import("@/components/DualGirlChat").then(m => m.DualGirlChat), { loading: LoadingPanel });
+const BlindfoldJoi = dynamic(() => import("@/components/BlindfoldJoi").then(m => m.BlindfoldJoi), { loading: LoadingPanel });
+const GoonRoom = dynamic(() => import("@/components/GoonRoom").then(m => m.GoonRoom), { loading: LoadingPanel });
+const RouletteRoom = dynamic(() => import("@/components/RouletteRoom").then(m => m.RouletteRoom), { loading: LoadingPanel });
+const StripRoulette = dynamic(() => import("@/components/StripRoulette").then(m => m.StripRoulette), { loading: LoadingPanel });
+const EdgeTimer = dynamic(() => import("@/components/EdgeTimer").then(m => m.EdgeTimer), { loading: LoadingPanel });
+const SpicyScenarioSimulator = dynamic(() => import("@/components/SpicyScenarioSimulator").then(m => m.SpicyScenarioSimulator), { loading: LoadingPanel });
+const TributeBrowser = dynamic(() => import("@/components/TributeBrowser").then(m => m.TributeBrowser), { loading: LoadingPanel });
+const StoryPackBrowser = dynamic(() => import("@/components/content/StoryPackBrowser").then(m => m.StoryPackBrowser), { loading: LoadingPanel });
+const JoiBrowser = dynamic(() => import("@/components/content/JoiBrowser").then(m => m.JoiBrowser), { loading: LoadingPanel });
+const CardImport = dynamic(() => import("@/components/CardImport").then(m => m.CardImport), { loading: LoadingPanel });
+const ShareImport = dynamic(() => import("@/components/ShareImport").then(m => m.ShareImport), { loading: LoadingPanel });
+const UserLounge = dynamic(() => import("@/components/UserLounge").then(m => m.UserLounge), { loading: LoadingPanel });
+const VaultPanel = dynamic(() => import("@/components/VaultPanel").then(m => m.VaultPanel), { loading: LoadingPanel });
+const MyGirlsHub = dynamic(() => import("@/components/MyGirlsHub").then(m => m.MyGirlsHub), { loading: LoadingPanel });
+const CoinWallet = dynamic(() => import("@/components/CoinWallet").then(m => m.CoinWallet), { loading: LoadingPanel });
+const LegalPages = dynamic(() => import("@/components/LegalPages").then(m => m.LegalPages), { loading: LoadingPanel });
+const AdvancedMediaSettings = dynamic(() => import("@/components/AdvancedMediaSettings").then(m => m.AdvancedMediaSettings), { loading: LoadingPanel });
+const MediaStudioModal = dynamic(() => import("@/components/MediaStudioModal"), { loading: LoadingPanel });
+const DownloadDesktopView = dynamic(() => import("@/components/DownloadDesktopView").then(m => m.DownloadDesktopView), { loading: LoadingPanel });
+const SettingsAndBackupDrawer = dynamic(() => import("@/components/SettingsAndBackupDrawer").then(m => m.SettingsAndBackupDrawer), { loading: LoadingPanel });
+const Penthouse3DSuite = dynamic(() => import("@/components/Penthouse3DSuite").then(m => m.Penthouse3DSuite), { loading: LoadingPanel });
+const Joi3DStage = dynamic(() => import("@/components/Joi3DStage").then(m => m.Joi3DStage), { loading: LoadingPanel });
 
 export type ShellRouteView =
   | "home"
@@ -237,9 +243,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     );
   }, [customCharacter, selectedId, user]);
 
-  const categories = useMemo(() => ["All", ...characterCategories()], []);
-  const tags = useMemo(() => Array.from(new Set(CHARACTERS.flatMap((c) => c.tags))).sort(), []);
-
   const selected =
     customCharacter?.id === selectedId
       ? customCharacter
@@ -409,8 +412,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               query={query}
               category={category}
               tag={tag}
-              categories={categories}
-              tags={tags}
               onQuery={setQuery}
               onCategory={(v) => {
                 setCategory(v);
@@ -420,7 +421,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               onSelect={(c) => {
                 setCustomCharacter(c);
                 setSelectedId(c.id);
-                setView("chat");
+                setView("profile");
               }}
               onBack={() => setView("home")}
             />
@@ -428,10 +429,13 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
 
           {view === "profile" && selected && (
             <CharacterProfile
+              key={selected.id}
               character={selected}
               romanceMode={romanceMode}
-              onBack={() => setView("home")}
+              onBack={() => setView("girls")}
               onChat={() => setView("chat")}
+              onUpdate={setCustomCharacter}
+              onStudio={() => setStudioModalOpen(true)}
               onTag={(t) => {
                 setTag(t);
                 setCategory("All");
@@ -575,7 +579,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <SettingsAndBackupDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
-        <MediaStudioModal isOpen={studioModalOpen} onClose={() => setStudioModalOpen(false)} />
+        <MediaStudioModal isOpen={studioModalOpen} activeChatCompanionId={view === "profile" || view === "chat" ? selected?.id : undefined} onClose={() => setStudioModalOpen(false)} />
       </NeonErrorBoundary>
 
       {sharedImportPreview && (

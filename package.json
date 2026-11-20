@@ -13,11 +13,12 @@
     "version:bump": "node scripts/bump-version.mjs",
     "audit:companions": "node scripts/audit-companions.mjs",
     "cloudshell": "bash scripts/cloudshell-setup.sh",
-    "test": "tsx --test lib/desktopRelease.test.ts firestore.rules.test.ts lib/moodEngine.test.ts lib/penthouseSuiteLogic.test.ts lib/memoryMap.test.ts lib/safety.test.ts lib/apiRoutes.test.ts && tsx scripts/validate-content.ts && node scripts/smoke-test.mjs && python3 -B -m unittest workers/test_workers.py",
+    "test": "node scripts/run-tests.mjs",
     "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project ivory-sunset-mxq1s",
     "deploy:rules:cloudshell": "npx -y firebase-tools@latest login --no-localhost && npm run deploy:rules",
     "deploy:auth": "npx -y firebase-tools@latest deploy --only auth --project ivory-sunset-mxq1s",
-    "deploy:firebase": "npx -y firebase-tools@latest deploy --only auth,firestore:rules --project ivory-sunset-mxq1s"
+    "deploy:firebase": "npx -y firebase-tools@latest deploy --only auth,firestore:rules --project ivory-sunset-mxq1s",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
@@ -38,6 +39,7 @@
     "vaul": "^1.1.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -48,5 +50,8 @@
     "tailwindcss": "^3.4.1",
     "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
