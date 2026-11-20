@@ -63,6 +63,8 @@ export function VoiceCallModal({
 
   const recogRef = useRef<SpeechRecognitionInstance | null>(null);
   const activeRef = useRef(true);
+  const mutedRef = useRef(muted);
+  const whisperRef = useRef(whisperMode);
   const historyRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([
     { role: "assistant", text: character.voiceIntro || character.initialMessage },
   ]);
@@ -80,7 +82,7 @@ export function VoiceCallModal({
   }, []);
 
   const startMicLoop = useCallback(() => {
-    if (!activeRef.current || muted || typeof window === "undefined") return;
+    if (!activeRef.current || mutedRef.current || typeof window === "undefined") return;
     const w = window as unknown as {
       SpeechRecognition?: new () => SpeechRecognitionInstance;
       webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
@@ -118,20 +120,20 @@ export function VoiceCallModal({
         setSpeaking(true);
         const tts = await speakWithNeuralVoice(res.text, {
           voiceId: character.voiceId,
-          whispery: whisperMode,
+          whispery: whisperRef.current,
           pitch: character.voice?.pitch,
           rate: character.voice?.rate,
         });
         setEngineUsed(tts.label);
         setSpeaking(false);
-        if (activeRef.current && !muted) startMicLoop();
+        if (activeRef.current && !mutedRef.current) startMicLoop();
       };
       recogRef.current = rec;
       rec.start();
     } catch {
       setListening(false);
     }
-  }, [character, muted, whisperMode]);
+  }, [character]);
 
   useEffect(() => {
     if (!open) return;
@@ -144,11 +146,11 @@ export function VoiceCallModal({
     setSpeaking(true);
     void speakWithNeuralVoice(character.voiceIntro || `Hey, glad you called.`, {
       voiceId: character.voiceId,
-      whispery: whisperMode,
+      whispery: whisperRef.current,
     }).then((r) => {
       setEngineUsed(r.label);
       setSpeaking(false);
-      if (activeRef.current && !muted) startMicLoop();
+      if (activeRef.current && !mutedRef.current) startMicLoop();
     });
 
     const onBossMute = () => {
@@ -162,7 +164,7 @@ export function VoiceCallModal({
       window.removeEventListener("vm:boss-key-mute", onBossMute);
       stopAll();
     };
-  }, [character, muted, onClose, open, startMicLoop, stopAll, whisperMode]);
+  }, [character, onClose, open, startMicLoop, stopAll]);
 
   if (!open) return null;
 
@@ -238,8 +240,10 @@ export function VoiceCallModal({
             <button
               type="button"
               onClick={() => {
-                setMuted((m) => !m);
-                if (!muted) {
+                const nextMuted = !mutedRef.current;
+                mutedRef.current = nextMuted;
+                setMuted(nextMuted);
+                if (nextMuted) {
                   try {
                     recogRef.current?.stop();
                   } catch {}
@@ -273,7 +277,10 @@ export function VoiceCallModal({
 
             <button
               type="button"
-              onClick={() => setWhisperMode((w) => !w)}
+              onClick={() => {
+                whisperRef.current = !whisperRef.current;
+                setWhisperMode(whisperRef.current);
+              }}
               aria-label="Toggle whisper voice mood"
               className={`flex h-12 w-12 items-center justify-center rounded-full border transition ${
                 whisperMode
