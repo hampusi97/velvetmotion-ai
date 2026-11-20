@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { SafeImage } from "@/components/SafeImage";
 import { LocalSetupWizard } from "@/components/LocalSetupWizard";
-import { useLocalEngineStatus } from "@/lib/localEngineBridge";
+import { checkDesktopUpdate, useLocalEngineStatus } from "@/lib/localEngineBridge";
 import {
   getLocalComputeMode, saveLocalComputeMode, LOCAL_COMPUTE_MODES, type LocalComputeMode,
 } from "@/lib/localComputePreferences";
@@ -42,6 +42,8 @@ export function DownloadDesktopView() {
   const [isMobile, setIsMobile] = useState(false);
   const [signedUpdaterEnabled, setSignedUpdaterEnabled] = useState(false);
   const [installedVersion, setInstalledVersion] = useState<string | null>(null);
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateCheckResult, setUpdateCheckResult] = useState<string | null>(null);
   const [autoUpdateOnLaunch, setAutoUpdateOnLaunch] = useState(true);
   const engine = useLocalEngineStatus();
   const ram = getRecommendedPresetsForRam(engine.ramGb);
@@ -88,6 +90,26 @@ export function DownloadDesktopView() {
     void load();
     return () => controller.abort();
   }, []);
+
+  const checkForNativeUpdates = async () => {
+    setUpdateChecking(true);
+    setUpdateCheckResult(null);
+    try {
+      if (signedUpdaterEnabled && window.__TAURI_INTERNALS__?.invoke) {
+        const result = await window.__TAURI_INTERNALS__.invoke<{ enabled: boolean; available: boolean; version?: string }>("check_signed_desktop_update");
+        setUpdateCheckResult(result.available
+          ? `A signed update ${result.version || ""} is available. The update notification will let you install it safely.`
+          : "No newer signed desktop release is available.");
+      } else {
+        const result = await checkDesktopUpdate();
+        setUpdateCheckResult(result.note);
+      }
+    } catch {
+      setUpdateCheckResult("Could not reach the secure release feed. Check your internet connection and try again.");
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-8 pb-20 text-white">
@@ -352,6 +374,11 @@ export function DownloadDesktopView() {
               </a>
             )}
           </div>
+          <button type="button" disabled={updateChecking} onClick={() => void checkForNativeUpdates()}
+            className="inline-flex items-center gap-2 rounded-full border border-[#e9bdc9]/35 bg-white/[.05] px-4 py-2 text-xs font-semibold text-pink-100 transition hover:bg-white/[.08] disabled:opacity-50">
+            <RefreshCw className="h-3.5 w-3.5" /> {updateChecking ? "Checking the internet..." : "Check for updates now"}
+          </button>
+          {updateCheckResult && <p role="status" className="text-xs leading-relaxed text-[#eac6d2]">{updateCheckResult}</p>}
           <p className="text-[11px] text-zinc-500">
             Installation never runs from an unsigned source. Existing sessions are not automatically restarted mid-conversation.
           </p>
