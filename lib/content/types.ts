@@ -96,5 +96,6 @@ export interface JoiScenario {
   summary: string;
   tone: string;
   accent: Accent;
+  themes?: readonly ("BNWO" | "SPH" | "Cheating fantasy")[];
   steps: JoiStep[];
 }

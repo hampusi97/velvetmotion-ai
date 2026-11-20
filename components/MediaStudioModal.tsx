@@ -433,7 +433,7 @@ export default function MediaStudioModal({
         resolution: videoMode === 'ai' ? videoResolution : undefined,
         signal: request.signal,
         comfyOnline: localEngine.comfyOnline,
-        videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
+        videoBackendUrl: getMediaSettings().img2vidUrl || videoBackendUrl,
       });
       if (request.signal.aborted) {
         if (res.videoUrl.startsWith('blob:')) URL.revokeObjectURL(res.videoUrl);

@@ -33,6 +33,7 @@ import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } f
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { continueCompanionScene, generateCompanionReply, sanitizeCompanionReply, type ChatStreamOptions } from "@/lib/chatRouter";
 import { assertCompliance } from "@/lib/complianceFilter";
+import { COMPANION_SESSION_THEMES, COMPANION_THEME_KEYS, parseCompanionSessionTheme, type CompanionSessionTheme } from "@/lib/companionSessionThemes";
 import {
   listChatBranchesDB,
   loadChatDB,
@@ -150,6 +151,8 @@ const NSFW_CHIPS = [
 
 const VIDEO_CHIPS: { id: SequenceKind; label: string }[] = [
   { id: "joi", label: "JOI clip" },
+  { id: "sph", label: "SPH clip" },
+  { id: "bnwo", label: "BNWO clip" },
   { id: "sex", label: "Motion clip" },
 ];
 
@@ -180,7 +183,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [liveReply, setLiveReply] = useState("");
   const [replyError, setReplyError] = useState<string | null>(null);
   const [sceneTone, setSceneTone] = useState<ChatSceneTone>("In character");
+  const [roleplayTheme, setRoleplayTheme] = useState<CompanionSessionTheme | null>(null);
   const replyController = useRef<AbortController | null>(null);
+  const clipController = useRef<AbortController | null>(null);
   const [generatingPhoto, setGeneratingPhoto] = useState(false);
   const [intimacy, setIntimacy] = useState(character.intimacy);
   const [voiceOn, setVoiceOn] = useState(true);
@@ -222,6 +227,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     return () => {
       mountedRef.current = false;
       replyController.current?.abort();
+      clipController.current?.abort();
     };
   }, []);
   const [branches, setBranches] = useState<BranchRow[]>([]);
@@ -384,6 +390,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       recentMood: timeMood.badge,
       extraSceneContext: [
         SCENE_TONES[sceneTone],
+        roleplayTheme ? COMPANION_SESSION_THEMES[roleplayTheme].direction : "",
         kinks.length ? `User-selected fantasy themes, only when relevant: ${kinks.join(", ")}.`
           : "",
       ].filter(Boolean).join(" "),
@@ -741,11 +748,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const generateSequence = async (kind: SequenceKind) => {
+    if (busy || clipController.current) return;
+    const controller = new AbortController();
+    clipController.current = controller;
     setBusy(true);
     setClipStatus("Checking compatible video generator...");
     try {
       const result = runSequenceGeneration(character, kind);
-      const existingLiveImg = [...messages].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
+      const existingLiveImg = [...messages].reverse().find((m) => m.imageUrl && m.mediaType && !m.isFallback)?.imageUrl;
       let baseImageUrl = existingLiveImg || "";
       if (!baseImageUrl) {
         const liveShot = await resolveBestMediaUrl(character, kind === "joi" ? "joi" : "seductive", "cinematic framing");
@@ -756,11 +766,15 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       }
       const frames = baseImageUrl ? [baseImageUrl, ...result.frames.slice(1)] : result.frames;
       const url = baseImageUrl || frames[frames.length - 1];
+      controller.signal.throwIfAborted();
 
       let videoUrl: string | null = null;
       let note = "Video generator not configured";
 
-      const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
+      const enhanced = await enhanceSequenceWithVideo(kind, frames, {
+        sourceType: flagshipProfile ? "fictional" : "unspecified",
+        signal: controller.signal,
+      });
       videoUrl = enhanced.videoUrl;
       note = enhanced.note;
 
@@ -781,6 +795,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         }
       }
 
+      controller.signal.throwIfAborted();
       const mediaMsg: ChatMessage = {
         role: "assistant",
         content: SEQUENCE_LINES[kind],
@@ -803,11 +818,17 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const { progression: nextProg } = earnCompanionXp(character.id, 10);
       setProgression(nextProg);
     } catch (err) {
+      if (!mountedRef.current) return;
+      if (controller.signal.aborted) {
+        setClipStatus("Stopped waiting for the clip. ComfyUI may still finish the render.");
+        return;
+      }
       const message = err instanceof Error ? err.message : "Video generator failed";
       setSafetyError(message);
       setClipStatus(`Video unavailable: ${message}`);
     } finally {
-      setBusy(false);
+      clipController.current = null;
+      if (mountedRef.current) setBusy(false);
     }
   };
 
@@ -1067,7 +1088,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 ✓ {savedToast}
               </div>
             )}
-            {clipStatus && <div className="text-[11px] text-[#00f5ff] px-1">{clipStatus}</div>}
+            {clipStatus && <div className="flex flex-wrap items-center gap-2 px-1 text-[11px] text-[#00f5ff]">
+              <span role="status">{clipStatus}</span>
+              {clipController.current && <button type="button" onClick={() => clipController.current?.abort()}
+                className="rounded-full border border-current px-2 py-1">Stop waiting for clip</button>}
+            </div>}
           </div>
         )}
 
@@ -1403,6 +1428,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
           {showActions && (
             <div className="space-y-1.5 px-1 pb-1">
+              <label className="flex flex-wrap items-center gap-2 text-xs text-rose-100">
+                Roleplay theme
+                <select value={roleplayTheme ?? ""} onChange={(event) => setRoleplayTheme(parseCompanionSessionTheme(event.target.value))}
+                  disabled={busy} className="min-w-0 rounded-lg border border-white/15 bg-[#1b1320] px-2 py-1">
+                  <option value="">Follow the conversation</option>
+                  {COMPANION_THEME_KEYS.map((theme) => <option key={theme} value={theme}>{COMPANION_SESSION_THEMES[theme].label}</option>)}
+                </select>
+              </label>
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
                 {flagshipProfile && (
                   <>
@@ -1410,7 +1443,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       className="shrink-0 inline-flex items-center gap-1 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
                       <Video className="h-3 w-3" aria-hidden="true" /> Direct a scene with {character.name}
                     </Link>
-                    <Link href={`/joi/?companion=${encodeURIComponent(character.id)}`}
+                    <Link href={`/joi/?companion=${encodeURIComponent(character.id)}${roleplayTheme ? `&theme=${roleplayTheme}` : ""}`}
                       className="shrink-0 inline-flex items-center gap-1 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
                       <Volume2 className="h-3 w-3" aria-hidden="true" /> JOI with {character.name}
                     </Link>

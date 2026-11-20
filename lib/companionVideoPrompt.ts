@@ -83,6 +83,39 @@ export const VIDEO_SCENE_PRESETS = [
       lighting: "warm candlelight and a soft edge light",
     },
   },
+  {
+    id: "bnwo-secret-date",
+    label: "BNWO · Secret date",
+    adult: true,
+    scene: {
+      action: "Consensual BNWO jealousy roleplay. She shares a lingering look with her Black date, then turns to the camera with a knowing smile.",
+      setting: "a private corner booth after the show",
+      camera: "gentle two-shot, then hold on her reaction",
+      lighting: "low amber light and soft velvet reflections",
+    },
+  },
+  {
+    id: "sph-night-in",
+    label: "SPH · Night in",
+    adult: true,
+    scene: {
+      action: "Agreed SPH roleplay. She gives the camera a mischievous smile, leans in to tease, then waits to read her adult partner's reaction.",
+      setting: "the edge of a chaise in a private suite",
+      camera: "eye-level portrait with a steady push in",
+      lighting: "violet window light under a warm key light",
+    },
+  },
+  {
+    id: "bnwo-private-fantasy",
+    label: "BNWO · Breeding fantasy",
+    adult: true,
+    scene: {
+      action: "Opening beat of a consensual BNWO breeding fantasy. She draws her Black adult partner closer, holds his gaze, and pauses for an answer.",
+      setting: "a private bedroom with soft velvet curtains",
+      camera: "slow move from her profile to a two-shot",
+      lighting: "dim rose light with warm practical lamps",
+    },
+  },
 ] satisfies Array<{ id: string; label: string; adult: boolean; scene: CompanionVideoScene }>;
 
 export const NEUTRAL_PORTRAIT_MOTION =
@@ -109,7 +142,7 @@ export function composeCompanionVideoPrompt(
 export function validateCompanionVideoPrompt(prompt: string, adultMode: boolean): string | null {
   const compliance = assertCompliance(prompt);
   if (!compliance.ok) return compliance.reason;
-  if (!adultMode && /\b(nsfw|nud(?:e|ity)|naked|undress(?:ing)?|explicit|erotic|sex(?:ual)?|lingerie|boudoir)\b/i.test(prompt)) {
+  if (!adultMode && /\b(nsfw|nud(?:e|ity)|naked|undress(?:ing)?|explicit|erotic|sex(?:ual)?|lingerie|boudoir|bnwo|sph|breeding fantasy)\b/i.test(prompt)) {
     return "Enable 18+ mode for this prompt, or choose a standard scene.";
   }
   return null;

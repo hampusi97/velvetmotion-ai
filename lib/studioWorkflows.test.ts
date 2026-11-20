@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { FLAGSHIP_COMPANIONS } from "@/data/companions";
-import { COMPANION_SESSION_THEMES, recommendedCompanionThemes } from "./companionSessionThemes";
+import { COMPANION_SESSION_THEMES, parseCompanionSessionTheme, recommendedCompanionThemes, THEMED_GUIDED_CUES } from "./companionSessionThemes";
 import { test } from "node:test";
 import { generateStudioVideoClip, type StudioVideoRequest } from "./canvasVideoExporter";
 import {
@@ -12,6 +12,7 @@ import {
 import { parseVideoSceneDraft, videoSceneDraftKey, type VideoSceneDraft } from "./videoSceneDraft";
 import { buildGuidedSession } from "./guidedSession";
 import { generateStudioPicture } from "./mediaGenerator";
+import { LOCAL_COMFY_VIDEO_URL, localComfyVideoHealthUrl } from "./mediaSettings";
 import { readChatEventStream } from "./chatStream";
 
 const videoRequest: StudioVideoRequest = {
@@ -77,6 +78,37 @@ test("JOI drafts map model cues to the selected session length", () => {
   assert.deepEqual(session.steps.map((step) => step.suggestedSeconds), [60, 120, 60]);
   assert.throws(() => buildGuidedSession('["One cue"]', persona, "gentle", 4), /three usable cues/);
   assert.throws(() => buildGuidedSession('["Start slowly.", "Use a deepfake.", "Take a breath."]', persona, "gentle", 4), /strictly prohibited/);
+});
+
+test("each selectable mature roleplay theme has a playable companion script", () => {
+  const companion = FLAGSHIP_COMPANIONS.find(({ id }) => id === "juno-aimes")!;
+  for (const key of ["bnwo", "bnwo-sph", "bnwo-cheating", "bnwo-breeding", "cheating", "breeding", "sph"] as const) {
+    assert.equal(parseCompanionSessionTheme(key), key);
+    const session = buildGuidedSession(JSON.stringify(THEMED_GUIDED_CUES[key]), {
+      name: companion.name, age: companion.age, summary: companion.tagline, voiceId: companion.voiceId,
+    }, COMPANION_SESSION_THEMES[key].label, 2, "companion");
+    assert.equal(session.steps.length, 3);
+    assert.equal(session.steps.at(-1)?.phase, "finish");
+    assert.equal(session.persona.voiceId, companion.voiceId);
+  }
+  assert.equal(parseCompanionSessionTheme("unknown"), null);
+});
+
+test("local video health probes use the configured loopback bridge", () => {
+  assert.equal(localComfyVideoHealthUrl(LOCAL_COMFY_VIDEO_URL), "http://127.0.0.1:8787/video/health");
+  assert.equal(localComfyVideoHealthUrl("http://localhost:9888/generate-video"), "http://localhost:9888/video/health");
+  assert.equal(localComfyVideoHealthUrl("https://example.test/generate-video"), null);
+  assert.equal(localComfyVideoHealthUrl("http://user@localhost:8787/generate-video"), null);
+});
+
+test("roleplay video scene presets require explicit adult mode", () => {
+  for (const id of ["bnwo-secret-date", "sph-night-in", "bnwo-private-fantasy"]) {
+    const preset = VIDEO_SCENE_PRESETS.find((scene) => scene.id === id);
+    assert.ok(preset?.adult);
+    const prompt = composeCompanionVideoPrompt(preset.scene, true, true);
+    assert.equal(validateCompanionVideoPrompt(prompt, true), null);
+    assert.match(validateCompanionVideoPrompt(prompt, false) ?? "", /Enable 18\+ mode/);
+  }
 });
 
 test("chat previews survive split SSE events and hide reasoning as tokens arrive", async () => {

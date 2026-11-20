@@ -95,7 +95,7 @@ export function CreatePostActions({
         note: "Sequence ready — enhancing clip if img2vid is set…",
       });
       setStatus("Enhancing to live clip…");
-      const enhanced = await enhanceSequenceWithVideo(character, kind, frames);
+      const enhanced = await enhanceSequenceWithVideo(kind, frames);
       setPreview({
         url: frames[frames.length - 1],
         frames,

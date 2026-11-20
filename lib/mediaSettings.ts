@@ -19,6 +19,19 @@ export type MediaBackendSettings = {
 
 const KEY = "vm-media-backend";
 
+export const LOCAL_COMFY_VIDEO_URL = "http://127.0.0.1:8787/generate-video";
+
+export function localComfyVideoHealthUrl(endpoint: string): string | null {
+  try {
+    const url = new URL(endpoint);
+    if (!(["http:", "https:"].includes(url.protocol) && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) ||
+      url.pathname !== "/generate-video" || url.username || url.password) return null;
+    return new URL("/video/health", url).href;
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULTS: MediaBackendSettings = {
   localImageBase: "",
   localImageMode: "prompt-url",

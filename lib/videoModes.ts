@@ -40,16 +40,17 @@ export function runSequenceGeneration(
 
 /** Async: attach real clip when possible; always keeps frames. */
 export async function enhanceSequenceWithVideo(
-  character: Character,
   kind: SequenceKind,
   frames: string[],
+  options?: Parameters<typeof requestImg2Vid>[3],
 ): Promise<{ videoUrl: string | null; note: string; mode: "mp4" | "webm" | "sequence" }> {
   if (!frames.length) return sequenceOnlyResult([]);
   const motion = MOTION_PROMPTS[kind] || MOTION_PROMPTS.default;
   try {
-    const result = await requestImg2Vid(frames[frames.length - 1], motion, frames);
+    const result = await requestImg2Vid(frames[frames.length - 1], motion, frames, options);
     return { videoUrl: result.videoUrl, note: result.note, mode: result.mode };
   } catch {
+    options?.signal?.throwIfAborted();
     return sequenceOnlyResult(frames);
   }
 }

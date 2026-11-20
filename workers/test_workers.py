@@ -117,9 +117,19 @@ class TestVelvetWorkers(unittest.TestCase):
                     patch.dict("os.environ", {"VELVET_COMFY_VIDEO_WORKFLOW": str(workflow), "VELVET_VIDEO_ORIGINS": "http://localhost:3000"}),
                     patch("workers.local_media_proxy.queue_video", return_value=job_id),
                     patch("workers.local_media_proxy.video_output", side_effect=[None, ("http://localhost:8188/test-clip", "video/mp4")]),
+                    patch("workers.local_media_proxy.check_video_workflow") as check_health,
                     patch("workers.local_media_proxy.urllib.request.urlopen", side_effect=open_upstream),
                 ):
                     headers = {"Content-Type": "application/json", "Origin": "http://localhost:3000"}
+                    ready = urllib.request.Request(base + "/video/health", headers=headers)
+                    with open_url(ready, timeout=5) as response:
+                        self.assertEqual(response.status, 200)
+                        self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "http://localhost:3000")
+                        self.assertEqual(json.load(response)["status"], "ready")
+                    check_health.side_effect = RuntimeError("Missing video model weights.")
+                    with self.assertRaises(HTTPError) as missing:
+                        open_url(ready, timeout=5)
+                    self.assertEqual(missing.exception.code, 503)
                     request = urllib.request.Request(base + "/generate-video", data=json.dumps(payload).encode(), headers=headers)
                     with open_url(request, timeout=5) as response:
                         self.assertEqual(response.status, 202)
@@ -137,6 +147,48 @@ class TestVelvetWorkers(unittest.TestCase):
             finally:
                 server.shutdown()
                 server.server_close()
+
+    def test_bundled_wan_graph_uses_requested_resolution_and_duration(self) -> None:
+        from io import BytesIO
+        from workers.comfy_video import WAN_VIDEO_WORKFLOW, check_video_workflow, load_video_workflow, queue_video
+
+        comfy = "http://localhost:8188"
+        graph = load_video_workflow(WAN_VIDEO_WORKFLOW)
+        node_info = {node["class_type"]: {} for node in graph.values()}
+        endpoints = {
+            "/object_info": node_info,
+            "/models/diffusion_models": ["wan2.2_ti2v_5B_fp16.safetensors"],
+            "/models/text_encoders": ["umt5_xxl_fp8_e4m3fn_scaled.safetensors"],
+            "/models/vae": ["wan2.2_vae.safetensors"],
+        }
+
+        def open_upstream(url, **_kwargs):
+            return BytesIO(json.dumps(endpoints[url.removeprefix(comfy)]).encode())
+
+        with patch("workers.comfy_video.urllib.request.urlopen", side_effect=open_upstream):
+            check_video_workflow(comfy, WAN_VIDEO_WORKFLOW)
+            endpoints["/models/vae"] = []
+            with self.assertRaisesRegex(RuntimeError, "Missing wan2.2_vae.safetensors"):
+                check_video_workflow(comfy, WAN_VIDEO_WORKFLOW)
+
+        job_id = "a31b1993-4ed4-474e-a4fc-4322db51b35a"
+
+        def forward(url, body, timeout):
+            self.assertEqual(url, comfy + "/prompt")
+            queued = body["prompt"]
+            self.assertEqual(queued["1"]["inputs"]["image"], "source.png")
+            self.assertEqual(queued["5"]["inputs"]["text"], "A slow turn")
+            latent = queued["8"]["inputs"]
+            self.assertEqual((latent["width"], latent["height"], latent["length"]), (480, 832, 73))
+            self.assertEqual(queued["11"]["inputs"]["fps"], 18)
+            self.assertEqual(queued["12"]["class_type"], "SaveVideo")
+            return {"prompt_id": job_id}
+
+        with patch("workers.comfy_video._upload_image", return_value="source.png"):
+            payload = {"sourceType": "fictional", "prompt": "A slow turn", "resolution": 480, "durationSec": 3, "speed": 0.75}
+            self.assertEqual(queue_video(comfy, WAN_VIDEO_WORKFLOW, payload, forward), job_id)
+            with self.assertRaisesRegex(ValueError, "supports 480p and 720p"):
+                queue_video(comfy, WAN_VIDEO_WORKFLOW, {**payload, "resolution": 1080}, forward)
 
     def test_telegram_session_history_window(self) -> None:
         bridge = VelvetTelegramBridge(

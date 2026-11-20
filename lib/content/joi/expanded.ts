@@ -91,6 +91,7 @@ export const EXPANDED_JOI: JoiScenario[] = [
   {
     id: "sph",
     label: "SPH JOI",
+    themes: ["SPH"],
     tone: "Playful size teasing you opted into",
     accent: "pink",
     persona: {

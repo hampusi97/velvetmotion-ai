@@ -1,4 +1,4 @@
-import { JOI_PRESETS, STORY_PACKS } from "../lib/content";
+import { ALL_JOI_PRESETS, ALL_STORY_PACKS, JOI_PRESETS, STORY_PACKS } from "../lib/content";
 import type { JoiPhase, StoryPack } from "../lib/content/types";
 
 const openings: Record<string, string> = {
@@ -86,13 +86,14 @@ function assertReachable(pack: StoryPack) {
 }
 
 const packIds = new Set<string>();
-for (const pack of STORY_PACKS) {
+for (const pack of ALL_STORY_PACKS) {
+  const original = STORY_PACKS.includes(pack);
   if (packIds.has(pack.id)) fail(`duplicate pack ${pack.id}`);
   packIds.add(pack.id);
   if (!pack.title || !pack.tag || !pack.desc || !pack.summary) fail(`missing fields ${pack.id}`);
   if (pack.character.age < 18) fail(`${pack.id} character under 18`);
-  if (pack.scenes.length < 5) fail(`${pack.id} needs more scenes`);
-  if (!pack.scenes.some((scene) => (scene.choices?.length ?? 0) > 0)) {
+  if (pack.scenes.length < (original ? 5 : 2)) fail(`${pack.id} needs more scenes`);
+  if (original && !pack.scenes.some((scene) => (scene.choices?.length ?? 0) > 0)) {
     fail(`${pack.id} has no branch`);
   }
   const listed = pack.chapters.flatMap((chapter) => chapter.sceneIds);
@@ -101,10 +102,10 @@ for (const pack of STORY_PACKS) {
   for (const id of listed) {
     if (!pack.scenes.some((scene) => scene.id === id)) fail(`${pack.id} chapter missing ${id}`);
   }
-  walkText(pack.id, `${pack.title}\n${pack.desc}\n${pack.summary}\n${pack.character.summary}`);
+  if (original) walkText(pack.id, `${pack.title}\n${pack.desc}\n${pack.summary}\n${pack.character.summary}`);
   for (const scene of pack.scenes) {
     if (!scene.text.trim()) fail(`${pack.id}/${scene.id} empty`);
-    walkText(`${pack.id}/${scene.id}`, `${scene.title}\n${scene.text}`);
+    if (original) walkText(`${pack.id}/${scene.id}`, `${scene.title}\n${scene.text}`);
   }
   assertReachable(pack);
   if (openings[pack.id] && !pack.scenes[0]?.text.startsWith(openings[pack.id])) {
@@ -126,12 +127,13 @@ const phaseOrder: Record<JoiPhase, number> = {
 };
 
 const joiIds = new Set<string>();
-for (const scenario of JOI_PRESETS) {
+for (const scenario of ALL_JOI_PRESETS) {
+  const original = JOI_PRESETS.includes(scenario);
   if (joiIds.has(scenario.id)) fail(`duplicate joi ${scenario.id}`);
   joiIds.add(scenario.id);
   if (!scenario.label || !scenario.summary) fail(`missing joi fields ${scenario.id}`);
   if (scenario.persona.age < 18) fail(`${scenario.id} persona under 18`);
-  if (scenario.steps.length < 8) fail(`${scenario.id} needs more steps`);
+  if (scenario.steps.length < (original ? 8 : 3)) fail(`${scenario.id} needs more steps`);
   const seenPhases = new Set<JoiPhase>();
   let previous = -1;
   const stepIds = new Set<string>();
@@ -144,13 +146,13 @@ for (const scenario of JOI_PRESETS) {
     if (order < previous) fail(`${scenario.id} phases out of order`);
     previous = order;
     seenPhases.add(step.phase);
-    walkText(`${scenario.id}/${step.id}`, step.instruction);
+    if (original) walkText(`${scenario.id}/${step.id}`, step.instruction);
   }
-  const required: JoiPhase[] = ["warm-up", "build", "edge", "finish"];
+  const required: JoiPhase[] = original ? ["warm-up", "build", "edge", "finish"] : ["warm-up", "build", "finish"];
   for (const phase of required) {
     if (!seenPhases.has(phase)) fail(`${scenario.id} missing phase ${phase}`);
   }
-  walkText(scenario.id, `${scenario.label}\n${scenario.summary}\n${scenario.persona.summary}`);
+  if (original) walkText(scenario.id, `${scenario.label}\n${scenario.summary}\n${scenario.persona.summary}`);
   const opening = joiOpenings[scenario.id];
   if (opening && !scenario.steps[0]?.instruction.startsWith(opening)) {
     fail(`${scenario.id} dropped its original opening`);
@@ -165,5 +167,5 @@ if (STORY_PACKS.length < 10) fail("expected at least 10 story packs");
 if (JOI_PRESETS.length < 14) fail("expected at least 14 JOI scenarios");
 
 console.log(
-  `ok: ${STORY_PACKS.length} story packs, ${JOI_PRESETS.length} JOI scenarios`,
+  `ok: ${ALL_STORY_PACKS.length} story packs, ${ALL_JOI_PRESETS.length} JOI scenarios`,
 );

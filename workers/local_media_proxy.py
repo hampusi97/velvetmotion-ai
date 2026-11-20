@@ -27,9 +27,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
 
 if __package__:
-    from .comfy_video import JOB_ID, MAX_REQUEST_BYTES, allowed_origin, queue_video, video_output
+    from .comfy_video import (
+        JOB_ID, MAX_REQUEST_BYTES, WAN_VIDEO_WORKFLOW, allowed_origin, check_video_workflow, queue_video, video_output,
+    )
 else:
-    from comfy_video import JOB_ID, MAX_REQUEST_BYTES, allowed_origin, queue_video, video_output
+    from comfy_video import (
+        JOB_ID, MAX_REQUEST_BYTES, WAN_VIDEO_WORKFLOW, allowed_origin, check_video_workflow, queue_video, video_output,
+    )
 
 COMFY_BASE = os.environ.get("COMFY_URL", "http://127.0.0.1:8188").rstrip("/")
 FORGE_BASE = os.environ.get("FORGE_URL", "http://127.0.0.1:7860").rstrip("/")
@@ -167,7 +171,7 @@ def run_comfy_generation(payload: Dict[str, Any]) -> Optional[str]:
 
 class LocalProxyHandler(BaseHTTPRequestHandler):
     def _is_video_route(self) -> bool:
-        return self.path == "/generate-video" or self.path.startswith("/video/jobs/")
+        return self.path in ("/generate-video", "/video/health") or self.path.startswith("/video/jobs/")
 
     def _send_cors_headers(self) -> None:
         if self._is_video_route():
@@ -200,6 +204,21 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
         if not workflow:
             self._send_json(503, {"error": "Set VELVET_COMFY_VIDEO_WORKFLOW to your exported ComfyUI video workflow."})
         return workflow
+
+    def _video_health(self) -> None:
+        workflow = self._video_available()
+        if not workflow:
+            return
+        try:
+            check_video_workflow(COMFY_BASE, workflow)
+        except (ValueError, RuntimeError) as exc:
+            self._send_json(503, {"error": str(exc)})
+        except FileNotFoundError:
+            self._send_json(503, {"error": "The video workflow file could not be found."})
+        except OSError:
+            self._send_json(503, {"error": "Start ComfyUI and check its address before testing the video bridge."})
+        else:
+            self._send_json(200, {"status": "ready", "detail": "Workflow nodes and video model files found in ComfyUI."})
 
     def _queue_video(self) -> None:
         workflow = self._video_available()
@@ -260,6 +279,9 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         if self.path.startswith("/video/jobs/"):
             self._serve_video_job()
+            return
+        if self.path == "/video/health":
+            self._video_health()
             return
         if self.path.startswith("/health"):
             self._send_json(
@@ -339,7 +361,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="VelvetMotion local media CORS proxy")
     parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8787, help="Bind port (default: 8787)")
+    parser.add_argument("--wan-video", action="store_true", help="Enable the bundled Wan2.2 5B video workflow")
     args = parser.parse_args()
+    if args.wan_video:
+        os.environ.setdefault("VELVET_COMFY_VIDEO_WORKFLOW", str(WAN_VIDEO_WORKFLOW))
 
     server = ThreadingHTTPServer((args.host, args.port), LocalProxyHandler)
     print(

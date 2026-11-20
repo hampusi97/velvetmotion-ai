@@ -8,6 +8,7 @@ export const FETISH_JOI: JoiScenario[] = [
   {
     id: "sph-size-queen",
     label: "SPH · Size Queen",
+    themes: ["SPH"],
     tone: "Sweet cruelty, rating talk, guided finish",
     accent: "fuchsia",
     persona: {
@@ -88,6 +89,7 @@ export const FETISH_JOI: JoiScenario[] = [
   {
     id: "bnwo-bbc-only",
     label: "BNWO · BBC Only",
+    themes: ["BNWO"],
     tone: "Cool hierarchy, raceplay fantasy, guided watching",
     accent: "violet",
     persona: {
@@ -167,7 +169,8 @@ export const FETISH_JOI: JoiScenario[] = [
   },
   {
     id: "cuck-phone-joi",
-    label: "Cuck Phone JOI",
+    label: "Cuck Phone JOI · Opal",
+    themes: ["Cheating fantasy"],
     tone: "Intimate report, listening strokes, aftercare",
     accent: "rose",
     persona: {
@@ -248,6 +251,7 @@ export const FETISH_JOI: JoiScenario[] = [
   {
     id: "bnwo-edge-only",
     label: "BNWO Edge Only",
+    themes: ["BNWO"],
     tone: "Dominant, patient, race-aware fantasy",
     accent: "amber",
     persona: {
@@ -294,7 +298,8 @@ export const FETISH_JOI: JoiScenario[] = [
   },
   {
     id: "cuck-phone",
-    label: "Cuck Phone JOI",
+    label: "Cuck Phone JOI · Opaline",
+    themes: ["Cheating fantasy"],
     tone: "Soft voice, detailed, phone-in-hand fantasy",
     accent: "rose",
     persona: {
@@ -343,6 +348,7 @@ export const FETISH_JOI: JoiScenario[] = [
   {
     id: "cuck-report",
     label: "Cuck · Report Back",
+    themes: ["Cheating fantasy"],
     tone: "Confession, detail, ownership",
     accent: "rose",
     persona: {
@@ -372,6 +378,13 @@ export const FETISH_JOI: JoiScenario[] = [
         title: "Permission",
         suggestedSeconds: 60,
         instruction: "\"You can finish. But only while I tell you how he filled me. Say thank you when you do.\"",
+      },
+      {
+        id: "c4",
+        phase: "finish",
+        title: "After the Call",
+        suggestedSeconds: 35,
+        instruction: "The scene ends here. Take a breath with me. Tell me whether you want reassurance or a quiet minute together.",
       },
     ],
   },

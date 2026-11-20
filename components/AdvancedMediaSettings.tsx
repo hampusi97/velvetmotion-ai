@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import {
   getMediaSettings,
+  LOCAL_COMFY_VIDEO_URL,
+  localComfyVideoHealthUrl,
   saveMediaSettings,
   type MediaBackendSettings,
 } from "@/lib/mediaSettings";
@@ -71,14 +73,30 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
         `${(settings.localImageBase || "http://127.0.0.1:8188").replace(/\/+$/, "")}/system_stats`,
       ),
     ]);
-    checks.push({
-      id: "video",
-      label: "True AI video generation",
-      status: settings.img2vidUrl ? "warn" : "error",
-      detail: settings.img2vidUrl
-        ? "Endpoint configured · verify by generating a clip"
-        : "No video model endpoint set · canvas clips animate stills only",
-    });
+    const localVideoHealth = localComfyVideoHealthUrl(settings.img2vidUrl);
+    if (localVideoHealth) {
+      const video: DiagnosticCheck = { id: "video", label: "Local ComfyUI video", status: "error", detail: "Start the local media proxy and ComfyUI." };
+      try {
+        const response = await fetch(localVideoHealth, { cache: "no-store", signal: AbortSignal.timeout(12_000) });
+        const health = await response.json() as { status?: string; detail?: string; error?: string };
+        if (response.ok && health.status === "ready") {
+          video.status = "ok";
+          video.detail = health.detail || "Workflow ready for a test render.";
+        } else {
+          video.detail = health.error || `Bridge returned HTTP ${response.status}.`;
+        }
+      } catch {
+        // Keep the local startup hint for network and invalid-response errors.
+      }
+      checks.push(video);
+    } else {
+      checks.push({
+        id: "video",
+        label: "True AI video generation",
+        status: settings.img2vidUrl ? "warn" : "error",
+        detail: settings.img2vidUrl ? "Endpoint saved. Generate a clip to test it." : "Choose a video model endpoint.",
+      });
+    }
     checks.push({
       id: "cloud",
       label: "Cloud generation",
@@ -147,7 +165,7 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
               className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/50 px-3 py-2 text-xs"
             >
               <span className="font-medium text-zinc-200">{d.label}</span>
-              <span className={d.status === "ok" ? "text-emerald-300 truncate max-w-[55%]" : d.status === "warn" ? "text-amber-300 truncate max-w-[55%]" : "text-rose-300 truncate max-w-[55%]"}>
+              <span className={`max-w-[62%] break-words ${d.status === "ok" ? "text-emerald-300" : d.status === "warn" ? "text-amber-300" : "text-rose-300"}`}>
                 {d.status === "ok" ? "● " : d.status === "warn" ? "⚠ " : "✕ "}
                 {d.detail}
               </span>
@@ -212,13 +230,25 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-pink-300">Img2vid / real clips</h2>
-        <input
-          className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
-          placeholder="https://your-img2vid.example/api/generate"
-          value={s.img2vidUrl}
-          onChange={(e) => update({ img2vidUrl: e.target.value.trim() })}
-        />
+        <h2 className="text-sm font-semibold text-pink-300">Video model</h2>
+        <p className="text-xs text-zinc-300">Run Wan2.2 5B on this computer with ComfyUI and the local media proxy.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" disabled={diagRunning} onClick={() => {
+            update({ img2vidUrl: LOCAL_COMFY_VIDEO_URL });
+            saveMediaSettings({ img2vidUrl: LOCAL_COMFY_VIDEO_URL });
+            void runDiagnostics();
+          }} className="rounded-xl border border-rose-300/40 px-3 py-1.5 text-xs text-rose-100 disabled:opacity-50">
+            Use local ComfyUI
+          </button>
+          <a href="https://docs.comfy.org/tutorials/video/wan/wan2_2#wan2-2-ti2v-5b-hybrid-version-workflow-example"
+            className="text-xs text-rose-200 underline underline-offset-2">ComfyUI model files</a>
+        </div>
+        <code className="block break-words text-xs text-zinc-300">python workers/local_media_proxy.py --wan-video</code>
+        <label className="block text-xs text-zinc-300">Video endpoint
+          <input type="url" className="mt-1 w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
+            placeholder="https://your-img2vid.example/api/generate" value={s.img2vidUrl}
+            onChange={(e) => update({ img2vidUrl: e.target.value.trim() })} />
+        </label>
         <input
           className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
           placeholder="Pollinations API key (optional)"

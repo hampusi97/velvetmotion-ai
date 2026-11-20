@@ -39,6 +39,7 @@ import {
   COMPANION_SESSION_THEMES,
   COMPANION_THEME_KEYS,
   recommendedCompanionThemes,
+  THEMED_GUIDED_CUES,
   type CompanionSessionTheme,
 } from "@/lib/companionSessionThemes";
 import { assertCompliance } from "@/lib/complianceFilter";
@@ -68,6 +69,8 @@ const SESSION_PACES = {
   quick: { timerScale: 0.8, voiceRate: 1.04 },
 };
 
+const SCRIPT_FILTERS = ["All", "BNWO", "SPH", "Cheating fantasy"] as const;
+
 function playCue(step: JoiStep, voiceId: string | undefined, whispery: boolean, rate: number) {
   const text = `${step.title}. ${step.instruction}`;
   const tuning = { pitch: 1.04, rate, whispery };
@@ -81,9 +84,11 @@ function playCue(step: JoiStep, voiceId: string | undefined, whispery: boolean, 
 export function JoiBrowser({
   initialScenarioId = null,
   initialCompanionId,
+  initialTheme = null,
 }: {
   initialScenarioId?: string | null;
   initialCompanionId?: string;
+  initialTheme?: CompanionSessionTheme | null;
 }) {
   const initialCompanion = FLAGSHIP_COMPANIONS.find(({ id }) => id === initialCompanionId) ?? FLAGSHIP_COMPANIONS[0];
   const [draft, setDraft] = useState<JoiScenario | null>(null);
@@ -91,13 +96,14 @@ export function JoiBrowser({
   const companion = FLAGSHIP_COMPANIONS.find(({ id }) => id === selectedCompanion) ?? initialCompanion;
   const recommendedThemes = recommendedCompanionThemes(companion.category);
   const [sessionTheme, setSessionTheme] = useState<CompanionSessionTheme>(
-    recommendedCompanionThemes(initialCompanion.category)[0],
+    initialTheme ?? recommendedCompanionThemes(initialCompanion.category)[0],
   );
   const [sessionTone, setSessionTone] = useState("playful");
   const [sessionMinutes, setSessionMinutes] = useState<2 | 4 | 6>(4);
   const [sessionDirection, setSessionDirection] = useState("");
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [scriptFilter, setScriptFilter] = useState<(typeof SCRIPT_FILTERS)[number]>("All");
   const [scenarioId, setScenarioId] = useState<string | null>(initialScenarioId);
   const [stepIndex, setStepIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -252,8 +258,10 @@ export function JoiBrowser({
   function loadCompanionScript() {
     setSessionError(null);
     try {
+      const themedCues = THEMED_GUIDED_CUES[sessionTheme];
       setDraft(buildGuidedSession(
-        JSON.stringify(companion.guidedPaceStages), companionPersona, "Companion pace", sessionMinutes, "companion",
+        JSON.stringify(themedCues ?? companion.guidedPaceStages), companionPersona,
+        themedCues ? COMPANION_SESSION_THEMES[sessionTheme].label : "Companion pace", sessionMinutes, "companion",
       ));
     } catch (error) {
       setSessionError(error instanceof Error ? error.message : "This companion's script could not be loaded.");
@@ -317,7 +325,6 @@ Direction and limits: ${direction || "No additional directions."}`,
                   const profile = FLAGSHIP_COMPANIONS.find(({ id }) => id === event.target.value);
                   if (!profile) return;
                   setSelectedCompanion(profile.id);
-                  setSessionTheme(recommendedCompanionThemes(profile.category)[0]);
                   setDraft(null);
                   setSessionError(null);
                 }} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
@@ -481,9 +488,19 @@ Direction and limits: ${direction || "No additional directions."}`,
           </div>
         </div>
 
-        {/* Full Guided JOI Scenarios */}
-        <div className="grid grid-cols-1 gap-2.5">
+        <section aria-labelledby="guided-presets-heading" className="grid grid-cols-1 gap-2.5">
+          <h3 id="guided-presets-heading" className="text-sm font-semibold text-white">Ready-made JOI sessions</h3>
+          <div className="flex flex-wrap gap-2">
+            {SCRIPT_FILTERS.map((filter) => (
+              <button key={filter} type="button" aria-pressed={scriptFilter === filter}
+                onClick={() => setScriptFilter(filter)}
+                className={`rounded-full border px-3 py-1.5 text-xs ${scriptFilter === filter ? "border-rose-300 bg-rose-300/20 text-rose-100" : "border-white/15 text-zinc-300"}`}>
+                {filter}
+              </button>
+            ))}
+          </div>
           {ALL_JOI_PRESETS.map((item, idx) => {
+            if (scriptFilter !== "All" && !item.themes?.includes(scriptFilter)) return null;
             const expanded = EXPANDED_JOI_IDS.includes(item.id);
             const char = CHARACTERS[idx % CHARACTERS.length];
             const thumb = characterMediaUrl(char, idx % 2 === 0 ? "lingerie" : "nude");
@@ -520,7 +537,7 @@ Direction and limits: ${direction || "No additional directions."}`,
               </button>
             );
           })}
-        </div>
+        </section>
       </section>
     );
   }

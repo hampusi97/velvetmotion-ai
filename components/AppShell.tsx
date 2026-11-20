@@ -34,6 +34,7 @@ import { SpicyScenarioSimulator } from "@/components/SpicyScenarioSimulator";
 import { TributeBrowser } from "@/components/TributeBrowser";
 import { StoryPackBrowser } from "@/components/content/StoryPackBrowser";
 import { JoiBrowser } from "@/components/content/JoiBrowser";
+import { parseCompanionSessionTheme, type CompanionSessionTheme } from "@/lib/companionSessionThemes";
 import { CardImport } from "@/components/CardImport";
 import { ShareImport } from "@/components/ShareImport";
 import { UserLounge } from "@/components/UserLounge";
@@ -131,6 +132,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   const pathname = usePathname() || "/";
   const [view, setView] = useState<ShellRouteView>(initialView);
   const [studioInitialTab, setStudioInitialTab] = useState<"photo" | "video">("photo");
+  const [joiTheme, setJoiTheme] = useState<CompanionSessionTheme | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
@@ -197,6 +199,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       const qView = params.get("view") as ShellRouteView | null;
       if (qView && pathname === "/") setView(qView);
       if (pathname.startsWith("/studio")) setStudioInitialTab(params.get("mode") === "video" ? "video" : "photo");
+      setJoiTheme(pathname.startsWith("/joi") ? parseCompanionSessionTheme(params.get("theme")) : null);
       const qId = params.get("companion") || params.get("id");
       if (qId) {
         const resolved = getCharacter(qId);
@@ -524,7 +527,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "scenario" && <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id, p) => openChatById(id, p)} />}
           {view === "tribute" && <TributeBrowser />}
           {view === "packs" && <StoryPackBrowser />}
-          {view === "joi" && <JoiBrowser key={selected?.id} initialCompanionId={selected?.id} />}
+          {view === "joi" && <JoiBrowser key={`${selected?.id}:${joiTheme}`} initialCompanionId={selected?.id} initialTheme={joiTheme} />}
           {view === "import" && <CardImport onHome={() => setView("home")} onOpen={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "share" && <ShareImport onHome={() => setView("home")} onImport={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}

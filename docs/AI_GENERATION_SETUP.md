@@ -64,26 +64,47 @@ In **Advanced media**, configure `img2vidUrl` with a bridge that accepts an HTTP
 }
 ```
 
-The bridge can finish synchronously or queue the render. To queue it, send HTTP `202` with a same-origin job URL in `Location` or a JSON `statusUrl` field and, optionally, `Retry-After` in seconds. Studio keeps polling while the job returns `202`, for up to five minutes. Cross-origin bridges need CORS and must expose `Location` and `Retry-After` if they use those headers.
+The bridge can finish synchronously or queue the render. To queue it, send HTTP `202` with a same-origin job URL in `Location` or a JSON `statusUrl` field and, optionally, `Retry-After` in seconds. Studio keeps polling for 30 minutes on the local ComfyUI bridge and five minutes on other endpoints. Cross-origin bridges need CORS and must expose `Location` and `Retry-After` if they use those headers.
 
 When ready, the bridge returns JSON such as `{"videoUrl":"https://example.com/render.mp4"}`, or with a direct `video/*` response. Add authentication on your bridge if exposed publicly; do not put private server secrets in frontend code.
 
 The **AI video** option requests 480p, 720p, or 1080p. The provider chooses what it can render and Studio shows the actual dimensions once the clip loads. Use **Animated still** to export a browser-rendered pan-and-zoom clip without a video model. Stopping a queued render in Studio stops polling. The backend decides whether to cancel its own job.
 
-### Use an installed ComfyUI video workflow locally
+### Run Wan2.2 5B on your computer
 
-1. On a GPU-backed ComfyUI installation, try the [Wan2.2 5B TI2V workflow](https://docs.comfy.org/tutorials/video/wan/wan2_2). Wan2.2 5B supports 720p at 24 fps. Install the checkpoints, run a short image-to-video test, and confirm the workflow produces an MP4 or WebM. See the [model requirements](https://github.com/Wan-Video/Wan2.2) for GPU memory and supported resolutions.
-2. Export the graph as **API format**. In the exported JSON, set the `LoadImage` node's `inputs.image` to `"{{image}}"`. You can also replace the positive prompt field with `"{{prompt}}"`. Optional `"{{durationSec}}"` and `"{{resolution}}"` slots are replaced with numbers. Use these only in nodes that accept seconds and the configured resolution value. Leave frame counts and dimension pairs at your model's supported settings.
-3. Set the `VELVET_COMFY_VIDEO_WORKFLOW` environment variable to that trusted local JSON file and start `python3 workers/local_media_proxy.py`. With the default loopback binding, set the Studio endpoint to `http://127.0.0.1:8787/generate-video`. For a local browser, run the app on localhost. The adapter accepts inline PNG, JPEG and WebP and sends them to your ComfyUI server.
-4. Start with a short 480p test and inspect the real result before increasing resolution. Set `VELVET_VIDEO_ORIGINS` only if your app runs on a different trusted origin. For a publicly hosted bridge, enforce authentication and content rules on the server.
+The bundled image-to-video workflow produces portrait MP4s at 480×832 or 704×1280, at 24 fps when the speed is 1×. ComfyUI documents running this model with native offloading on 8 GB VRAM. Rendering time and usable duration depend on the card and available system RAM. The model authors list 24 GB VRAM for their own standalone 720p command. [ComfyUI Wan2.2 guide](https://docs.comfy.org/tutorials/video/wan/wan2_2) · [Wan2.2 model requirements](https://github.com/Wan-Video/Wan2.2#run-text-image-to-video-generation)
+
+1. Start an up-to-date [local ComfyUI](https://docs.comfy.org/installation/comfyui_portable_windows). On Windows with a supported NVIDIA GPU, the Portable package includes `run_nvidia_gpu.bat`. The bridge uses `http://127.0.0.1:8188` by default. If ComfyUI prints a different port, set `COMFY_URL` to that address.
+2. Download the three Wan2.2 5B files from the [official ComfyUI guide](https://docs.comfy.org/tutorials/video/wan/wan2_2#2-manually-download-models) and place them in the matching folders. Allow roughly 17 GB for the weights and additional space for outputs.
+
+   | ComfyUI folder | File |
+   | --- | --- |
+   | `models/diffusion_models` | `wan2.2_ti2v_5B_fp16.safetensors` |
+   | `models/text_encoders` | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` |
+   | `models/vae` | `wan2.2_vae.safetensors` |
+
+3. From the VelvetMotion repo, start the local bridge in a separate terminal. Windows uses `py` in this example. On macOS or Linux, substitute `python3`.
+
+   ```powershell
+   py workers/local_media_proxy.py --wan-video
+   ```
+
+4. Run `npm install` once and then `npm run dev` from the repo. Open `http://localhost:3000`, select **Advanced Media → Use local ComfyUI**, and check the **Local ComfyUI video** result. It checks the workflow nodes and the model filenames. Keep ComfyUI and the bridge running while you use Studio.
+5. In **Studio → Video**, select a companion and try **AI video**, **480p**, and **3 seconds**. Check the finished clip for motion and appearance before attempting a longer 720p render.
+
+### Use your own ComfyUI video workflow
+
+Export your working graph in **API format**. Set the `LoadImage` node's image input to `"{{image}}"` and the positive prompt input to `"{{prompt}}"`. Set `VELVET_COMFY_VIDEO_WORKFLOW` to that file and start `python3 workers/local_media_proxy.py`. The bridge accepts inline PNG, JPEG, or WebP and serves results at `http://127.0.0.1:8787/generate-video`.
+
+Use optional `"{{durationSec}}"`, `"{{resolution}}"`, or `"{{seed}}"` slots only in nodes that accept those values. The bridge also supports `"{{width}}"`, `"{{height}}"`, `"{{frames}}"`, and `"{{fps}}"` for workflows compatible with the bundled portrait dimensions and 24 fps timing. Set `VELVET_VIDEO_ORIGINS` for a different trusted app origin.
 
 ## High-detail portraits and guided audio
 
 - **High detail** requests 1.5× the standard photo dimensions, up to 1536 pixels on the longest edge. It requires a configured local image model. A render error keeps the request local.
-- Open **Guided JOI Audio** to generate three new cues using the configured chat model. Choose a fictional companion, duration and tone, review the draft, then open it in the existing timer and voice player. Ready-made sessions remain available.
+- Open **Guided JOI Audio** to generate three cues using the configured chat model or load a built-in script. Select a fictional companion, theme, duration and tone, then review the draft. In chat, **Studio & Clips → Roleplay theme** passes the selected theme to the chat model and to the companion's JOI link.
 
 ## Troubleshooting
-1. Open **Advanced media → Re-test All**. These probes check actual local chat/voice/image services rather than nonexistent `/api/*` routes.
+1. Open **Advanced media → Re-test All**. The diagnostics probe local chat, voice and image services and check the selected local video bridge.
 2. An HTTP response means an endpoint is reachable; it does **not** prove that a model is loaded or supports the requested content. Test an actual generation.
 3. Use the engine/result label and any error. Look for CORS/mixed-content failures, model not loaded, quota/rate limits, media formats, and invalid custom endpoint paths.
 4. Avoid fake status claims, insecure API keys in URLs, nonconsensual real-person likenesses, or any sexual content involving minors. All companions must be fictional adults and all users should be age-verified before adult features are enabled.

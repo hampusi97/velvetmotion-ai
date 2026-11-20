@@ -7,6 +7,7 @@
  */
 import { blobToDataUrl } from "./imageStore";
 import { assertCompliance } from "./complianceFilter";
+import { localComfyVideoHealthUrl } from "./mediaSettings";
 
 export interface VideoMotionPreset {
   id: "slow-zoom-blink" | "neon-hair-sway" | "balcony-breeze" | "club-light-pulse";
@@ -209,7 +210,8 @@ export async function generateStudioVideoClip(
   const endpoint = req.videoBackendUrl?.trim();
   let backendError: string | undefined;
   if (endpoint && req.mode !== "animated-still") {
-    const timeout = AbortSignal.timeout(300_000);
+    const timeoutMinutes = localComfyVideoHealthUrl(endpoint) ? 30 : 5;
+    const timeout = AbortSignal.timeout(timeoutMinutes * 60_000);
     const signal = req.signal ? AbortSignal.any([req.signal, timeout]) : timeout;
     try {
       const backend = new URL(endpoint);
@@ -233,6 +235,7 @@ export async function generateStudioVideoClip(
           image,
           prompt: req.prompt || "",
           motion: motion.id,
+          duration: req.durationSec,
           durationSec: req.durationSec,
           speed: req.speed,
           resolution: req.resolution,
@@ -292,7 +295,7 @@ export async function generateStudioVideoClip(
       return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true, videoFormat: /\.webm(?:$|[?#])|^data:video\/webm/i.test(url) ? "webm" : /\.mp4(?:$|[?#])|^data:video\/mp4/i.test(url) ? "mp4" : "unknown" };
     } catch (err) {
       req.signal?.throwIfAborted();
-      backendError = timeout.aborted ? "The video job timed out after five minutes." : err instanceof Error ? err.message : "Video service unavailable";
+      backendError = timeout.aborted ? `The video job timed out after ${timeoutMinutes} minutes.` : err instanceof Error ? err.message : "Video service unavailable";
     }
   }
   if (req.mode === "ai") {
