@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 :root {
+  /* Bundled fontsource fonts: no external font fetch during builds. */
+  --font-sans: "Outfit Variable";
+  --font-display: "Fraunces Variable";
   --vm-bg: #111114;
   --vm-surface: rgba(24, 24, 28, 0.92);
   --vm-surface-elevated: rgba(31, 31, 37, 0.96);
