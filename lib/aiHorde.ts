@@ -21,7 +21,7 @@ export async function generateHordeImage(opts: HordeGenOptions): Promise<{ url: 
   const {
     prompt,
     nsfw = true,
-    models = ["Pony Diffusion XL", "WAI-ANI-NSFW-PONYXL", "DreamShaper XL", "Juggernaut XL"],
+    models,
     seed,
   } = opts;
   // Strictly cap free tier resolution & steps (<= 512x768, <= 20 steps, n=1 -> 0 kudos, avoids 403)
@@ -32,7 +32,9 @@ export async function generateHordeImage(opts: HordeGenOptions): Promise<{ url: 
 
   const body = {
     prompt: prompt.slice(0, 1000),
-    models,
+    // Explicit model names can go offline as workers join/leave. If the caller
+    // has not selected a model, let Horde match any compatible online worker.
+    ...(models?.length ? { models } : {}),
     params: {
       width,
       height,
