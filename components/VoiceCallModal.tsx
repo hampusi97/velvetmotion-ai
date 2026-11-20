@@ -16,6 +16,9 @@ import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { earnCompanionXp } from "@/lib/progression";
 import { getTimeMood } from "@/lib/timeMood";
 import { AmbientMixer } from "@/components/AmbientMixer";
+import { VrmAvatarViewer } from "@/components/VrmAvatarViewer";
+import { saveVrmAvatar, removeVrmAvatar } from "@/lib/vrmAvatarStore";
+import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
 
 interface SpeechRecognitionAlternativeLike {
   transcript?: string;
@@ -56,6 +59,11 @@ export function VoiceCallModal({
   const [whisperMode, setWhisperMode] = useState(() => getTimeMood().whisperBias);
   const [listening, setListening] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [vrmMode, setVrmMode] = useState(false);
+  const [vrmRevision, setVrmRevision] = useState(0);
+  const [vrmBusy, setVrmBusy] = useState(false);
+  const [vrmNotice, setVrmNotice] = useState("");
+  const vrmFileRef = useRef<HTMLInputElement | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [transcript, setTranscript] = useState<string>(character.voiceIntro || `Hey... I'm right here.`);
   const [engineUsed, setEngineUsed] = useState<string>("Kokoro / WebSpeech");
@@ -68,6 +76,30 @@ export function VoiceCallModal({
   const historyRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([
     { role: "assistant", text: character.voiceIntro || character.initialMessage },
   ]);
+
+  const importAvatar = async (file?: File) => {
+    if (!file) return;
+    setVrmBusy(true);
+    try {
+      const info = await saveVrmAvatar(character.id, file);
+      setVrmRevision(value=>value+1);
+      setVrmMode(true);
+      setVrmNotice(`Locally saved VRM ${info.version === 1 ? "1.0" : "0.x"} preview model.`);
+    } catch (error) {
+      setVrmNotice(error instanceof Error ? error.message : "Could not import VRM avatar.");
+    } finally {
+      if (vrmFileRef.current) vrmFileRef.current.value = "";
+      setVrmBusy(false);
+    }
+  };
+  const deleteAvatar = async () => {
+    try {
+      await removeVrmAvatar(character.id);
+      setVrmMode(false);
+      setVrmRevision(value=>value+1);
+      setVrmNotice("3D avatar removed from this browser.");
+    } catch (error) { setVrmNotice(error instanceof Error ? error.message : "Cannot remove VRM avatar."); }
+  };
 
   const stopAll = useCallback(() => {
     activeRef.current = false;
@@ -185,23 +217,44 @@ export function VoiceCallModal({
             </span>
           </div>
 
-          {/* Pulsing Neon Circular Audio Waveform Avatar */}
-          <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
-            <span
-              className={`absolute inset-0 rounded-full border-2 ${
-                speaking
+          {/* Optional locally stored 3D VRM avatar for the active chat call. */}
+          {vrmMode ? (
+            <div className="relative mx-auto h-64 w-full max-w-[240px] overflow-hidden rounded-2xl border border-violet-300/40">
+              <VrmAvatarViewer characterId={character.id} revision={vrmRevision} speaking={speaking} listening={listening} />
+            </div>
+          ) : (
+            <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
+              <span className={`absolute inset-0 rounded-full border-2 ${speaking
                   ? "border-[#ff1e8e] shadow-[0_0_32px_rgba(255,30,142,0.85)] animate-ping"
-                  : listening
-                    ? "border-[#00f5ff] shadow-[0_0_26px_rgba(0,245,255,0.7)] animate-pulse"
-                    : "border-white/20"
-              }`}
-            />
-            <img
-              src={staticPortraitUrl(character.id)}
-              alt={character.name}
-              className="relative h-28 w-28 rounded-full object-cover object-top ring-2 ring-[#ff1e8e]/70"
-            />
+                  : listening ? "border-[#00f5ff] shadow-[0_0_26px_rgba(0,245,255,0.7)] animate-pulse" : "border-white/20"
+                }`} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
+                alt={character.name}
+                className="relative h-28 w-28 rounded-full object-cover object-top ring-2 ring-[#ff1e8e]/70" />
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" aria-pressed={vrmMode} onClick={() => setVrmMode(value=>!value)}
+              className={`rounded-xl border px-3 py-1.5 text-xs ${vrmMode
+                ? "border-violet-300/60 bg-violet-600/20 text-violet-100"
+                : "border-white/20 text-zinc-300"}`}>
+              {vrmMode ? "3D preview ON" : "3D avatar"}
+            </button>
+            <input ref={vrmFileRef} type="file" accept=".vrm,model/gltf-binary"
+              className="hidden" aria-label="Select a VRM avatar"
+              onChange={e => { void importAvatar(e.target.files?.[0]); }} />
+            <button type="button" disabled={vrmBusy} onClick={() => vrmFileRef.current?.click()}
+              className="rounded-xl border border-white/20 px-3 py-1.5 text-xs text-zinc-300 disabled:opacity-50">
+              {vrmBusy ? "Saving avatar…" : "Import .vrm"}
+            </button>
+            {vrmMode && <button type="button" onClick={() => void deleteAvatar()}
+              className="rounded-xl border border-white/20 px-3 py-1.5 text-xs text-zinc-300">
+              Remove avatar
+            </button>}
           </div>
+          {vrmNotice && <p role="status" className="text-[11px] text-violet-200">{vrmNotice}</p>}
 
           <div>
             <h2 className="text-xl font-extrabold text-[#f7f7fc]">{character.name}</h2>
