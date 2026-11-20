@@ -24,6 +24,7 @@ export interface LocalEngineStatus {
   kokoroOnline: boolean;
   ollamaOnline: boolean;
   comfyOnline: boolean;
+  a1111Online: boolean;
   homeEngineOnline: boolean;
   homeTunnelUrl?: string | null;
   anyLocalOnline: boolean;
@@ -71,6 +72,23 @@ async function probeEndpoint(url: string, timeoutMs = 900): Promise<boolean> {
     return false;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** Verify that the local Stable Diffusion WebUI API is actually responding.
+ * A TCP listener or generic HTTP 404 does not prove A1111/Forge is usable.
+ */
+export async function probeA1111Api(fetcher: typeof fetch = fetch): Promise<boolean> {
+  try {
+    const response = await fetcher("http://127.0.0.1:7860/sdapi/v1/sd-models", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(1500),
+    });
+    if (!response.ok) return false;
+    const models: unknown = await response.json();
+    return Array.isArray(models);
+  } catch {
+    return false;
   }
 }
 
@@ -131,12 +149,13 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     }
   };
 
-  const [koboldHttp, fishHttp, kokoroHttp, ollamaHttp, comfyHttp, homeHealth] = await Promise.all([
+  const [koboldHttp, fishHttp, kokoroHttp, ollamaHttp, comfyHttp, a1111Http, homeHealth] = await Promise.all([
     nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
     nativePorts?.fishOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5002/health"),
     nativePorts?.kokoroOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8880/docs"),
     nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
     nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
+    probeA1111Api(),
     probeHomeHealth(),
   ]);
   const homeEngineOnline = Boolean(homeHealth);
@@ -154,6 +173,7 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
   const kokoroOnline = Boolean(nativePorts?.kokoroOnline || kokoroHttp);
   const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp || homeHealth?.engines?.ollama);
   const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp || homeHealth?.engines?.comfyui);
+  const a1111Online = Boolean(a1111Http);
 
   return {
     isDesktop: desktop,
@@ -162,9 +182,10 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     kokoroOnline,
     ollamaOnline,
     comfyOnline,
+    a1111Online,
     homeEngineOnline,
     homeTunnelUrl: homeHealth?.publicTunnelUrl || null,
-    anyLocalOnline: koboldOnline || fishOnline || kokoroOnline || ollamaOnline || comfyOnline || homeEngineOnline,
+    anyLocalOnline: koboldOnline || fishOnline || kokoroOnline || ollamaOnline || comfyOnline || a1111Online || homeEngineOnline,
     ramGb,
     ramTier: ramTierForGb(ramGb),
     specs,
@@ -252,6 +273,7 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
     kokoroOnline: false,
     ollamaOnline: false,
     comfyOnline: false,
+    a1111Online: false,
     homeEngineOnline: false,
     homeTunnelUrl: null,
     anyLocalOnline: false,
