@@ -34,14 +34,15 @@ const GUIDES: Record<Engine, {
   },
   picture: {
     name: "Pictures",
-    title: "Connect a ComfyUI image model",
-    summary: "Create portraits with supported local image checkpoints and workflows.",
+    title: "Connect a local image generator",
+    summary: "Connect ComfyUI or AUTOMATIC1111/Forge with your installed models.",
     url: "https://www.comfy.org/download",
-    service: "ComfyUI",
+    service: "ComfyUI (or A1111 / Forge)",
     instructions: [
       "Install ComfyUI from its official project. It needs an image model that fits your GPU.",
       "Download and load a compatible checkpoint and generation workflow, then start ComfyUI.",
-      "Return here to check the local service. A green check means reachable, not that image generation has been tested.",
+      "Alternatively start AUTOMATIC1111 / Forge with --api on 127.0.0.1:7860, and select it in Advanced Media.",
+      "Return here to test the backend. A green check confirms a reachable API, not successful image generation.",
     ],
     command: "http://127.0.0.1:8188",
   },
@@ -74,7 +75,7 @@ export function LocalSetupWizard({
   const online = selection === "chat"
     ? status.ollamaOnline || status.koboldOnline
     : selection === "picture"
-      ? status.comfyOnline
+      ? status.comfyOnline || status.a1111Online
       : status.kokoroOnline || status.fishOnline;
   const iconMap = { chat: Cpu, picture: ImageIcon, voice: Mic2 };
 
