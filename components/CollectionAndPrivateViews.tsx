@@ -243,16 +243,6 @@ export function CollectionGalleryView({
     </section>
   );
 }
-         <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 const PRIVATE_SETS = [
   {
