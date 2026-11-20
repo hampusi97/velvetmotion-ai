@@ -1053,6 +1053,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               </div>
             )}
             {clipStatus && <div className="text-[11px] text-[#00f5ff] px-1">{clipStatus}</div>}
+            {clipStatus?.toLowerCase().includes("fail") && (
+              <button type="button" onClick={() => setClipStatus(null)} className="text-[11px] text-pink-300 underline">Try another mood</button>
+            )}
           </div>
         )}
 

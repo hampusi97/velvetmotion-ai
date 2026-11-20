@@ -38,7 +38,7 @@ export function MobileBottomNav({
               href={tab.href}
               aria-current={isActive ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[52px] min-w-[56px] py-1.5 text-[10px] font-semibold transition active:scale-95",
+                "flex flex-1 flex-col items-center justify-center gap-0.5 min-h-[56px] min-w-[64px] py-2 text-[11px] font-semibold transition active:scale-95",
                 isActive ? "text-[#ff5678]" : "text-zinc-400",
               )}
             >
