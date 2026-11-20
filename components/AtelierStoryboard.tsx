@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BookmarkPlus, ChevronDown, Download, Film, Image as ImageIcon, Loader2, Play, Plus, Square, Trash2 } from "lucide-react";
 import { FLAGSHIP_COMPANIONS } from "@/data/companions";
 import { generateStudioPicture } from "@/lib/mediaGenerator";
+import { generateFictionalReferenceVariation } from "@/lib/referenceImageGenerator";
 import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { getMediaSettings } from "@/lib/mediaSettings";
@@ -27,6 +28,7 @@ export function AtelierStoryboard() {
   const [location, setLocation] = useState("An intimate rooftop penthouse after sunset, modern architecture, soft velvet interiors");
   const [shots, setShots] = useState<AtelierShot[]>(DEFAULT_ATELIER_SHOTS);
   const [adultMode, setAdultMode] = useState(false);
+  const [referenceMode, setReferenceMode] = useState(false);
   const [fictionConfirmed, setFictionConfirmed] = useState(false);
   const [results, setResults] = useState<Record<string, ShotResult>>({});
   const [processing, setProcessing] = useState(false);
@@ -35,6 +37,8 @@ export function AtelierStoryboard() {
   const stopAfterCurrent = useRef(false);
   const localEngine = useLocalEngineStatus();
   const character = FLAGSHIP_COMPANIONS.find((c) => c.id === characterId) || FLAGSHIP_COMPANIONS[0];
+  const settings = getMediaSettings();
+  const referenceBackendAvailable = Boolean(settings.img2imgUrl || (settings.localImageBase && settings.localImageMode === "comfy"));
 
   useEffect(() => {
     try {
@@ -76,9 +80,34 @@ export function AtelierStoryboard() {
       setError("Confirm you are using original fictional adult characters before rendering.");
       return;
     }
+    if (referenceMode && !referenceBackendAvailable) {
+      setError("Face-reference generation needs an img2img endpoint or ComfyUI reference nodes in Advanced Media Settings.");
+      return;
+    }
     setProcessing(true);
     setError("");
     stopAfterCurrent.current = false;
+    let referenceDataUrl = "";
+    if (referenceMode) {
+      try {
+        const response = await fetch(character.portraitUrl);
+        if (!response.ok) throw new Error("Original fictional reference portrait unavailable");
+        const blob = await response.blob();
+        if (!blob.type.startsWith("image/") || blob.size > 12 * 1024 * 1024) {
+          throw new Error("Fictional portrait is unavailable or too large");
+        }
+        referenceDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Could not decode character portrait"));
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        setProcessing(false);
+        setError(e instanceof Error ? e.message : "Could not open character reference");
+        return;
+      }
+    }
     const queue = onlyId ? shots.filter((s) => s.id === onlyId) : shots;
     for (let index = 0; index < queue.length; index++) {
       if (stopAfterCurrent.current) break;
@@ -91,11 +120,15 @@ export function AtelierStoryboard() {
         });
         const compliance = assertCompliance(prompt);
         if (!compliance.ok) throw new Error(compliance.reason);
-        const image = await generateStudioPicture({
-          prompt, width: 640, height: 960, nsfw: adultMode || shot.wardrobe === "editorial lingerie",
-          characterId: character.id,
-          localEngine,
-        });
+        const image = referenceMode
+          ? await generateFictionalReferenceVariation({
+              referenceImage: referenceDataUrl, prompt,
+              sourceType: "fictional", adultMode: adultMode || shot.wardrobe === "editorial lingerie",
+            })
+          : await generateStudioPicture({
+              prompt, width: 640, height: 960, nsfw: adultMode || shot.wardrobe === "editorial lingerie",
+              characterId: character.id, localEngine,
+            });
         if (shot.type === "video") {
           const clip = await generateStudioVideoClip({
             imageUrl: image.imageUrl, sourceType: "fictional", adultMode,
@@ -191,6 +224,11 @@ export function AtelierStoryboard() {
           <input type="checkbox" checked={fictionConfirmed} onChange={(e) => setFictionConfirmed(e.target.checked)}
             className="accent-[#ce779e]" />
           Original fictional adults only, with no real-person likenesses
+        </label>
+        <label className="flex items-center gap-2 text-xs text-zinc-200">
+          <input type="checkbox" checked={referenceMode} disabled={!fictionConfirmed}
+            onChange={(e) => setReferenceMode(e.target.checked)} className="accent-[#ce779e]" />
+          Use original fictional portrait as a face reference (requires compatible img2img model)
         </label>
         <label className="flex items-center gap-2 text-xs text-zinc-200">
           <input type="checkbox" checked={adultMode} disabled={!fictionConfirmed}
