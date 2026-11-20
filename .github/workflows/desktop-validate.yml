@@ -14,6 +14,12 @@ on:
       - ".github/workflows/desktop-validate.yml"
   workflow_dispatch:
 
+# Only the newest commit needs a full native dependency download and Rust
+# compilation; older PR commits are superseded by the same branch.
+concurrency:
+  group: velvetmotion-desktop-check-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
