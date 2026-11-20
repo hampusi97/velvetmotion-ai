@@ -23,6 +23,7 @@ import { emitVaultUpdated } from '@/lib/firebaseSync';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
 import { SafeImage } from '@/components/SafeImage';
 import { AtelierStoryboard } from '@/components/AtelierStoryboard';
+import { fetchStudioVideoBlob, saveStudioVideoBlob } from '@/lib/studioVideoDownload';
 
 interface MediaStudioModalProps {
   isOpen: boolean;
@@ -119,6 +120,7 @@ export default function MediaStudioModal({
   const [durationSec, setDurationSec] = useState<3 | 5 | 8>(5);
   const [videoSpeed, setVideoSpeed] = useState<0.75 | 1 | 1.25>(1);
   const [videoBusy, setVideoBusy] = useState(false);
+  const [videoDownloading, setVideoDownloading] = useState(false);
   const videoAbortRef = useRef<AbortController | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoEngineUsed, setVideoEngineUsed] = useState<string | null>(null);
@@ -342,6 +344,25 @@ export default function MediaStudioModal({
         videoAbortRef.current = null;
         setVideoBusy(false);
       }
+    }
+  }
+
+  async function downloadVideoClip() {
+    if (!generatedVideoUrl || videoDownloading) return;
+    setVideoDownloading(true);
+    setErrorMsg(null);
+    try {
+      const blob = await fetchStudioVideoBlob(generatedVideoUrl);
+      const extension = videoFormat === 'unknown'
+        ? (blob.type.includes('mp4') ? 'mp4' : 'webm')
+        : videoFormat;
+      saveStudioVideoBlob(blob, `velvetmotion-short.${extension}`);
+      setStatusMsg('Clip saved from your selected video provider.');
+    } catch (error) {
+      setErrorMsg((error instanceof Error ? error.message : 'Video download failed.') +
+        ' If the model server blocks browser downloads, use Open clip and save the file directly.');
+    } finally {
+      setVideoDownloading(false);
     }
   }
 
@@ -964,12 +985,14 @@ export default function MediaStudioModal({
                 >
                   <BookmarkPlus className="h-3.5 w-3.5" /> Save to Shorts / Collection
                 </button>
-                <a
-                  href={generatedVideoUrl}
-                  download={`velvetmotion-short.${videoFormat === 'mp4' ? 'mp4' : 'webm'}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold text-white"
-                >
-                  <Download className="h-3.5 w-3.5" /> Download clip
+                <button type="button" disabled={videoDownloading}
+                  onClick={() => void downloadVideoClip()}
+                  className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+                  <Download className="h-3.5 w-3.5" /> {videoDownloading ? 'Downloading…' : 'Download clip'}
+                </button>
+                <a href={generatedVideoUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/15 px-3 py-1.5 text-xs text-zinc-300">
+                  Open clip
                 </a>
               </div>
             </div>
