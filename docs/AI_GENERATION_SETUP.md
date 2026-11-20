@@ -47,3 +47,38 @@ Without that endpoint, VelvetMotion can export a **pan/zoom WebM animated still*
 2. An HTTP response means an endpoint is reachable; it does **not** prove that a model is loaded or supports the requested content. Test an actual generation.
 3. Use the engine/result label and any error. Look for CORS/mixed-content failures, model not loaded, quota/rate limits, media formats, and invalid custom endpoint paths.
 4. Avoid fake status claims, insecure API keys in URLs, nonconsensual real-person likenesses, or any sexual content involving minors. All companions must be fictional adults and all users should be age-verified before adult features are enabled.
+
+
+## Private Atelier — reference-aware fictional artwork
+
+**Advanced Media → Reference-aware image variations** now accepts an optional `img2imgUrl` for a compatible bridge. The Studio also supports local ComfyUI when configured with the necessary base64/reference-image and IP-Adapter nodes. A plain text-to-image model cannot guarantee identity consistency or preserve the reference.
+
+After uploading an original fictional-adult portrait, confirming rights, and selecting **18+ fictional fantasy mode** if appropriate, Studio can submit this POST contract:
+
+```json
+{
+  "image": "data:image/webp;base64,...",
+  "imageUrl": "data:image/webp;base64,...",
+  "prompt": "Original fictional adult character, keep visual identity, cinematic portrait...",
+  "seed": 12345,
+  "strength": 0.35,
+  "adultMode": true,
+  "sourceType": "fictional"
+}
+```
+
+Accepted results: direct image bytes with an `image/*` content type or a JSON object with `imageUrl`, `url`, or `image` pointing to a valid image URL. If no reference-aware model is configured, the Studio displays an explicit failure instead of presenting a reused static portrait as generated content.
+
+**Your own real-life selfie:** the upload UI recognizes this as a separate category and restricts it to nonsexual animation. It must not be submitted to the adult image variation route. The browser uses permissions checkboxes for convenience only; a commercial backend must enforce eligibility and source provenance independently.
+
+For video, the bridge receives `sourceType` and `adultMode` fields. Treat these as untrusted inputs in your backend and independently verify the rules. This frontend alone is not identity or consent verification.
+
+## Voice Atelier
+
+During fictional companion creation, pick one of six female-style Kokoro voice presets and tune pitch/pace. **Instant preview** uses the device’s Web Speech engine; **Neural preview** uses a separately running compatible Kokoro TTS server at `127.0.0.1:8880`. The selected `voiceId` and browser tuning are written into the companion record so voice calls can reuse them.
+
+This does **not** synthesize a unique voice from real-person recordings or guarantee a particular voice provider supports adult content. A future voice-cloning backend must require verifiable speaker authorization, explicit usage consent, revocation, and secure deletion.
+
+## Visual motion vs video generation
+
+The new **Living Portraits** homepage panel performs pausable, accessible Ken Burns effects on still portraits. It is a visual UI animation, not a video model. The actual Studio video workflow remains a separate configured generator and labels a browser pan/zoom clip honestly.
