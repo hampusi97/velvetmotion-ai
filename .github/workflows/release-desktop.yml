@@ -1,14 +1,19 @@
-name: Release VelvetMotion Desktop (Tauri v2)
+name: Automatic VelvetMotion Desktop Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag (example: v1.0.14). Use a unique version.'
-        required: true
+        description: 'Optional explicit version, e.g. v1.2.3 (blank = next patch)'
+        required: false
+
+# Never ship two "latest" releases simultaneously or in the wrong order.
+concurrency:
+  group: velvetmotion-desktop-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -17,30 +22,46 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.meta.outputs.tag }}
-      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Compute deterministic release tag & semver
-        id: meta
-        shell: bash
+      - uses: actions/checkout@v4
+      - name: Calculate the next desktop version
+        id: version
         env:
-          INPUT_TAG: ${{ github.event.inputs.tag_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MANUAL_TAG: ${{ github.event.inputs.tag_name }}
+        shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF_NAME}"
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="$GITHUB_REF_NAME"
+          elif [[ -n "$MANUAL_TAG" ]]; then
+            TAG="$MANUAL_TAG"
           else
-            TAG="${INPUT_TAG}"
+            # Increment the highest published/draft desktop patch release.
+            TAGS=$(gh release list --limit 100 --json tagName --jq '.[].tagName' || true)
+            export VM_EXISTING_RELEASE_TAGS="$TAGS"
+            TAG=$(node - <<'JS'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const versions = [pkg.version, ...(process.env.VM_EXISTING_RELEASE_TAGS || '').split(/\s+/)]
+            .map(v => /^v?(\d+)\.(\d+)\.(\d+)$/.exec(v || ''))
+            .filter(Boolean)
+            .map(m => [Number(m[1]), Number(m[2]), Number(m[3])]);
+          versions.sort((a, b) => b[0]-a[0] || b[1]-a[1] || b[2]-a[2]);
+          const [major, minor, patch] = versions[0] || [1,0,0];
+          process.stdout.write(`v${major}.${minor}.${patch + 1}`);
+          JS
+            )
           fi
-          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid release version. Required form: v1.2.3" >&2
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid release tag: must be vMAJOR.MINOR.PATCH"
             exit 1
           fi
-          VERSION="${TAG#v}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "Preparing automatic desktop release $TAG"
 
   publish-tauri:
     needs: prepare
@@ -56,9 +77,8 @@ jobs:
             args: ''
           - platform: windows-latest
             args: ''
-
     runs-on: ${{ matrix.platform }}
-
+    timeout-minutes: 75
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -78,27 +98,63 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev pkg-config
 
-      - name: Install frontend dependencies, sync version & build out/
+      - name: Install dependencies and synchronize release version
         shell: bash
         run: |
-          npm ci --no-audit --no-fund || npm ci --no-audit --no-fund
-          if [[ "${{ needs.prepare.outputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            node scripts/bump-version.mjs "${{ needs.prepare.outputs.version }}"
-          fi
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          node scripts/bump-version.mjs "${{ needs.prepare.outputs.version }}"
           npm run audit:companions
           npm run build
 
-      - name: Build and publish native desktop installers
+      - name: Enable cryptographically signed in-app updates only when keys exist
+        id: signing
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_UPDATER_PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" && -z "$TAURI_UPDATER_PUBKEY" ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Desktop installers will publish automatically, but in-app updates need TAURI_SIGNING_PRIVATE_KEY (secret) and TAURI_UPDATER_PUBKEY (repo variable)."
+          elif [[ -z "$TAURI_SIGNING_PRIVATE_KEY" || -z "$TAURI_UPDATER_PUBKEY" ]]; then
+            echo "::error::Partial updater signing configuration. Add both private key secret and public key variable, or remove both."
+            exit 1
+          else
+            node scripts/prepare-signed-updater.mjs
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and upload installers to a draft GitHub release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ needs.prepare.outputs.tag }}
           releaseName: 'VelvetMotion Desktop ${{ needs.prepare.outputs.tag }}'
-          releaseBody: 'Native VelvetMotion Private Atelier desktop release. Includes the bundled interface, opt-in local AI connection diagnostics, and manual installer updates through official GitHub Releases. AI model weights are not bundled.'
-          releaseDraft: false
+          releaseBody: 'Automatically built from GitHub main after frontend and native validation. Desktop app bundles the interface; local model weights are separate. In-app automatic installation is available only when a signed updater has been configured.'
+          releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          includeUpdaterJson: ${{ steps.signing.outputs.enabled == 'true' }}
+          args: ${{ matrix.args }} ${{ steps.signing.outputs.enabled == 'true' && '--features signed-updater' || '' }}
 
+  publish-release:
+    needs: [prepare, publish-tauri]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release only after ALL four operating systems succeed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          echo "### Desktop release published" >> "$GITHUB_STEP_SUMMARY"
+          echo "Version: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "Assets: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
