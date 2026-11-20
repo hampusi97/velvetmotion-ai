@@ -1,19 +1,14 @@
-name: Release Hybrid Desktop App (Tauri v2)
+name: Release VelvetMotion Desktop (Tauri v2)
 
 on:
   push:
     tags:
       - 'v*'
-    branches:
-      - main
-    paths:
-      - 'src-tauri/**'
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag (e.g. v1.0.5; defaults to patch bump on main push)'
-        required: false
-        default: ''
+        description: 'Release tag (example: v1.0.14). Use a unique version.'
+        required: true
 
 permissions:
   contents: write
@@ -31,14 +26,17 @@ jobs:
       - name: Compute deterministic release tag & semver
         id: meta
         shell: bash
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag_name }}
         run: |
-          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            TAG="${{ github.event.inputs.tag_name }}"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
-            BASE=$(node -e "const p=require('./src-tauri/tauri.conf.json'); const a=String(p.version||'1.0.0').split('.').map(Number); console.log(a[0]+'.'+a[1]+'.'+(a[2]+${{ github.run_number }}))")
-            TAG="v${BASE}"
+            TAG="${INPUT_TAG}"
+          fi
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version. Required form: v1.2.3" >&2
+            exit 1
           fi
           VERSION="${TAG#v}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
@@ -80,7 +78,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev
 
       - name: Install frontend dependencies, sync version & build out/
         shell: bash
@@ -92,7 +90,7 @@ jobs:
           npm run audit:companions
           npm run build
 
-      - name: Build Tauri Bundles & Updater Manifest (latest.json)
+      - name: Build and publish native desktop installers
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
