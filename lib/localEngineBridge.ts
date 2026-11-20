@@ -21,6 +21,7 @@ export interface LocalEngineStatus {
   isDesktop: boolean;
   koboldOnline: boolean;
   fishOnline: boolean;
+  kokoroOnline: boolean;
   ollamaOnline: boolean;
   comfyOnline: boolean;
   homeEngineOnline: boolean;
@@ -83,13 +84,13 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     if (Number.isFinite(mem) && mem > 0) ramGb = mem;
   }
 
-  let nativePorts: { koboldOnline?: boolean; fishOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
+  let nativePorts: { koboldOnline?: boolean; fishOnline?: boolean; kokoroOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
   if (desktop && window.__TAURI_INTERNALS__?.invoke) {
     try {
       const [specsRes, portsRes] = await Promise.all([
         window.__TAURI_INTERNALS__.invoke<SystemSpecs>("get_system_specs").catch(() => null),
         window.__TAURI_INTERNALS__
-          .invoke<{ koboldOnline: boolean; fishOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
+          .invoke<{ koboldOnline: boolean; fishOnline: boolean; kokoroOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
           .catch(() => null),
       ]);
       specs = specsRes;
@@ -130,9 +131,10 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     }
   };
 
-  const [koboldHttp, fishHttp, ollamaHttp, comfyHttp, homeHealth] = await Promise.all([
+  const [koboldHttp, fishHttp, kokoroHttp, ollamaHttp, comfyHttp, homeHealth] = await Promise.all([
     nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
     nativePorts?.fishOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5002/health"),
+    nativePorts?.kokoroOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8880/docs"),
     nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
     nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
     probeHomeHealth(),
@@ -149,6 +151,7 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
   }
   const koboldOnline = Boolean(nativePorts?.koboldOnline || koboldHttp || homeHealth?.engines?.koboldcpp);
   const fishOnline = Boolean(nativePorts?.fishOnline || fishHttp);
+  const kokoroOnline = Boolean(nativePorts?.kokoroOnline || kokoroHttp);
   const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp || homeHealth?.engines?.ollama);
   const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp || homeHealth?.engines?.comfyui);
 
@@ -156,11 +159,12 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     isDesktop: desktop,
     koboldOnline,
     fishOnline,
+    kokoroOnline,
     ollamaOnline,
     comfyOnline,
     homeEngineOnline,
     homeTunnelUrl: homeHealth?.publicTunnelUrl || null,
-    anyLocalOnline: koboldOnline || fishOnline || ollamaOnline || comfyOnline || homeEngineOnline,
+    anyLocalOnline: koboldOnline || fishOnline || kokoroOnline || ollamaOnline || comfyOnline || homeEngineOnline,
     ramGb,
     ramTier: ramTierForGb(ramGb),
     specs,
@@ -245,6 +249,7 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
     isDesktop: false,
     koboldOnline: false,
     fishOnline: false,
+    kokoroOnline: false,
     ollamaOnline: false,
     comfyOnline: false,
     homeEngineOnline: false,
