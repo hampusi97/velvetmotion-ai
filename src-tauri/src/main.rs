@@ -10,6 +10,8 @@ use tauri::{
     AppHandle, Emitter, Manager,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+#[cfg(feature = "signed-updater")]
+use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,6 +40,38 @@ fn port_open(port: u16) -> bool {
 #[tauri::command]
 fn desktop_app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
+}
+
+#[tauri::command]
+fn desktop_signed_updates_enabled() -> bool {
+    cfg!(feature = "signed-updater")
+}
+
+/// Only compiled with a verified signing public key embedded at release time.
+/// The Tauri updater validates the cryptographic signature before installing.
+#[tauri::command]
+async fn install_signed_desktop_update(app: AppHandle) -> Result<String, String> {
+    #[cfg(feature = "signed-updater")]
+    {
+        let updater = app.updater().map_err(|e| e.to_string())?;
+        let update = updater.check().await.map_err(|e| e.to_string())?;
+        let Some(update) = update else {
+            return Ok("Already on the latest signed release.".to_string());
+        };
+        let new_version = update.version.clone();
+        update
+            .download_and_install(|_chunk, _size| {}, || {})
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(format!(
+            "Installed signed VelvetMotion update {new_version}. Restart to use the new version."
+        ))
+    }
+    #[cfg(not(feature = "signed-updater"))]
+    {
+        let _ = app;
+        Err("This desktop build was not configured for signed in-app updates. Download a newer installer from the official VelvetMotion GitHub releases.".to_string())
+    }
 }
 
 #[tauri::command]
@@ -100,11 +134,17 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             desktop_app_version,
+            desktop_signed_updates_enabled,
+            install_signed_desktop_update,
             get_system_specs,
             probe_local_engines,
             toggle_boss_key
         ])
         .setup(|app| {
+            #[cfg(feature = "signed-updater")]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
             let show_item =
                 MenuItem::with_id(app, "toggle", "Show / Stealth Hide", true, None::<&str>)?;
             let quit_item =
@@ -128,8 +168,8 @@ fn main() {
 
             // Always render the bundled local UI. Never silently navigate the
             // privileged native window to a remotely editable website.
-            // Install new builds manually from verified GitHub Releases until
-            // a signed updater channel is configured and audited.
+            // Signed builds use a cryptographically verified updater; unsigned
+            // builds never register one. Local model services remain opt-in.
 
             Ok(())
         })
