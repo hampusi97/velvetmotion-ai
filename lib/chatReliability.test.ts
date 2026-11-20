@@ -8,7 +8,8 @@ import {
   type CompanionPersona,
   type RouterMessage,
 } from "./chatRouter";
-import { detectExplicitMediaIntent, splitIntoNaturalBubbles } from "./dynamicChatEngine";
+import { detectExplicitMediaIntent, sanitizeCompanionReply, splitIntoNaturalBubbles } from "./dynamicChatEngine";
+import { installPromptOverlapsComposer } from "../components/InstallPrompt";
 import { createChatTurnGuard, createTranscriptRevision, shouldCommitTurnToActiveView } from "./chatTurn";
 
 const persona: CompanionPersona = {
@@ -333,5 +334,72 @@ describe("companion chat reliability", () => {
     assert.equal(revisions.owns("blair-cole", firstWrite), false);
     assert.equal(guard.snapshot().thinking, false);
     assert.equal(guard.snapshot().locked, false);
+  });
+
+  it("drops leaked reasoning, including the plain-prose second bubble from the live chat", () => {
+    const spoken = "*leans in, voice low* I like the kind that makes people forget their names. Rain? Too wet. Snow? Too cold. But a scorch like this that glances at the sun? It turns everyone into an open book. What about you? Prefer your weather with a side of surprises?";
+    const planning = "Okay, the user asked about my favorite weather. I need to keep it playful and flirty, matching the golden hour vibe. Let me think... I should avoid generic answers. Maybe something that hints at my performative side. Rain is too wet, snow too cold—I go with the heat. It makes people more open, which ties into my personality. Then I'll flip it back to them with a question that keeps the conversation going.";
+    const leaked = `${spoken}\n\n${planning}`;
+    const cleaned = sanitizeCompanionReply(leaked, "Nova Reyes");
+    assert.match(cleaned, /Rain\? Too wet/);
+    assert.doesNotMatch(cleaned, /the user asked|Let me think|avoid generic|flip it back/i);
+    const bubbles = splitIntoNaturalBubbles(cleaned);
+    assert.ok(bubbles.length >= 1);
+    assert.equal(bubbles.some((bubble) => /the user asked/i.test(bubble)), false);
+
+    assert.match(sanitizeCompanionReply(`<think>${planning}</think>\n\n${spoken}`, "Nova Reyes"), /Rain\?/);
+    assert.doesNotMatch(sanitizeCompanionReply(`${spoken}\n<think>\n${planning}`, "Nova Reyes"), /the user asked/i);
+    assert.equal(sanitizeCompanionReply(`<think>${planning}`, "Nova Reyes"), "");
+    assert.equal(sanitizeCompanionReply(planning, "Nova Reyes"), "");
+    assert.match(sanitizeCompanionReply("I need to see you closer tonight.", "Nova"), /closer tonight/);
+  });
+
+  it("ignores reasoning fields and treats a reasoning-only completion as empty", async () => {
+    const planning = "Okay, the user asked about my favorite weather. I need to keep it playful and flirty. Let me think... I should avoid generic answers.";
+    const spoken = "Heat. The kind that makes you honest with me.";
+    let sawThinkDisabled = false;
+    const fetchImpl = (async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body || "{}")) as { reasoning?: { exclude?: boolean } };
+      if (body.reasoning?.exclude) sawThinkDisabled = true;
+      return jsonResponse({
+        choices: [{
+          message: {
+            content: [
+              { type: "reasoning", text: planning },
+              { type: "text", text: spoken },
+            ],
+            reasoning_content: planning,
+          },
+        }],
+      });
+    }) as typeof fetch;
+    const result = await generateCompanionReply(history, { ...persona, name: "Nova Reyes" }, {
+      settings: {
+        provider: "openrouter",
+        openRouterApiKey: "test-or-key",
+        customModel: "deepseek/deepseek-chat",
+      },
+      fetchImpl,
+      timeoutMs: 80,
+    });
+    assert.equal(sawThinkDisabled, true);
+    assert.equal(result.providerUsed, "openrouter-byok");
+    assert.match(result.text, /makes you honest/);
+    assert.doesNotMatch(result.text, /the user asked/i);
+
+    const onlyPlanning = await generateCompanionReply(history, persona, {
+      settings: customSettings(),
+      fetchImpl: (async () => jsonResponse({ choices: [{ message: { content: planning, reasoning_content: planning } }] })) as typeof fetch,
+      timeoutMs: 80,
+    });
+    assert.equal(onlyPlanning.providerUsed, "in-character-fallback");
+    assert.doesNotMatch(onlyPlanning.text, /the user asked|Let me think/i);
+  });
+
+  it("keeps the install prompt off chat composers", () => {
+    assert.equal(installPromptOverlapsComposer("chat"), true);
+    assert.equal(installPromptOverlapsComposer("group"), true);
+    assert.equal(installPromptOverlapsComposer("dual"), true);
+    assert.equal(installPromptOverlapsComposer("home"), false);
   });
 });

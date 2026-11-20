@@ -48,7 +48,7 @@ import { DownloadDesktopView } from "@/components/DownloadDesktopView";
 import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
 import { SettingsAndBackupDrawer } from "@/components/SettingsAndBackupDrawer";
 import { SupporterBanner } from "@/components/SupporterBanner";
-import { InstallPrompt } from "@/components/InstallPrompt";
+import { InstallPrompt, installPromptOverlapsComposer } from "@/components/InstallPrompt";
 import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
 import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
 import { ProactiveToast } from "@/components/ProactiveToast";
@@ -569,7 +569,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       </div>
 
       <MobileBottomNav active={view} onNavigate={navigate} />
-      <InstallPrompt />
+      <InstallPrompt hidden={installPromptOverlapsComposer(view)} />
       <LiveUpdateBanner />
       <DesktopAutoUpdater />
       <SettingsAndBackupDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />

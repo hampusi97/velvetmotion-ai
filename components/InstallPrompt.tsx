@@ -1,7 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export function InstallPrompt() {
+/** Chat, group, and dual composers sit where this fixed card would land. */
+export function installPromptOverlapsComposer(view: string): boolean {
+  return view === "chat" || view === "group" || view === "dual";
+}
+
+export function InstallPrompt({ hidden = false }: { hidden?: boolean }) {
   const [deferred, setDeferred] = useState<any>(null);
   const [show, setShow] = useState(false);
 
@@ -21,7 +26,7 @@ export function InstallPrompt() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (!show) return null;
+  if (!show || hidden) return null;
 
   return (
     <div className="fixed bottom-24 left-4 right-4 z-50 mx-auto max-w-sm lg:bottom-6 rounded-2xl border border-pink-500/40 bg-zinc-950 p-4 shadow-2xl">

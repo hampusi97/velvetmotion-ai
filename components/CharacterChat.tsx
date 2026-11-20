@@ -677,7 +677,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const routedTurn = await requestReplyForHistory(next, text);
       const rawReply = routedTurn?.text || fallbackReply(character, text, romanceMode);
       const providerUsed = routedTurn?.providerUsed || "character-voice-fallback";
-      const sanitized = sanitizeCompanionReply(rawReply, character.name) || rawReply || fallbackReply(character, text, romanceMode);
+      const sanitized = sanitizeCompanionReply(rawReply, character.name) || fallbackReply(character, text, romanceMode);
       const { cleanText, imagePrompts } = extractInlineImageRequests(sanitized);
       let replyText = cleanText.trim();
       if (!replyText) {
@@ -761,7 +761,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     try {
       const routedTurn = await requestReplyForHistory(prior, lastUser);
       const rawReply = routedTurn?.text || fallbackReply(character, lastUser, romanceMode);
-      const sanitized = sanitizeCompanionReply(rawReply, character.name) || rawReply || fallbackReply(character, lastUser, romanceMode);
+      const sanitized = sanitizeCompanionReply(rawReply, character.name) || fallbackReply(character, lastUser, romanceMode);
       const { cleanText, imagePrompts } = extractInlineImageRequests(sanitized);
       const nextReply =
         cleanText.trim() ||
@@ -848,7 +848,6 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       );
       const cont =
         sanitizeCompanionReply(routed.text, character.name) ||
-        routed.text.trim() ||
         fallbackReply(character, "Continue the scene", romanceMode);
       const baseText = target.content.trim();
       const nextContent = `${baseText} ${cont}`.trim();
@@ -1344,9 +1343,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               m.role === "assistant"
                 ? splitInnerThoughtAndReply(m.content)
                 : { innerThought: null, spokenReply: m.content };
-            const cleanDisplay =
-              (sanitizeCompanionReply(parsed.spokenReply, character.name) || parsed.spokenReply || "").trim() ||
-              `${character.name.split(" ")[0]} is still here.`;
+            const cleanDisplay = sanitizeCompanionReply(parsed.spokenReply, character.name).trim();
+            if (m.role === "assistant" && !cleanDisplay && !m.imageUrl && !m.videoUrl) return null;
 
             return (
               <div key={i} className={`group flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>

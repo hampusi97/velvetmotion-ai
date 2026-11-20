@@ -114,6 +114,7 @@ export function buildDynamicSystemPrompt(params: {
     '4. React to the latest user message in the history. Do not reset the scene, ignore what they just said, or answer as a different character.',
     '5. Stay strictly fictional adults (18+) only.',
     '6. Do NOT write [Image of ...] or [Photo of ...] brackets in text replies unless sending an actual photo.',
+    '7. Never reveal planning. Do not add a second message about what the user asked or how you will answer.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -186,9 +187,68 @@ export function extractInlineImageRequests(rawReply: string): {
   return { cleanText, imagePrompts };
 }
 
+const REASONING_TAG_PATTERNS: RegExp[] = [
+  /<think\b[^>]*>[\s\S]*?<\/think>/gi,
+  /<reasoning\b[^>]*>[\s\S]*?<\/reasoning>/gi,
+  /<analysis\b[^>]*>[\s\S]*?<\/analysis>/gi,
+  /<\|think\|>[\s\S]*?<\|\/think\|>/gi,
+  /<\|begin_of_thought\|>[\s\S]*?<\|end_of_thought\|>/gi,
+  /◁think▷[\s\S]*?◁\/think▷/gi,
+  /^[\s\S]*?<\/think>/gi,
+  /^[\s\S]*?<\/reasoning>/gi,
+  /<(?:think|reasoning|analysis)\b[^>]*>[\s\S]*$/gi,
+  /<\|think\|>[\s\S]*$/gi,
+  /◁think▷[\s\S]*$/gi,
+];
+
+/** Planning prose, not something the companion would say out loud. */
+export function isModelReasoningText(text: string): boolean {
+  const sample = text.trim();
+  if (!sample) return false;
+  if (/^(?:okay[,!]?\s+)?the user\b/i.test(sample)) return true;
+  if (/^let me think\b/i.test(sample) && /\b(?:user|reply|response|flirty|generic)\b/i.test(sample)) return true;
+  const cues = [
+    /\bthe user (asked|said|wants|mentioned)\b/i,
+    /\bi (?:need|should|must|have) to\b/i,
+    /\b(?:my|the) (?:response|reply|answer)\b/i,
+    /\blet me think\b/i,
+    /\bavoid generic\b/i,
+    /\bflip it back\b/i,
+    /\bkeep (?:it|this) (?:playful|flirty|in character)\b/i,
+    /\bperformative side\b/i,
+    /\bchain of thought\b/i,
+    /\bso (?:the|this) (?:conversation|reply)\b/i,
+  ];
+  let score = 0;
+  for (const cue of cues) if (cue.test(sample)) score += 1;
+  return score >= 2;
+}
+
+function stripProseReasoning(text: string): string {
+  const paragraphs = text.split(/\n{2,}/);
+  const kept = paragraphs
+    .map((paragraph) => {
+      const sentences = paragraph.match(/[^.!?]+[.!?]+(?:\s|$)|[^.!?]+$/g) || [paragraph];
+      if (sentences.length < 2) return paragraph;
+      const spoken = sentences.filter((sentence) => !isModelReasoningText(sentence));
+      return spoken.length < sentences.length ? spoken.join(" ") : paragraph;
+    })
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph && !isModelReasoningText(paragraph));
+  return kept.join("\n\n").trim();
+}
+
 /** Strips <think>, <reasoning>, role echoes, and robotic fallback strings cleanly. */
 export function sanitizeCompanionReply(raw: string, companionName: string): string {
   if (!raw || typeof raw !== 'string') return '';
+  let withoutThoughts = raw;
+  for (const pattern of REASONING_TAG_PATTERNS) {
+    pattern.lastIndex = 0;
+    withoutThoughts = withoutThoughts.replace(pattern, "");
+  }
+  withoutThoughts = stripProseReasoning(withoutThoughts);
+  if (!withoutThoughts) return '';
+  raw = withoutThoughts;
   const first = companionName.split(/\s+/)[0] || companionName;
   const escapedFull = companionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const escapedFirst = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -235,7 +295,10 @@ export function splitIntoNaturalBubbles(reply: string): string[] {
   const paragraphs = clean
     .split(/\n{2,}/)
     .map((p) => p.trim())
-    .filter(Boolean);
+    .filter((p) => p && !isModelReasoningText(p));
+
+  if (!paragraphs.length) return [];
+  if (paragraphs.length === 1 && paragraphs[0].length < 130) return paragraphs;
 
   if (paragraphs.length >= 2) {
     return [paragraphs[0], paragraphs.slice(1).join(' ')];
