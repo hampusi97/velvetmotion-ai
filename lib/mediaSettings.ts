@@ -1,4 +1,4 @@
-/** Power-user media backends (localStorage). Never required for free Pollinations path. */
+/** Optional user-configured media backends in browser storage. Actual generation depends on connected compatible services. */
 
 export type MediaBackendSettings = {
   /** e.g. http://127.0.0.1:8188 or A1111/Forge /sdapi/v1/txt2img base */
