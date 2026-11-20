@@ -342,7 +342,9 @@ export default function MediaStudioModal({
     setErrorMsg(null);
     try {
       const blob = await fetchStudioVideoBlob(generatedVideoUrl);
-      const extension = videoFormat === 'mp4' ? 'mp4' : 'webm';
+      const extension = videoFormat === 'unknown'
+        ? (blob.type.includes('mp4') ? 'mp4' : 'webm')
+        : videoFormat;
       saveStudioVideoBlob(blob, `velvetmotion-short.${extension}`);
       setStatusMsg('Clip saved from your selected video provider.');
     } catch (error) {
