@@ -47,6 +47,49 @@ fn desktop_signed_updates_enabled() -> bool {
     cfg!(feature = "signed-updater")
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SignedUpdateStatus {
+    enabled: bool,
+    available: bool,
+    version: Option<String>,
+}
+
+/// Use Tauri's configured HTTPS update manifest. Signatures are enforced
+/// during installation; this check never executes code or installs a payload.
+#[tauri::command]
+async fn check_signed_desktop_update(app: AppHandle) -> Result<SignedUpdateStatus, String> {
+    #[cfg(feature = "signed-updater")]
+    {
+        let update = app
+            .updater()
+            .map_err(|e| e.to_string())?
+            .check()
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(SignedUpdateStatus {
+            enabled: true,
+            available: update.is_some(),
+            version: update.map(|u| u.version),
+        })
+    }
+    #[cfg(not(feature = "signed-updater"))]
+    {
+        let _ = app;
+        Ok(SignedUpdateStatus {
+            enabled: false,
+            available: false,
+            version: None,
+        })
+    }
+}
+
+/// The user chooses when to restart after a signed update is installed.
+#[tauri::command]
+fn restart_desktop_after_update(app: AppHandle) {
+    app.restart();
+}
+
 /// Only compiled with a verified signing public key embedded at release time.
 /// The Tauri updater validates the cryptographic signature before installing.
 #[tauri::command]
@@ -135,7 +178,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             desktop_app_version,
             desktop_signed_updates_enabled,
+            check_signed_desktop_update,
             install_signed_desktop_update,
+            restart_desktop_after_update,
             get_system_specs,
             probe_local_engines,
             toggle_boss_key

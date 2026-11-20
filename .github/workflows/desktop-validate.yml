@@ -8,8 +8,17 @@ on:
       - "public/downloads/velvetmotion_home_engine.py"
       - "components/DownloadDesktopView.tsx"
       - "lib/desktopRelease*"
+      - "scripts/verify-desktop-release*"
+      - "components/DesktopAutoUpdater.tsx"
+      - ".github/workflows/release-desktop.yml"
       - ".github/workflows/desktop-validate.yml"
   workflow_dispatch:
+
+# Only the newest commit needs a full native dependency download and Rust
+# compilation; older PR commits are superseded by the same branch.
+concurrency:
+  group: velvetmotion-desktop-check-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -38,6 +47,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Validate installer link selection
         run: npx tsx --test lib/desktopRelease.test.ts
+      - name: Validate desktop release completeness and signatures
+        run: node --test scripts/verify-desktop-release.test.mjs
       - name: Validate Home Engine Python syntax
         run: python3 -m py_compile public/downloads/velvetmotion_home_engine.py
       - name: Check Rust formatting
