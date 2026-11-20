@@ -59,7 +59,8 @@ export function parseSillyTavernCard(raw: unknown): Character | null {
   if (!Number.isInteger(age) || age < 18 || age > 120) return null;
   if (!validateCharacterCompliance({ name, age, personality, backstory: scenario, tagline: card.description || "" }).ok) return null;
 
-  const id = hashId(name);
+  // Include the card persona so two different characters sharing a name do not overwrite one another.
+  const id = hashId([name, personality, scenario, first].join("\\u241f"));
 
   const character: Character = {
     id,
