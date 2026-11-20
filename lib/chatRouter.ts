@@ -85,17 +85,21 @@ function readCompletionText(data: unknown): string {
   if (!data || typeof data !== "object") return "";
   const choices = (data as { choices?: unknown }).choices;
   if (!Array.isArray(choices) || !choices[0] || typeof choices[0] !== "object") return "";
-  const choice = choices[0] as { message?: { content?: unknown }; text?: unknown };
+  const choice = choices[0] as {
+    message?: { content?: unknown; reasoning_content?: unknown; reasoning?: unknown };
+    text?: unknown;
+  };
   const content = choice.message?.content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
       .map((part) => {
         if (typeof part === "string") return part;
-        if (part && typeof part === "object" && "text" in part && typeof (part as { text?: unknown }).text === "string") {
-          return (part as { text: string }).text;
-        }
-        return "";
+        if (!part || typeof part !== "object" || !("text" in part)) return "";
+        const typed = part as { type?: unknown; text?: unknown };
+        const kind = typeof typed.type === "string" ? typed.type.toLowerCase() : "";
+        if (kind === "reasoning" || kind === "thinking" || kind === "reasoning_content") return "";
+        return typeof typed.text === "string" ? typed.text : "";
       })
       .join("");
   }
@@ -435,6 +439,7 @@ async function tryOpenAIChatTiers(
       timeoutMs: localTimeout,
       fetchImpl,
       samplerPayload: { ...buildSamplerPayload("ollama", presetId, enableAntiSlop), max_tokens: localBudget.maxTokens },
+      extraBody: { think: false },
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, companionName);
     if (ollamaClean) return measure(ollamaClean, "ollama-local", t0);
@@ -485,6 +490,7 @@ async function tryOpenAIChatTiers(
         "X-Title": "VelvetMotion AI",
       },
       samplerPayload: buildSamplerPayload("openrouter", presetId, enableAntiSlop),
+      extraBody: { reasoning: { exclude: true } },
     });
     const orClean = sanitizeCompanionReply(orRaw, companionName);
     if (orClean) return { text: orClean, providerUsed: "openrouter-byok" };
