@@ -10,6 +10,7 @@ test("Tauri permits only the expected local ComfyUI media source", () => {
   const connect = csp.split(";").map(s=>s.trim()).find(s=>s.startsWith("connect-src ")) || "";
   assert.ok(media.includes("http://127.0.0.1:8188"), "video playback needs local :8188 in media-src");
   assert.ok(connect.includes("http://127.0.0.1:8188"), "video workflow API needs local :8188 in connect-src");
+  assert.ok(connect.includes("http://127.0.0.1:7860"), "A1111 / Forge API needs local :7860 in connect-src");
   assert.ok(!media.split(/\s+/).includes("http:"), "never open media-src to every insecure HTTP origin");
   assert.ok(!media.includes("unsafe-eval"), "media-src should not permit executable code");
 });
