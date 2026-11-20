@@ -15,6 +15,8 @@ import { reportGenerationSpeed, type LocalEngineStatus } from "./localEngineBrid
 
 export interface PictureGenerationRequest {
   prompt: string;
+  /** Honored by local Forge/Comfy/Kobold endpoints where supported; not guaranteed for cloud fallback. */
+  negativePrompt?: string;
   seed?: number;
   width: number;
   height: number;
@@ -36,6 +38,7 @@ async function tryKoboldSdTxt2Img(
   width: number,
   height: number,
   seed: number,
+  negativePrompt?: string,
 ): Promise<string | null> {
   try {
     const ctrl = new AbortController();
@@ -45,7 +48,7 @@ async function tryKoboldSdTxt2Img(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         prompt,
-        negative_prompt: "low quality, blurry, deformed, watermark, text, underage, child",
+        negative_prompt: `low quality, blurry, deformed, watermark, text, underage, child${negativePrompt ? `, ${negativePrompt.slice(0, 360)}` : ""}`,
         seed,
         width,
         height,
@@ -88,6 +91,7 @@ export async function generateStudioPicture(
       width: req.width,
       height: req.height,
       characterId: req.characterId,
+      negative: req.negativePrompt,
     });
     if (localRes.ok && localRes.imageUrl) {
       imageUrl = localRes.imageUrl;
@@ -97,7 +101,7 @@ export async function generateStudioPicture(
 
   // 1B. Local KoboldCpp SD / FLUX (:5001)
   if (!imageUrl && req.localEngine?.koboldOnline) {
-    const koboldImg = await tryKoboldSdTxt2Img(req.prompt, req.width, req.height, parsedSeed);
+    const koboldImg = await tryKoboldSdTxt2Img(req.prompt, req.width, req.height, parsedSeed, req.negativePrompt);
     if (koboldImg) {
       imageUrl = koboldImg;
       engine = "Local KoboldCpp SD";
