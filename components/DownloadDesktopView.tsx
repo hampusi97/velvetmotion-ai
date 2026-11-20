@@ -48,6 +48,7 @@ export function DownloadDesktopView() {
     { title: "KoboldCpp", status: engine.koboldOnline, detail: "Local conversation" },
     { title: "ComfyUI", status: engine.comfyOnline, detail: "Image workflows" },
     { title: "Fish voice", status: engine.fishOnline, detail: "Local neural voice" },
+    { title: "Kokoro", status: engine.kokoroOnline, detail: "Local neural voice" },
     { title: "Home Engine", status: engine.homeEngineOnline, detail: "Optional bridge" },
   ];
 
@@ -201,7 +202,7 @@ export function DownloadDesktopView() {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           {connections.map((c) => (
             <div key={c.title} className="rounded-[19px] border border-white/10 bg-white/[.025] p-3">
               <span className={"inline-block h-2 w-2 rounded-full " + (c.status ? "bg-emerald-400" : "bg-zinc-600")} aria-hidden="true" />
