@@ -13,6 +13,7 @@ import {
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
 import { getMediaSettings } from '@/lib/mediaSettings';
+import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { useLocalEngineStatus } from '@/lib/localEngineBridge';
 import { addToGallery, getGallery, loadChat, saveChat } from '@/lib/storage';
@@ -121,7 +122,9 @@ export default function MediaStudioModal({
   const [charVibe, setCharVibe] = useState('');
   const [charGreeting, setCharGreeting] = useState('');
   const [fictionalConfirmed, setFictionalConfirmed] = useState(false);
-  const [uploadSourceKind, setUploadSourceKind] = useState<'fictional' | 'real-consented' | null>(null);
+  const [uploadSourceKind, setUploadSourceKind] = useState<'fictional' | 'self' | null>(null);
+  const [uploadedAdultMode, setUploadedAdultMode] = useState(false);
+  const [customVoice, setCustomVoice] = useState<VoiceDesign>(DEFAULT_VOICE_DESIGN);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const [videoIsGenerative, setVideoIsGenerative] = useState(false);
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm' | 'unknown'>('unknown');
@@ -238,9 +241,13 @@ export default function MediaStudioModal({
         durationSec,
         speed: videoSpeed,
         // A real-person photograph may only be used for a neutral, nonsexual animation.
-        prompt: videoSourceUrl === uploadedPreview && uploadSourceKind === 'real-consented'
+        prompt: videoSourceUrl === uploadedPreview && uploadSourceKind === 'self'
           ? 'Nonsexual portrait animation, subtle natural blink, gentle head turn, fully clothed, natural lighting'
           : `${companion.name} ${customPrompt}`,
+        sourceType: videoSourceUrl === uploadedPreview
+          ? uploadSourceKind === 'fictional' ? 'fictional' : 'real-person'
+          : 'unspecified',
+        adultMode: videoSourceUrl === uploadedPreview && uploadSourceKind === 'fictional' && uploadedAdultMode,
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
       });
@@ -295,6 +302,7 @@ export default function MediaStudioModal({
       setVideoSourceUrl(webpData);
       setUploadSourceKind(null);
       setUploadRightsConfirmed(false);
+      setUploadedAdultMode(false);
       setFictionalConfirmed(false);
       setGeneratedVideoUrl(null);
       setStatusMsg('Portrait loaded locally. Confirm permission, then animate or create a fictional companion.');
@@ -372,7 +380,7 @@ export default function MediaStudioModal({
       tagline: charVibe.trim() || 'Custom companion created in Pro Media Studio',
       portraitUrl: uploadedPreview,
       visualDna: `${Math.max(18, charAge)}-year-old fictional woman, ${charVibe.trim() || 'stylish candid portrait, warm lighting'}`,
-      voiceId: 'af_heart',
+      voiceId: customVoice.voiceId,
       voiceSampleLine: charGreeting.trim() || `Hey... I'm ${charName.trim()}. Ready to talk?`,
       personality: charVibe.trim() || 'Playful, affectionate, expressive.',
       backstory: charVibe.trim() || 'Created directly in your private VelvetMotion studio.',
@@ -401,7 +409,7 @@ export default function MediaStudioModal({
             initialMessage: created.greeting,
             tags: ['Custom', created.category],
             intimacy: 55,
-            voice: { label: created.voiceId, pitch: 1, rate: 0.96, style: created.personality },
+            voice: { label: created.voiceId, pitch: customVoice.pitch, rate: customVoice.rate, style: created.personality },
             voiceId: created.voiceId,
             visualDna: created.visualDna,
             personality: created.personality,
@@ -767,12 +775,20 @@ export default function MediaStudioModal({
           {uploadedPreview && videoSourceUrl === uploadedPreview && (
             <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
               <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
-              <p className="mt-1">Only fictional adults are eligible for adult fantasy generation. Real adult photographs are allowed for nonsexual animation with permission.</p>
+              <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
               <label className="mt-2 flex items-start gap-2">
                 <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
                 <span>I own or have permission to animate this image and all depicted people are adults.</span>
               </label>
             </div>
+          )}
+          {uploadedPreview && videoSourceUrl === uploadedPreview && uploadSourceKind === 'fictional' && (
+            <label className="flex items-center justify-between rounded-xl border border-fuchsia-300/20 bg-black/30 p-3 text-[11px] text-pink-100">
+              <span>18+ mode for original fictional adult artwork
+                <small className="mt-0.5 block text-zinc-400">Requires a compatible model; not a guarantee of content.</small>
+              </span>
+              <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="accent-[#dc789c]" />
+            </label>
           )}
           <button
             type="button"
@@ -850,18 +866,29 @@ export default function MediaStudioModal({
               <p className="font-bold text-pink-200">Use this portrait</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <label className="flex items-start gap-2 text-zinc-200">
-                  <input type="radio" checked={uploadSourceKind === 'fictional'} onChange={() => setUploadSourceKind('fictional')} name="studio-photo-source" />
+                  <input type="radio" checked={uploadSourceKind === 'fictional'} onChange={() => { setUploadSourceKind('fictional'); setUploadedAdultMode(false); }} name="studio-photo-source" />
                   <span>Original fictional adult / AI-created character</span>
                 </label>
                 <label className="flex items-start gap-2 text-zinc-200">
-                  <input type="radio" checked={uploadSourceKind === 'real-consented'} onChange={() => setUploadSourceKind('real-consented')} name="studio-photo-source" />
-                  <span>Real adult with permission (nonsexual animation only)</span>
+                  <input type="radio" checked={uploadSourceKind === 'self'} onChange={() => { setUploadSourceKind('self'); setUploadedAdultMode(false); }} name="studio-photo-source" />
+                  <span>My own adult selfie (nonsexual animation only)</span>
                 </label>
               </div>
               <label className="flex items-start gap-2 text-zinc-200">
                 <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
-                <span>I have the rights to use this image, and every depicted person is an adult.</span>
+                <span>I own or have rights to use this image, and every depicted person is an adult. Selfies must show me, not someone else.</span>
               </label>
+              {uploadSourceKind === 'fictional' && (
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-pink-300/25 bg-black/25 p-3">
+                  <span>
+                    <strong className="block text-xs text-pink-200">18+ fictional fantasy mode</strong>
+                    <span className="mt-0.5 block text-[10px] text-zinc-400">
+                      Pass an adult-mode request to a compatible configured video model. Only original fictional adults qualify.
+                    </span>
+                  </span>
+                  <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="h-4 w-4 accent-[#dc789c]" />
+                </label>
+              )}
               <button
                 type="button"
                 disabled={!uploadSourceKind || !uploadRightsConfirmed}
@@ -930,6 +957,11 @@ export default function MediaStudioModal({
             placeholder="Opening line..."
             className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#ff1e8e] focus:outline-none"
           />
+
+          {uploadedPreview && uploadSourceKind === 'fictional' && (
+            <VoiceDesigner value={customVoice} onChange={setCustomVoice} compact
+              sample={charGreeting.trim() || `Hi! I'm ${charName.trim() || "your companion"}. It's lovely to meet you.`} />
+          )}
 
           <label className="flex items-start gap-2 text-[11px] text-zinc-300">
             <input
