@@ -113,8 +113,10 @@ export async function generateA1111Image(request: A1111Request): Promise<A1111Re
     if (typeof rawImage !== "string" || !rawImage || rawImage.length > MAX_IMAGE_BASE64) {
       return { ok: false, note: "A1111 returned no valid image bytes." };
     }
-    const imageUrl = rawImage.startsWith("data:image/")
-      ? rawImage : `data:image/png;base64,${normalizeA1111InputImage(rawImage)}`;
+    const encoded = normalizeA1111InputImage(rawImage);
+    const mimeMatch = /^data:image\/(png|jpeg|jpg|webp);base64,/i.exec(rawImage);
+    const mime = mimeMatch?.[1]?.toLowerCase() === "jpg" ? "jpeg" : (mimeMatch?.[1]?.toLowerCase() || "png");
+    const imageUrl = `data:image/${mime};base64,${encoded}`;
     return { ok: true, imageUrl, note: source ? "Local A1111/Forge img2img" : "Local A1111/Forge txt2img" };
   } catch (error) {
     return { ok: false, note: `A1111 ${endpoint} failed: ${error instanceof Error ? error.message : "connection error"}` };
