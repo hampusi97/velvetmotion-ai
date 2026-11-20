@@ -78,7 +78,7 @@ test("all providers failing returns a useful error, not a simulated picture", as
   try {
     await assert.rejects(
       generateStudioPicture({ prompt: "fictional adult landscape portrait", width: 512, height: 512 }),
-      /No image was generated.*Cloudflare.*AI Horde/s,
+      /No image was generated.*Cloudflare.*AI Horde/,
     );
   } finally {
     globalThis.fetch = originalFetch;
