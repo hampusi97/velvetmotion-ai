@@ -1515,7 +1515,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           </div>
 
           {/* Pinned Bottom Composer */}
-          <div className="flex gap-1.5 sm:gap-2 px-1">
+          <form
+            className="flex gap-1.5 sm:gap-2 px-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+          >
             <button
               type="button"
               onClick={() => setGamesOpen((g) => !g)}
@@ -1552,7 +1558,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             >
               Send
             </button>
-          </div>
+          </form>
         </div>
       </section>
 
