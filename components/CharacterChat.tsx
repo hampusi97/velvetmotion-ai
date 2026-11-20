@@ -49,6 +49,7 @@ import { AmbientMixer } from "@/components/AmbientMixer";
 import { computeMoodState } from "@/lib/moodEngine";
 import { extractMemoriesFromMessage, loadMemories, saveMemories, splitInnerThoughtAndReply } from "@/lib/memoryMap";
 import { memoryPromptBlock, pinLong, pushShort } from "@/lib/memoryTiers";
+import { buildLorebookContext, loadLorebook } from "@/lib/lorebook";
 import { stageFromIntimacy } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
 import { cleanSpeechText, speakWithNeuralVoice } from "@/lib/kokoroTts";
@@ -379,13 +380,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     notifySaved("Saved to Collection & Photo Diary");
   };
 
-  const buildPersonaPayload = () => {
+  const buildPersonaPayload = (recentUserText = "") => {
     const dynamicMemories = toDynamicMemories(character.id);
     const vaultNotes = loadCategorizedMemories(character.id)
       .slice(0, 8)
       .map((m) => `- [${m.category}] ${m.text}`)
       .join("\n");
-    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id)].filter(Boolean).join("\n");
+    const loreContext = buildLorebookContext(loadLorebook(character.id), recentUserText);
+    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext].filter(Boolean).join("\n");
     return {
       id: character.id,
       name: character.name,
@@ -440,7 +442,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
     const routed = await generateCompanionReply(
       historyMsgs.slice(-16).map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
-      buildPersonaPayload(),
+      buildPersonaPayload(userPrompt),
     );
 
     const sanitized = sanitizeCompanionReply(routed.text, character.name);

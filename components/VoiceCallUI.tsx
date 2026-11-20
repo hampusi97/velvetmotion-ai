@@ -6,6 +6,8 @@ import { speak, stopSpeaking } from "@/lib/speech";
 import { characterMediaUrl, joiSequenceFrames } from "@/lib/media";
 import { generateCompanionReply } from "@/lib/chatRouter";
 import { pushShort, memoryPromptBlock } from "@/lib/memoryTiers";
+import { detectVoiceAction } from "@/lib/voiceCommands";
+import { buildLorebookContext, loadLorebook } from "@/lib/lorebook";
 import { bumpIntimacy, getIntimacy } from "@/lib/storage";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 
@@ -37,6 +39,8 @@ export function VoiceCallUI({ character, onClose }: Props) {
   const [videoMode, setVideoMode] = useState(false);
   const [camActive, setCamActive] = useState(false);
   const [listening, setListening] = useState(false);
+  const [micPaused, setMicPaused] = useState(false);
+  const pausedRef = useRef(false);
   const [speaking, setSpeaking] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [status, setStatus] = useState("Tap Start call");
@@ -112,7 +116,8 @@ export function VoiceCallUI({ character, onClose }: Props) {
           tagline: character.tagline,
           personality: character.personality,
           backstory: character.background,
-          memoryBlock: memoryPromptBlock(character.id),
+          memoryBlock: [memoryPromptBlock(character.id), buildLorebookContext(loadLorebook(character.id), userText)]
+            .filter(Boolean).join("\n"),
           relationshipLevel: getIntimacy(character.id, character.intimacy),
         },
       );
@@ -135,7 +140,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
       speak(reply, { ...character.voice }, {
         onEnd: () => {
           setSpeaking(false);
-          if (activeRef.current) startListen();
+          if (activeRef.current && !pausedRef.current) startListen();
           else setStatus("Call ended");
         },
       });
@@ -146,6 +151,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
   };
 
   const startListen = () => {
+    if (!activeRef.current || pausedRef.current) return;
     const SR =
       typeof window !== "undefined"
         ? (
@@ -183,7 +189,18 @@ export function VoiceCallUI({ character, onClose }: Props) {
     };
     recog.onresult = (ev: SpeechRecognitionResultEventLike) => {
       const text = ev.results[0]?.[0]?.transcript?.trim();
-      if (text) void replyTo(text);
+      if (!text) return;
+      const action = detectVoiceAction(text);
+      if (action === "end-call") { endCall(); return; }
+      if (action === "pause-listening") {
+        pausedRef.current = true;
+        setMicPaused(true);
+        setStatus("Microphone paused. Tap Resume mic to continue.");
+        recog.stop();
+        return;
+      }
+      if (action) return;
+      void replyTo(text);
     };
     recogRef.current = recog;
     try {
@@ -195,6 +212,8 @@ export function VoiceCallUI({ character, onClose }: Props) {
 
   const startCall = () => {
     activeRef.current = true;
+    pausedRef.current = false;
+    setMicPaused(false);
     setLive(true);
     setLog([]);
     const hi =
@@ -217,6 +236,8 @@ export function VoiceCallUI({ character, onClose }: Props) {
 
   const endCall = () => {
     activeRef.current = false;
+    pausedRef.current = false;
+    setMicPaused(false);
     setLive(false);
     setListening(false);
     setSpeaking(false);
@@ -318,10 +339,14 @@ export function VoiceCallUI({ character, onClose }: Props) {
                 <button
                   type="button"
                   disabled={speaking}
-                  onClick={() => startListen()}
+                  onClick={() => {
+                    if (micPaused) { pausedRef.current = false; setMicPaused(false); }
+                    else if (listening) { pausedRef.current = true; setMicPaused(true); recogRef.current?.stop(); setStatus("Microphone paused."); return; }
+                    startListen();
+                  }}
                   className="flex-1 rounded-2xl border border-emerald-500/50 bg-emerald-500/15 py-3 text-sm font-medium disabled:opacity-40"
                 >
-                  🎤 Talk
+                  {micPaused ? "🎤 Resume mic" : listening ? "🔇 Pause mic" : "🎤 Talk"}
                 </button>
                 <button
                   type="button"
@@ -339,7 +364,7 @@ export function VoiceCallUI({ character, onClose }: Props) {
             </button>
           )}
           <p className="text-[10px] text-zinc-600">
-            Voice chat. Tap the mic to talk.
+            Voice chat uses optional browser speech recognition. Say “end call” or “stop listening” during a call; no voice commands run system programs.
           </p>
         </div>
       </div>

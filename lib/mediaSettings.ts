@@ -5,6 +5,8 @@ export type MediaBackendSettings = {
   localImageBase: string;
   /** Path style: comfy | forge | custom-prompt-url */
   localImageMode: "comfy" | "forge" | "prompt-url";
+  /** Optional installed CheckpointLoaderSimple model selected in the Studio. */
+  comfyCheckpoint: string;
   /** Optional img2vid endpoint that accepts image URL + prompt */
   img2vidUrl: string;
   /** Optional reference-aware img2img bridge URL for original fictional artwork. */
@@ -22,6 +24,7 @@ const KEY = "vm-media-backend";
 const DEFAULTS: MediaBackendSettings = {
   localImageBase: "",
   localImageMode: "prompt-url",
+  comfyCheckpoint: "",
   img2vidUrl: "",
   img2imgUrl: "",
   pollinationsKey: "",
