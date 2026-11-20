@@ -17,11 +17,11 @@ import json
 import os
 import random
 import re
-import socketserver
+import subprocess
 import sys
-import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 PORT = int(os.environ.get("VELVET_ENGINE_PORT", "8787"))
@@ -31,17 +31,17 @@ CF_IMAGE_WORKER = os.environ.get(
 ).rstrip("/")
 ALLOW_CLOUD_FALLBACK = os.environ.get("VELVET_ALLOW_CLOUD_FALLBACK", "0") == "1"
 
-KOBOLD_URL = os.environ.get("KOBOLD_URL", "http://127.0.0.1:5001")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
-COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
+KOBOLD_URL = os.environ.get("KOBOLD_URL", "http://127.0.0.1:5001").rstrip("/")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188").rstrip("/")
 
 # Only explicitly allowed first-party UIs may read responses via browser CORS.
 ALLOWED_ORIGINS = {
     "https://velvetmotion-ai.hampusi97.workers.dev",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:8787",
-    "http://127.0.0.1:8787",
+    f"http://localhost:{PORT}",
+    f"http://127.0.0.1:{PORT}",
     "tauri://localhost",
     "http://tauri.localhost",
 }
@@ -165,8 +165,19 @@ def probe(url, timeout=0.8):
         return False
 
 
+def probe_engines(*, include_media=True):
+    endpoints = {
+        "koboldcpp": f"{KOBOLD_URL}/api/v1/model",
+        "ollama": f"{OLLAMA_URL}/api/tags",
+    }
+    if include_media:
+        endpoints["comfyui"] = f"{COMFY_URL}/system_stats"
+    with ThreadPoolExecutor(max_workers=len(endpoints)) as executor:
+        return dict(zip(endpoints, executor.map(probe, endpoints.values())))
+
+
 def strip_think(text):
-    return re.sub(r"<think>[\s\S]*?</think>", "", text or "", flags=re.IGNORECASE).strip()
+    return re.sub(r"<think>[\s\S]*?(?:</think>|$)", "", text or "", flags=re.IGNORECASE).strip()
 
 
 class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
@@ -211,7 +222,10 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
         if length < 0 or length > MAX_JSON_BYTES:
             raise ValueError("Body exceeds local request limit")
         raw = self.rfile.read(length) if length > 0 else b"{}"
-        return json.loads(raw.decode("utf-8") or "{}")
+        body = json.loads(raw.decode("utf-8") or "{}")
+        if not isinstance(body, dict):
+            raise ValueError("Expected a JSON object")
+        return body
 
     def do_GET(self):
         if not self.request_origin_allowed():
@@ -220,16 +234,13 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/health":
             total_ram, avail_ram = get_ram_gb()
-            kobold = probe(f"{KOBOLD_URL}/api/v1/model")
-            ollama = probe(f"{OLLAMA_URL}/api/tags")
-            comfy = probe(f"{COMFY_URL}/system_stats")
             self.send_json(200, {
                 "status": "online",
                 "engine": "VelvetMotion Home Engine",
                 "totalRamGb": total_ram,
                 "availableRamGb": avail_ram,
                 "cpuCores": os.cpu_count() or 4,
-                "engines": {"koboldcpp": kobold, "ollama": ollama, "comfyui": comfy},
+                "engines": probe_engines(),
                 "publicTunnelUrl": None,
                 "hostingStaticOut": STATIC_DIR.exists(),
                 "cloudFallbackEnabled": ALLOW_CLOUD_FALLBACK,
@@ -253,7 +264,7 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         try:
             body = self.read_json_body()
-        except Exception:
+        except (OSError, ValueError):
             self.send_json(400, {"error": "Invalid or oversized JSON body"})
             return
 
@@ -279,9 +290,10 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
         messages = body.get("messages", [])
 
         targets = []
-        if probe(f"{KOBOLD_URL}/api/v1/model"):
+        engines = probe_engines(include_media=False)
+        if engines["koboldcpp"]:
             targets.append(("koboldcpp", f"{KOBOLD_URL}/v1/chat/completions", "local-gguf"))
-        if probe(f"{OLLAMA_URL}/api/tags"):
+        if engines["ollama"]:
             targets.append(("ollama", f"{OLLAMA_URL}/v1/chat/completions", body.get("model") or "llama3.1:8b"))
 
         for provider, endpoint, model in targets:
@@ -301,12 +313,17 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
                 with urllib.request.urlopen(req, timeout=45) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     reply = strip_think(data["choices"][0]["message"]["content"])
-                    self.send_json(200, {"provider": provider, "reply": reply})
-                    return
             except Exception as exc:
                 print(f"[VelvetEngine] {provider} chat error: {exc}")
+                continue
+            if reply:
+                self.send_json(200, {"provider": provider, "reply": reply})
+                return
 
-        self.send_json(503, {"error": "No local LLM running (start KoboldCpp on :5001 or Ollama on :11434)"})
+        if targets:
+            self.send_json(502, {"error": "Local chat providers did not return a reply. Check the loaded models and their logs."})
+        else:
+            self.send_json(503, {"error": "No local LLM running. Start KoboldCpp or Ollama and load a model."})
 
     def handle_image_generation(self, prompt, steps, seed):
         if not prompt:
@@ -374,20 +391,20 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
 
 def main():
     total_ram, avail_ram = get_ram_gb()
+    engines = probe_engines()
     print("=" * 68)
     print("⚡ VELVETMOTION AI — HOME SERVER & LOCAL RAM/GPU SUPPLEMENT ENGINE")
     print("=" * 68)
     print(f"• Local Web & API:  http://127.0.0.1:{PORT}")
     print(f"• System RAM:       {total_ram} GB total ({avail_ram} GB available)")
     print(f"• Static Site Dir:  {STATIC_DIR} ({'FOUND' if STATIC_DIR.exists() else 'API-ONLY MODE'})")
-    print(f"• Local Engines:    KoboldCpp={probe(KOBOLD_URL + '/api/v1/model')} | Ollama={probe(OLLAMA_URL + '/api/tags')} | ComfyUI={probe(COMFY_URL + '/system_stats')}")
+    print(f"• Local Engines:    KoboldCpp={engines['koboldcpp']} | Ollama={engines['ollama']} | ComfyUI={engines['comfyui']}")
     print("=" * 68)
 
     print("• Network:          loopback-only; no public tunnel is started")
     print(f"• Cloud fallback:   {'enabled' if ALLOW_CLOUD_FALLBACK else 'off (private by default)'}")
 
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("127.0.0.1", PORT), VelvetEngineHandler) as httpd:
+    with http.server.ThreadingHTTPServer(("127.0.0.1", PORT), VelvetEngineHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

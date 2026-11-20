@@ -35,6 +35,11 @@ export const PORTRAIT_BY_ID: Record<string, string> = {
   "dani-reyes": "/portraits/dani-reyes.webp",
   "elara-shah": "/portraits/elara-shah.webp",
   "beck-carver": "/portraits/beck-carver.webp",
+  "nadia-morrow": "/portraits/nadia-morrow.webp",
+  "daphne-shaw": "/portraits/daphne-shaw.webp",
+  "camille-laurent": "/portraits/camille-laurent.webp",
+  "inez-mercado": "/portraits/inez-mercado.webp",
+  "simone-adeyemi": "/portraits/simone-adeyemi.webp",
 
   // 36 Distinct Roster Companions (.jpg)
   "nova-g": "/portraits/nova-g.jpg",

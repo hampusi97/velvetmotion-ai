@@ -1,6 +1,6 @@
 import { loadGalleryDB, saveGalleryDB } from "./db";
-import { blobToDataUrl } from "./imageStore";
-import { getGallery, type GalleryItem } from "./storage";
+import { blobToDataUrl, remoteImageToStableDataUrl } from "./imageStore";
+import { addToGallery, getGallery, type GalleryItem } from "./storage";
 
 export function collectionMediaFile({ url, type }: Pick<GalleryItem, "url" | "type">) {
   const mime = url.match(/^data:(image|video)\/([\w+-]+)/i);
@@ -30,21 +30,46 @@ export async function saveCollectionClip(clip: Pick<GalleryItem, "url" | "charac
     mood: "video",
     createdAt: Date.now(),
   });
+  window.dispatchEvent(new Event("vm:vault-updated"));
+}
+
+/** Save an image that can be opened again after the original render URL expires. */
+export async function saveCollectionPhoto(photo: Omit<GalleryItem, "id" | "createdAt">) {
+  const url = photo.url.startsWith("data:image/") ? photo.url
+    : await remoteImageToStableDataUrl(photo.url, AbortSignal.timeout(15_000));
+  if (!url.startsWith("data:image/")) throw new Error("The model did not return a photo that can be saved.");
+  const saved = addToGallery({ ...photo, url });
+  if (!saved) throw new Error("Collection storage is unavailable.");
+  try {
+    await saveGalleryDB({
+      id: saved.id,
+      characterId: saved.characterId,
+      characterName: saved.characterName,
+      prompt: saved.prompt,
+      url: saved.url,
+      mood: saved.type,
+      createdAt: saved.createdAt,
+    });
+  } catch (error) {
+    if (!getGallery().some((item) => item.id === saved.id)) throw error;
+  }
+  window.dispatchEvent(new Event("vm:vault-updated"));
+  return saved.url;
 }
 
 export async function loadCollectionItems(): Promise<GalleryItem[]> {
-  const clips = await loadGalleryDB().catch(() => []);
+  const rows = await loadGalleryDB().catch(() => []);
   const items = new Map(getGallery().map((item) => [item.id, item]));
-  for (const clip of clips) {
-    if (clip.mood !== "video" || !clip.characterName) continue;
-    items.set(clip.id, {
-      id: clip.id,
-      characterId: clip.characterId || "",
-      characterName: clip.characterName,
-      type: "video",
-      url: clip.url,
-      prompt: clip.prompt,
-      createdAt: clip.createdAt,
+  for (const row of rows) {
+    if (!row.characterName || items.has(row.id)) continue;
+    items.set(row.id, {
+      id: row.id,
+      characterId: row.characterId || "",
+      characterName: row.characterName,
+      type: row.mood,
+      url: row.url,
+      prompt: row.prompt,
+      createdAt: row.createdAt,
     });
   }
   return [...items.values()];

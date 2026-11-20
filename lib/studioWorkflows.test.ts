@@ -163,6 +163,21 @@ test("chat rejects a disconnected stream before a reply can be saved", async () 
   await assert.rejects(readChatEventStream(body), /ended before the provider completed/);
 });
 
+test("a terminal chat event completes a reply even if the provider keeps the connection open", { timeout: 1000 }, async () => {
+  let released = false;
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const event = { choices: [{ delta: { content: "Look for the small brass dial." }, finish_reason: "stop" }] };
+      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
+    },
+    cancel() {
+      released = true;
+    },
+  });
+  assert.equal(await readChatEventStream(body), "Look for the small brass dial.");
+  assert.equal(released, true);
+});
+
 test("18+ video presets produce an editable fictional prompt and require 18+ mode", () => {
   const preset = VIDEO_SCENE_PRESETS.find(({ id }) => id === "after-hours");
   assert.ok(preset);

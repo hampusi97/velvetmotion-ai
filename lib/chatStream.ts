@@ -21,7 +21,6 @@ export async function readChatEventStream(
   let pending = "";
   let text = "";
   let finished = false;
-  let done = false;
 
   function readLine(line: string) {
     if (line.startsWith("data:")) {
@@ -33,7 +32,6 @@ export async function readChatEventStream(
     const data = dataLines.splice(0).join("\n");
     if (data === "[DONE]") {
       finished = true;
-      done = true;
       return;
     }
 
@@ -54,15 +52,18 @@ export async function readChatEventStream(
   }
 
   try {
-    while (!done) {
+    while (!finished) {
       const chunk = await reader.read();
       if (chunk.done) break;
       pending += decoder.decode(chunk.value, { stream: true });
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
-      for (const line of lines) readLine(line.replace(/\r$/, ""));
+      for (const line of lines) {
+        readLine(line.replace(/\r$/, ""));
+        if (finished) break;
+      }
     }
-    if (!done) {
+    if (!finished) {
       readLine((pending + decoder.decode()).replace(/\r$/, ""));
       readLine("");
     }

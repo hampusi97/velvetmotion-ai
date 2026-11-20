@@ -6,7 +6,7 @@ import { CompanionProfile, COMPANION_ARCHETYPE_FILTERS, FLAGSHIP_COMPANIONS } fr
 import type { Character } from '@/lib/characters';
 import { bumpIntimacy, saveMatch } from '@/lib/storage';
 import { useCoinsStore } from '@/lib/coinsStore';
-import { saveMatchDB } from '@/lib/db';
+import { loadMatchesDB, saveMatchDB } from '@/lib/db';
 import { playMatchChime, playSuperLikeZap, playSwipeTick } from '@/lib/neonAudio';
 import { hapticMatch, hapticSuperLike, hapticSwipe } from '@/lib/haptics';
 import { SafeImage } from '@/components/SafeImage';
@@ -22,7 +22,7 @@ export interface DiscoverCard extends CompanionProfile {
 interface DiscoverSwipeProps {
   profiles?: DiscoverCard[];
   fallbackPortraitUrl?: string;
-  onStartChat?: (profile: CompanionProfile, openerOverride?: string, bonusAffinity?: number) => void;
+  onStartChat?: (profile: CompanionProfile, openingLine?: string) => void;
   onHome?: () => void;
   onMeet3D?: (character: Character) => void;
   onMatch?: (character: Character) => void;
@@ -85,9 +85,11 @@ export function DiscoverSwipe({
   const deck = React.useMemo(() => deckFilter === 'All'
     ? fullDeck
     : fullDeck.filter((card) => card.category === deckFilter && !card.isSecretAdmirer), [deckFilter, fullDeck]);
-  const availableFilters = COMPANION_ARCHETYPE_FILTERS.filter((category) =>
-    fullDeck.some((card) => card.category === category),
-  );
+  const availableFilters = React.useMemo(() => {
+    const categories = new Set(fullDeck.filter((card) => !card.isSecretAdmirer).map((card) => card.category));
+    const preferredOrder = new Set([...COMPANION_ARCHETYPE_FILTERS, ...[...categories].sort()]);
+    return [...preferredOrder].filter((category) => categories.has(category));
+  }, [fullDeck]);
   const [index, setIndex] = useState(0);
   const [lastPass, setLastPass] = useState<number | null>(null);
   const [showMatches, setShowMatches] = useState(false);
@@ -99,6 +101,7 @@ export function DiscoverSwipe({
   // Match, Rizz Challenge & Super-Like states
   const [matchedCard, setMatchedCard] = useState<DiscoverCard | null>(null);
   const [matchedBonus, setMatchedBonus] = useState<number>(0);
+  const [matchedOpeningLine, setMatchedOpeningLine] = useState<string>();
   const [rizzTarget, setRizzTarget] = useState<DiscoverCard | null>(null);
   const [rizzInput, setRizzInput] = useState('');
   const [rizzFeedback, setRizzFeedback] = useState<string | null>(null);
@@ -117,6 +120,7 @@ export function DiscoverSwipe({
   });
 
   useEffect(() => {
+    let active = true;
     try {
       const raw = window.localStorage.getItem(MATCHES_KEY);
       if (raw) {
@@ -131,10 +135,16 @@ export function DiscoverSwipe({
     } catch {
       // Ignore
     }
+    void loadMatchesDB().then((stored) => {
+      if (!active) return;
+      for (const id of stored) knownMatches.current.add(id);
+      setMatchIds([...knownMatches.current]);
+    }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   const recordMatch = useCallback(
-    (card: DiscoverCard, bonus = 0) => {
+    (card: DiscoverCard, bonus = 0, openingLine?: string) => {
       const cleanId = card.id.replace(/^secret-/, '');
       const isNewMatch = !knownMatches.current.has(cleanId);
       if (isNewMatch) {
@@ -148,6 +158,7 @@ export function DiscoverSwipe({
         hapticMatch();
       }
       setMatchedBonus(isNewMatch ? bonus : 0);
+      setMatchedOpeningLine(openingLine);
       setMatchedCard({ ...card, id: cleanId });
     },
     [earn],
@@ -279,7 +290,7 @@ export function DiscoverSwipe({
     setRizzTarget(null);
     setRizzFeedback(null);
     isTransitioning.current = true;
-    recordMatch(target, 18);
+    recordMatch(target, 18, line);
     advanceDeck();
   }
 
@@ -562,6 +573,8 @@ export function DiscoverSwipe({
             <input
               type="text"
               value={rizzInput}
+              aria-label="Opening line"
+              maxLength={320}
               onChange={(e) => setRizzInput(e.target.value)}
               placeholder="Write your opening line..."
               className="mt-3 w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white focus:border-[#ff1e8e] focus:outline-none"
@@ -609,10 +622,9 @@ export function DiscoverSwipe({
                   type="button"
                   onClick={() => {
                     const chosen = matchedCard;
-                    const bonus = matchedBonus;
                     setMatchedCard(null);
                     if (onStartChat) {
-                      onStartChat(chosen, chosen.greeting, bonus);
+                      onStartChat(chosen, matchedOpeningLine);
                     } else if (onMatch) {
                       onMatch(toLegacyCharacter(chosen));
                     }

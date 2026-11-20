@@ -19,9 +19,9 @@ import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/compone
 import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { useLocalEngineStatus } from '@/lib/localEngineBridge';
-import { addToGallery, getGallery } from '@/lib/storage';
-import { appendMainChatMessage, saveCustomCompanionDB, saveGalleryDB } from '@/lib/db';
-import { saveCollectionClip } from '@/lib/collectionMedia';
+import type { GalleryItem } from '@/lib/storage';
+import { appendMainChatMessage, saveCustomCompanionDB } from '@/lib/db';
+import { collectionMediaFile, loadCollectionItems, saveCollectionClip, saveCollectionPhoto } from '@/lib/collectionMedia';
 import { remoteImageToStableDataUrl } from '@/lib/imageStore';
 import { emitVaultUpdated } from '@/lib/firebaseSync';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
@@ -47,6 +47,17 @@ interface MediaStudioModalProps {
   onCompanionCreated?: (companion: CompanionProfile) => void;
   onDropIntoChat?: (companionId: string, imageUrl: string, caption: string) => void | Promise<void>;
 }
+
+type StudioPhoto = {
+  url: string;
+  galleryUrl?: string;
+  companion: Pick<CompanionProfile, 'id' | 'name'>;
+  style: string;
+  scene: string;
+  mature: boolean;
+  engine: string;
+  saved: boolean;
+};
 
 const SCENE_PRESETS = [
   { id: 'sunset-pool', label: 'Sunset Pool', suffix: 'golden-hour infinity pool, warm reflections, crisp DSLR candid', nsfw: false },
@@ -122,11 +133,11 @@ export default function MediaStudioModal({
   const [wardrobeStyle, setWardrobeStyle] = useState("elegant evening fashion");
   const [negativePrompt, setNegativePrompt] = useState("watermarks, extra fingers, distorted faces");
   const [nsfwMode, setNsfwMode] = useState(false);
+  const photoRequest = useRef<symbol | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const [photo, setPhoto] = useState<StudioPhoto | null>(null);
   const [photoRevealed, setPhotoRevealed] = useState(true);
-  const [engineBadge, setEngineBadge] = useState<string | null>(null);
-  const [galleryPhoto, setGalleryPhoto] = useState<string | null>(null);
 
   const [videoSourceUrl, setVideoSourceUrl] = useState(() =>
     FLAGSHIP_COMPANIONS.find((profile) => profile.id === activeChatCompanionId)?.portraitUrl ?? FLAGSHIP_COMPANIONS[0].portraitUrl,
@@ -145,10 +156,12 @@ export default function MediaStudioModal({
   const videoAbort = useRef<AbortController | null>(null);
   const [videoBusy, setVideoBusy] = useState(false);
   const [clipSaving, setClipSaving] = useState(false);
+  const [clipSaved, setClipSaved] = useState(false);
   const [clipCompanion, setClipCompanion] = useState<{ id: string; name: string } | null>(null);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
   const [videoDimensions, setVideoDimensions] = useState('');
   const [videoEngineUsed, setVideoEngineUsed] = useState<string | null>(null);
+  const [savedStills, setSavedStills] = useState<GalleryItem[]>([]);
 
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
   const [charName, setCharName] = useState('');
@@ -161,6 +174,7 @@ export default function MediaStudioModal({
   const [customVoice, setCustomVoice] = useState<VoiceDesign>(DEFAULT_VOICE_DESIGN);
   const [referenceBusy, setReferenceBusy] = useState(false);
   const [referenceResult, setReferenceResult] = useState<string | null>(null);
+  const uploadVersion = useRef(0);
   const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
   const [videoIsGenerative, setVideoIsGenerative] = useState(false);
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm' | 'unknown'>('unknown');
@@ -186,16 +200,37 @@ export default function MediaStudioModal({
   }, [isOpen, standalone]);
 
   useEffect(() => {
-    if (isOpen || standalone) return () => videoAbort.current?.abort();
+    if (!isOpen && !standalone) {
+      setPhotoBusy(false);
+      setReferenceBusy(false);
+      return;
+    }
+    return () => {
+      videoAbort.current?.abort();
+      photoRequest.current = null;
+      uploadVersion.current += 1;
+    };
   }, [isOpen, standalone]);
 
   useEffect(() => {
     if (generatedVideoUrl?.startsWith('blob:')) return () => URL.revokeObjectURL(generatedVideoUrl);
   }, [generatedVideoUrl]);
 
+  const generatedPhoto = photo?.url;
   useEffect(() => {
     if (generatedPhoto?.startsWith('blob:')) return () => URL.revokeObjectURL(generatedPhoto);
   }, [generatedPhoto]);
+
+  useEffect(() => {
+    if (tab !== 'video' || (!isOpen && !standalone)) return;
+    let active = true;
+    void loadCollectionItems().then((items) => {
+      if (!active) return;
+      setSavedStills(items.filter((item) => item.url && !item.url.startsWith('blob:') && !collectionMediaFile(item).isVideo)
+        .sort((a, b) => b.createdAt - a.createdAt).slice(0, 10));
+    });
+    return () => { active = false; };
+  }, [tab, isOpen, standalone, photo?.saved]);
 
   const draftCompanion = FLAGSHIP_COMPANIONS.find((profile) => profile.portraitUrl === videoSourceUrl);
   const draftCompanionId = draftCompanion?.id;
@@ -300,6 +335,7 @@ export default function MediaStudioModal({
   }
 
   async function handleGeneratePhoto() {
+    if (photoRequest.current || photoSaving) return;
     const preset = scenePresets.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
     const prompt = [
       companion.visualDna,
@@ -323,6 +359,8 @@ export default function MediaStudioModal({
       ? requestedSeed : Math.floor(Math.random() * 90000 + 1000);
     const wantsNsfw = nsfwMode || preset.nsfw || /\b(nsfw|nude|nudity|explicit|sexual|lingerie)\b/i.test(prompt);
     const safeNegative = negativePrompt.trim().slice(0, 360);
+    const request = Symbol();
+    photoRequest.current = request;
 
     setPhotoBusy(true);
     setErrorMsg(null);
@@ -331,6 +369,7 @@ export default function MediaStudioModal({
     try {
       if (!wantsNsfw && !safeNegative) {
         const comfyInfo = await probeComfyUi();
+        if (photoRequest.current !== request) return;
         if (comfyInfo.online) {
           setComfyCheckpoints(comfyInfo.checkpoints);
           try {
@@ -342,19 +381,9 @@ export default function MediaStudioModal({
               height: photoHeight,
               seed: parsedSeed,
             });
-            const galleryUrl = await remoteImageToStableDataUrl(blobUrl).catch((error) => {
-              URL.revokeObjectURL(blobUrl);
-              throw error;
-            });
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
             const engineLabel = `ComfyUI (${comfyCheckpoint || comfyInfo.checkpoints[0] || 'Local :8188'})`;
-            setGeneratedPhoto(blobUrl);
-            setGalleryPhoto(galleryUrl);
-            setPhotoRevealed(true);
-            setVideoSourceUrl(blobUrl);
-            setEngineBadge(engineLabel);
-            handleSaveToCollection(galleryUrl, 'studio-photo');
-            setStatusMsg(`Rendered via ${engineLabel} in ${elapsedSec}s (seed ${parsedSeed}) · Auto-saved to Photo Diary & Collection`);
+            await finishPhoto(request, { imageUrl: blobUrl, engine: engineLabel, elapsedSec, seed: parsedSeed });
             return;
           } catch {
             /* Fall back seamlessly to studio pipeline / Cloudflare Image Worker GET /generate */
@@ -376,25 +405,55 @@ export default function MediaStudioModal({
         negativePrompt,
       });
 
-      setGeneratedPhoto(result.imageUrl);
-      setGalleryPhoto(result.galleryImageUrl ?? null);
-      setPhotoRevealed(!wantsNsfw);
-      setVideoSourceUrl(result.imageUrl);
-      setEngineBadge(result.engine);
-      handleSaveToCollection(result.galleryImageUrl || result.imageUrl, wantsNsfw ? 'selfie' : 'studio-photo');
-      setStatusMsg(`Rendered via ${result.engine} in ${result.elapsedSec}s (seed ${result.seed}) · Auto-saved to Photo Diary & Collection`);
+      await finishPhoto(request, result);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
+      if (photoRequest.current === request) setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
     } finally {
-      setPhotoBusy(false);
+      if (photoRequest.current === request) {
+        photoRequest.current = null;
+        setPhotoBusy(false);
+      }
+    }
+
+    async function finishPhoto(render: symbol, result: Awaited<ReturnType<typeof generateStudioPicture>>) {
+      if (photoRequest.current !== render) {
+        if (result.imageUrl.startsWith('blob:')) URL.revokeObjectURL(result.imageUrl);
+        return;
+      }
+      const rendered: StudioPhoto = {
+        url: result.imageUrl,
+        galleryUrl: result.galleryImageUrl,
+        companion,
+        style: studioStyle,
+        scene: preset.label,
+        mature: wantsNsfw,
+        engine: result.engine,
+        saved: false,
+      };
+      setPhoto(rendered);
+      setPhotoRevealed(!rendered.mature);
+      setVideoSourceUrl((current) => current === videoSourceUrl ? rendered.url : current);
+      const details = `Rendered via ${result.engine} in ${result.elapsedSec}s (seed ${result.seed})`;
+      try {
+        const url = await savePhoto(rendered);
+        if (photoRequest.current !== render) return;
+        setPhoto({ ...rendered, galleryUrl: url, saved: true });
+        setStatusMsg(`${details} · Saved to Photo Diary & Collection`);
+      } catch {
+        if (photoRequest.current !== render) return;
+        setStatusMsg(details);
+        setErrorMsg('The photo is ready. Collection could not save it. Try again or download it.');
+      }
     }
   }
 
   async function handleGenerateReferenceVariant() {
+    if (referenceBusy) return;
     if (!uploadedPreview || uploadSourceKind !== 'fictional' || !uploadRightsConfirmed) {
       setErrorMsg('This feature requires an original fictional adult image and confirmed usage rights.');
       return;
     }
+    const sourceVersion = uploadVersion.current;
     setReferenceBusy(true);
     setErrorMsg(null);
     setStatusMsg('Requesting a reference-aware variation from your configured image model...');
@@ -405,14 +464,16 @@ export default function MediaStudioModal({
         adultMode: uploadedAdultMode,
         sourceType: 'fictional',
       });
+      if (sourceVersion !== uploadVersion.current) return;
       setReferenceResult(response.imageUrl);
       setVideoSourceUrl(response.imageUrl);
       setStatusMsg(`New fictional portrait generated with ${response.engine}. You can animate it or use it as this companion’s avatar.`);
     } catch (err) {
+      if (sourceVersion !== uploadVersion.current) return;
       setErrorMsg(err instanceof Error ? err.message : 'Reference image generation failed.');
       setStatusMsg(null);
     } finally {
-      setReferenceBusy(false);
+      if (sourceVersion === uploadVersion.current) setReferenceBusy(false);
     }
   }
 
@@ -456,7 +517,12 @@ export default function MediaStudioModal({
         return;
       }
       setGeneratedVideoUrl(res.videoUrl);
-      setClipCompanion(draftCompanion || companion);
+      setClipSaved(false);
+      const savedSource = savedStills.find((item) => item.url === videoSourceUrl);
+      setClipCompanion(draftCompanion ?? (photo?.url === videoSourceUrl ? photo.companion : undefined) ?? (
+        savedSource ? { id: savedSource.characterId, name: savedSource.characterName }
+        : { id: 'studio-upload', name: charName.trim() || 'Uploaded portrait' }
+      ));
       setVideoDimensions('');
       setVideoEngineUsed(res.engine);
       setVideoIsGenerative(res.isGenerative);
@@ -488,23 +554,26 @@ export default function MediaStudioModal({
       setErrorMsg(isJson ? 'Character cards must be under 1 MB.' : 'Pictures must be under 12 MB.');
       return;
     }
-    // Never attempt to decode JSON as a photograph.
-    if (isJson) {
-      const parsed = parseCardV2Json(await file.text());
-      if (parsed.ok) {
-        setCharName(parsed.character.name);
-        setCharAge(parsed.character.age);
-        setCharVibe(parsed.character.personality);
-        setCharGreeting(parsed.character.initialMessage);
-        setStatusMsg('Imported character card. Add a portrait to animate it.');
-      } else {
-        setErrorMsg(parsed.error);
-      }
-      return;
-    }
-
+    const sourceVersion = ++uploadVersion.current;
+    setReferenceBusy(false);
     try {
+      if (isJson) {
+        const parsed = parseCardV2Json(await file.text());
+        if (sourceVersion !== uploadVersion.current) return;
+        if (parsed.ok) {
+          setCharName(parsed.character.name);
+          setCharAge(parsed.character.age);
+          setCharVibe(parsed.character.personality);
+          setCharGreeting(parsed.character.initialMessage);
+          setStatusMsg('Imported character card. Add a portrait to animate it.');
+        } else {
+          setErrorMsg(parsed.error);
+        }
+        return;
+      }
+
       const webpData = await compressUploadToWebp(file);
+      if (sourceVersion !== uploadVersion.current) return;
       setUploadedPreview(webpData);
       setReferenceResult(null);
       setVideoSourceUrl(webpData);
@@ -512,11 +581,11 @@ export default function MediaStudioModal({
       setUploadRightsConfirmed(false);
       setUploadedAdultMode(false);
       setFictionalConfirmed(false);
-      setGeneratedVideoUrl(null);
       setStatusMsg('Portrait loaded locally. Confirm permission, then animate or create a fictional companion.');
 
       if (file.type === 'image/png') {
         const charaRaw = extractCharaFromPngBuffer(await file.arrayBuffer());
+        if (sourceVersion !== uploadVersion.current) return;
         if (charaRaw) {
           const parsed = parseCardV2Json(charaRaw, webpData);
           if (parsed.ok) {
@@ -531,32 +600,39 @@ export default function MediaStudioModal({
         }
       }
     } catch {
-      setErrorMsg('Could not decode this image. Please try another PNG, JPG, or WebP.');
+      if (sourceVersion === uploadVersion.current) {
+        setErrorMsg(isJson ? 'Could not read that character card.' : 'Could not decode this image. Please try another PNG, JPG, or WebP.');
+      }
     }
   }
 
-  function handleSaveToCollection(url: string, type = 'studio') {
-    const saved = addToGallery({
-      characterId: companion.id,
-      characterName: companion.name,
-      type,
-      url,
-      prompt: `${companion.name} · ${studioStyle}`,
+  function savePhoto(rendered: StudioPhoto) {
+    return saveCollectionPhoto({
+      characterId: rendered.companion.id,
+      characterName: rendered.companion.name,
+      type: rendered.mature ? 'selfie' : 'studio-photo',
+      url: rendered.galleryUrl ?? rendered.url,
+      prompt: `${rendered.scene} · ${rendered.style}`,
     });
-    if (saved) {
-      void saveGalleryDB({
-        id: saved.id,
-        characterId: saved.characterId,
-        url: saved.url,
-        mood: type,
-        createdAt: saved.createdAt,
-      });
+  }
+
+  async function handleSavePhoto() {
+    if (!photo || photo.saved || photoSaving || photoRequest.current) return;
+    setPhotoSaving(true);
+    setErrorMsg(null);
+    try {
+      const url = await savePhoto(photo);
+      setPhoto((current) => current === photo ? { ...photo, galleryUrl: url, saved: true } : current);
+      setStatusMsg('Photo saved to Collection.');
+    } catch {
+      setErrorMsg('Collection could not save this photo. Try again or download it.');
+    } finally {
+      setPhotoSaving(false);
     }
-    setStatusMsg('Saved permanently to Collection!');
   }
 
   async function handleSaveClip() {
-    if (!generatedVideoUrl || !clipCompanion || clipSaving || videoBusy) return;
+    if (!generatedVideoUrl || !clipCompanion || clipSaved || clipSaving || videoBusy) return;
     setClipSaving(true);
     setErrorMsg(null);
     setStatusMsg(null);
@@ -568,6 +644,7 @@ export default function MediaStudioModal({
         prompt: videoIsGenerative ? 'AI-generated motion' : 'Animated still',
       });
       emitVaultUpdated();
+      setClipSaved(true);
       setStatusMsg('Clip saved to Collection.');
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'The clip could not be saved to browser storage.');
@@ -576,11 +653,12 @@ export default function MediaStudioModal({
     }
   }
 
-  async function handleDropToChat(url: string) {
-    const targetId = activeChatCompanionId || companion.id;
-    const caption = `*Studio drop (${studioStyle}):* ${scenePresets.find((s) => s.id === sceneId)?.label || 'Custom'}`;
+  async function handleDropToChat(rendered: StudioPhoto) {
+    const targetId = activeChatCompanionId || rendered.companion.id;
+    const caption = `*Studio drop (${rendered.style}):* ${rendered.scene}`;
     try {
-      const imageUrl = url.startsWith('blob:') ? await remoteImageToStableDataUrl(url) : url;
+      const url = rendered.galleryUrl ?? rendered.url;
+      const imageUrl = url.startsWith('data:image/') ? url : await remoteImageToStableDataUrl(url);
       if (onDropIntoChat) {
         await onDropIntoChat(targetId, imageUrl, caption);
       } else {
@@ -746,8 +824,10 @@ export default function MediaStudioModal({
               <label className="mb-1 block text-[11px] text-[#a6a6c4]">Companion</label>
               <select
                 value={selectedId}
+                aria-label="Photo companion"
                 onChange={(e) => {
                   setSelectedId(e.target.value);
+                  setSceneId(SCENE_PRESETS[0].id);
                   const found = FLAGSHIP_COMPANIONS.find((c) => c.id === e.target.value);
                   if (found) setVideoSourceUrl(found.portraitUrl);
                 }}
@@ -906,54 +986,54 @@ export default function MediaStudioModal({
 
           <button
             type="button"
-            disabled={photoBusy}
+            disabled={photoBusy || photoSaving}
             onClick={() => void handleGeneratePhoto()}
             className="w-full rounded-full neon-btn-primary py-2.5 text-xs font-bold text-white disabled:opacity-50"
           >
             {photoBusy ? 'Generating Neon Portrait...' : 'Generate Photo'}
           </button>
 
-          {generatedPhoto && (
+          {photo && (
             <div className="space-y-2.5 pt-2">
               <div className="relative mx-auto aspect-[2/3] w-56 overflow-hidden rounded-2xl border border-[#ff1e8e]/45 bg-black">
                 <SafeImage
-                  src={generatedPhoto}
+                  src={photo.url}
                   alt="Generated studio photo"
                   onClick={() => setPhotoRevealed(true)}
                   className={`h-full w-full cursor-pointer object-cover transition duration-500 ${
                     photoRevealed ? '' : 'blur-2xl scale-110'
                   }`}
                 />
-                {engineBadge && (
-                  <span className="absolute left-2 top-2 rounded-full bg-black/75 border border-[#00f5ff]/40 px-2 py-0.5 text-[9px] font-bold text-[#00f5ff]">
-                    {engineBadge}
-                  </span>
-                )}
+                <span className="absolute left-2 top-2 rounded-full bg-black/75 border border-[#00f5ff]/40 px-2 py-0.5 text-[9px] font-bold text-[#00f5ff]">
+                  {photo.engine}
+                </span>
                 {!photoRevealed && (
                   <button type="button" onClick={() => setPhotoRevealed(true)} className="absolute inset-0 flex items-center justify-center bg-black/35">
                     <span className="rounded-full neon-btn-primary px-4 py-1.5 text-xs font-bold">Tap to Reveal</span>
                   </button>
                 )}
               </div>
+              <p className="text-center text-zinc-300">{photo.companion.name} · {photo.scene}</p>
               <div className="flex flex-wrap justify-center gap-2">
                 <a
-                  href={generatedPhoto}
-                  download={`velvetmotion-${companion.id}`}
+                  href={photo.url}
+                  download={`velvetmotion-${photo.companion.id}`}
                   className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-semibold"
                 >
                   <Download className="h-3.5 w-3.5" /> Download image
                 </a>
                 <button
                   type="button"
-                  onClick={() => handleSaveToCollection(galleryPhoto || generatedPhoto, 'studio-photo')}
-                  className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/15 px-3 py-1.5 text-[11px] font-bold text-[#00f5ff]"
+                  disabled={photo.saved || photoBusy || photoSaving}
+                  onClick={() => void handleSavePhoto()}
+                  className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/15 px-3 py-1.5 text-[11px] font-bold text-[#00f5ff] disabled:opacity-55"
                 >
-                  <BookmarkPlus className="h-3.5 w-3.5" /> Save to Collection
+                  <BookmarkPlus className="h-3.5 w-3.5" /> {photo.saved ? 'Saved to Collection' : photoSaving ? 'Saving photo…' : 'Save to Collection'}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setVideoSourceUrl(generatedPhoto);
+                    setVideoSourceUrl(photo.url);
                     setTab('video');
                   }}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/50 bg-[#ff5678]/20 px-3 py-1.5 text-[11px] font-bold text-white"
@@ -962,7 +1042,7 @@ export default function MediaStudioModal({
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleDropToChat(galleryPhoto || generatedPhoto)}
+                  onClick={() => void handleDropToChat(photo)}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff1e8e]/50 bg-[#ff1e8e]/20 px-3 py-1.5 text-[11px] font-bold text-pink-100"
                 >
                   <MessageSquare className="h-3.5 w-3.5" /> Drop into Active Chat
@@ -997,7 +1077,7 @@ export default function MediaStudioModal({
               onChange={(e) => setVideoSourceUrl(e.target.value)}
               className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white outline-none focus:border-[#ff5678]"
             >
-              {generatedPhoto && <option value={generatedPhoto}>Latest Studio Photo</option>}
+              {photo && <option value={photo.url}>Latest Studio Photo · {photo.companion.name}</option>}
               {uploadedPreview && <option value={uploadedPreview}>My uploaded portrait</option>}
               {referenceResult && <option value={referenceResult}>Latest reference variation</option>}
               {FLAGSHIP_COMPANIONS.map((c) => (
@@ -1005,10 +1085,7 @@ export default function MediaStudioModal({
                   {c.name} — Flagship Portrait
                 </option>
               ))}
-              {getGallery()
-                .filter((g) => g.url && !g.url.startsWith('blob:') && g.type !== 'video')
-                .slice(0, 10)
-                .map((g) => (
+              {savedStills.map((g) => (
                   <option key={g.id} value={g.url}>
                     Saved: {g.characterName} ({g.type})
                   </option>
@@ -1042,7 +1119,7 @@ export default function MediaStudioModal({
               <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
               <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
               <label className="mt-2 flex items-start gap-2">
-                <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
+                <input type="checkbox" checked={uploadRightsConfirmed} disabled={referenceBusy} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
                 <span>I own or have permission to animate this image and all depicted people are adults.</span>
               </label>
             </div>
@@ -1224,10 +1301,10 @@ export default function MediaStudioModal({
                 <button
                   type="button"
                   onClick={() => void handleSaveClip()}
-                  disabled={clipSaving || videoBusy}
+                  disabled={clipSaved || clipSaving || videoBusy}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/45 bg-[#2a1820] px-3.5 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                 >
-                  <BookmarkPlus className="h-3.5 w-3.5" /> {clipSaving ? 'Saving clip…' : 'Save clip to Collection'}
+                  <BookmarkPlus className="h-3.5 w-3.5" /> {clipSaved ? 'Saved to Collection' : clipSaving ? 'Saving clip…' : 'Save clip to Collection'}
                 </button>
                 <a
                   href={generatedVideoUrl}
@@ -1266,16 +1343,16 @@ export default function MediaStudioModal({
               <p className="font-bold text-pink-200">Use this portrait</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <label className="flex items-start gap-2 text-zinc-200">
-                  <input type="radio" checked={uploadSourceKind === 'fictional'} onChange={() => { setUploadSourceKind('fictional'); setUploadedAdultMode(false); }} name="studio-photo-source" />
+                  <input type="radio" checked={uploadSourceKind === 'fictional'} disabled={referenceBusy} onChange={() => { setUploadSourceKind('fictional'); setUploadedAdultMode(false); }} name="studio-photo-source" />
                   <span>Original fictional adult / AI-created character</span>
                 </label>
                 <label className="flex items-start gap-2 text-zinc-200">
-                  <input type="radio" checked={uploadSourceKind === 'self'} onChange={() => { setUploadSourceKind('self'); setUploadedAdultMode(false); }} name="studio-photo-source" />
+                  <input type="radio" checked={uploadSourceKind === 'self'} disabled={referenceBusy} onChange={() => { setUploadSourceKind('self'); setUploadedAdultMode(false); }} name="studio-photo-source" />
                   <span>My own adult selfie (nonsexual animation only)</span>
                 </label>
               </div>
               <label className="flex items-start gap-2 text-zinc-200">
-                <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
+                <input type="checkbox" checked={uploadRightsConfirmed} disabled={referenceBusy} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
                 <span>I own or have rights to use this image, and every depicted person is an adult. Selfies must show me, not someone else.</span>
               </label>
               {uploadSourceKind === 'fictional' && (
@@ -1353,6 +1430,7 @@ export default function MediaStudioModal({
             accept="image/png,image/webp,image/jpeg,application/json"
             onChange={(e) => {
               const f = e.target.files?.[0];
+              e.target.value = '';
               if (f) void processFile(f);
             }}
             className="hidden"

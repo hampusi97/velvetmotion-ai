@@ -1,6 +1,8 @@
 /** Advanced backend toggles — stored in localStorage. No secrets leave the device. */
 
 const KEY = "vm-advanced-config";
+export const CHAT_ROUTER_SETTINGS_KEY = "velvetmotion_llm_settings";
+export const DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434";
 
 export type AdvancedConfig = {
   ollamaUrl: string; // e.g. http://localhost:11434
@@ -11,28 +13,50 @@ export type AdvancedConfig = {
 };
 
 const DEFAULTS: AdvancedConfig = {
-  ollamaUrl: "http://localhost:11434",
-  ollamaModel: "llama3.2",
+  ollamaUrl: DEFAULT_OLLAMA_URL,
+  ollamaModel: "llama3.1:8b",
   useWebLLM: false,
   telegramBotToken: "",
   discordWebhook: "",
 };
 
-export function loadAdvancedConfig(): AdvancedConfig {
-  if (typeof window === "undefined") return DEFAULTS;
+function readSettings(key: string): Record<string, unknown> {
+  if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return DEFAULTS;
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const stored = JSON.parse(localStorage.getItem(key) || "null");
+    return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {};
   } catch {
-    return DEFAULTS;
+    return {};
   }
+}
+
+function nonemptyString(value: unknown): string | undefined {
+  return typeof value === "string" ? value.trim() || undefined : undefined;
+}
+
+export function loadAdvancedConfig(): AdvancedConfig {
+  const advanced = readSettings(KEY);
+  const router = readSettings(CHAT_ROUTER_SETTINGS_KEY);
+  return {
+    ...DEFAULTS,
+    ...advanced,
+    ollamaUrl: (nonemptyString(router.ollamaUrl) || nonemptyString(advanced.ollamaUrl) || DEFAULT_OLLAMA_URL).replace(/\/+$/, ""),
+    ollamaModel: nonemptyString(router.ollamaModel) || nonemptyString(advanced.ollamaModel) || DEFAULTS.ollamaModel,
+  };
 }
 
 export function saveAdvancedConfig(partial: Partial<AdvancedConfig>) {
   if (typeof window === "undefined") return;
   const next = { ...loadAdvancedConfig(), ...partial };
   localStorage.setItem(KEY, JSON.stringify(next));
+  if (partial.ollamaUrl !== undefined || partial.ollamaModel !== undefined) {
+    const router = readSettings(CHAT_ROUTER_SETTINGS_KEY);
+    localStorage.setItem(CHAT_ROUTER_SETTINGS_KEY, JSON.stringify({
+      ...router,
+      ollamaUrl: nonemptyString(next.ollamaUrl) || DEFAULT_OLLAMA_URL,
+      ollamaModel: nonemptyString(next.ollamaModel) || DEFAULTS.ollamaModel,
+    }));
+  }
 }
 
 /**

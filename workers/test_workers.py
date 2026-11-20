@@ -6,11 +6,13 @@ import tempfile
 import threading
 import unittest
 import urllib.request
-from pathlib import Path
-from unittest.mock import patch
 from http.server import ThreadingHTTPServer
+from io import BytesIO
+from pathlib import Path
+from unittest.mock import Mock, patch
 
-from workers.local_media_proxy import LocalProxyHandler, build_comfy_workflow
+from public.downloads import velvetmotion_home_engine
+from workers.local_media_proxy import LocalProxyHandler, build_comfy_workflow, run_comfy_generation
 from workers.telegram_bridge import ChatSessionState, VelvetTelegramBridge
 
 
@@ -66,12 +68,50 @@ class TestVelvetWorkers(unittest.TestCase):
             with urllib.request.urlopen(opt_req, timeout=5) as opt_resp:
                 self.assertEqual(opt_resp.status, 204)
                 self.assertEqual(opt_resp.headers.get("Access-Control-Allow-Origin"), "*")
+
+            ollama_body = {"model": "fixture", "messages": [{"role": "user", "content": "Hello"}]}
+            ollama_req = urllib.request.Request(
+                f"http://127.0.0.1:{port}/ollama/chat",
+                data=json.dumps(ollama_body).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            with patch("workers.local_media_proxy.forward_json", return_value={"done": True}) as forward:
+                with urllib.request.urlopen(ollama_req, timeout=5) as resp:
+                    self.assertEqual(json.load(resp), {"done": True})
+                self.assertEqual(forward.call_args.args[1], {**ollama_body, "stream": False})
         finally:
             server.shutdown()
             server.server_close()
 
+    def test_comfy_image_completed_without_output_stops_polling(self) -> None:
+        history = {"job": {"status": {"completed": True}, "outputs": {}}}
+        with (
+            patch("workers.local_media_proxy.forward_json", return_value={"prompt_id": "job"}) as forward,
+            patch("workers.local_media_proxy.urllib.request.urlopen", side_effect=[BytesIO(json.dumps(history).encode())]) as get_result,
+            patch("workers.local_media_proxy.time.sleep"),
+        ):
+            self.assertIsNone(run_comfy_generation({"seed": 0}))
+            self.assertEqual(forward.call_args.args[1]["prompt"]["3"]["inputs"]["seed"], 0)
+            get_result.assert_called_once()
+
+    def test_home_engine_tries_next_model_after_incomplete_reply(self) -> None:
+        def chat_response(content):
+            return BytesIO(json.dumps({"choices": [{"message": {"content": content}}]}).encode())
+
+        handler = Mock()
+        with (
+            patch.object(velvetmotion_home_engine, "probe_engines", return_value={"koboldcpp": True, "ollama": True}),
+            patch.object(velvetmotion_home_engine.urllib.request, "urlopen", side_effect=[
+                chat_response("<think>Waiting for the rest"),
+                chat_response("Here is the reply."),
+            ]) as request,
+        ):
+            velvetmotion_home_engine.VelvetEngineHandler.handle_chat(handler, {})
+
+        handler.send_json.assert_called_once_with(200, {"provider": "ollama", "reply": "Here is the reply."})
+        self.assertEqual(request.call_count, 2)
+
     def test_comfy_video_bridge_queues_and_streams_result(self) -> None:
-        from io import BytesIO
         from urllib.error import HTTPError
         from workers.comfy_video import queue_video
 
@@ -149,7 +189,6 @@ class TestVelvetWorkers(unittest.TestCase):
                 server.server_close()
 
     def test_bundled_wan_graph_uses_requested_resolution_and_duration(self) -> None:
-        from io import BytesIO
         from workers.comfy_video import WAN_VIDEO_WORKFLOW, check_video_workflow, load_video_workflow, queue_video
 
         comfy = "http://localhost:8188"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Cloud, Copy, Cpu, Download, ExternalLink, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
 import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
 import { loadRouterSettings, saveRouterSettings, type ChatRouterSettings } from "@/lib/chatRouter";
@@ -58,6 +58,10 @@ export function SettingsAndBackupDrawer({
   const engine = useLocalEngineStatus();
   const { status: cloudStatus, syncNow } = useFirebaseCloudSync();
   const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
+
+  useEffect(() => {
+    if (open) setOllamaModel(loadRouterSettings().ollamaModel || "llama3.1:8b");
+  }, [open]);
 
   if (!open) return null;
 

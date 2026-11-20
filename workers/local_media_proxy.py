@@ -132,7 +132,8 @@ def forward_json(url: str, payload: Dict[str, Any], timeout: int = 120) -> Dict[
 def run_comfy_generation(payload: Dict[str, Any]) -> Optional[str]:
     prompt = str(payload.get("prompt") or "beautiful adult woman portrait")
     negative = str(payload.get("negative_prompt") or DEFAULT_NEGATIVE)
-    seed = int(payload.get("seed") or int(time.time()))
+    raw_seed = payload.get("seed")
+    seed = int(raw_seed) if raw_seed not in (None, "") else int(time.time())
     width = int(payload.get("width") or 768)
     height = int(payload.get("height") or 1152)
 
@@ -142,14 +143,17 @@ def run_comfy_generation(payload: Dict[str, Any]) -> Optional[str]:
     if not prompt_id:
         return None
 
-    deadline = time.time() + 110
-    while time.time() < deadline:
+    deadline = time.monotonic() + 110
+    while time.monotonic() < deadline:
         time.sleep(1.2)
         with urllib.request.urlopen(f"{COMFY_BASE}/history/{prompt_id}", timeout=15) as resp:
             history = json.loads(resp.read().decode("utf-8"))
         item = history.get(prompt_id)
         if not item:
             continue
+        status = item.get("status") or {}
+        if status.get("status_str") == "error":
+            raise RuntimeError("ComfyUI could not finish the image workflow. Check its server logs.")
         outputs = item.get("outputs") or {}
         for node_out in outputs.values():
             images = node_out.get("images") or []
@@ -166,6 +170,8 @@ def run_comfy_generation(payload: Dict[str, Any]) -> Optional[str]:
                     raw_bytes = view_resp.read()
                 b64 = base64.b64encode(raw_bytes).decode("ascii")
                 return f"data:image/png;base64,{b64}"
+        if status.get("completed"):
+            return None
     return None
 
 
@@ -307,7 +313,9 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length) if length > 0 else b"{}"
         try:
             payload = json.loads(raw.decode("utf-8"))
-        except Exception:
+            if not isinstance(payload, dict):
+                raise ValueError("Expected a JSON object")
+        except ValueError:
             self._send_json(400, {"error": "Invalid JSON body"})
             return
 
@@ -321,7 +329,7 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
 
         if self.path.startswith("/ollama/chat"):
             try:
-                res = forward_json(f"{OLLAMA_BASE}/api/chat", payload)
+                res = forward_json(f"{OLLAMA_BASE}/api/chat", {**payload, "stream": False})
                 self._send_json(200, res)
             except Exception as exc:
                 self._send_json(502, {"error": f"Ollama upstream failed: {exc}"})

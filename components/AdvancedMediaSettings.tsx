@@ -15,6 +15,7 @@ import {
   type TelegramBridgeConfig,
 } from "@/lib/telegramBridge";
 import {
+  DEFAULT_OLLAMA_URL,
   loadAdvancedConfig,
   saveAdvancedConfig,
   type AdvancedConfig,
@@ -65,7 +66,7 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
 
     await Promise.all([
       probe("kobold", "KoboldCpp chat (:5001)", "http://127.0.0.1:5001/v1/models"),
-      probe("ollama", "Ollama chat (:11434)", "http://127.0.0.1:11434/api/tags"),
+      probe("ollama", "Ollama chat", `${loadAdvancedConfig().ollamaUrl}/api/tags`),
       probe("kokoro", "Kokoro neural voice (:8880)", "http://127.0.0.1:8880/docs"),
       probe(
         "comfy",
@@ -272,11 +273,12 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
       <section className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-pink-300">Local LLM (Ollama) & Webhooks</h2>
         <p className="text-xs text-zinc-500">
-          Connect chat to a local Ollama server (`ollama serve`) or run `python3 workers/local_media_proxy.py --port 8787`.
+          Start Ollama with <code>ollama serve</code> and select Local in Chat model settings to use this URL and model.
         </p>
         <input
           className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
-          placeholder="http://localhost:11434"
+          aria-label="Ollama URL"
+          placeholder={DEFAULT_OLLAMA_URL}
           value={adv.ollamaUrl}
           onChange={(e) => {
             setAdv({ ...adv, ollamaUrl: e.target.value.trim() });
@@ -285,7 +287,8 @@ export function AdvancedMediaSettings({ onHome }: { onHome: () => void }) {
         />
         <input
           className="w-full rounded-xl bg-black border border-white/15 px-3 py-2 text-sm"
-          placeholder="llama3.2"
+          aria-label="Ollama model"
+          placeholder="llama3.1:8b"
           value={adv.ollamaModel}
           onChange={(e) => {
             setAdv({ ...adv, ollamaModel: e.target.value.trim() });

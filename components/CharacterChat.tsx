@@ -53,7 +53,7 @@ import { extractMemoriesFromMessage, loadMemories, saveMemories, splitInnerThoug
 import { memoryPromptBlock, pinLong, pushShort } from "@/lib/memoryTiers";
 import { stageFromIntimacy } from "@/lib/relationship";
 import { speak } from "@/lib/speech";
-import { cleanSpeechText, speakWithNeuralVoice } from "@/lib/kokoroTts";
+import { cleanSpeechText, speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
 import { useCoinsStore } from "@/lib/coinsStore";
 import {
   earnCompanionXp,
@@ -129,6 +129,7 @@ type ChatMessage = StoredMessage & {
 type CharacterChatProps = {
   character: Character;
   romanceMode: boolean;
+  initialDraft?: string;
   onBack: () => void;
   onOpen3D?: (character: Character) => void;
   onSelectCompanion?: (character: Character) => void;
@@ -175,12 +176,15 @@ const SCENE_TONES = {
 } as const;
 
 type ChatSceneTone = keyof typeof SCENE_TONES;
+type ChatOperation = "thread" | "reply" | "photo" | "clip";
 
-export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSelectCompanion }: CharacterChatProps) {
+export function CharacterChat({ character, romanceMode, initialDraft, onBack, onOpen3D, onSelectCompanion }: CharacterChatProps) {
   const flagshipProfile = FLAGSHIP_COMPANIONS.some(({ id }) => id === character.id);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [input, setInput] = useState(initialDraft ?? "");
+  const [operation, setOperation] = useState<ChatOperation | null>("thread");
+  const operationRef = useRef<ChatOperation | null>("thread");
+  const busy = operation !== null;
   const [liveReply, setLiveReply] = useState("");
   const [replyError, setReplyError] = useState<string | null>(null);
   const [sceneTone, setSceneTone] = useState<ChatSceneTone>("In character");
@@ -229,6 +233,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       mountedRef.current = false;
       replyController.current?.abort();
       clipController.current?.abort();
+      stopNeuralSpeech();
     };
   }, []);
   const [branches, setBranches] = useState<BranchRow[]>([]);
@@ -247,6 +252,45 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const stage = stageFromIntimacy(intimacy);
   const progStats = levelProgressPercent(progression.xp);
 
+  const startOperation = (next: ChatOperation) => {
+    if (busy || operationRef.current || !mountedRef.current) return false;
+    operationRef.current = next;
+    setOperation(next);
+    return true;
+  };
+
+  const finishOperation = () => {
+    operationRef.current = null;
+    if (mountedRef.current) setOperation(null);
+  };
+
+  const startReply = () => {
+    if (!startOperation("reply")) return null;
+    const controller = new AbortController();
+    replyController.current = controller;
+    setReplyError(null);
+    setLiveReply("");
+    return controller;
+  };
+
+  const finishReply = () => {
+    replyController.current = null;
+    if (mountedRef.current) setLiveReply("");
+    finishOperation();
+  };
+
+  const openThread = (branchId: string, thread: ChatMessage[]) => {
+    stopNeuralSpeech();
+    setActiveBranchId(branchId);
+    setMessages(thread);
+    setEditingIndex(null);
+    setSpeakingId(null);
+    setRevealed(new Set());
+    setActiveMedia(null);
+    setLightboxUrl(null);
+    setReplyError(null);
+  };
+
   const refreshDiary = () => {
     const lsItems = getGallery()
       .filter((g) => g.characterId === character.id && g.type !== "video")
@@ -262,21 +306,24 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   useEffect(() => {
+    let cancelled = false;
     setProgression(getCompanionProgression(character.id));
     setGifts(getGiftsFor(character.id));
     setIntimacy(getIntimacy(character.id, character.intimacy));
-    setActiveBranchId("main");
     refreshDiary();
-    void listChatBranchesDB(character.id).then(setBranches);
     void (async () => {
-      const dbLoaded = await loadChatDB(character.id).catch(() => null);
+      const [dbLoaded, savedBranches] = await Promise.all([
+        loadChatDB(character.id).catch(() => null),
+        listChatBranchesDB(character.id).catch(() => []),
+      ]);
+      if (cancelled) return;
       const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
-      if (loaded.length > 0) setMessages(loaded);
-      else {
-        const adapted = `${character.initialMessage}\n\n*${timeMood.label}:* ${timeMood.greetingLine(character.name.split(" ")[0])}`;
-        setMessages([{ role: "assistant", content: adapted }]);
-      }
+      const adapted = `${character.initialMessage}\n\n*${timeMood.label}:* ${timeMood.greetingLine(character.name.split(" ")[0])}`;
+      setBranches(savedBranches);
+      openThread("main", loaded.length ? loaded : [{ role: "assistant", content: adapted }]);
+      finishOperation();
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [character.id, character.initialMessage, character.intimacy]);
 
@@ -291,19 +338,19 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   useEffect(() => () => stopIntimacyAudio(), []);
 
   const persist = (next: ChatMessage[]) => {
+    if (!mountedRef.current) return;
     setMessages(next);
     if (activeBranchId === "main") {
-      void saveChatDB(character.id, next);
       saveChat(character.id, next);
+      void saveChatDB(character.id, next).catch(() => undefined);
     } else {
       const active = branches.find((b) => b.branchId === activeBranchId);
-      void saveChatBranchDB({
-        characterId: character.id,
-        branchId: activeBranchId,
-        label: active?.label || `Timeline ${activeBranchId}`,
-        messages: next,
-        createdAt: active?.createdAt || Date.now(),
-      }).then(() => listChatBranchesDB(character.id).then(setBranches));
+      if (!active) return;
+      const updatedBranch = { ...active, messages: next };
+      setBranches((rows) => rows.map((row) => row.branchId === activeBranchId ? updatedBranch : row));
+      void saveChatBranchDB(updatedBranch).catch(() => {
+        if (mountedRef.current) setSafetyError("Could not save this timeline to browser storage.");
+      });
     }
   };
 
@@ -313,37 +360,44 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   }, [character.initialMessage, character.name, messages]);
 
   const forkFromMessage = async (idx: number) => {
-    if (busy) return;
+    if (!startOperation("thread")) return;
     const slice = messages.slice(0, idx + 1);
     const branchId = `b-${Date.now().toString(36)}`;
     const label = `What-If #${branches.length + 1}`;
-    const saved = await saveChatBranchDB({
-      characterId: character.id,
-      branchId,
-      label,
-      messages: slice,
-      parentBranch: activeBranchId,
-      createdAt: Date.now(),
-    });
-    const nextList = await listChatBranchesDB(character.id);
-    setBranches(nextList.length ? nextList : [...branches, saved]);
-    setActiveBranchId(branchId);
-    setMessages(slice);
-    notifySaved(`Forked ${label}`);
+    try {
+      const saved = await saveChatBranchDB({
+        characterId: character.id,
+        branchId,
+        label,
+        messages: slice,
+        parentBranch: activeBranchId,
+        createdAt: Date.now(),
+      });
+      if (!mountedRef.current) return;
+      setBranches((rows) => [...rows, saved]);
+      openThread(branchId, slice);
+      notifySaved(`Forked ${label}`);
+    } catch {
+      if (mountedRef.current) setSafetyError("Could not create the timeline. Try again.");
+    } finally {
+      finishOperation();
+    }
   };
 
   const switchBranch = async (branchId: string) => {
-    if (busy) return;
-    setActiveBranchId(branchId);
-    if (branchId === "main") {
-      const dbLoaded = await loadChatDB(character.id).catch(() => null);
-      const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
-      setMessages(loaded.length ? loaded : [{ role: "assistant", content: character.initialMessage }]);
-      return;
-    }
-    const found = branches.find((b) => b.branchId === branchId);
-    if (found && Array.isArray(found.messages)) {
-      setMessages(found.messages as ChatMessage[]);
+    if (branchId === activeBranchId || !startOperation("thread")) return;
+    try {
+      if (branchId === "main") {
+        const dbLoaded = await loadChatDB(character.id).catch(() => null);
+        if (!mountedRef.current) return;
+        const loaded = (Array.isArray(dbLoaded) ? (dbLoaded as ChatMessage[]) : null) || loadChat(character.id);
+        openThread(branchId, loaded.length ? loaded : [{ role: "assistant", content: character.initialMessage }]);
+        return;
+      }
+      const found = branches.find((b) => b.branchId === branchId);
+      if (found) openThread(branchId, found.messages as ChatMessage[]);
+    } finally {
+      finishOperation();
     }
   };
 
@@ -514,23 +568,20 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const send = async (overrideText?: string, bonusXp = 6, retryExisting = false) => {
     const previous = messages.at(-1);
     const text = (retryExisting ? previous?.content || "" : overrideText ?? input).trim();
-    if (!text || busy || replyController.current || (retryExisting && previous?.role !== "user")) return;
+    if (!text || (retryExisting && previous?.role !== "user")) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
       setSafetyError(guard.reason);
       return;
     }
+    const controller = startReply();
+    if (!controller) return;
 
     if (!overrideText && !retryExisting) setInput("");
     const next: ChatMessage[] = retryExisting ? messages : [...messages, { role: "user", content: text }];
-    if (!retryExisting) persist(next);
-    const controller = new AbortController();
-    replyController.current = controller;
-    setReplyError(null);
-    setLiveReply("");
-    setBusy(true);
 
     try {
+      if (!retryExisting) persist(next);
       const rawReply = await requestReplyForHistory(next, text, {
         signal: controller.signal,
         onProgress: (preview) => {
@@ -538,7 +589,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           setLiveReply(extractInlineImageRequests(preview.replace(/\[(?:image|photo|selfie)[^\]]*$/i, "")).cleanText);
         },
       }, !retryExisting);
-      if (!rawReply || !mountedRef.current || controller.signal.aborted) return;
+      controller.signal.throwIfAborted();
+      if (!rawReply || !mountedRef.current) return;
       replyController.current = null;
       setLiveReply("");
       const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
@@ -554,6 +606,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       if (imagePrompts.length > 0 && mountedRef.current) {
         await attachInlinePhotoAt(latestBatch, latestBatch.length - 1, imagePrompts[0]);
       }
+      if (!mountedRef.current) return;
 
       const newInt = bumpIntimacy(character.id, 3);
       setIntimacy(newInt);
@@ -577,44 +630,47 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     } catch {
       if (mountedRef.current) setReplyError(controller.signal.aborted ? "Reply stopped. You can retry the same message." : "The reply was interrupted. Try again.");
     } finally {
-      replyController.current = null;
-      if (mountedRef.current) {
-        setLiveReply("");
-        setBusy(false);
-      }
+      finishReply();
     }
   };
 
   const regenerateAt = async (assistantIndex: number) => {
-    if (busy) return;
+    const controller = startReply();
+    if (!controller) return;
     const prior = messages.slice(0, assistantIndex);
     const lastUser = [...prior].reverse().find((m) => m.role === "user")?.content || "Continue right where we left off";
-    setReplyError(null);
-    setBusy(true);
     try {
-      const rawReply = await requestReplyForHistory(prior, lastUser, {}, false);
+      const rawReply = await requestReplyForHistory(prior, lastUser, { signal: controller.signal }, false);
+      controller.signal.throwIfAborted();
       if (!rawReply) return;
       const { cleanText, imagePrompts } = extractInlineImageRequests(rawReply);
       const nextReply = cleanText || (imagePrompts.length > 0 ? "*Sends you a quick photo...*" : rawReply);
       const updated = [...prior, { role: "assistant" as const, content: nextReply }, ...messages.slice(assistantIndex + 1)];
+      setRevealed((indices) => new Set([...indices].filter((i) => i !== assistantIndex)));
       persist(updated);
+      replyController.current = null;
       if (imagePrompts.length > 0 && mountedRef.current) {
         await attachInlinePhotoAt(updated, prior.length, imagePrompts[0]);
       }
+    } catch {
+      if (mountedRef.current) setReplyError(controller.signal.aborted ? "Reply stopped." : "Could not regenerate this reply. Try again.");
     } finally {
-      setBusy(false);
+      finishReply();
     }
   };
 
   const rewindTo = (index: number) => {
-    if (busy) return;
+    if (busy || operationRef.current) return;
     setEditingIndex(null);
+    setRevealed((indices) => new Set([...indices].filter((i) => i <= index)));
+    setActiveMedia(null);
+    setReplyError(null);
     persist(messages.slice(0, index + 1));
     notifySaved("Rewound thread");
   };
 
   const saveEditedMessage = (assistantIndex: number) => {
-    if (busy) return;
+    if (busy || operationRef.current) return;
     const trimmed = editDraft.trim();
     if (!trimmed) {
       setEditingIndex(null);
@@ -635,7 +691,6 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const continueAt = async (assistantIndex: number) => {
-    if (busy) return;
     const baseMessages =
       editingIndex === assistantIndex && editDraft.trim()
         ? messages.map((msg, idx) =>
@@ -650,29 +705,37 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       setSafetyError(guard.reason);
       return;
     }
+    const controller = startReply();
+    if (!controller) return;
     setSafetyError(null);
     setEditingIndex(null);
-    if (editingIndex === assistantIndex) persist(baseMessages);
 
-    setBusy(true);
     try {
+      if (editingIndex === assistantIndex) persist(baseMessages);
       const slice = baseMessages.slice(0, assistantIndex + 1);
       const routed = await continueCompanionScene(
         slice.map((m) => ({ role: m.role as "user" | "assistant", text: m.content })),
         buildPersonaPayload(),
+        { signal: controller.signal },
       );
+      controller.signal.throwIfAborted();
+      if (!mountedRef.current) return;
+      if (routed.providerUsed === "provider-unavailable" || routed.providerUsed === "compliance-guard") {
+        setReplyError(routed.text);
+        return;
+      }
       const cont = sanitizeCompanionReply(routed.text, character.name) || routed.text.trim();
       if (!cont) return;
-      const baseText = target.content.trim();
-      const joiner = /[.!?…"\u201D*]$/.test(baseText) ? " " : " ";
-      const nextContent = `${baseText}${joiner}${cont}`.trim();
+      const nextContent = `${target.content.trim()} ${cont}`.trim();
       const updated = baseMessages.map((msg, idx) =>
         idx === assistantIndex ? { ...msg, content: nextContent } : msg,
       );
       persist(updated);
       notifySaved("Continued scene");
+    } catch {
+      if (mountedRef.current) setReplyError(controller.signal.aborted ? "Reply stopped." : "Could not continue this reply. Try again.");
     } finally {
-      setBusy(false);
+      finishReply();
     }
   };
 
@@ -682,13 +745,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       setSafetyError(check.reason);
       return;
     }
+    if (!startOperation("photo")) return;
     setSafetyError(null);
 
-    setBusy(true);
     setGeneratingPhoto(true);
     try {
       const themedExtra = [extra, timeMood.sceneLightingBias].filter(Boolean).join(", ");
       const resolved = await resolveBestMediaUrl(character, mood, themedExtra);
+      if (!mountedRef.current) return;
       const rawUrl = resolved?.url || "";
       const isValidUrl =
         rawUrl.startsWith("http://") ||
@@ -744,18 +808,17 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const { progression: nextProg } = earnCompanionXp(character.id, 8);
       setProgression(nextProg);
     } catch (err) {
-      setSafetyError(err instanceof Error ? err.message : "Could not generate Scene Selfie. Please try again.");
+      if (mountedRef.current) setSafetyError(err instanceof Error ? err.message : "Could not generate Scene Selfie. Please try again.");
     } finally {
-      setGeneratingPhoto(false);
-      setBusy(false);
+      if (mountedRef.current) setGeneratingPhoto(false);
+      finishOperation();
     }
   };
 
   const generateSequence = async (kind: SequenceKind) => {
-    if (busy || clipController.current) return;
+    if (!startOperation("clip")) return;
     const controller = new AbortController();
     clipController.current = controller;
-    setBusy(true);
     setClipStatus("Checking compatible video generator...");
     try {
       const result = runSequenceGeneration(character, kind);
@@ -791,6 +854,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             speed: kind === "joi" ? 1.25 : 1,
             prompt: `${character.name} ${kind} video clip`,
             comfyOnline: engineStatus.comfyOnline,
+            signal: controller.signal,
           });
           videoUrl = webmClip.videoUrl;
           note = webmClip.engine;
@@ -832,7 +896,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       setClipStatus(`Video unavailable: ${message}`);
     } finally {
       clipController.current = null;
-      if (mountedRef.current) setBusy(false);
+      finishOperation();
     }
   };
 
@@ -845,25 +909,27 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   };
 
   const runFullScenePipeline = async () => {
-    if (busy) return;
+    if (!startOperation("photo")) return;
     const promptText =
       input.trim() || messages.filter((m) => m.role === "user").at(-1)?.content || "Pull me close into a private late-night scene.";
-    if (input.trim()) setInput("");
-    setBusy(true);
+    setReplyError(null);
     setGeneratingPhoto(true);
     setClipStatus("Running Client Director Pipeline (Mood → Reply → Selfie)...");
     try {
       const nextWithUser: ChatMessage[] = [...messages, { role: "user", content: promptText }];
       const replyText = await requestReplyForHistory(nextWithUser, promptText);
+      if (!mountedRef.current) return;
       if (!replyText) {
         setClipStatus("Scene stopped because the chat model did not return a reply.");
         return;
       }
+      if (input.trim()) setInput((current) => current.trim() === promptText ? "" : current);
+      const replyBatch: ChatMessage[] = [...nextWithUser, { role: "assistant", content: replyText }];
+      persist(replyBatch);
       const mood: MediaMood = intimacy >= 60 ? "nude" : "lingerie";
       const photo = await resolveBestMediaUrl(character, mood, promptText.slice(0, 120));
       if (!mountedRef.current) return;
       if (photo.isFallback || !photo.url) {
-        persist([...nextWithUser, { role: "assistant", content: replyText }]);
         setClipStatus(`Reply saved. Photo unavailable. ${photo.error || "Check your image generator in Settings."}`);
         return;
       }
@@ -881,14 +947,16 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       persist(updated);
       setRevealed((s) => new Set(s).add(updated.length - 1));
       setClipStatus("Scene pipeline complete");
+    } catch {
+      if (mountedRef.current) setClipStatus("The scene could not finish. Check the model connection and try again.");
     } finally {
-      setGeneratingPhoto(false);
-      setBusy(false);
+      if (mountedRef.current) setGeneratingPhoto(false);
+      finishOperation();
     }
   };
 
   const sendGift = (giftId: string) => {
-    if (busy) return;
+    if (busy || operationRef.current) return;
     const gift = GIFTS.find((g) => g.id === giftId);
     if (!gift) return;
     const res = spend(gift.cost || 12);
@@ -1020,6 +1088,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       aria-label="Switch What-If branch"
                       value={activeBranchId}
                       onChange={(e) => void switchBranch(e.target.value)}
+                      disabled={busy}
                       className="rounded-full border border-[#ff1e8e]/50 bg-[#0c0c16] px-2 py-0.5 text-[10px] font-bold text-pink-200 outline-none"
                     >
                       <option value="main">Main Timeline</option>
@@ -1138,6 +1207,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                         <button
                           type="button"
                           onClick={() => saveEditedMessage(i)}
+                          disabled={busy}
                           className="inline-flex items-center gap-1 rounded-lg border border-[#00ffa3]/45 bg-[#00ffa3]/15 px-2.5 py-1 font-bold text-[#00ffa3] hover:bg-[#00ffa3]/25"
                         >
                           <Check className="h-3 w-3" /> Save
@@ -1285,6 +1355,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       </button>
                       <button
                         type="button"
+                        disabled={busy}
                         onClick={() => {
                           setEditingIndex(i);
                           setEditDraft(cleanDisplay);
@@ -1296,6 +1367,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       </button>
                       <button
                         type="button"
+                        disabled={busy}
                         onClick={() => void continueAt(i)}
                         className="inline-flex items-center gap-0.5 text-[#ff8aa1] hover:text-[#ff1e8e]"
                         title="Seamlessly continue from this reply"
@@ -1304,6 +1376,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                       </button>
                       <button
                         type="button"
+                        disabled={busy}
                         onClick={() => void regenerateAt(i)}
                         className="inline-flex items-center gap-0.5 hover:text-[#ff1e8e]"
                       >
@@ -1313,6 +1386,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                   )}
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => void forkFromMessage(i)}
                     className="inline-flex items-center gap-0.5 text-[#00f5ff] hover:underline"
                     title="Fork What-If timeline from here"
@@ -1321,6 +1395,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                   </button>
                   <button
                     type="button"
+                    disabled={busy}
                     onClick={() => rewindTo(i)}
                     className="inline-flex items-center gap-0.5 hover:text-amber-300"
                   >
@@ -1339,7 +1414,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             </div>
           )}
 
-          {busy && !generatingPhoto && (
+          {operation === "thread" && <p role="status" className="px-2 text-xs text-rose-200">Opening timeline…</p>}
+          {operation === "reply" && !generatingPhoto && (
             <div className="max-w-[88%] space-y-2 px-2">
               {liveReply ? (
                 <p aria-label="Live companion reply" className="whitespace-pre-wrap rounded-2xl border border-rose-200/15 bg-[#241626] px-3 py-2 text-sm text-rose-50">
@@ -1610,7 +1686,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   void send();
                 }

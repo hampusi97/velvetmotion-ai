@@ -92,6 +92,8 @@ The bundled image-to-video workflow produces portrait MP4s at 480×832 or 704×1
    ```
 
 4. Run `npm install` once and then `npm run dev` from the repo. Open `http://localhost:3000`, select **Advanced Media → Use local ComfyUI**, and check the **Local ComfyUI video** result. It checks the workflow nodes and the model filenames. Keep ComfyUI and the bridge running while you use Studio.
+
+   If the Home Engine is already running on port 8787, start the media bridge with `--wan-video --port 8788`. Save `http://127.0.0.1:8788/generate-video` in **Advanced Media → Video endpoint**.
 5. In **Studio → Video**, select a companion and try **AI video**, **480p**, and **3 seconds**. Check the finished clip for motion and appearance before attempting a longer 720p render.
 
 ### Use your own ComfyUI video workflow

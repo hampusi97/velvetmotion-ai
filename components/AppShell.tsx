@@ -126,6 +126,7 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
   const [storyPackId, setStoryPackId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [chatRevision, setChatRevision] = useState(0);
+  const [chatDraft, setChatDraft] = useState<{ characterId: string; text: string } | null>(null);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
   const [query, setQuery] = useState("");
@@ -188,6 +189,7 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
     setJoiTheme(pathname.startsWith("/joi") ? parseCompanionSessionTheme(params.get("theme")) : null);
     const qId = params.get("companion") || params.get("id");
     setSelectedId(qId ? getCharacter(qId)?.id ?? qId : null);
+    setChatDraft(null);
   }, [initialView, pathname, search]);
 
   useEffect(() => {
@@ -239,6 +241,7 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
       : (selectedId ? getCharacter(selectedId) : undefined) ?? CHARACTERS[0] ?? null;
 
   const openChatById = async (id: string, scenarioPrompt?: string, incomingNote?: string) => {
+    setChatDraft(null);
     const found = getCharacter(id);
     const scenario = scenarioPrompt?.trim();
     const content = scenario ? `*Scenario:* ${scenario}\n\n“Right here inside the scene with you.”` : incomingNote?.trim();
@@ -379,9 +382,14 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
               <CharacterChat
                 key={`${selected.id}:${chatRevision}`}
                 character={selected}
+                initialDraft={chatDraft?.characterId === selected.id ? chatDraft.text : undefined}
                 romanceMode={romanceMode}
-                onBack={() => setView("home")}
+                onBack={() => {
+                  setChatDraft(null);
+                  setView("home");
+                }}
                 onSelectCompanion={(c) => {
+                  setChatDraft(null);
                   setCustomCharacter(c);
                   setSelectedId(c.id);
                 }}
@@ -398,7 +406,10 @@ function AppShellContent({ initialView = "home" }: { initialView?: ShellRouteVie
                   setSelectedId(c.id);
                   setView("chat");
                 }}
-                onStartChat={(profile, opener) => openChatById(profile.id, undefined, opener)}
+                onStartChat={(profile, openingLine) => {
+                  void openChatById(profile.id);
+                  if (openingLine) setChatDraft({ characterId: profile.id, text: openingLine });
+                }}
               />
             </NeonErrorBoundary>
           )}

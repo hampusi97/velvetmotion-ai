@@ -10,6 +10,7 @@ import { readChatEventStream } from "./chatStream";
 import { assertCompliance } from "./complianceFilter";
 import { localComputeBudget } from "./localComputePreferences";
 import { reportGenerationSpeed } from "./localEngineBridge";
+import { CHAT_ROUTER_SETTINGS_KEY, loadAdvancedConfig } from "./advancedConfig";
 import {
   buildDynamicSystemPrompt,
   sanitizeCompanionReply as sanitizeWithDynamicEngine,
@@ -59,12 +60,13 @@ export interface ChatRouterSettings {
   enableAntiSlop?: boolean;
 }
 
-const KEY = "velvetmotion_llm_settings";
+const KEY = CHAT_ROUTER_SETTINGS_KEY;
 
 export function loadRouterSettings(): ChatRouterSettings {
   if (typeof window === "undefined") {
     return { provider: "auto", samplerPreset: "roleplay-balanced", enableAntiSlop: true };
   }
+  const { ollamaUrl, ollamaModel } = loadAdvancedConfig();
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
@@ -73,6 +75,8 @@ export function loadRouterSettings(): ChatRouterSettings {
         samplerPreset: "roleplay-balanced",
         enableAntiSlop: true,
         ...JSON.parse(raw),
+        ollamaUrl,
+        ollamaModel,
       };
     }
   } catch {
@@ -83,6 +87,8 @@ export function loadRouterSettings(): ChatRouterSettings {
     samplerPreset: "roleplay-balanced",
     enableAntiSlop: true,
     aiHordeApiKey: "0000000000",
+    ollamaUrl,
+    ollamaModel,
   };
 }
 
@@ -437,11 +443,12 @@ export async function generateCompanionReply(
 /**
  * DavidAU Stop -> Edit -> Continue steering helper: takes a slice ending on the
  * edited companion turn, calls the active LLM via `buildContinueSteeringMessages`,
- * and falls back smoothly if local/cloud endpoints are offline.
+ * and reports when a provider is unavailable.
  */
 export async function continueCompanionScene(
   historyWithEditedLastAssistant: RouterMessage[],
   persona: CompanionPersona,
+  options: ChatStreamOptions = {},
 ): Promise<{ text: string; providerUsed: string }> {
   const lastAssistantText =
     [...historyWithEditedLastAssistant].reverse().find((m) => m.role === "assistant")?.text || "";
@@ -455,7 +462,7 @@ export async function continueCompanionScene(
     historyWithEditedLastAssistant.map((m) => ({ role: m.role, content: m.text })),
   );
 
-  const llmRes = await tryOpenAIChatTiers(steeringMessages, persona.name);
+  const llmRes = await tryOpenAIChatTiers(steeringMessages, persona.name, options);
   if (llmRes) return llmRes;
 
   return {

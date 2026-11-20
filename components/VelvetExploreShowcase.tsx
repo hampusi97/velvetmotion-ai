@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Search,
-  Lock,
+  ArrowRight,
+  ArrowUpRight,
+  AudioLines,
+  Camera,
   Film,
-  Sparkles,
-  Flame,
+  LockKeyhole,
   Play,
-  ChevronRight,
+  Plus,
+  Search,
+  X,
 } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
 import {
@@ -18,17 +21,19 @@ import {
   COMPANION_ARCHETYPE_FILTERS,
   FLAGSHIP_COMPANIONS,
   type CompanionCategory,
-  type CompanionProfile,
 } from '@/data/companions';
+import { CHARACTERS } from '@/lib/characters';
 
-export interface ShowcaseCompanion {
+type Appearance = {
+  category?: 'Caucasian' | 'Black' | 'Latina' | 'Asian' | 'European' | 'South Asian' | 'Mixed';
+  hair?: 'Blonde' | 'Brunette' | 'Black' | 'Red' | 'Colorful';
+};
+
+export interface ShowcaseCompanion extends Appearance {
   id: string;
   name: string;
   age: number;
   portrait: string;
-  fallbackPortrait?: string;
-  category?: 'Caucasian' | 'Black' | 'Latina' | 'Asian' | 'European' | 'South Asian' | 'Mixed';
-  hair?: 'Blonde' | 'Brunette' | 'Black' | 'Red' | 'Colorful';
   isNew?: boolean;
   hasPrivate?: boolean;
   tagline: string;
@@ -36,346 +41,151 @@ export interface ShowcaseCompanion {
   archetypeCategory?: CompanionCategory;
 }
 
-const FALLBACK_PORTRAIT = '/portraits/nova.jpg';
+const FLAGSHIP_APPEARANCES: Partial<Record<string, Appearance>> = {
+  'nadia-morrow': { hair: 'Red' },
+  'daphne-shaw': { hair: 'Blonde' },
+  'camille-laurent': { hair: 'Brunette' },
+  'inez-mercado': { hair: 'Black' },
+  'simone-adeyemi': { hair: 'Black' },
+  'selene-vega': { hair: 'Black' },
+  'romy-bell': { hair: 'Red' },
+  'talia-james': { hair: 'Black' },
+  'dani-reyes': { hair: 'Brunette' },
+  'elara-shah': { hair: 'Black' },
+  'beck-carver': { hair: 'Blonde' },
+  'mara-graves': { hair: 'Black' },
+  'vesna-nox': { hair: 'Red' },
+  'blair-hartwell': { hair: 'Blonde' },
+  'rowan-mercer': { hair: 'Black' },
+  'jade-aster': { hair: 'Black' },
+  'morgan-ellis': { hair: 'Red' },
+  'veda-kane': { hair: 'Black' },
+  'noor-mansour': { hair: 'Black' },
+  'juno-aimes': { hair: 'Black' },
+  'imani-reed': { category: 'Black', hair: 'Black' },
+  'renata-costa': { category: 'Latina', hair: 'Brunette' },
+  'celeste-voss': { hair: 'Black' },
+  'chloe-parker': { category: 'Caucasian', hair: 'Brunette' },
+  'sloane-kensington': { hair: 'Black' },
+  'raven-vance': { hair: 'Black' },
+  'sora-takahashi': { category: 'Asian' },
+  'yumi-chen': { category: 'Asian' },
+};
 
-function toShowcaseCard(
-  profile: CompanionProfile,
-  hair?: ShowcaseCompanion['hair'],
-  category?: ShowcaseCompanion['category'],
-): ShowcaseCompanion {
-  return {
+const LEGACY_APPEARANCES: Record<string, Appearance & Pick<ShowcaseCompanion, 'hasPrivate'>> = {
+  priya: { category: 'South Asian', hair: 'Black', hasPrivate: true },
+  elena: { category: 'European', hair: 'Brunette', hasPrivate: true },
+  'anime-yumi': { category: 'Asian', hair: 'Black', hasPrivate: true },
+  'blondie-m': { category: 'Caucasian', hair: 'Blonde' },
+  scarlett: { category: 'Latina', hair: 'Black', hasPrivate: true },
+  freya: { category: 'European', hair: 'Blonde' },
+  valentina: { category: 'Latina', hair: 'Brunette', hasPrivate: true },
+  nova: { hair: 'Black', hasPrivate: true },
+  'sloane-v': { hair: 'Brunette', hasPrivate: true },
+};
+
+const afterHoursIds = new Set(AFTER_DARK_COMPANIONS.map(({ id }) => id));
+const featuredProfiles = [...ARCHETYPE_COMPANIONS, ...AFTER_DARK_COMPANIONS];
+const featuredIds = new Set(featuredProfiles.map(({ id }) => id));
+const flagshipProfiles = [
+  ...featuredProfiles,
+  ...FLAGSHIP_COMPANIONS.filter(({ id }) => !featuredIds.has(id)),
+];
+const adultSceneIds = new Set(FLAGSHIP_COMPANIONS
+  .filter(({ sceneSelfiePresets }) => sceneSelfiePresets.some(({ nsfw }) => nsfw))
+  .map(({ id }) => id));
+
+export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
+  ...flagshipProfiles.map((profile) => ({
     id: profile.id,
     name: profile.name,
     age: profile.age,
     portrait: profile.portraitUrl,
-    category,
-    hair,
+    ...FLAGSHIP_APPEARANCES[profile.id],
     isNew: profile.isNew,
+    hasPrivate: profile.isPrivate,
     archetypeCategory: profile.category,
     role: profile.archetype,
     tagline: profile.tagline,
-  };
-}
-
-const AFTER_DARK_CARDS = AFTER_DARK_COMPANIONS.map((profile) => toShowcaseCard(
-  profile,
-  profile.id === 'renata-costa' ? 'Brunette' : 'Black',
-  profile.id === 'imani-reed' ? 'Black' : profile.id === 'renata-costa' ? 'Latina' : undefined,
-));
-
-const ARCHETYPE_HAIR: Record<string, ShowcaseCompanion['hair']> = {
-  'selene-vega': 'Black',
-  'romy-bell': 'Red',
-  'talia-james': 'Black',
-  'dani-reyes': 'Brunette',
-  'elara-shah': 'Black',
-  'beck-carver': 'Blonde',
-  'mara-graves': 'Black',
-  'vesna-nox': 'Red',
-  'blair-hartwell': 'Blonde',
-  'rowan-mercer': 'Black',
-  'jade-aster': 'Black',
-  'morgan-ellis': 'Red',
-  'veda-kane': 'Black',
-  'noor-mansour': 'Black',
-  'juno-aimes': 'Black',
-};
-const newArchetypeCards = ARCHETYPE_COMPANIONS.map((profile) => toShowcaseCard(profile, ARCHETYPE_HAIR[profile.id]));
-const includedProfileIds = new Set([...AFTER_DARK_CARDS, ...newArchetypeCards].map(({ id }) => id));
-const additionalGothCards = FLAGSHIP_COMPANIONS
-  .filter((profile) => profile.category === 'Goth' && !includedProfileIds.has(profile.id))
-  .map((profile) => toShowcaseCard(profile, 'Black'));
-
-export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
-  ...newArchetypeCards,
-  ...AFTER_DARK_CARDS,
-  ...additionalGothCards,
-  {
-    id: 'chloe',
-    name: 'Chloe',
-    age: 23,
-    portrait: '/portraits/chloe.jpg',
-    category: 'Caucasian',
-    hair: 'Brunette',
-    isNew: true,
-    tagline: 'Late-night penthouse energy',
-  },
-  {
-    id: 'priya',
-    name: 'Priya',
-    age: 25,
-    portrait: '/portraits/priya-v.jpg',
-    category: 'South Asian',
-    hair: 'Black',
-    isNew: true,
-    hasPrivate: true,
-    tagline: 'Playful, bold & unforgettable',
-  },
-  {
-    id: 'elena',
-    name: 'Elena',
-    age: 27,
-    portrait: '/portraits/elena.jpg',
-    category: 'European',
-    hair: 'Brunette',
-    isNew: true,
-    hasPrivate: true,
-    tagline: 'Velvet lounge confessions',
-  },
-  {
-    id: 'delilah',
-    name: 'Delilah',
-    age: 21,
-    portrait: '/portraits/delilah-v.jpg',
-    category: 'Mixed',
-    hair: 'Colorful',
-    hasPrivate: true,
-    tagline: 'Neon café rebel',
-  },
-  {
-    id: 'suzu',
-    name: 'Suzu',
-    age: 21,
-    portrait: '/portraits/suzu-m.jpg',
-    category: 'Asian',
-    hair: 'Black',
-    hasPrivate: true,
-    tagline: 'Tokyo midnight arcade',
-  },
-  {
-    id: 'mia',
-    name: 'Mia',
-    age: 24,
-    portrait: '/portraits/mia.jpg',
-    category: 'Caucasian',
-    hair: 'Blonde',
-    tagline: 'Golden hour tease',
-  },
-  {
-    id: 'scarlett',
-    name: 'Scarlett',
-    age: 26,
-    portrait: '/portraits/scarlett.jpg',
-    category: 'Latina',
-    hair: 'Black',
-    isNew: true,
-    hasPrivate: true,
-    tagline: 'Midnight rooftop drinks',
-  },
-  {
-    id: 'freya',
-    name: 'Freya',
-    age: 24,
-    portrait: '/portraits/freya.jpg',
-    category: 'European',
-    hair: 'Blonde',
-    isNew: true,
-    tagline: 'Nordic charm after dark',
-  },
-  {
-    id: 'valentina',
-    name: 'Valentina',
-    age: 27,
-    portrait: '/portraits/valentina.jpg',
-    category: 'Latina',
-    hair: 'Brunette',
-    hasPrivate: true,
-    tagline: 'VIP lounge regular',
-  },
-  {
-    id: 'mila',
-    name: 'Mila',
-    age: 22,
-    portrait: '/portraits/mila-s.jpg',
-    category: 'European',
-    hair: 'Blonde',
-    hasPrivate: true,
-    tagline: 'After-party whisperer',
-  },
-  {
-    id: 'nova',
-    name: 'Nova',
-    age: 24,
-    portrait: '/portraits/nova.jpg',
-    category: 'Asian',
-    hair: 'Black',
-    hasPrivate: true,
-    tagline: 'Cyber-neon muse',
-  },
-  {
-    id: 'sloane',
-    name: 'Sloane',
-    age: 26,
-    portrait: '/portraits/sloane.jpg',
-    category: 'Caucasian',
-    hair: 'Brunette',
-    hasPrivate: true,
-    tagline: 'Sharp wit, softer side',
-  },
+  })),
+  ...CHARACTERS.filter(({ id }) => Object.hasOwn(LEGACY_APPEARANCES, id)).map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    age: profile.age,
+    portrait: profile.avatar,
+    tagline: profile.tagline,
+    ...LEGACY_APPEARANCES[profile.id],
+  })),
 ];
-
-const ADULT_SCENE_CARDS = FLAGSHIP_COMPANIONS
-  .filter((profile) => profile.sceneSelfiePresets.some((scene) => scene.nsfw))
-  .map((profile) => SHOWCASE_COMPANIONS.find(({ id }) => id === profile.id) ?? toShowcaseCard(profile));
 
 const HERO_SLIDES = [
   {
-    id: 'nova',
-    eyebrow: 'VelvetMotion AI',
+    label: 'Match Lounge',
+    eyebrow: 'The Private Atelier',
     title: 'Companions after dark',
-    caption: 'Meet fictional AI companions, find a match, and create your own scenes in Studio.',
+    caption: 'Chat with fictional AI companions, find a match, or create a scene of your own.',
     cta: 'Find a match',
     href: '/discover/',
     image: '/promos/match-lounge.webp',
+    position: 'object-[87%_42%] sm:object-[70%_38%]',
   },
   {
-    id: 'chloe',
+    label: 'Chloe',
     eyebrow: 'Featured companion',
     title: 'An evening with Chloe',
     caption: 'Pick up a conversation with a warm, playful late-night confidante.',
-    cta: 'Chat now',
-    href: '/chat/?companion=chloe',
-    image: '/portraits/chloe.jpg',
+    cta: 'Chat with Chloe',
+    href: '/chat/?companion=chloe-parker',
+    image: '/portraits/chloe-parker.webp',
+    position: 'object-[64%_32%] sm:object-[center_32%]',
   },
   {
-    id: 'priya',
+    label: 'Group chat',
     eyebrow: 'Group chat',
-    title: 'Priya & Mia',
+    title: 'Priya & Maya',
     caption: 'Start a shared scene with two distinct companion personalities.',
-    cta: 'Enter room',
+    cta: 'Enter group chat',
     href: '/group/',
     image: '/portraits/priya-v.jpg',
+    position: 'object-[66%_28%] sm:object-[center_28%]',
   },
 ];
 
-const EXPERIENCES = [
-  {
-    id: 'creators',
-    title: 'VELVET',
-    subtitle: 'CREATORS',
-    caption: 'Upload fictional art or craft your dream companion.',
-    href: '/create/',
-    image: '/portraits/priya-v.jpg',
-    accent: 'from-[#ff1e8e] via-[#ff4dff] to-[#00f5ff]',
-    position: 'top' as const,
-  },
-  {
-    id: 'video',
-    title: 'BUILD',
-    subtitle: 'YOUR VIDEO',
-    caption: 'Direct AI clips with a connected video model.',
-    href: '/studio/',
-    image: '/portraits/mia.jpg',
-    accent: 'from-[#ff4d8d] to-[#ff1e8e]',
-    position: 'top' as const,
-  },
-  {
-    id: 'private',
-    title: 'Private',
-    subtitle: 'Content',
-    caption: 'Unlock exclusive late-night photo sets for free.',
-    href: '/private/',
-    image: '/portraits/scarlett.jpg',
-    accent: 'from-[#ff4dff] to-[#ff1e8e]',
-    position: 'top' as const,
-  },
-  {
-    id: 'cams',
-    title: 'GUIDED',
-    subtitle: 'JOI AUDIO',
-    caption: 'Generate a personal script or try a ready-made session.',
-    href: '/joi/',
-    image: '/portraits/raven.jpg',
-    accent: 'from-[#ff1e8e] to-[#c026d3]',
-    position: 'bottom' as const,
-  },
-  {
-    id: 'shorts',
-    title: 'VELVET',
-    subtitle: 'SHORTS',
-    caption: 'Swipe vertical neon stories & jump straight into chat.',
-    href: '/shorts/',
-    image: '/portraits/elena.jpg',
-    accent: 'from-[#00f5ff] to-[#ff1e8e]',
-    position: 'top' as const,
-  },
+const studioTools = [
+  { title: 'Photo Studio', caption: 'Create portraits and scene stills.', href: '/studio/', image: '/portraits/veda-kane.webp', icon: Camera },
+  { title: 'Video Studio', caption: 'Animate a still or connect a video model.', href: '/studio/?mode=video', image: '/portraits/elara-shah.webp', icon: Film },
+  { title: 'Guided audio', caption: 'Play a session or write your own script.', href: '/joi/', image: '/portraits/imani-reed.webp', icon: AudioLines },
 ];
 
-const SHORTS_EPISODES = [
-  {
-    id: 'ep-1',
-    title: 'Midnight Penthouse',
-    companion: 'Chloe',
-    image: '/portraits/chloe.jpg',
-    href: '/shorts/',
-    isTeaser: false,
-  },
-  {
-    id: 'ep-2',
-    title: 'Neon Arcade Date',
-    companion: 'Suzu',
-    image: '/portraits/suzu-m.jpg',
-    href: '/shorts/',
-    isTeaser: false,
-  },
-  {
-    id: 'ep-3',
-    title: 'SPICY SERIES',
-    companion: 'Unlock all episodes free',
-    image: '',
-    href: '/shorts/',
-    isTeaser: true,
-  },
-  {
-    id: 'ep-4',
-    title: 'After-Hours Lounge',
-    companion: 'Scarlett',
-    image: '/portraits/scarlett.jpg',
-    href: '/shorts/',
-    isTeaser: false,
-  },
-  {
-    id: 'ep-5',
-    title: 'Rooftop Confessions',
-    companion: 'Valentina',
-    image: '/portraits/valentina.jpg',
-    href: '/shorts/',
-    isTeaser: false,
-  },
+const moreToExplore = [
+  { title: 'Create a companion', href: '/create/', icon: Plus },
+  { title: 'Private Content', href: '/private/', icon: LockKeyhole },
+  { title: 'Velvet Shorts', href: '/shorts/', icon: Play },
 ];
 
-const FILTER_PILLS = ['All', '18+ Scenes', ...COMPANION_ARCHETYPE_FILTERS, 'After Hours', 'New arrivals', 'Private Content', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
+const PRIMARY_FILTERS = [
+  'All', 'New arrivals', '18+ Scenes', 'After Hours', ...COMPANION_ARCHETYPE_FILTERS, 'Private Content',
+];
+const MORE_FILTERS = ['Anime', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
+const PAGE_SIZE = 12;
 
-function SafePortrait({
-  src,
-  alt,
-  className = '',
-}: {
-  src: string;
-  alt: string;
-  className?: string;
-}) {
-  return (
-    <SafeImage
-      src={src || FALLBACK_PORTRAIT}
-      fallbackSrc={FALLBACK_PORTRAIT}
-      alt={alt}
-      loading="lazy"
-      className={className}
-    />
-  );
-}
+const focusStyle = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#edbfae]';
+const primaryAction = `inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#f1c9b7] px-5 py-2.5 text-sm font-semibold text-[#291720] hover:bg-[#ffe1d4] motion-safe:transition-colors ${focusStyle}`;
+const secondaryAction = `inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#f6d9cc]/25 bg-[#1a1017]/80 px-5 py-2.5 text-sm font-medium text-[#f8e7de] hover:border-[#edbfae]/60 hover:bg-[#302029] motion-safe:transition-colors ${focusStyle}`;
 
 export default function VelvetExploreShowcase() {
-  const [heroIdx, setHeroIdx] = useState(0);
+  const [heroIndex, setHeroIndex] = useState(0);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
-    const onStyleTab = (e: Event) => {
-      const tab = (e as CustomEvent<string>).detail;
-      if (tab === 'anime') setActiveFilter('Asian');
-      else if (tab === 'all' || tab === 'girls') setActiveFilter('All');
+    const onStyleTab = (event: Event) => {
+      const tab = (event as CustomEvent<string>).detail;
+      if (tab === 'anime' || tab === 'all' || tab === 'girls') {
+        setActiveFilter(tab === 'anime' ? 'Anime' : 'All');
+        setVisibleCount(PAGE_SIZE);
+      }
     };
     window.addEventListener('vm:style-tab', onStyleTab);
     return () => window.removeEventListener('vm:style-tab', onStyleTab);
@@ -383,338 +193,232 @@ export default function VelvetExploreShowcase() {
 
   const filtered = useMemo(() => {
     const search = query.trim().toLowerCase().replace(/\bstep[- ]*daughters?\b/g, 'stepdaughter');
-    const cards = activeFilter === '18+ Scenes' ? ADULT_SCENE_CARDS : SHOWCASE_COMPANIONS;
-    return cards.filter((c) => {
+    return SHOWCASE_COMPANIONS.filter((companion) => {
       const matchesQuery = !search ||
-        [c.name, c.tagline, c.role, c.archetypeCategory].some((value) => value?.toLowerCase().includes(search));
+        [companion.name, companion.tagline, companion.role, companion.archetypeCategory]
+          .some((value) => value?.toLowerCase().includes(search));
       if (!matchesQuery) return false;
-      if (activeFilter === 'All' || activeFilter === '18+ Scenes') return true;
-      if (activeFilter === 'New arrivals') return Boolean(c.isNew);
-      if (activeFilter === 'After Hours') return AFTER_DARK_CARDS.some(({ id }) => id === c.id);
-      if (activeFilter === 'Private Content') return Boolean(c.hasPrivate);
-      if (activeFilter === 'Blonde' || activeFilter === 'Brunette') return c.hair === activeFilter;
-      return c.category === activeFilter || c.archetypeCategory === activeFilter;
+      if (activeFilter === 'All') return true;
+      if (activeFilter === '18+ Scenes') return adultSceneIds.has(companion.id);
+      if (activeFilter === 'New arrivals') return Boolean(companion.isNew);
+      if (activeFilter === 'After Hours') return afterHoursIds.has(companion.id);
+      if (activeFilter === 'Private Content') return Boolean(companion.hasPrivate);
+      if (activeFilter === 'Blonde' || activeFilter === 'Brunette') return companion.hair === activeFilter;
+      return companion.category === activeFilter || companion.archetypeCategory === activeFilter;
     });
   }, [query, activeFilter]);
 
-  const activeHero = HERO_SLIDES[heroIdx] ?? HERO_SLIDES[0];
+  const selectFilter = (filter: string) => {
+    setActiveFilter(filter);
+    setVisibleCount(PAGE_SIZE);
+  };
+  const updateQuery = (value: string) => {
+    setQuery(value);
+    setVisibleCount(PAGE_SIZE);
+  };
 
-  // Keep discovery promos in the unfiltered catalog.
-  const gridItems = useMemo(() => {
-    const out: Array<
-      | { type: 'companion'; data: ShowcaseCompanion }
-      | { type: 'promo-shorts' }
-      | { type: 'promo-private' }
-    > = [];
-
-    const showPromos = activeFilter === 'All' && !query.trim();
-    filtered.forEach((c, idx) => {
-      if (showPromos && idx === 4) out.push({ type: 'promo-shorts' });
-      if (showPromos && idx === 7) out.push({ type: 'promo-private' });
-      out.push({ type: 'companion', data: c });
-    });
-
-    return out;
-  }, [activeFilter, filtered, query]);
-
-  const isBrowsingAll = activeFilter === 'All' && !query.trim();
-  const mobileRows = isBrowsingAll ? 2 : 1;
+  const hero = HERO_SLIDES[heroIndex];
+  const visibleCast = filtered.slice(0, visibleCount);
 
   return (
-    <div className="min-h-screen bg-[#08080e] text-[#f7f7fc] pb-16">
-      {/* FULL-BLEED CINEMATIC HERO CAROUSEL */}
-      <section className="relative min-h-[390px] w-full overflow-hidden rounded-b-3xl border-b border-rose-200/15 bg-[#110b14] sm:min-h-[465px]">
-        <SafeImage
-          key={activeHero.id}
-          src={activeHero.image}
-          alt=""
-          fetchPriority="high"
-          className="absolute inset-0 h-full w-full object-cover object-[65%_40%] motion-safe:animate-[velvet-hero-enter_650ms_ease-out_both]"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,#130a15_3%,rgba(19,10,21,.92)_38%,rgba(19,10,21,.52)_70%,rgba(19,10,21,.18))] sm:bg-[linear-gradient(90deg,#130a15_3%,rgba(19,10,21,.85)_36%,rgba(19,10,21,.22)_76%,transparent)]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#08080e] via-transparent to-[#08080e]/30" />
+    <div className="min-h-screen bg-[#100c12] text-[#f8eeeb]">
+      <div className="mx-auto max-w-[1500px] px-4 pb-14 pt-4 sm:px-7 sm:pt-6 xl:px-9">
+        <section aria-label="Featured experiences" className="relative isolate overflow-hidden rounded-[1.35rem] border border-[#e5baa8]/20 bg-[#1a1018] shadow-[0_24px_60px_-34px_#000] sm:rounded-[1.8rem]">
+          <SafeImage
+            key={hero.image}
+            src={hero.image}
+            fallbackSrc="/promos/match-lounge.webp"
+            alt=""
+            fetchPriority={heroIndex === 0 ? 'high' : 'auto'}
+            className={`absolute inset-y-0 right-0 -z-20 h-full w-full object-cover sm:w-[68%] ${hero.position}`}
+          />
+          <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,#1a1018_0%,#1a1018_28%,rgba(26,16,24,.89)_43%,rgba(26,16,24,.18)_77%),linear-gradient(0deg,#1a1018_1%,transparent_48%)] max-sm:bg-[linear-gradient(90deg,rgba(26,16,24,.96),rgba(26,16,24,.76)_46%,rgba(26,16,24,.2)),linear-gradient(0deg,#1a1018_1%,transparent_60%)]" />
 
-        <div className="relative z-10 flex min-h-[390px] max-w-2xl flex-col justify-center px-6 pb-14 pt-10 sm:min-h-[465px] sm:px-12">
-          <p className="text-sm font-semibold text-rose-200">{activeHero.eyebrow}</p>
-          <h1 className="mt-3 max-w-[12ch] font-display text-5xl leading-[.98] tracking-tight text-rose-50 sm:text-7xl">
-            {activeHero.title}
-          </h1>
-          <p className="mt-5 max-w-sm text-sm leading-relaxed text-rose-50/80 sm:text-base">{activeHero.caption}</p>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <Link
-              href={activeHero.href}
-              className="inline-flex items-center justify-center rounded-full bg-rose-200 px-5 py-2.5 text-sm font-bold text-[#2b1421] transition hover:bg-rose-100"
-            >
-              {activeHero.cta}
-            </Link>
-            <Link
-              href="/studio/"
-              className="inline-flex items-center justify-center rounded-full border border-rose-200/40 bg-black/35 px-5 py-2.5 text-sm font-semibold text-rose-100 backdrop-blur-md transition hover:bg-rose-200/15"
-            >
-              Open Studio
-            </Link>
-          </div>
-        </div>
-
-        {/* Carousel Dash Indicators */}
-        <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2">
-          {HERO_SLIDES.map((s, i) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => setHeroIdx(i)}
-              aria-label={s.title}
-              aria-pressed={heroIdx === i}
-              className={`h-1 rounded-full transition-all ${
-                i === heroIdx
-                  ? 'w-7 bg-[#ff1e8e] shadow-[0_0_10px_rgba(255,30,142,0.9)]'
-                  : 'w-4 bg-white/30 hover:bg-white/60'
-              }`}
-            />
-          ))}
-        </div>
-      </section>
-
-      <div className="mx-auto max-w-[1440px] px-4 sm:px-6">
-        {/* EXPLORE FEATURED CHARACTERS HEADER + FILTER BAR */}
-        <section className="mt-6">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-display text-3xl tracking-tight text-rose-50 sm:text-4xl">Meet the cast</h2>
-            <Link
-              href="/discover/"
-              className="shrink-0 text-xs font-semibold text-[#00f5ff] hover:underline"
-            >
-              Open Match Lounge →
-            </Link>
-          </div>
-
-          <div className="mt-4 flex items-center gap-2.5 overflow-x-auto pb-2 no-scrollbar">
-            <div className="relative min-w-[180px] sm:min-w-[210px]">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Search companions"
-                placeholder="Name or personality"
-                className="w-full rounded-full border border-white/10 bg-[#151520] py-2 pl-10 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-[#ff1e8e]"
-              />
+          <div className="flex min-h-[390px] flex-col justify-between px-5 pb-4 pt-10 sm:min-h-[440px] sm:px-9 sm:pb-5 sm:pt-14 xl:min-h-[475px] xl:px-12">
+            <div className="max-w-full">
+              <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#e7b3a3]">{hero.eyebrow}</p>
+              <h1 className="mt-3 max-w-[11ch] font-display text-[clamp(2.7rem,6vw,5.3rem)] font-normal leading-[.97] tracking-[-.065em] text-[#fff1ec]">
+                {hero.title}
+              </h1>
+              <p className="mt-4 max-w-[32ch] text-sm leading-relaxed text-[#ead8d6] sm:mt-5 sm:text-base">{hero.caption}</p>
+              <div className="mt-5 flex flex-wrap gap-2.5 sm:mt-6">
+                <Link href={hero.href} className={primaryAction}>
+                  {hero.cta}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link href="/studio/" className={secondaryAction}>
+                  Open Studio
+                </Link>
+              </div>
             </div>
 
-            {FILTER_PILLS.map((pill) => {
-              const active = activeFilter === pill;
-              return (
+            <div role="group" aria-label="Choose a featured experience" className="mt-5 flex w-max max-w-full divide-x divide-[#e5baa8]/15 overflow-hidden rounded-full border border-[#e5baa8]/20 bg-[#1a1018]/85">
+              {HERO_SLIDES.map((slide, index) => (
                 <button
-                  key={pill}
+                  key={slide.label}
                   type="button"
-                  aria-pressed={active}
-                  onClick={() => setActiveFilter(pill)}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
-                    active
-                      ? 'border border-[#ff1e8e] bg-[#ff1e8e]/15 text-white shadow-[0_0_14px_rgba(255,30,142,0.45)]'
-                      : 'border border-white/10 bg-[#151520] text-white/75 hover:border-white/25 hover:text-white'
-                  }`}
+                  aria-pressed={heroIndex === index}
+                  onClick={() => setHeroIndex(index)}
+                  className={`min-h-11 shrink-0 px-3 text-xs motion-safe:transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#edbfae] sm:px-5 ${heroIndex === index
+                    ? 'bg-[#dfb2a3]/15 font-semibold text-[#ffe0d2]'
+                    : 'text-[#d4bfbe] hover:bg-[#dfb2a3]/10 hover:text-[#ffe0d2]'}`}
                 >
-                  {pill === 'Private Content' && <Lock className="h-3.5 w-3.5 text-[#ff4d8d]" />}
-                  {pill}
+                  {slide.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="cast-heading" className="mt-9 sm:mt-12">
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-[#e5baa8]/15 pb-4">
+            <h2 id="cast-heading" className="font-display text-[2rem] font-normal leading-none tracking-[-.055em] text-[#fff1ec] sm:text-[2.85rem]">Meet the cast</h2>
+            <Link href="/discover/" className={`inline-flex min-h-8 items-center gap-1.5 text-xs font-medium text-[#f0bbaa] hover:text-[#ffded1] sm:text-sm ${focusStyle}`}>
+              Open Match Lounge
+              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
           </div>
 
-          {!gridItems.length && <p role="status" className="mt-4 text-sm text-zinc-300">No companions match that search.</p>}
-          <div aria-label="Companion portraits"
-            style={{ '--cast-columns': Math.max(1, Math.ceil(gridItems.length / mobileRows)) } as React.CSSProperties}
-            className="mt-4 grid grid-cols-[repeat(var(--cast-columns),minmax(104px,31%))] gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid-cols-3 sm:overflow-visible md:grid-cols-4 lg:grid-cols-6">
-            {gridItems.map((item) => {
-              if (item.type === 'promo-shorts') {
-                return (
-                  <Link
-                    key="promo-shorts"
-                    href="/shorts/"
-                    className="group relative flex aspect-[2/3] snap-start flex-col items-center justify-between overflow-hidden rounded-2xl border-2 border-[#a855f7]/80 bg-gradient-to-b from-[#1a0b2e] via-[#120b24] to-[#0b0718] p-4 shadow-[0_0_24px_rgba(168,85,247,0.45)] transition hover:-translate-y-1"
-                  >
-                    <div className="mt-2 text-center">
-                      <span className="block text-2xl font-black tracking-wider text-white drop-shadow-[0_0_14px_rgba(0,245,255,0.9)]">
-                        SHORTS
-                      </span>
-                      <span className="mt-1 inline-block rounded-full border border-[#00f5ff]/50 bg-[#00f5ff]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#00f5ff]">
-                        Neon Reels
-                      </span>
-                    </div>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[#ff1e8e]/60 bg-[#ff1e8e]/20 shadow-[0_0_24px_rgba(255,30,142,0.65)] group-hover:scale-110 transition">
-                      <Play className="h-7 w-7 fill-white text-white ml-0.5" />
-                    </div>
-                    <span className="w-full rounded-full bg-gradient-to-r from-[#ff4d8d] to-[#ff1e8e] py-2 text-center text-xs font-bold text-white shadow-[0_0_16px_rgba(255,30,142,0.5)]">
-                      Watch
-                    </span>
-                  </Link>
-                );
-              }
+          <div className="mt-4 flex flex-col gap-2 xl:flex-row xl:items-start">
+            <div role="search" className="relative min-w-0 xl:w-52 xl:shrink-0">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#c9aaa9]" aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(event) => updateQuery(event.target.value)}
+                aria-label="Search companions"
+                inputMode="search"
+                placeholder="Name or personality"
+                className="h-11 w-full rounded-xl border border-[#e5baa8]/20 bg-[#1a121b] pl-10 pr-10 text-sm text-[#fff1ec] placeholder:text-[#baa4a7] focus:border-[#edbfae] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#edbfae]"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => updateQuery('')}
+                  aria-label="Clear search"
+                  className="absolute right-1 top-1 flex h-9 w-9 items-center justify-center rounded-lg text-[#e5c4bb] hover:bg-[#33212c] focus-visible:outline focus-visible:outline-[#edbfae]"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            <div role="group" aria-label="Filter companions" className="flex w-full min-w-0 items-center gap-2 overflow-x-auto px-1 py-1 sm:flex-wrap">
+              {PRIMARY_FILTERS.map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  aria-pressed={activeFilter === filter}
+                  onClick={() => selectFilter(filter)}
+                  className={`min-h-10 shrink-0 rounded-full border px-3 text-xs font-medium motion-safe:transition-colors ${focusStyle} ${activeFilter === filter
+                    ? 'border-[#edbfae]/55 bg-[#edbfae]/15 text-[#ffe3d7]'
+                    : 'border-[#e5baa8]/15 bg-[#1b121c] text-[#dcc9ca] hover:border-[#edbfae]/40 hover:text-[#fff1ec]'}`}
+                >
+                  {filter}
+                </button>
+              ))}
+              <select
+                aria-label="More companion filters"
+                value={MORE_FILTERS.includes(activeFilter) ? activeFilter : ''}
+                onChange={(event) => selectFilter(event.target.value || 'All')}
+                className={`min-h-10 shrink-0 rounded-full border border-[#e5baa8]/20 bg-[#1b121c] px-3 text-xs font-medium text-[#dcc9ca] ${focusStyle}`}
+              >
+                <option value="">More filters</option>
+                {MORE_FILTERS.map((filter) => <option value={filter} key={filter}>{filter}</option>)}
+              </select>
+            </div>
+          </div>
 
-              if (item.type === 'promo-private') {
-                return (
+          <p role="status" className="mt-3 text-xs text-[#c4aeb3]">
+            {filtered.length === 0
+              ? 'No companions match your search.'
+              : `Showing ${visibleCast.length} of ${filtered.length} ${filtered.length === 1 ? 'companion' : 'companions'}`}
+          </p>
+          {filtered.length > 0 && (
+            <ul aria-label="Companion portraits" className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 xl:grid-cols-6">
+              {visibleCast.map((companion) => (
+                <li key={companion.id} className="relative min-w-0">
                   <Link
-                    key="promo-private"
-                    href="/private/"
-                    className="group relative flex aspect-[2/3] snap-start flex-col items-center justify-between overflow-hidden rounded-2xl border border-[#ff1e8e]/70 bg-[#140b18] p-4 shadow-[0_0_22px_rgba(255,30,142,0.35)] transition hover:-translate-y-1"
+                    href={`/chat/?companion=${companion.id}`}
+                    aria-label={`Chat with ${companion.name}, ${companion.age}`}
+                    className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#e5baa8]/15 bg-[#1d131d] hover:border-[#edbfae]/50 motion-safe:transition-colors ${focusStyle}`}
                   >
-                    <SafePortrait
-                      src="/portraits/scarlett.jpg"
-                      alt="Private Content"
-                      className="absolute inset-0 h-full w-full object-cover opacity-55 group-hover:scale-105 transition duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-b from-[#08080e]/60 via-transparent to-[#08080e]/90" />
-                    <div className="relative z-10 mt-3 text-center">
-                      <span className="block font-serif italic text-2xl font-bold text-white drop-shadow-[0_0_14px_rgba(255,30,142,0.95)]">
-                        Private
-                      </span>
-                      <span className="block font-serif italic text-xl font-bold text-[#ff8ac4] drop-shadow-[0_0_12px_rgba(255,30,142,0.95)]">
-                        Content
-                      </span>
+                    <div className="relative aspect-[4/5] overflow-hidden bg-[#221720]">
+                      <SafeImage
+                        src={companion.portrait}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover object-top motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.04]"
+                      />
+                      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#150c16]/55 via-transparent to-transparent" />
                     </div>
-                    <span className="relative z-10 w-full rounded-full bg-gradient-to-r from-[#ff4d8d] to-[#ff1e8e] py-2 text-center text-xs font-bold text-white shadow-[0_0_16px_rgba(255,30,142,0.55)]">
-                      Unlock
-                    </span>
-                  </Link>
-                );
-              }
-
-              const c = item.data;
-              return (
-                <article key={c.id} className="relative aspect-[2/3] snap-start">
-                  <Link
-                    href={`/chat/?companion=${c.id}`}
-                    aria-label={`Chat with ${c.name}, ${c.age}`}
-                    className="group relative block h-full overflow-hidden rounded-[1.15rem] border border-rose-100/15 bg-[#19101a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300 motion-safe:transition motion-safe:hover:-translate-y-1 hover:border-rose-300/60"
-                  >
-                    <SafePortrait
-                      src={c.portrait}
-                      alt=""
-                      className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
-
-                    {c.isNew && (
-                      <span className="absolute left-2 top-2 rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold text-[#3b1a2d]">New</span>
+                    {companion.isNew && (
+                      <span className="absolute left-2.5 top-2.5 rounded-full border border-[#edbfae]/35 bg-[#241423]/95 px-2.5 py-1 text-[10px] font-semibold text-[#fde0d4]">
+                        New
+                      </span>
                     )}
-                    <div className="absolute inset-x-2.5 bottom-2.5 sm:inset-x-3 sm:bottom-3">
-                      <span className="flex items-baseline gap-1.5">
-                        <span className="truncate font-display text-[1.05rem] tracking-tight text-white sm:text-2xl">{c.name}</span>
-                        <span className="shrink-0 text-xs text-rose-100/80">{c.age}</span>
-                      </span>
-                      <span className="mt-0.5 line-clamp-2 text-[10px] font-medium leading-tight text-rose-50/80 sm:text-xs">{c.role || c.tagline}</span>
+                    <div className="flex flex-1 items-start justify-between gap-1.5 px-3 pb-3 pt-2.5">
+                      <div className="min-w-0">
+                        <span className="flex items-baseline gap-1.5">
+                          <span className="truncate font-display text-[1.2rem] leading-tight tracking-[-.035em] text-[#fff1ec]">{companion.name}</span>
+                          <span className="shrink-0 text-[11px] text-[#d9b9b5]">{companion.age}</span>
+                        </span>
+                        <span className="mt-0.5 line-clamp-2 text-xs leading-[1.35] text-[#cbb8bc]">{companion.role || companion.tagline}</span>
+                      </div>
+                      <ArrowUpRight aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#ddb4a6] group-hover:text-[#fff1ec]" />
                     </div>
                   </Link>
-                  {c.role && (
-                    <Link href={`/studio/?companion=${c.id}&mode=video`} aria-label={`Create a video with ${c.name}`}
-                      className="absolute right-1.5 top-1.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200/40 bg-[#271927]/90 text-rose-100 hover:bg-[#5a2b43] focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300">
+                  {companion.role && (
+                    <Link
+                      href={`/studio/?companion=${companion.id}&mode=video`}
+                      aria-label={`Create a video with ${companion.name}`}
+                      className={`absolute right-2 top-2 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#edbfae]/35 bg-[#241423]/95 text-[#ffe0d2] hover:border-[#edbfae]/65 hover:bg-[#412538] ${focusStyle}`}
+                    >
                       <Film className="h-4 w-4" aria-hidden="true" />
                     </Link>
                   )}
-                </article>
-              );
-            })}
-          </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {filtered.length > visibleCount && (
+            <div className="mt-5 flex justify-center">
+              <button type="button" className={secondaryAction} onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}>
+                Show more companions
+              </button>
+            </div>
+          )}
         </section>
 
-        {/* VELVET EXPERIENCES — 5 TALL VERTICAL SHOWCASE CARDS */}
-        <section className="mt-12">
-          <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-            <span className="text-[#ff4d8d]">Velvet</span>{' '}
-            <span className="text-white">Experiences</span>
-          </h2>
-          <p className="mt-0.5 text-sm text-white/60">New ways to play beyond chat.</p>
-
-          <div className="mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
-            {EXPERIENCES.map((exp) => (
-              <Link
-                key={exp.id}
-                href={exp.href}
-                className="group relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-[#13131d] transition duration-300 hover:-translate-y-1 hover:border-[#ff1e8e]/80 hover:shadow-[0_0_26px_rgba(255,30,142,0.35)]"
-              >
-                <SafePortrait
-                  src={exp.image}
-                  alt={exp.title}
-                  className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
+        <section aria-labelledby="studio-heading" className="mt-12 sm:mt-16">
+          <h2 id="studio-heading" className="border-b border-[#e5baa8]/15 pb-4 font-display text-[2rem] font-normal leading-none tracking-[-.055em] text-[#fff1ec] sm:text-[2.85rem]">Studio & audio</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-3 md:gap-4">
+            {studioTools.map(({ title, caption, href, image, icon: Icon }) => (
+              <Link key={title} href={href} className={`group relative isolate flex min-h-[9rem] min-w-0 items-end overflow-hidden rounded-2xl border border-[#e5baa8]/15 bg-[#20141f] p-4 hover:border-[#edbfae]/50 motion-safe:transition-colors sm:min-h-[11rem] ${focusStyle}`}>
+                <SafeImage
+                  src={image}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-y-0 right-0 -z-20 h-full w-[56%] object-cover object-[center_27%] motion-safe:transition-transform motion-safe:duration-500 motion-safe:group-hover:scale-[1.04]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/15 to-black/80" />
-
-                <div
-                  className={`absolute inset-x-3 z-10 text-center ${
-                    exp.position === 'top' ? 'top-4' : 'bottom-4'
-                  }`}
-                >
-                  <span
-                    className={`block bg-gradient-to-r ${exp.accent} bg-clip-text text-2xl font-black uppercase tracking-tight text-transparent drop-shadow-[0_0_14px_rgba(255,30,142,0.85)]`}
-                  >
-                    {exp.title}
-                  </span>
-                  <span className="block text-xl font-black uppercase tracking-tight text-white drop-shadow-[0_0_12px_rgba(0,245,255,0.65)]">
-                    {exp.subtitle}
-                  </span>
-                  <p className="mt-1.5 text-[11px] font-medium text-white/85">{exp.caption}</p>
+                <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,#20141f_30%,rgba(32,20,31,.9)_54%,rgba(32,20,31,.25)),linear-gradient(0deg,#20141f_0%,transparent_70%)]" />
+                <div className="min-w-0">
+                  <Icon className="mb-2 h-4 w-4 text-[#edbfae]" aria-hidden="true" />
+                  <h3 className="font-display text-xl leading-tight tracking-[-.035em] text-[#fff1ec]">{title}</h3>
+                  <p className="mt-1 max-w-[23ch] text-xs leading-relaxed text-[#dfc9c7]">{caption}</p>
                 </div>
+                <ArrowUpRight className="absolute right-3.5 top-3.5 h-4 w-4 text-[#f1c9b7]" aria-hidden="true" />
               </Link>
             ))}
           </div>
-        </section>
-
-        {/* WATCH VELVET SHORTS HORIZONTAL RAIL */}
-        <section className="mt-12">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-              <span className="text-[#ff4d8d]">Watch</span>{' '}
-              <span className="text-white">Velvet Shorts</span>
-              <ChevronRight className="ml-1 inline h-5 w-5 text-white/50" />
-            </h2>
-          </div>
-
-          <div className="mt-4 grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-5">
-            {SHORTS_EPISODES.map((ep) =>
-              ep.isTeaser ? (
-                <Link
-                  key={ep.id}
-                  href={ep.href}
-                  className="group relative flex aspect-[2/3] snap-start flex-col items-center justify-center overflow-hidden rounded-2xl border border-[#ff1e8e]/60 bg-gradient-to-b from-[#1f0c18] to-[#0e0912] p-5 text-center shadow-[0_0_24px_rgba(255,30,142,0.28)] transition hover:-translate-y-1"
-                >
-                  <span className="absolute left-2.5 top-2.5 rounded-full bg-[#ff1e8e] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
-                    NEW EPISODES
-                  </span>
-                  <Flame className="h-9 w-9 text-white drop-shadow-[0_0_12px_rgba(255,30,142,0.9)]" />
-                  <span className="mt-3 text-sm font-black uppercase tracking-wider text-white">
-                    {ep.title}
-                  </span>
-                  <p className="mt-1.5 text-xs text-white/70">
-                    Discover all interactive neon Shorts episodes — 100% free
-                  </p>
-                  <span className="mt-5 rounded-full bg-gradient-to-r from-[#ff4d8d] to-[#ff1e8e] px-5 py-2 text-xs font-extrabold uppercase tracking-wide text-white shadow-[0_0_16px_rgba(255,30,142,0.6)]">
-                    WATCH FREE
-                  </span>
-                </Link>
-              ) : (
-                <Link
-                  key={ep.id}
-                  href={ep.href}
-                  className="group relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-[#13131d] transition hover:-translate-y-1 hover:border-[#ff1e8e]/80"
-                >
-                  <SafePortrait
-                    src={ep.image}
-                    alt={ep.title}
-                    className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
-                  <span className="absolute left-2.5 top-2.5 rounded-full bg-[#ff1e8e] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
-                    NEW EPISODES
-                  </span>
-                  <div className="absolute inset-x-3 bottom-3">
-                    <span className="block text-sm font-extrabold text-white">{ep.title}</span>
-                    <span className="text-xs text-[#ff8ac4]">{ep.companion}</span>
-                  </div>
-                </Link>
-              ),
-            )}
+          <div aria-label="More experiences" className="mt-4 grid gap-2 sm:grid-cols-3">
+            {moreToExplore.map(({ title, href, icon: Icon }) => (
+              <Link key={title} href={href} className={`flex min-h-11 items-center gap-2.5 rounded-xl border border-[#e5baa8]/15 bg-[#1a121b] px-3.5 py-2 text-sm text-[#f0ddda] hover:border-[#edbfae]/45 motion-safe:transition-colors ${focusStyle}`}>
+                <Icon className="h-4 w-4 shrink-0 text-[#edbfae]" aria-hidden="true" />
+                {title}
+                <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 text-[#d8a99c]" aria-hidden="true" />
+              </Link>
+            ))}
           </div>
         </section>
       </div>

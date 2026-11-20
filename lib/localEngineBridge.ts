@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { CHAT_ROUTER_SETTINGS_KEY, DEFAULT_OLLAMA_URL, loadAdvancedConfig } from "./advancedConfig";
 
 export type RamTier = "8 GB Lite" | "16 GB Balanced" | "32 GB+ Ultra";
 
@@ -102,8 +103,9 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
   }
 
   let homeEngineBase = "http://127.0.0.1:8787";
+  const { ollamaUrl } = loadAdvancedConfig();
   try {
-    const rawLlm = localStorage.getItem("velvetmotion_llm_settings");
+    const rawLlm = localStorage.getItem(CHAT_ROUTER_SETTINGS_KEY);
     if (rawLlm) {
       const parsed = JSON.parse(rawLlm) as { homeEngineUrl?: string };
       if (parsed?.homeEngineUrl?.trim()) homeEngineBase = parsed.homeEngineUrl.trim().replace(/\/+$/, "");
@@ -135,7 +137,7 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
     nativePorts?.fishOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5002/health"),
     nativePorts?.kokoroOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8880/docs"),
-    nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
+    nativePorts?.ollamaOnline && ollamaUrl === DEFAULT_OLLAMA_URL ? Promise.resolve(true) : probeEndpoint(`${ollamaUrl}/api/tags`),
     nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
     probeHomeHealth(),
   ]);
