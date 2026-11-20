@@ -86,7 +86,7 @@ See [full one-time setup instructions](docs/ONE_TIME_SIGNING_SETUP.md). Never pa
 
 ## Deployment
 
-- **Cloudflare:** The `CI & Deploy Web` workflow runs lint, TypeScript, content checks and a static build before publishing from `main`. It needs the encrypted GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Missing credentials cause a visible failure.
+- **Cloudflare:** Workers Builds publishes the static site from `main` through its Git integration. The `CI & Deploy Web` workflow runs lint, TypeScript, content checks, and a static build, then verifies that the production site serves the expected commit. For a manual deploy from GitHub Actions, configure the encrypted `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets.
 - **Vercel:** A separate Git-linked Vercel project may automatically build from `main` when its plan and usage limits permit. Check the real Vercel deployment status rather than assuming a successful GitHub merge proves production is live.
 - **Native releases:** `.github/workflows/release-desktop.yml` creates platform installers and validates release completeness before publishing. Signed update artifacts require Tauri signing keys.
 

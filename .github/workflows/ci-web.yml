@@ -60,17 +60,17 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: versions upload --preview-alias pr-${{ github.event.pull_request.number }}
 
-      # A production push MUST never appear successful when deployment was skipped.
-      - name: Verify Cloudflare credentials for production
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      # Cloudflare Workers Builds deploys main through its Git integration.
+      - name: Verify credentials for a manual production deploy
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
         run: |
           if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
-            echo "::error::Automatic production deploy is not active. Configure repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
+            echo "::error::Manual production deploy requires repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
             exit 1
           fi
 
-      - name: Automatically deploy every successful main commit
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Manually deploy a validated main commit
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -81,7 +81,8 @@ jobs:
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           expected_sha="${GITHUB_SHA:0:7}"
-          for attempt in {1..6}; do
+          max_attempts=16
+          for ((attempt = 1; attempt <= max_attempts; attempt++)); do
             if metadata=$(curl --fail --silent --show-error --max-time 10 \
                 "${PRODUCTION_URL}/build-meta.json?commit=${GITHUB_SHA}&attempt=${attempt}") &&
               deployed_sha=$(jq -er '.commitSha | strings' <<< "$metadata") &&
@@ -89,8 +90,8 @@ jobs:
               echo "Production is serving commit $deployed_sha."
               exit 0
             fi
-            echo "Production commit $expected_sha not visible yet (attempt $attempt/6)."
-            if [ "$attempt" -lt 6 ]; then sleep 10; fi
+            echo "Production commit $expected_sha not visible yet (attempt $attempt/$max_attempts)."
+            if [ "$attempt" -lt "$max_attempts" ]; then sleep 15; fi
           done
           echo "::error::Could not verify production commit $expected_sha at ${PRODUCTION_URL}/build-meta.json."
           exit 1

@@ -59,7 +59,7 @@ Tauri's official guide: https://v2.tauri.app/plugin/updater/
 
 ## Separate issue: website hosting
 
-Desktop signing has nothing to do with Cloudflare/Vercel. The Cloudflare web deploy separately needs `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` encrypted GitHub Actions secrets; do not use your Tauri keys for web deployment. Vercel's own Git integration follows its linked project and billing/usage limits.
+Cloudflare Workers Builds publishes the website from `main` through its Git integration. The manual GitHub Actions deploy uses separate encrypted `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets. Vercel's Git integration follows its linked project and billing limits.
 
 ## Important boundaries
 
