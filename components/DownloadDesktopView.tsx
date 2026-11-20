@@ -265,6 +265,21 @@ export function DownloadDesktopView() {
           ))}
         </div>
 
+        <div className="rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e9adbd]">Current mode</p>
+          <p className="mt-1 text-lg font-semibold">
+            {engine.ollamaOnline ? "LOCAL RAM — Ollama" : engine.koboldOnline ? "LOCAL RAM — KoboldCpp" : "DEMO MODE"}
+          </p>
+          <p className="mt-1 text-xs text-zinc-400">
+            {engine.ollamaOnline || engine.koboldOnline
+              ? "A local engine is reachable. Chat can stay on your machine."
+              : "No local engine detected. Install Ollama or KoboldCpp, then hit Test connections."}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href="https://ollama.com" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-zinc-200 hover:border-white/35">Get Ollama</a>
+            <a href="https://github.com/LostRuins/koboldcpp" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-zinc-200 hover:border-white/35">Get KoboldCpp</a>
+          </div>
+        </div>
         <p className="text-[11px] text-[#d3bbca]">Hardware estimate: {ram.label}. Model sizes depend on the real available RAM and VRAM; the browser estimate may be inaccurate.</p>
         <div className="grid gap-2 sm:grid-cols-3">
           {(Object.keys(LOCAL_COMPUTE_MODES) as LocalComputeMode[]).map((mode) => (
