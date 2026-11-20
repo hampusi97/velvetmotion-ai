@@ -163,7 +163,7 @@ export function VoiceDesigner({
       <p className="text-[10px] leading-relaxed text-zinc-500">
         Instant preview uses available device voices. Neural preview needs a running Kokoro-compatible service.
         Voice sliders affect browser playback; neural voice tone also depends on the configured model.
-        This is preset customization, not cloning a real person's voice.
+        This is preset customization, not cloning a real person&apos;s voice.
       </p>
     </section>
   );
