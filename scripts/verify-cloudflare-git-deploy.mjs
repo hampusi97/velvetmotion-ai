@@ -13,7 +13,10 @@ export const PAGES_CHECK = "Cloudflare Pages: velvetmotion-ai";
 
 export function evaluateDeployChecks(checks) {
   if (!Array.isArray(checks)) return { state: "pending", reason: "Check-run results are unavailable" };
-  const get = name => checks.filter(c => c && c.name === name).at(-1);
+  // GitHub may retain multiple check runs when a provider reruns the same SHA.
+  // Always trust the newest check run ID, not an old successful attempt.
+  const get = name => checks.filter(c => c && c.name === name)
+    .sort((a, b) => (Number(a.id) || 0) - (Number(b.id) || 0)).at(-1);
   const worker = get(WORKER_CHECK);
   const pages = get(PAGES_CHECK);
   if (worker?.status === "completed" && worker.conclusion === "success") {
