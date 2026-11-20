@@ -32,7 +32,7 @@ export function CollectionGalleryView({
             My Collection &amp; Saved Selfies
           </h1>
           <p className="text-xs text-[#a6a6c4]">
-            All generated portraits, unlocked scene selfies, and clips stored locally in IndexedDB.
+            Saved portraits and eligible clips from this device. Browser storage can be cleared; download important media to keep a separate copy.
           </p>
         </div>
         {onOpenStudio && (
@@ -51,7 +51,7 @@ export function CollectionGalleryView({
           <Lock className="h-8 w-8 mx-auto text-[#ff1e8e]" />
           <p className="text-sm font-bold text-[#f7f7fc]">Your Collection is empty</p>
           <p className="text-xs text-[#a6a6c4] max-w-sm mx-auto">
-            Generate a selfie in Chat or Pro Media Studio and click Save to keep it permanently on this device.
+            Generate an image in Chat or Media Studio, then save it to your local collection. Download anything important; clearing browser storage can remove saved items.
           </p>
           {onOpenStudio && (
             <button

@@ -6,9 +6,9 @@ import "./globals.css";
 
 const TITLE = "VelvetMotion AI";
 const TAGLINE =
-  "Match → chat → studio. Private uncensored companions. Fictional adults 18+ only.";
+  "Explore fictional adult companions, chat, create art and discover private local-first experiences.";
 const DESC =
-  "Free NSFW AI companions — Discover swipe, neural voice calls, Pro Media Studio, and local GPU acceleration. Fictional 18+ characters only.";
+  "VelvetMotion Private Atelier: fictional adult AI companions, conversations, synthetic voices, image and video tools, and optional local models. Generation depends on compatible services.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://velvetmotion-ai.hampusi97.workers.dev"),
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     "virtual companion",
     "local AI",
     "voice companion",
-    "uncensored AI",
+    "fictional adult AI",
   ],
   authors: [{ name: "VelvetMotion" }],
   appleWebApp: {
@@ -63,7 +63,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#05050a",
+  themeColor: "#0e0a12",
 };
 
 const cfAnalyticsToken = process.env.NEXT_PUBLIC_CF_ANALYTICS_TOKEN || "";
@@ -82,14 +82,14 @@ export default function RootLayout({
       <head>
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#05050a" />
+        <meta name="theme-color" content="#0e0a12" />
         <script
           dangerouslySetInnerHTML={{
             __html: `try{var n=localStorage.getItem('vm-neon-intensity');if(n==='subtle'||n==='hyper'){document.documentElement.setAttribute('data-neon',n);}if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}}catch(e){}`,
           }}
         />
       </head>
-      <body suppressHydrationWarning className="relative min-h-dvh bg-[#05050a] font-sans text-[#f7f7fc] antialiased">
+      <body suppressHydrationWarning className="relative min-h-dvh bg-[#0e0a12] font-sans text-[#f7f7fc] antialiased">
         <div className="vm-ambient-mesh" aria-hidden="true" />
         <div className="relative z-10">{children}</div>
         {cfAnalyticsToken ? (

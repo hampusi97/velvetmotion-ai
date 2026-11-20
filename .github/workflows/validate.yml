@@ -17,6 +17,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: node --test scripts/verify-desktop-release.test.mjs
+      - run: node --check scripts/setup-signing.mjs
       - run: npm run build
         env:
           NODE_ENV: production
