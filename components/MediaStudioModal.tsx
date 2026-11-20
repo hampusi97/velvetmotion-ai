@@ -233,7 +233,12 @@ export default function MediaStudioModal({
       });
       setGeneratedVideoUrl(res.videoUrl);
       setVideoEngineUsed(res.engine);
-      setStatusMsg(`Rendered ${durationSec}s @ ${videoSpeed}x via ${res.engine}!`);
+      if (res.isGenerative) {
+        setStatusMsg(`Generated ${durationSec}s via ${res.engine}.`);
+      } else {
+        setStatusMsg(`Created ${durationSec}s animated-still effect, not generative AI video.`);
+        setErrorMsg(res.warning || 'Set up a compatible video backend to generate motion.');
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
     } finally {
