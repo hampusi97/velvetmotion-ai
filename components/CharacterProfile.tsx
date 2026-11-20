@@ -232,7 +232,9 @@ export function CharacterProfile({
             <div className="absolute bottom-5 left-5">
               <p className="vm-eyebrow">Fictional adult · {character.age}</p>
               <p className="mt-2 text-sm text-white/80">
-                {meta.visualStyle} portrait
+                {meta.visualStyle === "Unspecified"
+                  ? "Character portrait"
+                  : `${meta.visualStyle} portrait`}
               </p>
             </div>
             <button

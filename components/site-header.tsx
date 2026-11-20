@@ -229,7 +229,7 @@ export function SiteHeader({
             {/* Live Speed HUD Pill */}
             <Link
               href="/download/"
-              title={engine.anyLocalOnline ? "Local GPU/RAM Engine Connected" : "Running on Cloud Free Inference"}
+              title={engine.anyLocalOnline ? "Local AI services detected" : "Connect a model or review your provider setup"}
               className={cn(
                 "hidden sm:inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition tabular-nums",
                 engine.anyLocalOnline
@@ -238,8 +238,8 @@ export function SiteHeader({
               )}
             >
               {engine.anyLocalOnline
-                ? `⚡ Local Ultra (${engine.ramGb} GB RAM${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""})`
-                : `☁️ Cloud Free${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""}`}
+                ? `⚡ Local services (${engine.ramGb} GB RAM${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""})`
+                : `AI setup${engine.metrics.tokPerSec ? ` · ${engine.metrics.tokPerSec} tok/s` : engine.metrics.imgSec ? ` · ${engine.metrics.imgSec}s img` : ""}`}
             </Link>
 
             <button

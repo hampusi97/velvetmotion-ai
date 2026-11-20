@@ -559,7 +559,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
                 <SupporterBanner onOpenWallet={() => navigate("wallet")} />
               </div>
               <footer className="mt-6 border-t border-white/[0.08] pt-6 pb-4 flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-400">
-                <span>VelvetMotion.ai · 100% Free Companion Studio · Fictional adults 18+ only · Local-First</span>
+                <span>VelvetMotion.ai · Independent companion studio · Fictional adults 18+ only</span>
                 <div className="flex flex-wrap gap-4">
                   <Link href="/download/" className="text-[#ff5678] font-semibold hover:underline">Desktop App</Link>
                   <Link href="/terms/" className="hover:text-[#ff5678]">Terms</Link>

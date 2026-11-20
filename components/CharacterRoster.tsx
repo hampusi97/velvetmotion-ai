@@ -217,7 +217,8 @@ export function CharacterRoster({
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               placeholder="A name, an interest, a little intrigue…"
-              className="vm-field w-full py-3.5 pl-11 text-sm"
+              className="vm-field w-full py-3.5 text-sm"
+              style={{ paddingLeft: "2.75rem" }}
             />
           </label>
           <button

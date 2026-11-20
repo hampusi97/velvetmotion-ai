@@ -66,6 +66,7 @@ test("discovery filters and favorites persist, with an actionable empty state", 
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("companions.png"),
     fullPage: true,
@@ -100,11 +101,14 @@ test("profile edits survive reload and failed portrait generation keeps the prev
   await page
     .getByRole("button", { name: "Generate locally", exact: true })
     .click();
-  await expect(page.getByRole("alert").filter({ hasText: "ComfyUI offline" })).toBeVisible();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "ComfyUI offline" }),
+  ).toBeVisible();
   await expect(
     page.getByAltText("Portrait of Chloe", { exact: true }),
   ).toHaveAttribute("src", originalPortrait!);
   await page.getByRole("button", { name: "Their story", exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("profile.png"),
     fullPage: true,
