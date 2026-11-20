@@ -12,7 +12,7 @@ import {
 } from '@/lib/canvasVideoExporter';
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
-import { getMediaSettings } from '@/lib/mediaSettings';
+import { getMediaSettings, saveMediaSettings } from '@/lib/mediaSettings';
 import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
 import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
@@ -142,6 +142,7 @@ export default function MediaStudioModal({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const localEngine = useLocalEngineStatus();
   const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([]);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState(() => getMediaSettings().comfyCheckpoint);
 
   useEffect(() => {
     if (!isOpen && !standalone) return;
@@ -190,15 +191,17 @@ export default function MediaStudioModal({
           setComfyCheckpoints(comfyInfo.checkpoints);
           try {
             const t0 = performance.now();
+            const activeCheckpoint = comfyInfo.checkpoints.includes(selectedCheckpoint)
+              ? selectedCheckpoint : comfyInfo.checkpoints[0];
             const blobUrl = await generateComfySfwPortrait({
               prompt,
-              checkpointName: comfyInfo.checkpoints[0],
+              checkpointName: activeCheckpoint,
               width: aspect.width,
               height: aspect.height,
               seed: parsedSeed,
             });
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
-            const engineLabel = `ComfyUI (${comfyInfo.checkpoints[0] || 'Local :8188'})`;
+            const engineLabel = `ComfyUI (${activeCheckpoint || 'Local :8188'})`;
             setGeneratedPhoto(blobUrl);
             setPhotoRevealed(true);
             setVideoSourceUrl(blobUrl);
@@ -703,9 +706,17 @@ export default function MediaStudioModal({
           </button>
 
           {comfyCheckpoints.length > 0 && (
-            <p className="text-[10px] text-[#00ffa3] text-center font-mono">
-              ● Priority 1 Local ComfyUI :8188 ready ({comfyCheckpoints[0]})
-            </p>
+            <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/5 px-3 py-2">
+              <label htmlFor="vm-comfy-checkpoint" className="block text-[10px] font-bold text-[#00ffa3] mb-1">
+                Local ComfyUI detected — choose an installed checkpoint
+              </label>
+              <select id="vm-comfy-checkpoint" value={comfyCheckpoints.includes(selectedCheckpoint) ? selectedCheckpoint : comfyCheckpoints[0]}
+                onChange={(event) => { setSelectedCheckpoint(event.target.value); saveMediaSettings({ comfyCheckpoint: event.target.value }); }}
+                className="w-full rounded-lg bg-[#18101d] p-2 text-xs text-white border border-white/20">
+                {comfyCheckpoints.map((checkpoint) => <option key={checkpoint} value={checkpoint}>{checkpoint}</option>)}
+              </select>
+              <p className="mt-1 text-[10px] text-zinc-400">Model detected, not yet generation-tested.</p>
+            </div>
           )}
 
           {generatedPhoto && (
