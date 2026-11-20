@@ -33,6 +33,7 @@ export function SettingsAndBackupDrawer({
   });
   const [openRouterKey, setOpenRouterKey] = useState(initialRouter.openRouterApiKey || "");
   const [customUrl, setCustomUrl] = useState(initialRouter.customBaseUrl || "");
+  const [customModel, setCustomModel] = useState(initialRouter.customModel || "");
   const [homeEngineUrl, setHomeEngineUrl] = useState(initialRouter.homeEngineUrl || "");
   const [ollamaModel, setOllamaModel] = useState(initialRouter.ollamaModel || "llama3.1:8b");
   const [installedOllama, setInstalledOllama] = useState<string[] | null>(null);
@@ -116,6 +117,7 @@ export function SettingsAndBackupDrawer({
     saveRouterSettings({
       openRouterApiKey: openRouterKey.trim() || undefined,
       customBaseUrl: customUrl.trim() || undefined,
+      customModel: customModel.trim() || undefined,
       homeEngineUrl: homeEngineUrl.trim() || undefined,
       ollamaModel: ollamaModel.trim() || "llama3.1:8b",
       samplerPreset,
@@ -547,6 +549,13 @@ export function SettingsAndBackupDrawer({
             className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
           />
           <input
+            value={customModel}
+            onChange={(e) => setCustomModel(e.target.value)}
+            placeholder="Custom server model ID (e.g. internlm/internlm2_5-7b-chat)"
+            aria-label="Custom OpenAI-compatible model identifier"
+            className="w-full rounded-xl border border-white/15 bg-[#0c0c16] px-3 py-2 text-xs text-white outline-none focus:border-[#ff1e8e]"
+          />
+          <input
             value={homeEngineUrl}
             onChange={(e) => setHomeEngineUrl(e.target.value)}
             placeholder="Home Engine / Tunnel URL (http://127.0.0.1:8787 or https://...trycloudflare.com)"
@@ -612,7 +621,28 @@ export function SettingsAndBackupDrawer({
                         </button>
                       </>
                     ) : (
-                      <span className="text-[10px] text-zinc-400">Custom server setup required</span>
+                      <button type="button" onClick={() => {
+                        const id = model.serverModelId || "";
+                        setCustomModel(id);
+                        if (!customUrl.trim()) {
+                          setStatusMsg("Enter an OpenAI-compatible server URL above, then select the model again. No connection was made.");
+                          return;
+                        }
+                        try {
+                          const url = new URL(customUrl.trim());
+                          if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
+                            throw new Error("Invalid custom endpoint.");
+                          }
+                          saveRouterSettings({
+                            provider: "custom", customBaseUrl: customUrl.trim(), customModel: id,
+                          });
+                          setStatusMsg("Selected " + model.name + " on your custom server. Confirm the model is running before chatting.");
+                        } catch {
+                          setStatusMsg("Enter a valid custom HTTP(S) model server URL (for example http://127.0.0.1:8000/v1).");
+                        }
+                      }} className="rounded-md border border-white/20 px-2 py-1 text-[10px] font-semibold text-white hover:bg-white/10">
+                        Use custom server
+                      </button>
                     )}
                   </div>
                 </div>
