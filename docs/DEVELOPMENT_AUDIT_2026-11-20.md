@@ -68,7 +68,7 @@ The former profile's Google Meet/Gmail/Drive controls were removed from this sur
 
 ## Verification and limits
 
-Local baseline: 76 TypeScript tests, 8 release/CSP tests, content validation, platform smoke checks and 3 Python tests passed. After implementation the unified runner passed **95 Node/TypeScript tests plus 3 Python tests** before the final rebase; the final runner also includes the newly merged upstream suites, content validation and platform smoke checks. Local lint and TypeScript passed; the production static export succeeded. Existing unrelated lint warnings remain.
+Local baseline: 76 TypeScript tests, 8 release/CSP tests, content validation, platform smoke checks and 3 Python tests passed. After implementation the final unified runner passed **106 Node/TypeScript tests plus 3 Python tests**, content validation and platform smoke checks. Local lint and TypeScript passed; the production static export succeeded. Existing unrelated lint warnings remain.
 
 The selected workspace permits building the app but blocks local Chromium Unix sockets. The shared browser also could not reach the local preview. Browser screenshots and flow assertions must therefore be verified by the added GitHub Actions job; they are not claimed as locally passed. Browser tests cover desktop and mobile discovery, favorites, filters, profile saving/reload, portrait failure, starter import, V3 export, memory, Studio selection, library membership and chat retry. External account and inference requests are blocked in those tests.
 

@@ -100,7 +100,7 @@ test("profile edits survive reload and failed portrait generation keeps the prev
   await page
     .getByRole("button", { name: "Generate locally", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "ComfyUI offline" })).toBeVisible();
   await expect(
     page.getByAltText("Portrait of Chloe", { exact: true }),
   ).toHaveAttribute("src", originalPortrait!);

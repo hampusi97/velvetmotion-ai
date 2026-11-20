@@ -277,6 +277,7 @@ export function CharacterRoster({
             <label className="vm-field-label">
               Interests
               <select
+                aria-label="Interests"
                 value={interest}
                 onChange={(e) => setInterest(e.target.value)}
                 className={selectClass}
@@ -290,6 +291,7 @@ export function CharacterRoster({
             <label className="vm-field-label">
               Conversation
               <select
+                aria-label="Conversation"
                 value={conversation}
                 onChange={(e) => setConversation(e.target.value)}
                 className={selectClass}
@@ -303,6 +305,7 @@ export function CharacterRoster({
             <label className="vm-field-label">
               Visual style
               <select
+                aria-label="Visual style"
                 value={visualStyle}
                 onChange={(e) => setVisualStyle(e.target.value)}
                 className={selectClass}
@@ -316,6 +319,7 @@ export function CharacterRoster({
             <label className="vm-field-label">
               Mood
               <select
+                aria-label="Mood"
                 value={tag || ""}
                 onChange={(e) => onTag(e.target.value || null)}
                 className={selectClass}

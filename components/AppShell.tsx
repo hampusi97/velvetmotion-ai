@@ -576,11 +576,11 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <InstallPrompt />
       <LiveUpdateBanner />
       <DesktopAutoUpdater />
-      <SettingsAndBackupDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      {settingsOpen && <SettingsAndBackupDrawer open onClose={() => setSettingsOpen(false)} />}
 
-      <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
-        <MediaStudioModal isOpen={studioModalOpen} activeChatCompanionId={view === "profile" || view === "chat" ? selected?.id : undefined} onClose={() => setStudioModalOpen(false)} />
-      </NeonErrorBoundary>
+      {studioModalOpen && <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
+        <MediaStudioModal isOpen activeChatCompanionId={view === "profile" || view === "chat" ? selected?.id : undefined} onClose={() => setStudioModalOpen(false)} />
+      </NeonErrorBoundary>}
 
       {sharedImportPreview && (
         <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
