@@ -246,3 +246,8 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .vm-download-motion { animation: none !important; transform: none !important; }
 }
+
+@keyframes velvet-hero-enter {
+  from { opacity: 0.65; transform: scale(1.025); }
+  to { opacity: 1; transform: scale(1); }
+}

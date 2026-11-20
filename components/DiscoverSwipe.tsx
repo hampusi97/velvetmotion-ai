@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Heart, Sparkles, Star, Volume2, X } from 'lucide-react';
+import { ArrowLeft, Heart, RotateCcw, Sparkles, Star, Volume2, X } from 'lucide-react';
 import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
 import type { Character } from '@/lib/characters';
 import { bumpIntimacy, saveMatch } from '@/lib/storage';
@@ -10,6 +10,7 @@ import { saveMatchDB } from '@/lib/db';
 import { playMatchChime, playSuperLikeZap, playSwipeTick } from '@/lib/neonAudio';
 import { hapticMatch, hapticSuperLike, hapticSwipe } from '@/lib/haptics';
 import { SafeImage } from '@/components/SafeImage';
+import { speakWithNeuralVoice, stopNeuralSpeech } from '@/lib/kokoroTts';
 
 export interface DiscoverCard extends CompanionProfile {
   prompts?: { question: string; answer: string };
@@ -31,16 +32,9 @@ const MATCHES_KEY = 'velvetmotion_matches';
 const SUPERLIKE_DATE_KEY = 'velvetmotion_superlike_date';
 
 function buildDefaultDeck(): DiscoverCard[] {
-  const promptsByIdx = [
-    { question: 'Quickest way to ruin my sleep schedule', answer: 'Sending a 1 AM voice note I actually want to replay.' },
-    { question: 'My ideal first date', answer: 'Rooftop drinks, zero small talk, and a dare by the second round.' },
-    { question: 'Green flag I look for', answer: 'Confidence without trying too hard—and remembering the little details.' },
-    { question: 'Unpopular opinion', answer: 'Late-night drives beat loud clubs every single time.' },
-  ];
-
-  const base: DiscoverCard[] = FLAGSHIP_COMPANIONS.map((c, idx) => ({
+  const base: DiscoverCard[] = FLAGSHIP_COMPANIONS.map((c) => ({
     ...c,
-    prompts: promptsByIdx[idx % promptsByIdx.length],
+    prompts: { question: 'Backstory', answer: c.backstory },
     hardToGet: c.category === 'Luxury' || c.category === 'Goth',
     extraPhotos: [c.portraitUrl],
   }));
@@ -86,9 +80,12 @@ export function DiscoverSwipe({
   onHome,
   onMatch,
 }: DiscoverSwipeProps) {
-  const [deck] = useState<DiscoverCard[]>(() => profiles ?? buildDefaultDeck());
+  const [deck, setDeck] = useState<DiscoverCard[]>(() => profiles ?? buildDefaultDeck());
   const [index, setIndex] = useState(0);
-  const [photoIdx, setPhotoIdx] = useState(0);
+  const [lastPass, setLastPass] = useState<number | null>(null);
+  const [showMatches, setShowMatches] = useState(false);
+  const [voicePlaying, setVoicePlaying] = useState(false);
+  const voicePreviewToken = useRef(0);
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -106,11 +103,22 @@ export function DiscoverSwipe({
   const startXRef = useRef(0);
   const isTransitioning = useRef(false);
   const current = deck[index];
+  const knownMatches = useRef(new Set<string>());
+  const matchedProfiles = matchIds.flatMap((id) => {
+    const profile = deck.find((card) => card.id === id) ?? FLAGSHIP_COMPANIONS.find((card) => card.id === id);
+    return profile ? [profile] : [];
+  });
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(MATCHES_KEY);
-      if (raw) setMatchIds(JSON.parse(raw));
+      if (raw) {
+        const stored: unknown = JSON.parse(raw);
+        if (Array.isArray(stored)) {
+          knownMatches.current = new Set(stored.filter((id): id is string => typeof id === 'string'));
+          setMatchIds([...knownMatches.current]);
+        }
+      }
       const today = new Date().toISOString().slice(0, 10);
       setSuperLikeUsedToday(window.localStorage.getItem(SUPERLIKE_DATE_KEY) === today);
     } catch {
@@ -121,37 +129,44 @@ export function DiscoverSwipe({
   const recordMatch = useCallback(
     (card: DiscoverCard, bonus = 0) => {
       const cleanId = card.id.replace(/^secret-/, '');
-      saveMatch(cleanId);
-      void saveMatchDB(cleanId);
-      bumpIntimacy(cleanId, Math.max(8, bonus));
-      earn(10);
-      setMatchIds((prev) => {
-        const next = Array.from(new Set([...prev, cleanId]));
-        try {
-          window.localStorage.setItem(MATCHES_KEY, JSON.stringify(next));
-        } catch {
-          // Ignore
-        }
-        return next;
-      });
-      playMatchChime();
-      hapticMatch();
-      setMatchedBonus(bonus);
+      const isNewMatch = !knownMatches.current.has(cleanId);
+      if (isNewMatch) {
+        knownMatches.current.add(cleanId);
+        saveMatch(cleanId);
+        void saveMatchDB(cleanId).catch(() => {});
+        bumpIntimacy(cleanId, Math.max(8, bonus));
+        earn(10);
+        setMatchIds([...knownMatches.current]);
+        playMatchChime();
+        hapticMatch();
+      }
+      setMatchedBonus(isNewMatch ? bonus : 0);
       setMatchedCard({ ...card, id: cleanId });
     },
     [earn],
   );
 
+  const stopVoicePreview = useCallback(() => {
+    voicePreviewToken.current += 1;
+    stopNeuralSpeech();
+    setVoicePlaying(false);
+  }, []);
+
+  useEffect(() => () => {
+    voicePreviewToken.current += 1;
+    stopNeuralSpeech();
+  }, []);
+
   const advanceDeck = useCallback(() => {
+    stopVoicePreview();
     setDragX(0);
     setIsDragging(false);
-    setPhotoIdx(0);
     setAdmirerRevealed(false);
     setIndex((i) => i + 1);
     setTimeout(() => {
       isTransitioning.current = false;
     }, 180);
-  }, []);
+  }, [stopVoicePreview]);
 
   const handleSwipe = useCallback(
     (direction: 'left' | 'right', isSuperLike = false) => {
@@ -160,9 +175,19 @@ export function DiscoverSwipe({
       if (!swipedCompanion) return;
 
       if (direction === 'left') {
+        setLastPass(index);
         playSwipeTick(false);
         hapticSwipe();
         isTransitioning.current = true;
+        advanceDeck();
+        return;
+      }
+
+      setLastPass(null);
+
+      if (knownMatches.current.has(swipedCompanion.id.replace(/^secret-/, ''))) {
+        isTransitioning.current = true;
+        recordMatch(swipedCompanion);
         advanceDeck();
         return;
       }
@@ -201,27 +226,22 @@ export function DiscoverSwipe({
     [advanceDeck, deck, index, recordMatch],
   );
 
-  const playVoicePrompt = useCallback((line: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    void import('@/lib/kokoroTts').then(({ cleanSpeechText, loadWebSpeechVoices, selectFemaleEnglishVoice }) => {
-      const clean = cleanSpeechText(line);
-      if (!clean) return;
-      window.speechSynthesis.cancel();
-      void loadWebSpeechVoices().then((voices) => {
-        const u = new SpeechSynthesisUtterance(clean);
-        u.rate = 0.96;
-        u.pitch = 1.08;
-        const fem = selectFemaleEnglishVoice(voices);
-        if (fem) u.voice = fem;
-        window.speechSynthesis.speak(u);
-      });
+  const playVoicePrompt = useCallback((profile: CompanionProfile) => {
+    if (voicePlaying) {
+      stopVoicePreview();
+      return;
+    }
+    const token = ++voicePreviewToken.current;
+    setVoicePlaying(true);
+    void speakWithNeuralVoice(profile.voiceSampleLine, { voiceId: profile.voiceId }).finally(() => {
+      if (token === voicePreviewToken.current) setVoicePlaying(false);
     });
-  }, []);
+  }, [stopVoicePreview, voicePlaying]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (rizzTarget || matchedCard) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (rizzTarget || matchedCard || showMatches || e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         handleSwipe('left');
@@ -233,12 +253,12 @@ export function DiscoverSwipe({
         handleSwipe('right', true);
       } else if (e.key === ' ' && current && !current.isSecretAdmirer) {
         e.preventDefault();
-        playVoicePrompt(current.voiceSampleLine);
+        playVoicePrompt(current);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, handleSwipe, matchedCard, playVoicePrompt, rizzTarget, superLikeUsedToday]);
+  }, [current, handleSwipe, matchedCard, playVoicePrompt, rizzTarget, showMatches, superLikeUsedToday]);
 
   function handleSubmitRizz(e: React.FormEvent) {
     e.preventDefault();
@@ -271,34 +291,47 @@ export function DiscoverSwipe({
         : 'border-[#ff1e8e]/30 shadow-2xl';
 
   return (
-    <div className="min-h-[100dvh] bg-[#05050a] px-3 pt-4 pb-24 text-[#f7f7fc]">
-      <div className="mx-auto flex max-w-sm flex-col items-center">
-        {/* Top Bar */}
-        <div className="mb-3 flex w-full items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {onHome && (
-              <button
-                type="button"
-                onClick={onHome}
-                className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-[#a6a6c4] hover:border-[#00f5ff]/50 hover:text-white"
-              >
-                ←
+    <section className="relative isolate mx-auto min-h-[80dvh] max-w-6xl overflow-hidden rounded-[2rem] border border-rose-200/10 bg-[#100c13] px-4 pb-12 pt-6 text-[#fff5f2] sm:px-8 lg:px-12">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_78%_25%,#422237_0%,transparent_60%)]" />
+      <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-center lg:gap-12">
+        <header className="pt-2">
+          {onHome && (
+            <button type="button" onClick={onHome} className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-xs text-zinc-200 hover:bg-white/10">
+              <ArrowLeft className="h-4 w-4" /> Home
+            </button>
+          )}
+          <h1 className="font-display text-4xl tracking-tight text-rose-50 sm:text-5xl lg:text-6xl">The Match Lounge</h1>
+          <p className="mt-3 max-w-md text-sm leading-relaxed text-rose-100/65">
+            Meet fictional AI companions. Swipe to match, hear a voice preview, or pick up a conversation from your saved matches.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button type="button" aria-expanded={showMatches} onClick={() => setShowMatches((open) => !open)}
+              className="inline-flex items-center gap-2 rounded-full border border-rose-200/30 bg-rose-200/10 px-4 py-2 text-sm font-semibold text-rose-100 hover:bg-rose-200/20">
+              <Heart className="h-4 w-4" /> Matches <span className="tabular-nums">{matchedProfiles.length}</span>
+            </button>
+            {lastPass !== null && (
+              <button type="button" onClick={() => { isTransitioning.current = false; setIndex(lastPass); setLastPass(null); setShowMatches(false); }}
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm text-zinc-200 hover:bg-white/10">
+                <RotateCcw className="h-4 w-4" /> Undo pass
               </button>
             )}
-            <h1 className="text-base font-extrabold tracking-tight neon-text-glow">
-              <span className="text-[#ff1e8e]">Discover</span> Match
-            </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-200 tabular-nums">
-              🪙 {coins}
-            </span>
-            <span className="rounded-full border border-[#ff1e8e]/30 bg-[#0c0c16] px-3 py-1 text-xs font-semibold text-pink-300 tabular-nums">
-              ♥ {matchIds.length}
-            </span>
-          </div>
-        </div>
-
+          {showMatches && (
+            <div className="mt-4 max-h-72 max-w-md space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-black/30 p-3">
+              {!matchedProfiles.length && <p className="p-2 text-sm text-zinc-300">Your matches will appear here.</p>}
+              {matchedProfiles.map((profile) => (
+                <button type="button" key={profile.id} onClick={() => {
+                  if (onStartChat) onStartChat(profile);
+                  else onMatch?.(toLegacyCharacter(profile));
+                }} className="flex w-full items-center gap-3 rounded-xl p-2 text-left hover:bg-white/10">
+                  <SafeImage src={profile.portraitUrl} alt="" className="h-12 w-10 rounded-lg object-cover object-top" />
+                  <span><strong className="block text-sm">{profile.name}</strong><span className="text-xs text-zinc-300">{profile.archetype}</span></span>
+                </button>
+              ))}
+            </div>
+          )}
+        </header>
+        <div className="mx-auto flex w-full max-w-sm flex-col items-center" aria-label="Companion deck">
         {!current ? (
           <div className="flex aspect-[3/4.6] w-full flex-col items-center justify-center rounded-3xl neon-glass p-6 text-center">
             <p className="text-base font-bold">Deck complete!</p>
@@ -307,6 +340,13 @@ export function DiscoverSwipe({
               type="button"
               onClick={() => {
                 isTransitioning.current = false;
+                const shuffled = [...deck];
+                for (let at = shuffled.length - 1; at > 0; at--) {
+                  const swap = Math.floor(Math.random() * (at + 1));
+                  [shuffled[at], shuffled[swap]] = [shuffled[swap], shuffled[at]];
+                }
+                setDeck(shuffled);
+                setLastPass(null);
                 setIndex(0);
               }}
               className="mt-4 rounded-full neon-btn-primary px-5 py-2 text-xs font-bold text-white"
@@ -316,19 +356,23 @@ export function DiscoverSwipe({
           </div>
         ) : (
           <>
+            <p aria-live="polite" className="mb-2 self-end text-xs tabular-nums text-rose-100/75">{index + 1} of {deck.length}</p>
             {/* Swipeable Card */}
             <div
               onPointerDown={(e) => {
+                if (!e.isPrimary || e.button !== 0) return;
+                e.currentTarget.setPointerCapture(e.pointerId);
                 startXRef.current = e.clientX;
                 setIsDragging(true);
               }}
               onPointerMove={(e) => {
                 if (isDragging) setDragX(e.clientX - startXRef.current);
               }}
-              onPointerUp={() => {
+              onPointerUp={(e) => {
                 if (!isDragging) return;
-                if (dragX > 90) handleSwipe('right');
-                else if (dragX < -90) handleSwipe('left');
+                const distance = e.clientX - startXRef.current;
+                if (distance > 90) handleSwipe('right');
+                else if (distance < -90) handleSwipe('left');
                 else {
                   setDragX(0);
                   setIsDragging(false);
@@ -342,14 +386,15 @@ export function DiscoverSwipe({
                 transform: `translateX(${dragX}px) rotate(${dragX * 0.05}deg)`,
                 transition: isDragging ? 'none' : 'transform 220ms ease-out',
               }}
-              className={`relative aspect-[3/4.6] w-full cursor-grab touch-none select-none overflow-hidden rounded-3xl border bg-[#0c0c16] active:cursor-grabbing ${dragTone}`}
+              className={`relative aspect-[4/5] w-full cursor-grab touch-pan-y select-none overflow-hidden rounded-3xl border bg-[#0c0c16] active:cursor-grabbing sm:aspect-[3/4] ${dragTone}`}
             >
               <SafeImage
-                src={current.extraPhotos?.[photoIdx] || current.portraitUrl}
+                key={current.id}
+                src={current.extraPhotos?.[0] || current.portraitUrl}
                 alt={current.isSecretAdmirer && !admirerRevealed ? 'Secret Admirer' : current.name}
                 draggable={false}
                 fallbackSrc={fallbackPortraitUrl || '/portraits/chloe-parker.webp'}
-                className={`h-full w-full object-cover object-top transition duration-500 ${
+                className={`h-full w-full object-cover object-top motion-safe:transition motion-safe:duration-500 ${
                   current.isSecretAdmirer && !admirerRevealed ? 'blur-2xl scale-110 brightness-75' : ''
                 }`}
               />
@@ -378,12 +423,12 @@ export function DiscoverSwipe({
               {(!current.isSecretAdmirer || admirerRevealed) && (
                 <button
                   type="button"
-                  aria-label="Play voice preview"
+                  aria-label={voicePlaying ? "Stop voice preview" : "Play voice preview"}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={() => playVoicePrompt(current.voiceSampleLine)}
+                  onClick={() => playVoicePrompt(current)}
                   className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/40 bg-black/65 px-3 py-1 text-[11px] font-semibold text-[#00f5ff] backdrop-blur hover:border-[#00f5ff]"
                 >
-                  <Volume2 className="h-3.5 w-3.5" /> Voice
+                  <Volume2 className="h-3.5 w-3.5" /> {voicePlaying ? "Stop" : "Voice"}
                 </button>
               )}
 
@@ -420,13 +465,14 @@ export function DiscoverSwipe({
                     <h2 className="text-xl font-extrabold">
                       {current.name}, <span className="font-medium text-zinc-300">{current.age}</span>
                     </h2>
-                    <p className="text-xs font-semibold text-[#ff1e8e]">{current.archetype}</p>
+                    <p className="text-xs font-semibold text-rose-200">{current.archetype}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-zinc-200">{current.tagline}</p>
                     {current.prompts && (
                       <div className="mt-2 rounded-xl border border-white/10 bg-black/55 p-2.5 backdrop-blur">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-[#a6a6c4]">
                           {current.prompts.question}
                         </p>
-                        <p className="mt-0.5 text-xs text-zinc-100">{current.prompts.answer}</p>
+                        <p className="mt-0.5 line-clamp-3 text-xs text-zinc-100">{current.prompts.answer}</p>
                       </div>
                     )}
                   </>
@@ -470,11 +516,12 @@ export function DiscoverSwipe({
             </p>
           </>
         )}
+        </div>
       </div>
 
       {/* One-Line Rizz Challenge Modal */}
       {rizzTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+        <div role="dialog" aria-modal="true" aria-label="Opening line" className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
           <form
             onSubmit={handleSubmitRizz}
             className="w-full max-w-xs rounded-3xl neon-glass p-5 text-center shadow-2xl"
@@ -516,7 +563,7 @@ export function DiscoverSwipe({
 
       {/* Exact-Name "IT'S A MATCH" Celebration Modal */}
       {matchedCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
+        <div role="dialog" aria-modal="true" aria-label="Match saved" className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
           <div className="w-full max-w-xs neon-border-sweep">
             <div className="neon-sweep-inner p-5 text-center">
               <p className="text-xs font-black uppercase tracking-widest text-[#00f5ff] neon-text-glow">
@@ -530,7 +577,7 @@ export function DiscoverSwipe({
               />
               <h3 className="mt-3 text-lg font-extrabold">{matchedCard.name} liked you back</h3>
               <p className="mt-1 text-xs text-pink-200">
-                Starting affinity boosted +{matchedBonus}% · +10 Free 🪙
+                {matchedBonus ? `Starting affinity +${matchedBonus}% · 10 bonus coins` : 'You’ve already saved this companion.'}
               </p>
               <div className="mt-4 flex flex-col gap-2">
                 <button
@@ -561,7 +608,7 @@ export function DiscoverSwipe({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

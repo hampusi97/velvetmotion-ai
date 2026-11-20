@@ -34,13 +34,28 @@ In **Advanced media**, configure `img2vidUrl` with a bridge that accepts an HTTP
   "prompt": "subtle camera movement and natural expression",
   "motion": "slow-zoom-blink",
   "durationSec": 5,
-  "speed": 1
+  "speed": 1,
+  "resolution": 720
 }
 ```
 
-The bridge must respond with JSON such as `{"videoUrl":"https://example.com/render.mp4"}`, or with a direct `video/*` response. Add authentication on your bridge if exposed publicly; do not put private server secrets in frontend code.
+The bridge can finish synchronously or queue the render. To queue it, send HTTP `202` with a same-origin job URL in `Location` or a JSON `statusUrl` field and, optionally, `Retry-After` in seconds. Studio keeps polling while the job returns `202`, for up to five minutes. Cross-origin bridges need CORS and must expose `Location` and `Retry-After` if they use those headers.
 
-Without that endpoint, VelvetMotion can export a **pan/zoom WebM animated still**. This is a useful fallback but not generative video or genuine movement. The UI now labels it accordingly.
+When ready, the bridge returns JSON such as `{"videoUrl":"https://example.com/render.mp4"}`, or with a direct `video/*` response. Add authentication on your bridge if exposed publicly; do not put private server secrets in frontend code.
+
+The **AI video** option requests 480p, 720p, or 1080p. The provider chooses what it can render and Studio shows the actual dimensions once the clip loads. Use **Animated still** to export a browser-rendered pan-and-zoom clip without a video model. Stopping a queued render in Studio stops polling. The backend decides whether to cancel its own job.
+
+### Use an installed ComfyUI video workflow locally
+
+1. In ComfyUI, test a working image-to-video graph such as a compatible Wan or LTX workflow with an MP4 or WebM save node. Install its checkpoints and custom nodes first.
+2. Export the graph as **API format**. In the exported JSON, set the `LoadImage` node's `inputs.image` to `"{{image}}"`. You can also replace the positive prompt field with `"{{prompt}}"`. Optional `"{{durationSec}}"` and `"{{resolution}}"` slots are replaced with numbers. Use these only in nodes that accept seconds and the configured resolution value. Leave frame counts and dimension pairs at your model's supported settings.
+3. Set the `VELVET_COMFY_VIDEO_WORKFLOW` environment variable to that trusted local JSON file and start `python3 workers/local_media_proxy.py`. With the default loopback binding, set the Studio endpoint to `http://127.0.0.1:8787/generate-video`. For a local browser, run the app on localhost. The adapter accepts inline PNG, JPEG and WebP and sends them to your ComfyUI server.
+4. Start with a short 480p test and inspect the real result before increasing resolution. Set `VELVET_VIDEO_ORIGINS` only if your app runs on a different trusted origin. For a publicly hosted bridge, enforce authentication and content rules on the server.
+
+## High-detail portraits and guided audio
+
+- **High detail** requests 1.5× the standard photo dimensions, up to 1536 pixels on the longest edge. It requires a configured local image model. A render error keeps the request local.
+- Open **Guided JOI Audio** to generate three new cues using the configured chat model. Choose a fictional companion, duration and tone, review the draft, then open it in the existing timer and voice player. Ready-made sessions remain available.
 
 ## Troubleshooting
 1. Open **Advanced media → Re-test All**. These probes check actual local chat/voice/image services rather than nonexistent `/api/*` routes.

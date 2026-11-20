@@ -12,6 +12,7 @@ export type LocalGenRequest = {
   width?: number;
   height?: number;
   negative?: string;
+  checkpoint?: string;
   characterId?: string;
   referenceImageBase64?: string;
 };
@@ -199,6 +200,7 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
       seed: req.seed,
       width: req.width || 768,
       height: req.height || 1152,
+      checkpoint: req.checkpoint,
       referenceImageBase64: req.referenceImageBase64,
     });
     const queueRes = await fetch(`${base}/prompt`, {
@@ -211,7 +213,8 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
     const { prompt_id: promptId } = (await queueRes.json()) as { prompt_id?: string };
     if (!promptId) return { ok: false, note: "ComfyUI returned no prompt_id" };
 
-    for (let i = 0; i < 45; i++) {
+    const deadline = Date.now() + (Math.max(req.width || 0, req.height || 0) > 1200 ? 180_000 : 60_000);
+    while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 1200));
       const histRes = await fetch(`${base}/history/${encodeURIComponent(promptId)}`, {
         signal: AbortSignal.timeout(5000),
@@ -219,9 +222,12 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
       if (!histRes.ok) continue;
       const hist = (await histRes.json()) as Record<
         string,
-        { outputs?: Record<string, { images?: Array<{ filename: string; subfolder?: string; type?: string }> }> }
+        { status?: { status_str?: string }; outputs?: Record<string, { images?: Array<{ filename: string; subfolder?: string; type?: string }> }> }
       >;
-      const outputs = hist?.[promptId]?.outputs;
+      if (hist[promptId]?.status?.status_str === "error") {
+        return { ok: false, note: "ComfyUI workflow failed. Check the server logs for a missing model, node, or GPU memory error." };
+      }
+      const outputs = hist[promptId]?.outputs;
       if (!outputs) continue;
       for (const nodeOut of Object.values(outputs)) {
         const imgMeta = nodeOut?.images?.[0];

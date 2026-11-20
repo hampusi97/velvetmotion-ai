@@ -130,8 +130,11 @@ export function AtelierStoryboard() {
               characterId: character.id, localEngine,
             });
         if (shot.type === "video") {
+          setResults((prev) => ({
+            ...prev, [shot.id]: { id: shot.id, imageUrl: image.imageUrl, engine: image.engine },
+          }));
           const clip = await generateStudioVideoClip({
-            imageUrl: image.imageUrl, sourceType: "fictional", adultMode,
+            imageUrl: image.imageUrl, mode: "ai", sourceType: "fictional", adultMode: adultMode || shot.wardrobe === "editorial lingerie",
             prompt: `Fictional adult ${character.name}, gentle character motion. ${shot.direction}`,
             motionId: "balcony-breeze", durationSec: shot.durationSec, speed: 1,
             comfyOnline: localEngine.comfyOnline,
@@ -151,7 +154,7 @@ export function AtelierStoryboard() {
         }
       } catch (e) {
         setResults((prev) => ({
-          ...prev, [shot.id]: { id: shot.id, error: e instanceof Error ? e.message : "Model generation failed" },
+          ...prev, [shot.id]: { ...prev[shot.id], id: shot.id, error: e instanceof Error ? e.message : "Model generation failed" },
         }));
         // Continue the user's other shots without inventing an image for this one.
       }

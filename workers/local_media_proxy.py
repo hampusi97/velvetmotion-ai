@@ -18,12 +18,18 @@ import argparse
 import base64
 import json
 import os
+import shutil
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional
+
+if __package__:
+    from .comfy_video import JOB_ID, MAX_REQUEST_BYTES, allowed_origin, queue_video, video_output
+else:
+    from comfy_video import JOB_ID, MAX_REQUEST_BYTES, allowed_origin, queue_video, video_output
 
 COMFY_BASE = os.environ.get("COMFY_URL", "http://127.0.0.1:8188").rstrip("/")
 FORGE_BASE = os.environ.get("FORGE_URL", "http://127.0.0.1:7860").rstrip("/")
@@ -160,19 +166,91 @@ def run_comfy_generation(payload: Dict[str, Any]) -> Optional[str]:
 
 
 class LocalProxyHandler(BaseHTTPRequestHandler):
+    def _is_video_route(self) -> bool:
+        return self.path == "/generate-video" or self.path.startswith("/video/jobs/")
+
     def _send_cors_headers(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
+        if self._is_video_route():
+            origin = self.headers.get("Origin")
+            self.send_header("Vary", "Origin")
+            if origin and allowed_origin(origin):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Access-Control-Expose-Headers", "Location, Retry-After")
+        else:
+            self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-    def _send_json(self, status: int, data: Dict[str, Any]) -> None:
+    def _send_json(self, status: int, data: Dict[str, Any], *, retry_after: str | None = None) -> None:
         raw = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self._send_cors_headers()
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
+        if retry_after:
+            self.send_header("Retry-After", retry_after)
         self.end_headers()
         self.wfile.write(raw)
+
+    def _video_available(self) -> str | None:
+        if not allowed_origin(self.headers.get("Origin")):
+            self._send_json(403, {"error": "This origin is not allowed to use the local video renderer."})
+            return None
+        workflow = os.environ.get("VELVET_COMFY_VIDEO_WORKFLOW")
+        if not workflow:
+            self._send_json(503, {"error": "Set VELVET_COMFY_VIDEO_WORKFLOW to your exported ComfyUI video workflow."})
+        return workflow
+
+    def _queue_video(self) -> None:
+        workflow = self._video_available()
+        if not workflow:
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= MAX_REQUEST_BYTES:
+                self._send_json(413, {"error": "Video source exceeds the request limit or is missing."})
+                return
+            payload = json.loads(self.rfile.read(length))
+            job_id = queue_video(COMFY_BASE, workflow, payload, forward_json)
+        except ValueError as exc:
+            self._send_json(400, {"error": str(exc)})
+        except (OSError, KeyError, RuntimeError):
+            self._send_json(502, {"error": "Could not queue the video in ComfyUI. Check the workflow and model setup."})
+        else:
+            self._send_json(202, {"statusUrl": f"/video/jobs/{job_id}"}, retry_after="3")
+
+    def _serve_video_job(self) -> None:
+        if not self._video_available():
+            return
+        job_id = self.path.removeprefix("/video/jobs/")
+        if not JOB_ID.fullmatch(job_id):
+            self._send_json(404, {"error": "Unknown video job."})
+            return
+        try:
+            output = video_output(COMFY_BASE, job_id)
+            if not output:
+                self._send_json(202, {"status": "rendering"}, retry_after="3")
+                return
+            url, content_type = output
+            response = urllib.request.urlopen(url, timeout=30)
+        except RuntimeError as exc:
+            self._send_json(502, {"error": str(exc)})
+            return
+        except (OSError, ValueError):
+            self._send_json(502, {"error": "Could not fetch the rendered video from ComfyUI."})
+            return
+        with response:
+            self.send_response(200)
+            self._send_cors_headers()
+            self.send_header("Content-Type", content_type)
+            length = response.headers.get("Content-Length")
+            if length:
+                self.send_header("Content-Length", length)
+            self.end_headers()
+            try:
+                shutil.copyfileobj(response, self.wfile)
+            except (BrokenPipeError, ConnectionResetError):
+                return
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         self.send_response(204)
@@ -180,6 +258,9 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path.startswith("/video/jobs/"):
+            self._serve_video_job()
+            return
         if self.path.startswith("/health"):
             self._send_json(
                 200,
@@ -197,6 +278,9 @@ class LocalProxyHandler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": "Not found. Use GET /health or POST /generate, /sdapi/v1/txt2img, /ollama/chat."})
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path == "/generate-video":
+            self._queue_video()
+            return
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length) if length > 0 else b"{}"
         try:

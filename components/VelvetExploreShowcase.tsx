@@ -185,30 +185,27 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
 const HERO_SLIDES = [
   {
     id: 'nova',
-    eyebrow: 'VELVETMOTION ORIGINAL',
-    title: 'Nova',
-    subtitle: 'IS ONLINE NOW',
-    caption: '100% Free · Editable Memory · Local RAM Ultra Mode',
-    cta: 'Show me',
-    href: '/chat/?companion=nova',
-    image: '/portraits/nova.jpg',
+    eyebrow: 'VelvetMotion AI',
+    title: 'Companions after dark',
+    caption: 'Meet fictional AI companions, find a match, and create your own scenes in Studio.',
+    cta: 'Find a match',
+    href: '/discover/',
+    image: '/promos/match-lounge.webp',
   },
   {
     id: 'chloe',
-    eyebrow: 'FEATURED TONIGHT',
-    title: 'Chloe',
-    subtitle: 'NEW SCENE DROPPED',
-    caption: 'Instant selfies, live neural voice calls & zero message caps',
+    eyebrow: 'Featured companion',
+    title: 'An evening with Chloe',
+    caption: 'Pick up a conversation with a warm, playful late-night confidante.',
     cta: 'Chat now',
     href: '/chat/?companion=chloe',
     image: '/portraits/chloe.jpg',
   },
   {
     id: 'priya',
-    eyebrow: '2-ON-1 GROUP DRAMA',
-    title: 'Priya × Mia',
-    subtitle: 'DOUBLE THE TROUBLE',
-    caption: 'Drop into a live 3-way room where they compete for you',
+    eyebrow: 'Group chat',
+    title: 'Priya & Mia',
+    caption: 'Start a shared scene with two distinct companion personalities.',
     cta: 'Enter room',
     href: '/group/',
     image: '/portraits/priya-v.jpg',
@@ -230,7 +227,7 @@ const EXPERIENCES = [
     id: 'video',
     title: 'BUILD',
     subtitle: 'YOUR VIDEO',
-    caption: 'Custom neon motion clips. Scene by scene.',
+    caption: 'Direct AI clips with a connected video model.',
     href: '/studio/',
     image: '/portraits/mia.jpg',
     accent: 'from-[#ff4d8d] to-[#ff1e8e]',
@@ -248,10 +245,10 @@ const EXPERIENCES = [
   },
   {
     id: 'cams',
-    title: 'LIVE VOICE',
-    subtitle: '& CALLS',
-    caption: 'Real-time neural voice calls & Guided Audio Studio.',
-    href: '/chat/?companion=nova&call=1',
+    title: 'GUIDED',
+    subtitle: 'JOI AUDIO',
+    caption: 'Generate a personal script or try a ready-made session.',
+    href: '/joi/',
     image: '/portraits/raven.jpg',
     accent: 'from-[#ff1e8e] to-[#c026d3]',
     position: 'bottom' as const,
@@ -387,39 +384,36 @@ export default function VelvetExploreShowcase() {
   return (
     <div className="min-h-screen bg-[#08080e] text-[#f7f7fc] pb-16">
       {/* FULL-BLEED CINEMATIC HERO CAROUSEL */}
-      <section className="relative h-[300px] sm:h-[360px] w-full overflow-hidden rounded-b-3xl border-b border-white/5">
-        <SafePortrait
+      <section className="relative min-h-[390px] w-full overflow-hidden rounded-b-3xl border-b border-rose-200/15 bg-[#110b14] sm:min-h-[465px]">
+        <SafeImage
+          key={activeHero.id}
           src={activeHero.image}
-          alt={activeHero.title}
-          className="absolute inset-0 h-full w-full object-cover object-top scale-105 transition-all duration-700"
+          alt=""
+          fetchPriority="high"
+          className="absolute inset-0 h-full w-full object-cover object-[65%_40%] motion-safe:animate-[velvet-hero-enter_650ms_ease-out_both]"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#08080e] via-[#08080e]/75 to-transparent" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,#130a15_3%,rgba(19,10,21,.92)_38%,rgba(19,10,21,.52)_70%,rgba(19,10,21,.18))] sm:bg-[linear-gradient(90deg,#130a15_3%,rgba(19,10,21,.85)_36%,rgba(19,10,21,.22)_76%,transparent)]" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#08080e] via-transparent to-[#08080e]/30" />
 
-        <div className="relative z-10 flex h-full flex-col justify-center px-6 sm:px-10 max-w-xl pb-4">
-          <span className="text-[11px] font-semibold tracking-[0.25em] text-[#00f5ff] drop-shadow-[0_0_8px_rgba(0,245,255,0.7)]">
-            {activeHero.eyebrow}
-          </span>
-          <h1 className="mt-1 text-4xl sm:text-5xl font-black tracking-tight text-white drop-shadow-[0_0_20px_rgba(255,30,142,0.65)]">
+        <div className="relative z-10 flex min-h-[390px] max-w-2xl flex-col justify-center px-6 pb-14 pt-10 sm:min-h-[465px] sm:px-12">
+          <p className="text-sm font-semibold text-rose-200">{activeHero.eyebrow}</p>
+          <h1 className="mt-3 max-w-[12ch] font-display text-5xl leading-[.98] tracking-tight text-rose-50 sm:text-7xl">
             {activeHero.title}
           </h1>
-          <p className="mt-1 text-xs sm:text-sm font-bold tracking-[0.28em] text-[#ff4d8d]">
-            {activeHero.subtitle}
-          </p>
-          <p className="mt-2 text-sm text-[#c8c8de]">{activeHero.caption}</p>
+          <p className="mt-5 max-w-sm text-sm leading-relaxed text-rose-50/80 sm:text-base">{activeHero.caption}</p>
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Link
               href={activeHero.href}
-              className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-[#ff1e8e] to-[#ff4d8d] px-7 py-2.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(255,30,142,0.6)] hover:brightness-110 transition"
+              className="inline-flex items-center justify-center rounded-full bg-rose-200 px-5 py-2.5 text-sm font-bold text-[#2b1421] transition hover:bg-rose-100"
             >
               {activeHero.cta}
             </Link>
             <Link
-              href="/download/"
-              className="inline-flex items-center justify-center rounded-full border border-[#00f5ff]/40 bg-[#0d0d18]/75 px-5 py-2.5 text-xs font-semibold text-[#00f5ff] backdrop-blur-md hover:border-[#00f5ff] transition"
+              href="/studio/"
+              className="inline-flex items-center justify-center rounded-full border border-rose-200/40 bg-black/35 px-5 py-2.5 text-sm font-semibold text-rose-100 backdrop-blur-md transition hover:bg-rose-200/15"
             >
-              ⚡ Desktop Local Ultra
+              Open Studio
             </Link>
           </div>
         </div>
@@ -431,7 +425,8 @@ export default function VelvetExploreShowcase() {
               key={s.id}
               type="button"
               onClick={() => setHeroIdx(i)}
-              aria-label={`Slide ${i + 1}`}
+              aria-label={s.title}
+              aria-pressed={heroIdx === i}
               className={`h-1 rounded-full transition-all ${
                 i === heroIdx
                   ? 'w-7 bg-[#ff1e8e] shadow-[0_0_10px_rgba(255,30,142,0.9)]'
@@ -455,7 +450,7 @@ export default function VelvetExploreShowcase() {
               href="/discover/"
               className="shrink-0 text-xs font-semibold text-[#00f5ff] hover:underline"
             >
-              Play Discover Swipe →
+              Open Match Lounge →
             </Link>
           </div>
 

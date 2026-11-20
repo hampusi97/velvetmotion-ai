@@ -8,6 +8,7 @@
  */
 import { assertCompliance } from "./complianceFilter";
 import { generateLocalImage } from "./comfyClient";
+import { getMediaSettings } from "./mediaSettings";
 import { fetchWorkerImage } from "./imageWorker";
 import { generateHordeImage } from "./aiHorde";
 import { remoteImageToStableDataUrl } from "./imageStore";
@@ -21,6 +22,8 @@ export interface PictureGenerationRequest {
   width: number;
   height: number;
   nsfw?: boolean;
+  requireLocal?: boolean;
+  checkpoint?: string;
   characterId?: string;
   imageWorkerUrl?: string;
   localEngine?: Pick<LocalEngineStatus, "comfyOnline" | "koboldOnline">;
@@ -81,10 +84,12 @@ export async function generateStudioPicture(
   const parsedSeed = req.seed ?? Math.floor(Math.random() * 90000 + 1000);
   const t0 = performance.now();
   let imageUrl: string | null = null;
+  let localError: string | undefined;
   let engine = "Cloud Free";
 
   // 1A. Local Ultra ComfyUI (:8188)
-  if (req.localEngine?.comfyOnline) {
+  const configuredImageEndpoint = getMediaSettings().localImageBase.trim();
+  if (configuredImageEndpoint || req.localEngine?.comfyOnline) {
     const localRes = await generateLocalImage({
       prompt: req.prompt,
       seed: parsedSeed,
@@ -92,10 +97,13 @@ export async function generateStudioPicture(
       height: req.height,
       characterId: req.characterId,
       negative: req.negativePrompt,
-    });
+      checkpoint: req.checkpoint,
+    }, configuredImageEndpoint || "http://127.0.0.1:8188");
     if (localRes.ok && localRes.imageUrl) {
       imageUrl = localRes.imageUrl;
-      engine = "Local Ultra ComfyUI";
+      engine = localRes.note || "Configured local image model";
+    } else {
+      localError = localRes.note;
     }
   }
 
@@ -106,6 +114,10 @@ export async function generateStudioPicture(
       imageUrl = koboldImg;
       engine = "Local KoboldCpp SD";
     }
+  }
+
+  if (!imageUrl && req.requireLocal) {
+    throw new Error(localError || "The local image model could not finish this render. Check the model, available VRAM and requested dimensions, or select Standard quality.");
   }
 
   // 2. Cloudflare Flux Image Worker

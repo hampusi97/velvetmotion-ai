@@ -32,6 +32,11 @@ import {
   startJoiBeat,
   stopJoiBeat,
 } from "@/lib/audioEngine";
+import { runGenerativePrompt } from "@/lib/chatRouter";
+import { buildGuidedSession } from "@/lib/guidedSession";
+import { assertCompliance } from "@/lib/complianceFilter";
+import { FLAGSHIP_COMPANIONS } from "@/data/companions";
+import { SafeImage } from "@/components/SafeImage";
 import { CHARACTERS } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
 
@@ -51,6 +56,13 @@ const BPM_MODES = [
 ] as const;
 
 export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: string | null }) {
+  const [draft, setDraft] = useState<JoiScenario | null>(null);
+  const [selectedCompanion, setSelectedCompanion] = useState(FLAGSHIP_COMPANIONS[0].id);
+  const [sessionTone, setSessionTone] = useState("playful");
+  const [sessionMinutes, setSessionMinutes] = useState<2 | 4 | 6>(4);
+  const [sessionDirection, setSessionDirection] = useState("");
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(initialScenarioId);
   const [stepIndex, setStepIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -69,7 +81,7 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
   }, [initialScenarioId]);
 
   const scenario: JoiScenario | undefined = scenarioId
-    ? getJoiScenario(scenarioId)
+    ? scenarioId === draft?.id ? draft : getJoiScenario(scenarioId)
     : undefined;
   const step = scenario?.steps[stepIndex];
 
@@ -154,14 +166,102 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
     });
   };
 
+  async function generateDraft() {
+    const companion = FLAGSHIP_COMPANIONS.find((profile) => profile.id === selectedCompanion);
+    if (!companion || sessionBusy) return;
+    const direction = sessionDirection.trim();
+    const safety = assertCompliance(direction);
+    setSessionError(null);
+    if (!safety.ok) {
+      setSessionError(safety.reason);
+      return;
+    }
+
+    setSessionBusy(true);
+    setDraft(null);
+    try {
+      const raw = await runGenerativePrompt(
+        "Write cues for a private JOI session between consenting fictional adults only. Respect the user's boundaries, make it easy to pause or stop, and close with a supportive wind-down. Return only a JSON array with exactly three short speech-ready strings, for warm-up, build, and wind-down. No markdown or stage directions.",
+        `Fictional persona: ${companion.name}, age ${companion.age}. ${companion.personality}
+Tone: ${sessionTone}. Duration: ${sessionMinutes} minutes. Direction and limits: ${direction || "No additional directions."}`,
+        companion.name,
+      );
+      if (!raw) throw new Error("No draft came back. Check your chat model in Settings or choose a ready-made session.");
+      setDraft(buildGuidedSession(raw, { name: companion.name, age: companion.age, summary: companion.tagline }, sessionTone, sessionMinutes));
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "Could not generate a session.");
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
   if (!scenario || !step) {
     return (
-      <section className="max-w-2xl mx-auto space-y-6">
+      <section className="mx-auto max-w-3xl space-y-6">
         <div>
           <h2 className="text-2xl font-bold text-pink-400 mb-1 flex items-center gap-2">
             <Volume2 className="h-6 w-6 text-pink-400" /> Audio Voice JOI Studio
           </h2>
           <p className="text-xs text-zinc-400">{CONTENT_DISCLAIMER}</p>
+        </div>
+
+        <div className="overflow-hidden rounded-3xl border border-rose-200/20 bg-gradient-to-br from-[#2e1a27] to-[#141019] p-5 sm:p-7">
+          <div className="flex gap-4">
+            <SafeImage src={FLAGSHIP_COMPANIONS.find((profile) => profile.id === selectedCompanion)?.portraitUrl || FLAGSHIP_COMPANIONS[0].portraitUrl}
+              alt="" className="h-24 w-20 rounded-xl object-cover object-top" />
+            <div>
+              <h3 className="font-serif text-2xl text-rose-50">Build a private JOI session</h3>
+              <p className="mt-1 max-w-md text-sm text-rose-100/75">Choose a fictional companion, set the pace, and review the generated script before starting.</p>
+            </div>
+          </div>
+          <form className="mt-5 space-y-3" onSubmit={(event) => { event.preventDefault(); void generateDraft(); }}>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="text-xs text-rose-100">Companion
+                <select value={selectedCompanion} onChange={(event) => setSelectedCompanion(event.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
+                  {FLAGSHIP_COMPANIONS.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-rose-100">Tone
+                <select value={sessionTone} onChange={(event) => setSessionTone(event.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
+                  <option value="playful">Playful</option><option value="gentle">Gentle</option><option value="confident">Confident</option>
+                </select>
+              </label>
+              <label className="text-xs text-rose-100">Duration
+                <select value={sessionMinutes} onChange={(event) => setSessionMinutes(Number(event.target.value) as 2 | 4 | 6)}
+                  className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm">
+                  <option value={2}>2 minutes</option><option value={4}>4 minutes</option><option value={6}>6 minutes</option>
+                </select>
+              </label>
+            </div>
+            <label className="block text-xs text-rose-100">Direction and limits
+              <textarea value={sessionDirection} onChange={(event) => setSessionDirection(event.target.value)}
+                maxLength={500} rows={2} className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm"
+                placeholder="Slow and playful, with a gentle wind-down" />
+            </label>
+            <p className="text-xs text-zinc-400">Uses your selected chat model. If it’s hosted, your directions are sent to that provider.</p>
+            <button type="submit" disabled={sessionBusy} className="rounded-full bg-rose-200 px-4 py-2 text-sm font-semibold text-[#27121e] disabled:opacity-60">
+              {sessionBusy ? "Writing session…" : "Generate draft"}
+            </button>
+          </form>
+          {sessionError && <p role="alert" className="mt-3 text-sm text-rose-200">{sessionError}</p>}
+          {draft && (
+            <div className="mt-5 border-t border-white/15 pt-4">
+              <h4 className="text-sm font-semibold">{draft.label} · {draft.summary}</h4>
+              <ol className="mt-2 space-y-3 text-sm text-zinc-200">
+                {draft.steps.map((cue) => <li key={cue.id}><strong>{cue.title}</strong> · {cue.instruction}</li>)}
+              </ol>
+              <button type="button" onClick={() => {
+                stopSpeaking();
+                setAutoVoice(false);
+                setStepIndex(0);
+                setScenarioId(draft.id);
+              }} className="mt-4 rounded-full border border-rose-200/40 px-4 py-2 text-sm text-rose-100 hover:bg-rose-200/10">
+                Open guided session
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Instant Dirty Talk & Stroke Beat Audio Packs */}
@@ -323,6 +423,8 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
             stopSpeaking();
             stopJoiBeat();
             setBeatBpm(null);
+            stopIntimacyAudio();
+            setAmbienceOn(false);
             setScenarioId(null);
             setStepIndex(0);
           }}

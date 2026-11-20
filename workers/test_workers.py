@@ -2,9 +2,12 @@
 """Unit & live HTTP tests for VelvetMotion Python workers (Telegram bridge & ComfyUI/Forge proxy)."""
 
 import json
+import tempfile
 import threading
 import unittest
 import urllib.request
+from pathlib import Path
+from unittest.mock import patch
 from http.server import ThreadingHTTPServer
 
 from workers.local_media_proxy import LocalProxyHandler, build_comfy_workflow
@@ -66,6 +69,74 @@ class TestVelvetWorkers(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+    def test_comfy_video_bridge_queues_and_streams_result(self) -> None:
+        from io import BytesIO
+        from urllib.error import HTTPError
+        from workers.comfy_video import queue_video
+
+        job_id = "3f2c83c8-7ea8-4aa0-ac21-29ac0d35692d"
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workflow = Path(tmp_dir) / "workflow.json"
+            workflow.write_text(json.dumps({
+                "1": {"class_type": "LoadImage", "inputs": {"image": "{{image}}"}},
+                "2": {"class_type": "VideoNode", "inputs": {"height": "{{resolution}}", "text": "{{prompt}}"}},
+            }))
+            payload = {
+                "image": "data:image/png;base64,aGVsbG8=",
+                "prompt": "Slow dolly in",
+                "sourceType": "fictional",
+                "resolution": 1080,
+            }
+            with patch("workers.comfy_video._upload_image", return_value="uploaded.png"):
+                def forward(_url, body, timeout):
+                    self.assertEqual(body["prompt"]["1"]["inputs"]["image"], "uploaded.png")
+                    self.assertEqual(body["prompt"]["2"]["inputs"], {"height": 1080, "text": "Slow dolly in"})
+                    return {"prompt_id": job_id}
+
+                self.assertEqual(queue_video("http://localhost:8188", workflow, payload, forward), job_id)
+                with self.assertRaisesRegex(ValueError, "fictional adult source"):
+                    queue_video("http://localhost:8188", workflow, {
+                        **payload, "sourceType": "real-person", "adultMode": True,
+                    }, forward)
+
+            class Clip(BytesIO):
+                headers = {"Content-Length": "9"}
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), LocalProxyHandler)
+            base = f"http://127.0.0.1:{server.server_address[1]}"
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            open_url = urllib.request.urlopen
+
+            def open_upstream(url, **kwargs):
+                return Clip(b"test clip") if url == "http://localhost:8188/test-clip" else open_url(url, **kwargs)
+
+            try:
+                with (
+                    patch.dict("os.environ", {"VELVET_COMFY_VIDEO_WORKFLOW": str(workflow), "VELVET_VIDEO_ORIGINS": "http://localhost:3000"}),
+                    patch("workers.local_media_proxy.queue_video", return_value=job_id),
+                    patch("workers.local_media_proxy.video_output", side_effect=[None, ("http://localhost:8188/test-clip", "video/mp4")]),
+                    patch("workers.local_media_proxy.urllib.request.urlopen", side_effect=open_upstream),
+                ):
+                    headers = {"Content-Type": "application/json", "Origin": "http://localhost:3000"}
+                    request = urllib.request.Request(base + "/generate-video", data=json.dumps(payload).encode(), headers=headers)
+                    with open_url(request, timeout=5) as response:
+                        self.assertEqual(response.status, 202)
+                        self.assertEqual(response.headers.get("Access-Control-Allow-Origin"), "http://localhost:3000")
+                        job_url = base + json.load(response)["statusUrl"]
+                    with open_url(job_url, timeout=5) as response:
+                        self.assertEqual(response.status, 202)
+                    with open_url(job_url, timeout=5) as response:
+                        self.assertEqual(response.headers.get("Content-Type"), "video/mp4")
+                        self.assertEqual(response.read(), b"test clip")
+                    unauthorized = urllib.request.Request(base + "/generate-video", data=b"{}", headers={"Origin": "https://untrusted.example"})
+                    with self.assertRaises(HTTPError) as denied:
+                        open_url(unauthorized, timeout=5)
+                    self.assertEqual(denied.exception.code, 403)
+            finally:
+                server.shutdown()
+                server.server_close()
 
     def test_telegram_session_history_window(self) -> None:
         bridge = VelvetTelegramBridge(

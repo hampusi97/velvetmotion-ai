@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Download, BookmarkPlus, Film, MessageSquare, Sparkles, Lock, Upload } from 'lucide-react';
 import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
 import {
@@ -102,6 +103,7 @@ export default function MediaStudioModal({
   const [sceneId, setSceneId] = useState<string>(SCENE_PRESETS[0].id);
   const [studioStyle, setStudioStyle] = useState<(typeof STUDIO_STYLES)[number]>('Neon Noir');
   const [aspectId, setAspectId] = useState<(typeof ASPECT_RATIOS)[number]['id']>('2:3');
+  const [photoQuality, setPhotoQuality] = useState<'standard' | 'high'>('standard');
   const [seedLock, setSeedLock] = useState<string>('');
   const [customPrompt, setCustomPrompt] = useState('');
   const [cameraStyle, setCameraStyle] = useState("cinematic 85mm portrait lens");
@@ -118,8 +120,14 @@ export default function MediaStudioModal({
   const [motionId, setMotionId] = useState<VideoMotionPreset['id']>(VIDEO_MOTION_PRESETS[0].id);
   const [durationSec, setDurationSec] = useState<3 | 5 | 8>(5);
   const [videoSpeed, setVideoSpeed] = useState<0.75 | 1 | 1.25>(1);
+  const [videoMode, setVideoMode] = useState<'ai' | 'animated-still'>('ai');
+  const [videoResolution, setVideoResolution] = useState<480 | 720 | 1080>(720);
+  const [videoDirection, setVideoDirection] = useState('');
+  const [videoAdultMode, setVideoAdultMode] = useState(false);
+  const videoAbort = useRef<AbortController | null>(null);
   const [videoBusy, setVideoBusy] = useState(false);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [videoDimensions, setVideoDimensions] = useState('');
   const [videoEngineUsed, setVideoEngineUsed] = useState<string | null>(null);
 
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
@@ -142,6 +150,7 @@ export default function MediaStudioModal({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const localEngine = useLocalEngineStatus();
   const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([]);
+  const [comfyCheckpoint, setComfyCheckpoint] = useState('');
 
   useEffect(() => {
     if (!isOpen && !standalone) return;
@@ -156,13 +165,32 @@ export default function MediaStudioModal({
     };
   }, [isOpen, standalone]);
 
+  useEffect(() => {
+    if (isOpen || standalone) return () => videoAbort.current?.abort();
+  }, [isOpen, standalone]);
+
   if (!isOpen && !standalone) return null;
 
   const companion = FLAGSHIP_COMPANIONS.find((c) => c.id === selectedId) ?? FLAGSHIP_COMPANIONS[0];
+  const scenePresets = [
+    ...SCENE_PRESETS,
+    ...companion.sceneSelfiePresets.map((preset) => ({
+      id: `companion-${preset.id}`, label: preset.label, suffix: preset.promptSuffix, nsfw: preset.nsfw,
+    })),
+  ];
   const aspect = ASPECT_RATIOS.find((a) => a.id === aspectId) ?? ASPECT_RATIOS[0];
 
+  const photoScale = photoQuality === 'high' ? 1.5 : 1;
+  const photoWidth = Math.round(aspect.width * photoScale / 8) * 8;
+  const photoHeight = Math.round(aspect.height * photoScale / 8) * 8;
+  const uploadVideoSource = Boolean(uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult));
+  const knownFictionalVideoSource = Boolean(
+    FLAGSHIP_COMPANIONS.some((c) => c.portraitUrl === videoSourceUrl) ||
+    (generatedPhoto && videoSourceUrl === generatedPhoto),
+  );
+
   async function handleGeneratePhoto() {
-    const preset = SCENE_PRESETS.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
+    const preset = scenePresets.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
     const prompt = [
       companion.visualDna,
       preset.suffix,
@@ -175,8 +203,15 @@ export default function MediaStudioModal({
     ]
       .filter(Boolean)
       .join(', ');
-    const parsedSeed = Number(seedLock) || Math.floor(Math.random() * 90000 + 1000);
-    const wantsNsfw = nsfwMode || preset.nsfw;
+    const compliance = assertCompliance(prompt);
+    if (!compliance.ok) {
+      setErrorMsg(compliance.reason);
+      return;
+    }
+    const requestedSeed = Number(seedLock);
+    const parsedSeed = seedLock.trim() && Number.isSafeInteger(requestedSeed) && requestedSeed >= 0
+      ? requestedSeed : Math.floor(Math.random() * 90000 + 1000);
+    const wantsNsfw = nsfwMode || preset.nsfw || /\b(nsfw|nude|nudity|explicit|sexual|lingerie)\b/i.test(prompt);
     const safeNegative = negativePrompt.trim().slice(0, 360);
 
     setPhotoBusy(true);
@@ -192,13 +227,13 @@ export default function MediaStudioModal({
             const t0 = performance.now();
             const blobUrl = await generateComfySfwPortrait({
               prompt,
-              checkpointName: comfyInfo.checkpoints[0],
-              width: aspect.width,
-              height: aspect.height,
+              checkpointName: comfyCheckpoint || comfyInfo.checkpoints[0],
+              width: photoWidth,
+              height: photoHeight,
               seed: parsedSeed,
             });
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
-            const engineLabel = `ComfyUI (${comfyInfo.checkpoints[0] || 'Local :8188'})`;
+            const engineLabel = `ComfyUI (${comfyCheckpoint || comfyInfo.checkpoints[0] || 'Local :8188'})`;
             setGeneratedPhoto(blobUrl);
             setPhotoRevealed(true);
             setVideoSourceUrl(blobUrl);
@@ -215,9 +250,11 @@ export default function MediaStudioModal({
       const result = await generateStudioPicture({
         prompt,
         seed: parsedSeed,
-        width: aspect.width,
-        height: aspect.height,
+        width: photoWidth,
+        height: photoHeight,
         nsfw: wantsNsfw,
+        requireLocal: photoQuality === 'high',
+        checkpoint: comfyCheckpoint || comfyCheckpoints[0],
         characterId: companion.id,
         imageWorkerUrl,
         localEngine,
@@ -264,14 +301,15 @@ export default function MediaStudioModal({
   }
 
   async function handleGenerateVideo() {
-    const derivedFromUpload = Boolean(uploadedPreview && (
-      videoSourceUrl === uploadedPreview ||
-      (referenceResult && videoSourceUrl === referenceResult)
-    ));
+    const derivedFromUpload = uploadVideoSource;
     if (derivedFromUpload && (!uploadSourceKind || !uploadRightsConfirmed)) {
       setErrorMsg('Choose the image source and confirm that you have permission to use it before animating.');
       return;
     }
+    const fictionalSource = derivedFromUpload ? uploadSourceKind === 'fictional' : knownFictionalVideoSource;
+    if (videoAbort.current) return;
+    const request = new AbortController();
+    videoAbort.current = request;
     setVideoBusy(true);
     setErrorMsg(null);
     setStatusMsg(null);
@@ -283,29 +321,41 @@ export default function MediaStudioModal({
         durationSec,
         speed: videoSpeed,
         // A real-person photograph may only be used for a neutral, nonsexual animation.
-        prompt: derivedFromUpload && uploadSourceKind === 'self'
+        prompt: !fictionalSource
           ? 'Nonsexual portrait animation, subtle natural blink, gentle head turn, fully clothed, natural lighting'
-          : `${companion.name} ${customPrompt}`,
+          : videoDirection.trim() || 'Natural character movement, consistent face, smooth camera, stable lighting',
         sourceType: derivedFromUpload
           ? uploadSourceKind === 'fictional' ? 'fictional' : 'real-person'
-          : 'unspecified',
-        adultMode: derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode,
+          : knownFictionalVideoSource ? 'fictional' : 'unspecified',
+        adultMode: videoMode === 'ai' && (derivedFromUpload
+          ? uploadSourceKind === 'fictional' && uploadedAdultMode
+          : knownFictionalVideoSource && videoAdultMode),
+        mode: videoMode,
+        resolution: videoMode === 'ai' ? videoResolution : undefined,
+        signal: request.signal,
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
       });
+      if (request.signal.aborted) {
+        if (res.videoUrl.startsWith('blob:')) URL.revokeObjectURL(res.videoUrl);
+        return;
+      }
+      if (generatedVideoUrl?.startsWith('blob:')) URL.revokeObjectURL(generatedVideoUrl);
       setGeneratedVideoUrl(res.videoUrl);
+      setVideoDimensions('');
       setVideoEngineUsed(res.engine);
       setVideoIsGenerative(res.isGenerative);
       setVideoFormat(res.videoFormat);
       if (res.isGenerative) {
-        setStatusMsg(`Generated ${durationSec}s via ${res.engine}.`);
+        setStatusMsg(`AI clip ready · ${res.engine}`);
       } else {
         setStatusMsg(`Created ${durationSec}s animated-still effect, not generative AI video.`);
-        setErrorMsg(res.warning || 'Set up a compatible video backend to generate motion.');
+        if (res.warning) setErrorMsg(res.warning);
       }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
+      if (!request.signal.aborted) setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
     } finally {
+      videoAbort.current = null;
       setVideoBusy(false);
     }
   }
@@ -392,7 +442,7 @@ export default function MediaStudioModal({
 
   function handleDropToChat(url: string) {
     const targetId = activeChatCompanionId || companion.id;
-    const caption = `*Studio drop (${studioStyle}):* ${SCENE_PRESETS.find((s) => s.id === sceneId)?.label || 'Custom'}`;
+    const caption = `*Studio drop (${studioStyle}):* ${scenePresets.find((s) => s.id === sceneId)?.label || 'Custom'}`;
     if (onDropIntoChat) {
       onDropIntoChat(targetId, url, caption);
     } else {
@@ -495,14 +545,14 @@ export default function MediaStudioModal({
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-extrabold tracking-tight neon-text-glow flex items-center gap-1.5">
+          <h2 className="flex items-center gap-2 font-display text-3xl tracking-tight text-rose-50">
             <Sparkles className="h-4 w-4 text-[#ff1e8e]" />
-            Pro Media <span className="text-[#00f5ff]">Studio</span>
+            Media Studio
           </h2>
           <p className="text-[11px] text-[#a6a6c4]">
             {localEngine.anyLocalOnline
-              ? `⚡ Dual-Engine: Local Ultra (${localEngine.ramTier}) ready`
-              : '☁️ Dual-Engine: Cloud Free (CF Flux + AI Horde)'}
+              ? 'Local services detected. Availability depends on the selected model.'
+              : 'Connect a local or hosted model to render photos and video.'}
           </p>
         </div>
         {!standalone && (
@@ -532,8 +582,9 @@ export default function MediaStudioModal({
               setTab(id);
               setErrorMsg(null);
             }}
+            aria-pressed={tab === id}
             className={`rounded-xl py-2 transition ${
-              tab === id ? 'neon-btn-primary text-white' : 'text-[#a6a6c4] hover:text-white'
+              tab === id ? 'bg-rose-200 text-[#291621]' : 'text-[#a6a6c4] hover:text-white'
             }`}
           >
             {label}
@@ -542,7 +593,7 @@ export default function MediaStudioModal({
       </div>
 
       {errorMsg && (
-        <p className="rounded-xl border border-rose-500/45 bg-rose-500/15 px-3 py-2 text-xs text-rose-200">{errorMsg}</p>
+        <p role="alert" className="rounded-xl border border-rose-500/45 bg-rose-500/15 px-3 py-2 text-xs text-rose-200">{errorMsg}</p>
       )}
       {statusMsg && (
         <p className="rounded-xl border border-[#00ffa3]/40 bg-[#00ffa3]/12 px-3 py-2 text-xs text-[#00ffa3]">{statusMsg}</p>
@@ -583,16 +634,17 @@ export default function MediaStudioModal({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {SCENE_PRESETS.map((p) => (
+            {scenePresets.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => setSceneId(p.id)}
+                aria-pressed={sceneId === p.id}
                 className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
                   sceneId === p.id ? 'border-[#ff1e8e] bg-[#ff1e8e]/20 text-white' : 'border-white/10 bg-[#05050a] text-zinc-300'
                 }`}
               >
-                {p.label}
+                {p.label}{p.nsfw ? ' · 18+' : ''}
               </button>
             ))}
           </div>
@@ -657,13 +709,23 @@ export default function MediaStudioModal({
               </select>
             </label>
             <label className="block text-[11px] text-zinc-300 sm:col-span-3">
+              <span className="flex items-center justify-between gap-2">
+                <span>Render quality</span>
+                <select value={photoQuality} onChange={(e) => setPhotoQuality(e.target.value === 'high' ? 'high' : 'standard')}
+                  className="rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white">
+                  <option value="standard">Standard · ${aspect.width} × ${aspect.height}</option>
+                  <option value="high">High detail · ${Math.round(aspect.width * 1.5 / 8) * 8} × ${Math.round(aspect.height * 1.5 / 8) * 8} · local GPU</option>
+                </select>
+              </span>
+            </label>
+            <label className="block text-[11px] text-zinc-300 sm:col-span-3">
               Negative prompt (supported local engines)
               <input value={negativePrompt} maxLength={360} onChange={(e) => setNegativePrompt(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white" />
             </label>
             <p className="text-[10px] leading-relaxed text-zinc-500 sm:col-span-3">
               A locked seed helps repeat conditions but does not guarantee identical faces. Facial reference adapters and compatible models are required for visual consistency.
-              Negative prompts are passed to local engines that support them; cloud providers may ignore them.
+              Cloud providers can limit the requested dimensions and ignore negative prompts.
             </p>
           </div>
 
@@ -693,6 +755,15 @@ export default function MediaStudioModal({
             Enable 18+ Adult Mode (fictional consenting adults only)
           </label>
 
+          {comfyCheckpoints.length > 0 && (
+            <label className="block text-xs text-zinc-300">ComfyUI checkpoint
+              <select value={comfyCheckpoint || comfyCheckpoints[0]} onChange={(event) => setComfyCheckpoint(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white">
+                {comfyCheckpoints.map((checkpoint) => <option key={checkpoint} value={checkpoint}>{checkpoint}</option>)}
+              </select>
+            </label>
+          )}
+
           <button
             type="button"
             disabled={photoBusy}
@@ -701,12 +772,6 @@ export default function MediaStudioModal({
           >
             {photoBusy ? 'Generating Neon Portrait...' : 'Generate Photo'}
           </button>
-
-          {comfyCheckpoints.length > 0 && (
-            <p className="text-[10px] text-[#00ffa3] text-center font-mono">
-              ● Priority 1 Local ComfyUI :8188 ready ({comfyCheckpoints[0]})
-            </p>
-          )}
 
           {generatedPhoto && (
             <div className="space-y-2.5 pt-2">
@@ -733,10 +798,10 @@ export default function MediaStudioModal({
               <div className="flex flex-wrap justify-center gap-2">
                 <a
                   href={generatedPhoto}
-                  download={`velvetmotion-${companion.id}.png`}
+                  download={`velvetmotion-${companion.id}`}
                   className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-semibold"
                 >
-                  <Download className="h-3.5 w-3.5" /> PNG
+                  <Download className="h-3.5 w-3.5" /> Download image
                 </a>
                 <button
                   type="button"
@@ -770,26 +835,38 @@ export default function MediaStudioModal({
 
       {tab === 'video' && (
         <div className="space-y-3 text-xs">
-          <p className="text-[11px] text-[#a6a6c4]">
-            A connected AI video workflow creates new motion. Without one, the browser exports a pan/zoom animated still. Choose a portrait or upload one first.
+          <p className="text-zinc-300">
+            Configure your video model in <Link href="/?view=advanced" className="font-semibold text-rose-200 underline underline-offset-2">Advanced Media</Link>.
           </p>
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-rose-300/15 bg-rose-950/20 p-2">
+            {(['ai', 'animated-still'] as const).map((mode) => (
+              <button key={mode} type="button" aria-pressed={videoMode === mode}
+                onClick={() => setVideoMode(mode)}
+                className={`rounded-xl p-3 text-left transition ${videoMode === mode ? 'bg-rose-200/15 text-rose-100' : 'text-zinc-400 hover:bg-white/5'}`}>
+                <span className="block font-semibold">{mode === 'ai' ? 'AI video' : 'Animated still'}</span>
+                <span className="mt-1 block text-[11px]">{mode === 'ai' ? 'Requires a video model' : 'Pan and zoom in your browser'}</span>
+              </button>
+            ))}
+          </div>
 
           <div>
-            <label className="mb-1 block text-[11px] text-[#a6a6c4]">Source Image (Portrait or Generated Selfie)</label>
+            <label htmlFor="studio-video-source" className="mb-1 block text-[11px] text-[#a6a6c4]">Source image</label>
             <select
+              id="studio-video-source"
               value={videoSourceUrl}
               onChange={(e) => setVideoSourceUrl(e.target.value)}
               className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white outline-none focus:border-[#ff5678]"
             >
               {generatedPhoto && <option value={generatedPhoto}>Latest Studio Photo</option>}
               {uploadedPreview && <option value={uploadedPreview}>My uploaded portrait</option>}
+              {referenceResult && <option value={referenceResult}>Latest reference variation</option>}
               {FLAGSHIP_COMPANIONS.map((c) => (
                 <option key={c.id} value={c.portraitUrl}>
                   {c.name} — Flagship Portrait
                 </option>
               ))}
               {getGallery()
-                .filter((g) => g.url && !g.url.startsWith('blob:'))
+                .filter((g) => g.url && !g.url.startsWith('blob:') && g.type !== 'video')
                 .slice(0, 10)
                 .map((g) => (
                   <option key={g.id} value={g.url}>
@@ -798,6 +875,32 @@ export default function MediaStudioModal({
                 ))}
             </select>
           </div>
+
+          <div className="flex gap-3 rounded-2xl border border-white/10 bg-black/25 p-3">
+            <SafeImage src={videoSourceUrl} alt="Selected source frame" className="h-24 w-20 rounded-xl object-cover object-top" />
+            {videoMode === 'ai' && (
+              <div className="min-w-0 flex-1 space-y-2">
+                <label className="block text-zinc-300">Requested resolution
+                  <select value={videoResolution} onChange={(e) => setVideoResolution(Number(e.target.value) as 480 | 720 | 1080)}
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-zinc-950 p-2">
+                    <option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option>
+                  </select>
+                </label>
+                <label className="block text-zinc-300">Motion direction
+                  <input value={videoDirection} onChange={(e) => setVideoDirection(e.target.value)} maxLength={500}
+                    placeholder="Slow dolly-in, soft window light"
+                    className="mt-1 w-full rounded-lg border border-white/15 bg-zinc-950 p-2" />
+                </label>
+                <p className="text-[11px] text-zinc-400">Your model determines the final resolution. Uploads and saved images without confirmed fictional provenance use neutral motion.</p>
+              </div>
+            )}
+          </div>
+          {videoMode === 'ai' && knownFictionalVideoSource && (
+            <label className="flex items-center gap-2 rounded-xl border border-rose-300/20 p-3 text-rose-100">
+              <input type="checkbox" checked={videoAdultMode} onChange={(e) => setVideoAdultMode(e.target.checked)} />
+              18+ fictional companion mode
+            </label>
+          )}
 
           <div className="space-y-1.5">
             <span className="block text-[11px] text-[#a6a6c4]">Motion Preset</span>
@@ -854,7 +957,7 @@ export default function MediaStudioModal({
             </div>
           </div>
 
-          {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && (
+          {uploadVideoSource && (
             <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
               <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
               <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
@@ -864,7 +967,7 @@ export default function MediaStudioModal({
               </label>
             </div>
           )}
-          {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && uploadSourceKind === 'fictional' && (
+          {videoMode === 'ai' && uploadVideoSource && uploadSourceKind === 'fictional' && (
             <label className="flex items-center justify-between rounded-xl border border-fuchsia-300/20 bg-black/30 p-3 text-[11px] text-pink-100">
               <span>18+ mode for original fictional adult artwork
                 <small className="mt-0.5 block text-zinc-400">Requires a compatible model; not a guarantee of content.</small>
@@ -878,23 +981,32 @@ export default function MediaStudioModal({
             onClick={() => void handleGenerateVideo()}
             className="w-full rounded-full neon-btn-primary py-2.5 text-xs font-bold text-white disabled:opacity-50"
           >
-            {videoBusy ? `Processing ${durationSec}s clip...` : `Create ${durationSec}s Video · AI if connected`}
+            {videoBusy ? 'Rendering clip…' : videoMode === 'ai' ? 'Generate AI video' : 'Create animated still'}
           </button>
+          {videoBusy && videoMode === 'ai' && (
+            <button type="button" onClick={() => videoAbort.current?.abort()} className="w-full rounded-full border border-white/15 py-2 text-zinc-300">
+              Stop waiting for this render
+            </button>
+          )}
           {generatedVideoUrl && (
             <div className="space-y-2 pt-2 text-center">
               {videoEngineUsed && (
                 <p className="text-[10px] font-bold text-[#00f5ff]">
-                  {videoIsGenerative ? 'AI-generated motion' : 'Animated still'} · {videoEngineUsed}
+                  {videoIsGenerative ? 'AI-generated motion' : 'Animated still'} · {videoEngineUsed}{videoDimensions && ` · ${videoDimensions}`}
                 </p>
               )}
               <video
                 src={generatedVideoUrl}
-                autoPlay
+                onError={() => setErrorMsg('The clip did not play in this browser. Check the provider output format and URL.') }
+                onLoadedMetadata={(event) => {
+                  const { videoWidth, videoHeight } = event.currentTarget;
+                  if (videoWidth && videoHeight) setVideoDimensions(`${videoWidth} × ${videoHeight}`);
+                }}
                 loop
                 muted
                 playsInline
                 controls
-                className="mx-auto aspect-[2/3] w-56 rounded-2xl border border-[#ff5678]/40 object-cover"
+                className="mx-auto max-h-96 max-w-full rounded-2xl border border-[#ff5678]/40 bg-black object-contain"
               />
               <div className="flex flex-wrap justify-center gap-2">
                 <button
@@ -913,7 +1025,7 @@ export default function MediaStudioModal({
                 </button>
                 <a
                   href={generatedVideoUrl}
-                  download={`velvetmotion-short.${videoFormat === 'mp4' ? 'mp4' : 'webm'}`}
+                  download={videoFormat === 'unknown' ? 'velvetmotion-short' : `velvetmotion-short.${videoFormat}`}
                   className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold text-white"
                 >
                   <Download className="h-3.5 w-3.5" /> Download clip

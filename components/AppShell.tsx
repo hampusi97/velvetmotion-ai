@@ -327,29 +327,20 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
 
   if (!adult) {
     return (
-      <main className="min-h-screen bg-[#05050a] text-white relative overflow-hidden">
-        <div className="absolute inset-0 blur-md scale-105 opacity-60 pointer-events-none">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
-            {CHARACTERS.slice(0, 8).map((c) => (
-              <img key={c.id} src={c.avatar} alt="" className="aspect-[2/3] w-full object-cover object-top rounded-2xl" />
-            ))}
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-[#05050a]/75 backdrop-blur-md" />
-        <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
-          <div className="max-w-md w-full neon-border-sweep">
-            <div className="neon-sweep-inner p-8 text-center space-y-4">
-              <div className="text-5xl font-display font-black bg-gradient-to-r from-[#ff1e8e] to-[#00f5ff] bg-clip-text text-transparent neon-text-glow">
-                V
-              </div>
-              <h1 className="text-3xl font-black text-white neon-text-glow">VelvetMotion AI</h1>
-              <p className="text-sm text-[#a6a6c4] leading-relaxed">
-                A private-first AI companion studio for adults. Local and selected cloud AI options; review our privacy policy before sharing chats or images.
+      <main className="relative isolate min-h-screen overflow-hidden bg-[#120d15] text-rose-50">
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[url('/promos/match-lounge.webp')] bg-cover bg-[70%_center] opacity-55" />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-[#120d15] via-[#120d15]/70 to-[#120d15]/45" />
+        <div className="mx-auto flex min-h-[100dvh] max-w-6xl items-center p-6 sm:p-12">
+          <div className="w-full max-w-md rounded-[2rem] border border-rose-200/25 bg-[#1b121c]/85 p-7 shadow-2xl backdrop-blur-md sm:p-9">
+              <p className="mb-3 text-sm font-semibold text-rose-200">Adults only</p>
+              <h1 className="font-display text-4xl tracking-tight sm:text-5xl">VelvetMotion AI</h1>
+              <p className="mt-4 text-sm leading-relaxed text-rose-50/80">
+                Explore fictional AI companions and create your own scenes. You must be 18 or older to enter.
               </p>
-              <div className="flex gap-4 justify-center text-xs text-[#a6a6c4]">
-                <Link href="/terms/" className="underline hover:text-[#00f5ff]">Terms</Link>
-                <Link href="/privacy/" className="underline hover:text-[#00f5ff]">Privacy</Link>
-                <Link href="/policy/" className="underline hover:text-[#00f5ff]">18+ Policy</Link>
+              <div className="my-5 flex gap-4 text-xs text-rose-100/80">
+                <Link href="/terms/" className="underline underline-offset-2 hover:text-white">Terms</Link>
+                <Link href="/privacy/" className="underline underline-offset-2 hover:text-white">Privacy</Link>
+                <Link href="/policy/" className="underline underline-offset-2 hover:text-white">18+ Policy</Link>
               </div>
               <button
                 type="button"
@@ -361,11 +352,10 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
                   }
                   setAdult(true);
                 }}
-                className="w-full py-3.5 rounded-2xl neon-btn-primary text-sm font-extrabold text-white"
+                className="w-full rounded-full bg-rose-200 py-3.5 text-sm font-bold text-[#281423] hover:bg-rose-100"
               >
                 I am 18+ — Enter VelvetMotion
               </button>
-            </div>
           </div>
         </div>
       </main>

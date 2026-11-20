@@ -5,6 +5,7 @@
  *  1. Desktop Local Ultra: ComfyUI (127.0.0.1:8188 FramePack / Wan 2.2 / LTX-2) or custom endpoint
  *  2. Cloud Free Instant Motion Engine: HTMLCanvasElement.captureStream() + MediaRecorder (.webm)
  */
+import { blobToDataUrl } from "./imageStore";
 import { assertCompliance } from "./complianceFilter";
 
 export interface VideoMotionPreset {
@@ -70,6 +71,9 @@ export interface StudioVideoRequest {
   adultMode?: boolean;
   comfyOnline?: boolean;
   videoBackendUrl?: string;
+  mode?: "ai" | "animated-still";
+  resolution?: 480 | 720 | 1080;
+  signal?: AbortSignal;
 }
 
 export interface StudioVideoResult {
@@ -203,30 +207,75 @@ export async function generateStudioVideoClip(
   // Reaching ComfyUI /system_stats alone does NOT mean a video workflow exists.
   const endpoint = req.videoBackendUrl?.trim();
   let backendError: string | undefined;
-  if (endpoint) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 120000);
+  if (endpoint && req.mode !== "animated-still") {
+    const timeout = AbortSignal.timeout(300_000);
+    const signal = req.signal ? AbortSignal.any([req.signal, timeout]) : timeout;
     try {
-      const res = await fetch(endpoint, {
+      const backend = new URL(endpoint);
+      if (!["https:", "http:"].includes(backend.protocol) || backend.username || backend.password) {
+        throw new Error("The video endpoint must be an HTTP or HTTPS URL without embedded credentials.");
+      }
+      const sameOriginImage = typeof window !== "undefined" &&
+        new URL(req.imageUrl, window.location.href).origin === window.location.origin;
+      const localBridge = ["localhost", "127.0.0.1", "[::1]"].includes(backend.hostname);
+      const image = sameOriginImage || /^(?:blob:|\/)/.test(req.imageUrl) || (localBridge && /^https?:/i.test(req.imageUrl))
+        ? await blobToDataUrl(await fetch(req.imageUrl, { signal }).then((response) => {
+          if (!response.ok) throw new Error("Could not read the selected source image.");
+          return response.blob();
+        }))
+        : req.imageUrl;
+      let response = await fetch(backend, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: req.imageUrl,
-          image: req.imageUrl,
+          imageUrl: image,
+          image,
           prompt: req.prompt || "",
           motion: motion.id,
           durationSec: req.durationSec,
           speed: req.speed,
+          resolution: req.resolution,
           adultMode: Boolean(req.adultMode && req.sourceType === "fictional"),
           sourceType: req.sourceType || "unspecified",
         }),
-        signal: ctrl.signal,
+        signal,
+        redirect: "error",
       });
-      if (!res.ok) throw new Error(`Video service returned HTTP ${res.status}`);
-      const contentType = res.headers.get("content-type") || "";
+
+      let statusUrl: URL | undefined;
+      while (response.status === 202) {
+        const location = response.headers.get("location");
+        const job = location ? null : (await response.json().catch(() => null)) as { statusUrl?: string } | null;
+        const next = location || job?.statusUrl;
+        if (next) statusUrl = new URL(next, response.url || backend);
+        if (!statusUrl || statusUrl.origin !== backend.origin || statusUrl.username || statusUrl.password) {
+          throw new Error("The video service must return a same-origin job status URL.");
+        }
+        const retryAfter = Number(response.headers.get("retry-after")) || 3;
+        await new Promise<void>((resolve, reject) => {
+          const onAbort = () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+          };
+          const timer = setTimeout(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, Math.min(15, Math.max(1, retryAfter)) * 1000);
+          signal.addEventListener("abort", onAbort, { once: true });
+          if (signal.aborted) onAbort();
+        });
+        response = await fetch(statusUrl, { signal, redirect: "error", cache: "no-store" });
+      }
+
+      if (!response.ok) {
+        const failure = await response.json().catch(() => null) as { error?: unknown } | null;
+        const detail = typeof failure?.error === "string" ? `: ${failure.error.slice(0, 300)}` : "";
+        throw new Error(`Video service returned HTTP ${response.status}${detail}`);
+      }
+      const contentType = response.headers.get("content-type") || "";
       if (contentType.startsWith("video/")) {
-        const blob = await res.blob();
-        if (blob.size === 0) throw new Error("Video service returned an empty file");
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("Video service returned an empty file");
         return {
           videoUrl: URL.createObjectURL(blob),
           engine: "Configured AI video backend",
@@ -234,17 +283,19 @@ export async function generateStudioVideoClip(
           videoFormat: contentType.includes("webm") ? "webm" : contentType.includes("mp4") ? "mp4" : "unknown",
         };
       }
-      const data = (await res.json()) as { videoUrl?: string; url?: string; video?: string; output?: string; error?: string };
+      const data = (await response.json()) as { videoUrl?: string; url?: string; video?: string; output?: string; error?: string };
       const url = data.videoUrl || data.url || data.video || data.output;
-      if (url && /^(https?:\/\/|blob:|data:video\/)/i.test(url)) {
-        return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true, videoFormat: /\.webm(?:$|[?#])/i.test(url) ? "webm" : /\.mp4(?:$|[?#])/i.test(url) ? "mp4" : "unknown" };
+      if (typeof url !== "string" || !/^(https?:\/\/|blob:|data:video\/)/i.test(url)) {
+        throw new Error(data.error || "Video service returned no playable video URL");
       }
-      backendError = data.error || "Video service returned no playable video URL";
+      return { videoUrl: url, engine: "Configured AI video backend", isGenerative: true, videoFormat: /\.webm(?:$|[?#])|^data:video\/webm/i.test(url) ? "webm" : /\.mp4(?:$|[?#])|^data:video\/mp4/i.test(url) ? "mp4" : "unknown" };
     } catch (err) {
-      backendError = err instanceof Error ? err.message : "Video service unavailable";
-    } finally {
-      clearTimeout(timer);
+      req.signal?.throwIfAborted();
+      backendError = timeout.aborted ? "The video job timed out after five minutes." : err instanceof Error ? err.message : "Video service unavailable";
     }
+  }
+  if (req.mode === "ai") {
+    throw new Error(backendError || "Configure an image-to-video workflow in Advanced Media before generating an AI clip.");
   }
 
   // 2. Optional browser fallback: pan/zoom only, NOT generated character motion.
@@ -254,7 +305,7 @@ export async function generateStudioVideoClip(
     engine: "Browser motion effect (animated still)",
     isGenerative: false,
     videoFormat: "webm",
-    warning: backendError || (req.comfyOnline
+    warning: req.mode === "animated-still" ? undefined : backendError || (req.comfyOnline
       ? "ComfyUI is reachable, but no AI video workflow endpoint is configured."
       : "Configure a compatible image-to-video endpoint for genuine AI motion."),
   };
