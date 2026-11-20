@@ -8,6 +8,7 @@ import {
   generateStudioVideoClip,
   VIDEO_DURATIONS,
   VIDEO_MOTION_PRESETS,
+  VIDEO_RESOLUTIONS,
   VIDEO_SPEEDS,
   type VideoMotionPreset,
 } from '@/lib/canvasVideoExporter';
@@ -30,6 +31,7 @@ import {
   VIDEO_SCENE_LIMITS,
   VIDEO_SCENE_PRESETS,
 } from '@/lib/companionVideoPrompt';
+import { parseVideoSceneDraft, videoSceneDraftKey, type VideoSceneDraft } from '@/lib/videoSceneDraft';
 import { AtelierStoryboard } from '@/components/AtelierStoryboard';
 
 interface MediaStudioModalProps {
@@ -130,9 +132,11 @@ export default function MediaStudioModal({
   const [durationSec, setDurationSec] = useState<3 | 5 | 8>(5);
   const [videoSpeed, setVideoSpeed] = useState<0.75 | 1 | 1.25>(1);
   const [videoMode, setVideoMode] = useState<'ai' | 'animated-still'>('ai');
-  const [videoResolution, setVideoResolution] = useState<480 | 720 | 1080>(720);
+  const [videoResolution, setVideoResolution] = useState<VideoSceneDraft['resolution']>(720);
   const [videoScene, setVideoScene] = useState(DEFAULT_COMPANION_VIDEO_SCENE);
   const [videoScenePreset, setVideoScenePreset] = useState('');
+  const [savedDraft, setSavedDraft] = useState<{ companionId: string; draft: VideoSceneDraft } | null>(null);
+  const [draftNotice, setDraftNotice] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState('');
   const [videoAdultMode, setVideoAdultMode] = useState(false);
   const videoAbort = useRef<AbortController | null>(null);
@@ -180,6 +184,24 @@ export default function MediaStudioModal({
     if (isOpen || standalone) return () => videoAbort.current?.abort();
   }, [isOpen, standalone]);
 
+  const draftCompanion = FLAGSHIP_COMPANIONS.find((profile) => profile.portraitUrl === videoSourceUrl);
+  const draftCompanionId = draftCompanion?.id;
+  const activeDraft = savedDraft?.companionId === draftCompanionId ? savedDraft?.draft : null;
+
+  useEffect(() => {
+    setDraftNotice('');
+    if (!draftCompanionId) {
+      setSavedDraft(null);
+      return;
+    }
+    try {
+      const draft = parseVideoSceneDraft(window.localStorage.getItem(videoSceneDraftKey(draftCompanionId)));
+      setSavedDraft(draft ? { companionId: draftCompanionId, draft } : null);
+    } catch {
+      setSavedDraft(null);
+    }
+  }, [draftCompanionId]);
+
   if (!isOpen && !standalone) return null;
 
   const companion = FLAGSHIP_COMPANIONS.find((c) => c.id === selectedId) ?? FLAGSHIP_COMPANIONS[0];
@@ -196,7 +218,7 @@ export default function MediaStudioModal({
   const photoHeight = Math.round(aspect.height * photoScale / 8) * 8;
   const uploadVideoSource = Boolean(uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult));
   const knownFictionalVideoSource = Boolean(
-    FLAGSHIP_COMPANIONS.some((c) => c.portraitUrl === videoSourceUrl) ||
+    draftCompanion ||
     (generatedPhoto && videoSourceUrl === generatedPhoto),
   );
 
@@ -205,6 +227,49 @@ export default function MediaStudioModal({
     : knownFictionalVideoSource;
   const usesAdultVideoMode = fictionalVideoSource && (uploadVideoSource ? uploadedAdultMode : videoAdultMode);
   const videoPrompt = composeCompanionVideoPrompt(videoScene, fictionalVideoSource, usesAdultVideoMode);
+
+  function saveVideoDraft() {
+    if (!draftCompanionId) return;
+    const error = validateCompanionVideoPrompt(videoPrompt, usesAdultVideoMode);
+    if (error) {
+      setDraftNotice(error);
+      return;
+    }
+    const draft: VideoSceneDraft = {
+      scene: videoScene, adultMode: usesAdultVideoMode, durationSec, resolution: videoResolution,
+      speed: videoSpeed, motionId,
+    };
+    try {
+      window.localStorage.setItem(videoSceneDraftKey(draftCompanionId), JSON.stringify(draft));
+      setSavedDraft({ companionId: draftCompanionId, draft });
+      setDraftNotice('Draft saved on this device.');
+    } catch {
+      setDraftNotice('This browser could not save the draft.');
+    }
+  }
+
+  function restoreVideoDraft(draft: VideoSceneDraft) {
+    setVideoScene(draft.scene);
+    setVideoScenePreset('');
+    setVideoAdultMode(draft.adultMode);
+    setDurationSec(draft.durationSec);
+    setVideoResolution(draft.resolution);
+    setVideoSpeed(draft.speed);
+    setMotionId(draft.motionId);
+    setErrorMsg(null);
+    setDraftNotice('Draft restored.');
+  }
+
+  function removeVideoDraft() {
+    if (!draftCompanionId) return;
+    try {
+      window.localStorage.removeItem(videoSceneDraftKey(draftCompanionId));
+      setSavedDraft(null);
+      setDraftNotice('Saved draft removed.');
+    } catch {
+      setDraftNotice('This browser could not remove the draft.');
+    }
+  }
 
   async function copyVideoPrompt() {
     const error = validateCompanionVideoPrompt(videoPrompt, usesAdultVideoMode);
@@ -912,9 +977,9 @@ export default function MediaStudioModal({
             {videoMode === 'ai' && (
               <div className="min-w-0 flex-1 space-y-2">
                 <label className="block text-zinc-300">Requested resolution
-                  <select value={videoResolution} onChange={(e) => setVideoResolution(Number(e.target.value) as 480 | 720 | 1080)}
+                  <select value={videoResolution} onChange={(e) => setVideoResolution(Number(e.target.value) as VideoSceneDraft['resolution'])}
                     className="mt-1 w-full rounded-lg border border-white/15 bg-zinc-950 p-2">
-                    <option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option>
+                    {VIDEO_RESOLUTIONS.map((resolution) => <option key={resolution} value={resolution}>{resolution}p</option>)}
                   </select>
                 </label>
                 <p className="text-[11px] text-zinc-400">Your model determines the final resolution.</p>
@@ -947,7 +1012,9 @@ export default function MediaStudioModal({
             </label>
           )}
           {videoMode === 'ai' && (
-            <section aria-labelledby="video-prompt-heading" className="space-y-3 rounded-2xl border border-rose-200/20 bg-[#221522] p-4">
+            <section aria-labelledby="video-prompt-heading" className={`space-y-3 rounded-2xl border p-4 ${usesAdultVideoMode
+              ? 'border-rose-200/30 bg-gradient-to-br from-[#3a1c2e] to-[#1e1421]'
+              : 'border-rose-200/20 bg-[#221522]'}`}>
               <h3 id="video-prompt-heading" className="font-display text-lg text-rose-50">Scene prompt</h3>
               {fictionalVideoSource ? (
                 <>
@@ -976,7 +1043,7 @@ export default function MediaStudioModal({
                           onChange={(event) => {
                             setVideoScene({ ...videoScene, [field]: event.target.value });
                             setVideoScenePreset('');
-                              }}
+                          }}
                           className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-white" />
                       </label>
                     ))}
@@ -984,6 +1051,31 @@ export default function MediaStudioModal({
                 </>
               ) : (
                 <p className="text-zinc-300">Unconfirmed and real-person sources use neutral portrait motion.</p>
+              )}
+              {draftCompanion && !uploadVideoSource && (
+                <div className="rounded-xl border border-rose-100/15 bg-black/20 p-3">
+                  <p className="font-semibold text-rose-50">Private draft for {draftCompanion.name}</p>
+                  <p className="mt-1 text-zinc-300">Saves one setup per companion portrait in this browser.</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" onClick={saveVideoDraft}
+                      className="rounded-full bg-rose-100 px-3 py-2 font-semibold text-[#321927]">
+                      {activeDraft ? 'Update draft' : 'Save draft'}
+                    </button>
+                    {activeDraft && (
+                      <>
+                        <button type="button" onClick={() => restoreVideoDraft(activeDraft)}
+                          className="rounded-full border border-rose-200/30 px-3 py-2 text-rose-100">
+                          {activeDraft.adultMode ? 'Restore 18+ draft' : 'Restore draft'}
+                        </button>
+                        <button type="button" onClick={removeVideoDraft}
+                          className="rounded-full border border-white/15 px-3 py-2 text-zinc-300">
+                          Clear saved draft
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {draftNotice && <p role="status" className="mt-2 text-rose-100">{draftNotice}</p>}
+                </div>
               )}
               <details className="rounded-xl border border-white/15 bg-black/20 p-3">
                 <summary className="cursor-pointer text-rose-100">Preview the prompt your model receives</summary>

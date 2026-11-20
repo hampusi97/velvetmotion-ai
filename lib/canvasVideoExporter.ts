@@ -57,6 +57,7 @@ export const VIDEO_MOTION_PRESETS: VideoMotionPreset[] = [
   },
 ];
 
+export const VIDEO_RESOLUTIONS = [480, 720, 1080] as const;
 export const VIDEO_DURATIONS = [3, 5, 8] as const;
 export const VIDEO_SPEEDS = [0.75, 1, 1.25] as const;
 
@@ -72,7 +73,7 @@ export interface StudioVideoRequest {
   comfyOnline?: boolean;
   videoBackendUrl?: string;
   mode?: "ai" | "animated-still";
-  resolution?: 480 | 720 | 1080;
+  resolution?: (typeof VIDEO_RESOLUTIONS)[number];
   signal?: AbortSignal;
 }
 

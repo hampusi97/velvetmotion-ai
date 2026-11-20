@@ -1377,10 +1377,16 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             <div className="space-y-1.5 px-1 pb-1">
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
                 {flagshipProfile && (
-                  <Link href={`/joi/?companion=${encodeURIComponent(character.id)}`}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
-                    <Volume2 className="h-3 w-3" aria-hidden="true" /> JOI with {character.name}
-                  </Link>
+                  <>
+                    <Link href={`/studio/?companion=${encodeURIComponent(character.id)}&mode=video`}
+                      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
+                      <Video className="h-3 w-3" aria-hidden="true" /> Direct a scene with {character.name}
+                    </Link>
+                    <Link href={`/joi/?companion=${encodeURIComponent(character.id)}`}
+                      className="shrink-0 inline-flex items-center gap-1 rounded-full border border-rose-300/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-100">
+                      <Volume2 className="h-3 w-3" aria-hidden="true" /> JOI with {character.name}
+                    </Link>
+                  </>
                 )}
                 {NSFW_CHIPS.map((chip) => (
                   <button

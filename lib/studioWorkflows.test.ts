@@ -9,6 +9,7 @@ import {
   validateCompanionVideoPrompt,
   VIDEO_SCENE_PRESETS,
 } from "./companionVideoPrompt";
+import { parseVideoSceneDraft, videoSceneDraftKey, type VideoSceneDraft } from "./videoSceneDraft";
 import { buildGuidedSession } from "./guidedSession";
 import { generateStudioPicture } from "./mediaGenerator";
 
@@ -114,4 +115,20 @@ test("every flagship adult has a mature photo preset and three playable guided c
     assert.equal(session.persona.voiceId, profile.voiceId, profile.id);
     assert.equal(session.summary, "4-minute companion script", profile.id);
   }
+});
+
+test("a scene draft round-trips render controls and omits image and provider fields", () => {
+  const preset = VIDEO_SCENE_PRESETS.find(({ id }) => id === "silk-and-shadows");
+  assert.ok(preset);
+  const draft: VideoSceneDraft = {
+    scene: preset.scene, adultMode: true, durationSec: 8,
+    resolution: 1080, speed: 0.75, motionId: "balcony-breeze",
+  };
+  assert.deepEqual(parseVideoSceneDraft(JSON.stringify({
+    ...draft, imageUrl: "data:image/png;base64,unused", providerToken: "unused",
+  })), draft);
+  assert.notEqual(videoSceneDraftKey("veda-kane"), videoSceneDraftKey("noor-mansour"));
+  assert.equal(parseVideoSceneDraft(JSON.stringify({ ...draft, resolution: 0 })), null);
+  assert.equal(parseVideoSceneDraft(JSON.stringify({ ...draft, scene: { ...draft.scene, action: 7 } })), null);
+  assert.equal(parseVideoSceneDraft("unreadable state"), null);
 });

@@ -50,6 +50,39 @@ export const VIDEO_SCENE_PRESETS = [
       lighting: "warm mirror bulbs and a deep plum backdrop",
     },
   },
+  {
+    id: "silk-and-shadows",
+    label: "Silk & shadows",
+    adult: true,
+    scene: {
+      action: "She steps into the light in a silk slip, pauses, and meets the camera with a teasing smile.",
+      setting: "a private suite with dark silk curtains",
+      camera: "slow portrait push in from the doorway",
+      lighting: "warm amber side light, deep shadows",
+    },
+  },
+  {
+    id: "midnight-encore",
+    label: "Midnight encore",
+    adult: true,
+    scene: {
+      action: "She slips off a velvet jacket to reveal lace lingerie, then turns slowly toward the mirror.",
+      setting: "a quiet dressing room after the last show",
+      camera: "one smooth arc from profile to eye level",
+      lighting: "soft mirror bulbs and plum rim light",
+    },
+  },
+  {
+    id: "candlelight-closeup",
+    label: "Candlelight close-up",
+    adult: true,
+    scene: {
+      action: "She leans against the chaise in satin lingerie, tilts her head, and holds the camera's gaze.",
+      setting: "a candlelit boudoir with burgundy velvet",
+      camera: "unbroken close-up, gradual push in",
+      lighting: "warm candlelight and a soft edge light",
+    },
+  },
 ] satisfies Array<{ id: string; label: string; adult: boolean; scene: CompanionVideoScene }>;
 
 export const NEUTRAL_PORTRAIT_MOTION =
