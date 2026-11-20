@@ -2,568 +2,361 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, Cpu, Download, ExternalLink, Laptop, RefreshCw, Shield, Smartphone, Sparkles, Volume2 } from "lucide-react";
-import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
+import {
+  ArrowDownToLine, ArrowLeft, ArrowUpRight, CheckCircle2, ChevronRight,
+  Cpu, Download, ExternalLink, Film, HardDrive, Laptop, Mic2, Monitor,
+  Pause, Play, RefreshCw, ShieldCheck, Sparkles, Waves,
+} from "lucide-react";
+import { SafeImage } from "@/components/SafeImage";
+import { LocalSetupWizard } from "@/components/LocalSetupWizard";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import {
-  DAVIDAU_RECOMMENDED_GGUFS,
-  DAVIDAU_RESOURCES,
-  DAVIDAU_SAMPLER_PRESETS,
-} from "@/lib/samplerPresets";
-import { SafeImage } from "@/components/SafeImage";
+  getLocalComputeMode, saveLocalComputeMode, LOCAL_COMPUTE_MODES, type LocalComputeMode,
+} from "@/lib/localComputePreferences";
+import { getRecommendedPresetsForRam } from "@/data/localModelCatalog";
+import {
+  DESKTOP_PLATFORMS, RELEASE_API, RELEASES_PAGE,
+  chooseDesktopInstaller, detectDesktopPlatform, humanFileSize,
+  type DesktopPlatform, type ReleaseAsset,
+} from "@/lib/desktopRelease";
 
-type DetectedOs = "mac-arm" | "mac-intel" | "windows" | "linux" | "mobile";
-
-function detectOs(): DetectedOs {
-  if (typeof navigator === "undefined") return "windows";
-  const ua = navigator.userAgent.toLowerCase();
-  if (/iphone|ipad|ipod|android/.test(ua)) return "mobile";
-  if (/macintosh|mac os x/.test(ua)) {
-    // Heuristic for Apple Silicon vs Intel
-    return /arm|m1|m2|m3|m4/.test(ua) || (navigator.maxTouchPoints || 0) > 1 ? "mac-arm" : "mac-arm";
-  }
-  if (/linux/.test(ua)) return "linux";
-  return "windows";
-}
-
-const RELEASE_REPO = process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim() || "hampusi97/velvetmotion-releases";
-const RELEASES_INDEX = `https://github.com/${RELEASE_REPO}/releases`;
-const RELEASE_API = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
-const FALLBACK_RELEASE_API = "https://api.github.com/repos/hampusi97/velvetmotion-ai/releases/latest";
-
-interface GithubReleaseAsset {
-  name: string;
-  browser_download_url: string;
-}
-
-function matchAssetUrl(assets: GithubReleaseAsset[], os: DetectedOs): string | null {
-  const lower = (s: string) => s.toLowerCase();
-  if (os === "windows") {
-    return (
-      assets.find((a) => lower(a.name).endsWith(".exe"))?.browser_download_url ||
-      assets.find((a) => lower(a.name).endsWith(".msi"))?.browser_download_url ||
-      null
-    );
-  }
-  if (os === "mac-arm") {
-    return (
-      assets.find((a) => /aarch64|arm64/.test(lower(a.name)) && lower(a.name).endsWith(".dmg"))?.browser_download_url ||
-      assets.find((a) => lower(a.name).endsWith(".dmg"))?.browser_download_url ||
-      null
-    );
-  }
-  if (os === "mac-intel") {
-    return (
-      assets.find((a) => /x64|x86_64/.test(lower(a.name)) && lower(a.name).endsWith(".dmg"))?.browser_download_url ||
-      assets.find((a) => lower(a.name).endsWith(".dmg"))?.browser_download_url ||
-      null
-    );
-  }
-  if (os === "linux") {
-    return (
-      assets.find((a) => lower(a.name).endsWith(".appimage"))?.browser_download_url ||
-      assets.find((a) => lower(a.name).endsWith(".deb"))?.browser_download_url ||
-      null
-    );
-  }
-  return null;
-}
-
-const OS_OPTIONS: Record<DetectedOs, { label: string; installer: string; note: string; href: string }> = {
-  windows: {
-    label: "Download for Windows (x64 .exe / .msi)",
-    installer: ".exe Installer",
-    note: "Windows 10/11 64-bit · Auto-updates daily via GitHub Releases",
-    href: RELEASES_INDEX,
-  },
-  "mac-arm": {
-    label: "Download for macOS Apple Silicon (.dmg)",
-    installer: "M1/M2/M3/M4 .dmg",
-    note: "Universal & Metal-ready · Auto-updates daily via GitHub Releases",
-    href: RELEASES_INDEX,
-  },
-  "mac-intel": {
-    label: "Download for macOS Intel (.dmg)",
-    installer: "x64 .dmg",
-    note: "macOS 12+ · Auto-updates daily via GitHub Releases",
-    href: RELEASES_INDEX,
-  },
-  linux: {
-    label: "Download for Linux (.AppImage / .deb)",
-    installer: "AppImage & .deb",
-    note: "Ubuntu, Debian, Fedora, Arch · Auto-updates daily via GitHub Releases",
-    href: RELEASES_INDEX,
-  },
-  mobile: {
-    label: "Install Mobile PWA App (1-Tap)",
-    installer: "Home Screen App",
-    note: "iOS Safari → Share → Add to Home Screen · Android Chrome → Install",
-    href: "/",
-  },
+type Release = {
+  tag_name: string;
+  assets: ReleaseAsset[];
+  published_at?: string;
+  html_url?: string;
 };
 
+const STEPS = [
+  { title: "Download the desktop app", detail: "Get the installer for your operating system from the official GitHub release.", icon: Download },
+  { title: "Choose your inference engine", detail: "For on-device AI, install a compatible model runtime such as Ollama, KoboldCpp or ComfyUI.", icon: Cpu },
+  { title: "Connect and create", detail: "Start your model, test the local connection, and use VelvetMotion with your own compute.", icon: Sparkles },
+];
+
 export function DownloadDesktopView() {
-  const [os, setOs] = useState<DetectedOs>("windows");
-  const [releaseTag, setReleaseTag] = useState<string | null>(null);
-  const [releaseNotes, setReleaseNotes] = useState<string | null>(null);
-  const [releaseAssets, setReleaseAssets] = useState<GithubReleaseAsset[]>([]);
-  const [releaseState, setReleaseState] = useState<"checking" | "live" | "pending">("checking");
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [probeToast, setProbeToast] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<DesktopPlatform>("windows");
+  const [release, setRelease] = useState<Release | null>(null);
+  const [releaseStatus, setReleaseStatus] = useState<"checking" | "ready" | "error">("checking");
+  const [computeMode, setComputeMode] = useState<LocalComputeMode>("balanced");
+  const [motion, setMotion] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [signedUpdaterEnabled, setSignedUpdaterEnabled] = useState(false);
+  const [autoUpdateOnLaunch, setAutoUpdateOnLaunch] = useState(true);
   const engine = useLocalEngineStatus();
-  const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
+  const ram = getRecommendedPresetsForRam(engine.ramGb);
+  const installer = release ? chooseDesktopInstaller(release.assets, platform) : null;
+  const connections = [
+    { title: "Ollama", status: engine.ollamaOnline, detail: "Local conversation" },
+    { title: "KoboldCpp", status: engine.koboldOnline, detail: "Local conversation" },
+    { title: "ComfyUI", status: engine.comfyOnline, detail: "Image workflows" },
+    { title: "Fish voice", status: engine.fishOnline, detail: "Local neural voice" },
+    { title: "Kokoro", status: engine.kokoroOnline, detail: "Local neural voice" },
+    { title: "Home Engine", status: engine.homeEngineOnline, detail: "Optional bridge" },
+  ];
 
   useEffect(() => {
-    setOs(detectOs());
-    let active = true;
-    const repos = Array.from(
-      new Set(
-        [process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim(), "hampusi97/velvetmotion-releases", "hampusi97/velvetmotion-ai"].filter(
-          (r): r is string => Boolean(r)
-        )
-      )
-    );
-    const loadRelease = async () => {
-      // 1) Try Tauri updater latest.json first for version, release notes & updater URLs
-      for (const repo of repos) {
-        try {
-          const res = await fetch(`https://github.com/${repo}/releases/latest/download/latest.json`, {
-            cache: "no-store",
-          });
-          if (!res.ok) continue;
-          const manifest = (await res.json()) as {
-            version?: string;
-            notes?: string;
-            platforms?: Record<string, { url?: string }>;
-          };
-          if (!active) return;
-          if (manifest?.version) {
-            setReleaseTag(manifest.version.startsWith("v") ? manifest.version : `v${manifest.version}`);
-            if (manifest.notes) setReleaseNotes(manifest.notes);
-            if (manifest.platforms) {
-              const mapped: GithubReleaseAsset[] = Object.entries(manifest.platforms)
-                .filter(([, p]) => Boolean(p?.url))
-                .map(([platform, p]) => ({
-                  name: `${platform}-${p.url!.split("/").pop() || platform}`,
-                  browser_download_url: p.url!,
-                }));
-              if (mapped.length > 0) setReleaseAssets(mapped);
-            }
-            setReleaseState("live");
-            break;
-          }
-        } catch {
-          /* CORS or latest.json pending; continue to GitHub Releases API */
+    setPlatform(detectDesktopPlatform(navigator.userAgent));
+    setIsMobile(/iphone|ipad|ipod|android/i.test(navigator.userAgent));
+    setComputeMode(getLocalComputeMode());
+    try { setAutoUpdateOnLaunch(localStorage.getItem("vm:auto-signed-desktop-updates") !== "off"); } catch { /* storage disabled */ }
+    if (window.__TAURI_INTERNALS__?.invoke) {
+      void window.__TAURI_INTERNALS__.invoke<boolean>("desktop_signed_updates_enabled")
+        .then(setSignedUpdaterEnabled).catch(() => setSignedUpdaterEnabled(false));
+    }
+    const controller = new AbortController();
+    const load = async () => {
+      try {
+        const response = await fetch(RELEASE_API, {
+          headers: { Accept: "application/vnd.github+json" },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("GitHub release request failed");
+        const data = await response.json() as Release;
+        if (!data.tag_name || !Array.isArray(data.assets) || data.assets.length === 0) {
+          throw new Error("No current release assets");
         }
+        setRelease(data);
+        setReleaseStatus("ready");
+      } catch {
+        if (!controller.signal.aborted) setReleaseStatus("error");
       }
-
-      // 2) Load GitHub Releases API assets list so direct .exe/.dmg/.AppImage installers resolve cleanly
-      for (const apiUrl of Array.from(new Set([RELEASE_API, FALLBACK_RELEASE_API]))) {
-        try {
-          const res = await fetch(apiUrl);
-          if (!res.ok) continue;
-          const data = (await res.json()) as { tag_name?: string; body?: string; assets?: GithubReleaseAsset[] } | null;
-          if (!active) return;
-          if (data && data.tag_name && Array.isArray(data.assets) && data.assets.length > 0) {
-            setReleaseTag(data.tag_name);
-            if (data.body) setReleaseNotes(data.body);
-            setReleaseAssets(data.assets);
-            setReleaseState("live");
-            return;
-          }
-        } catch {
-          /* try next release endpoint */
-        }
-      }
-      if (active) setReleaseState((prev) => (prev === "live" ? "live" : "pending"));
     };
-    void loadRelease();
-    return () => {
-      active = false;
-    };
+    void load();
+    return () => controller.abort();
   }, []);
 
-  const rec = OS_OPTIONS[os];
-  const resolvedHref = os === "mobile" ? "/" : matchAssetUrl(releaseAssets, os) || RELEASES_INDEX;
-
   return (
-    <div className="mx-auto max-w-4xl space-y-8 pb-16">
-      <div>
-        <Link href="/" className="text-xs text-[#00f5ff] hover:underline">
-          ← Back to Explore
+    <main className="mx-auto w-full max-w-6xl space-y-8 pb-20 text-white">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <Link href="/" className="inline-flex items-center gap-2 text-xs text-[#e7b7be] transition hover:text-white">
+          <ArrowLeft className="h-4 w-4" /> Back to VelvetMotion
         </Link>
-      </div>
+        <span className="rounded-full border border-[#efc5ce]/20 bg-[#2b1a27] px-4 py-1.5 text-[10px] font-bold uppercase tracking-[.17em] text-[#f0c7c8]">
+          Private Atelier / Desktop
+        </span>
+      </header>
 
-      {/* Hero Card */}
-      <section className="neon-border-sweep">
-        <div className="neon-sweep-inner p-6 sm:p-10 text-center space-y-4">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#00f5ff]/50 bg-[#00f5ff]/15 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#00f5ff]">
-            <Sparkles className="h-3.5 w-3.5" /> HYBRID TAURI v2 DESKTOP + LOCAL ULTRA MODE
-          </span>
-          <h1 className="font-display text-3xl sm:text-5xl font-black text-white neon-text-glow">
-            VelvetMotion Desktop App
-          </h1>
-          <p className="mx-auto max-w-xl text-sm text-[#a6a6c4]">
-            Same zero-cost companion experience—supercharged with Local RAM/GPU inference (KoboldCpp, Ollama, ComfyUI),
-            Cmd/Ctrl+Shift+H Boss-Key tray stealth, Offline Airplane Mode, and two-layer daily auto-updates.
-          </p>
-
-          {/* Hyper-Neon Desktop Preview Showcase */}
-          <div className="mx-auto max-w-xl rounded-2xl border border-[#ff1e8e]/35 bg-[#05050a]/90 p-3 flex items-center justify-center gap-3">
-            <img src="/icon-512.png" alt="VelvetMotion Icon" className="h-14 w-14 rounded-2xl border border-[#00f5ff]/50 shadow-[0_0_20px_rgba(0,245,255,0.3)]" />
-            <div className="flex -space-x-3">
-              <img src="/portraits/nova-park.webp" alt="Nova Park" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#ff1e8e]" />
-              <img src="/portraits/chloe-parker.webp" alt="Chloe Parker" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#00f5ff]" />
-              <img src="/portraits/aria-velasco.webp" alt="Aria Velasco" className="h-14 w-14 rounded-full object-cover object-top border-2 border-[#a855f7]" />
-            </div>
-            <div className="text-left text-[11px] leading-tight">
-              <p className="font-extrabold text-[#00ffa3]">● Tauri v2 Native Bridge</p>
-              <p className="text-[#a6a6c4]">CORS-free :5001 · :11434 · :8188</p>
-              <p className="text-[#00f5ff]">Firebase + Cloudflare Synced</p>
-            </div>
-          </div>
-
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-            {os === "mobile" ? (
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 rounded-full neon-btn-primary px-7 py-3.5 text-sm font-extrabold text-white"
-              >
-                <Smartphone className="h-4 w-4" /> {rec.label}
-              </Link>
-            ) : (
-              <a
-                href={resolvedHref}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full neon-btn-primary px-7 py-3.5 text-sm font-extrabold text-white"
-              >
-                <Download className="h-4 w-4" /> {releaseTag ? `${rec.label} · ${releaseTag}` : rec.label}
-              </a>
-            )}
-            <span className="text-xs text-[#00ffa3] font-semibold">
-              {releaseState === "live" && releaseTag
-                ? `${releaseTag} Live Installer Ready · ${rec.note}`
-                : releaseState === "pending"
-                  ? "Installers build automatically once v1.0.0 tag is pushed · Full Web & PWA works now"
-                  : rec.note}
+      <section className="relative isolate overflow-hidden rounded-[32px] border border-[#ddb0bf]/20 bg-[#1b111d] shadow-[0_35px_95px_rgba(0,0,0,.32)]">
+        <div className="pointer-events-none absolute -right-24 -top-20 h-80 w-80 rounded-full bg-[#c45387]/20 blur-[100px]" aria-hidden="true" />
+        <div className="pointer-events-none absolute -bottom-40 left-20 h-80 w-80 rounded-full bg-[#a78bfa]/10 blur-[100px]" aria-hidden="true" />
+        <div className="relative grid items-center gap-7 px-6 py-10 sm:px-10 sm:py-12 lg:min-h-[430px] lg:grid-cols-[1.1fr_.9fr] lg:gap-9 lg:px-12">
+          <div className="relative z-10 space-y-5">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#e4b3ba]/25 bg-white/[.05] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.19em] text-[#f0cbd0]">
+              <Sparkles className="h-3.5 w-3.5" /> The desktop experience
             </span>
-          </div>
-
-          {releaseNotes && (
-            <p className="mx-auto max-w-xl text-[11px] text-[#a6a6c4] line-clamp-2">
-              {releaseNotes}
+            <h1 className="font-display text-4xl font-semibold leading-[1.04] tracking-tight text-white sm:text-6xl">
+              Your stories.
+              <span className="block bg-gradient-to-r from-[#f6d8be] via-[#ebabc1] to-[#c4b2f1] bg-clip-text text-transparent">
+                Your machine.
+              </span>
+            </h1>
+            <p className="max-w-lg text-sm leading-7 text-[#d7c7d1]">
+              A beautiful private-first home for your fictional AI companions. Discover characters, personalize voices
+              and connect local models to make the experience your own.
             </p>
-          )}
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-white/10 bg-white/[.055] px-3 py-1.5 text-[11px] text-[#eee0e5]">Native desktop window</span>
+              <span className="rounded-full border border-white/10 bg-white/[.055] px-3 py-1.5 text-[11px] text-[#eee0e5]">Optional local inference</span>
+              <span className="rounded-full border border-white/10 bg-white/[.055] px-3 py-1.5 text-[11px] text-[#eee0e5]">Control your providers</span>
+            </div>
+            <a href="#installer" className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#d37a95] to-[#a65c85] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#c26589]/15 transition hover:brightness-110">
+              Find your installer <ChevronRight className="h-4 w-4" />
+            </a>
+          </div>
 
-          {/* All OS Download Pills */}
-          <div className="pt-3 flex flex-wrap justify-center gap-2 text-xs">
-            {(
-              [
-                ["windows", "Windows (.exe / .msi)"],
-                ["mac-arm", "macOS Apple Silicon"],
-                ["mac-intel", "macOS Intel"],
-                ["linux", "Linux (.AppImage / .deb)"],
-              ] as const
-            ).map(([k, lbl]) => (
-              <a
-                key={k}
-                href={matchAssetUrl(releaseAssets, k) || RELEASES_INDEX}
-                target="_blank"
-                rel="noreferrer"
-                className={`rounded-full border px-3 py-1.5 font-semibold transition ${
-                  os === k
-                    ? "border-[#00f5ff] bg-[#00f5ff]/15 text-[#00f5ff]"
-                    : "border-white/15 text-[#a6a6c4] hover:border-[#ff1e8e]/50 hover:text-white"
-                }`}
-              >
-                {lbl}
-              </a>
-            ))}
+          <div className="relative hidden h-[340px] lg:block" aria-label="A showcase of fictional adult companions">
+            <div className="absolute left-[5%] top-[17%] h-[255px] w-[175px] -rotate-6 overflow-hidden rounded-[28px] border border-[#e3c4c4]/30 shadow-[0_22px_60px_rgba(0,0,0,.5)]">
+              <SafeImage src="/portraits/sloane-kensington.webp" alt="Sloane, fictional AI companion" className={"h-full w-full object-cover " + (motion ? "vm-download-motion" : "")} />
+            </div>
+            <div className="absolute left-[31%] top-[1%] z-10 h-[304px] w-[195px] overflow-hidden rounded-[30px] border border-[#e3c4c4]/50 shadow-[0_30px_65px_rgba(0,0,0,.55)]">
+              <SafeImage src="/portraits/chloe-parker.webp" alt="Chloe, fictional AI companion" className={"h-full w-full object-cover " + (motion ? "vm-download-motion" : "")} />
+            </div>
+            <div className="absolute right-[1%] top-[21%] h-[255px] w-[175px] rotate-6 overflow-hidden rounded-[28px] border border-[#e3c4c4]/30 shadow-[0_22px_60px_rgba(0,0,0,.5)]">
+              <SafeImage src="/portraits/raven-vance.webp" alt="Raven, fictional AI companion" className={"h-full w-full object-cover " + (motion ? "vm-download-motion" : "")} />
+            </div>
+            <button type="button" onClick={() => setMotion((v) => !v)} aria-pressed={!motion}
+              className="absolute bottom-0 right-4 z-20 inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[10px] backdrop-blur-md">
+              {motion ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              {motion ? "Pause motion" : "Resume motion"}
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Web Free vs Desktop Local Ultra Table */}
-      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-4">
-        <h2 className="text-lg font-extrabold text-[#f7f7fc] flex items-center gap-2">
-          <Laptop className="h-5 w-5 text-[#ff1e8e]" /> Web Free vs Desktop Local Ultra
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-white/10 text-[#a6a6c4]">
-                <th className="py-2.5 pr-4">Capability</th>
-                <th className="py-2.5 px-4 text-white">Web Free (Browser)</th>
-                <th className="py-2.5 pl-4 text-[#00f5ff]">Desktop Local Ultra (Tauri v2)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {[
-                ["Chat LLM Inference", "Cloud Free / BYOK / Localhost", "Auto-connects KoboldCpp & Ollama (zero wait)"],
-                ["Selfie & Image Quality", "Cloudflare Flux + AI Horde", "Local ComfyUI FLUX/SDXL + Cloud fallback"],
-                ["Boss-Key & Tray Stealth", "Tab switch", "Global CmdOrCtrl+Shift+H instant hide + audio mute + PIN lock"],
-                ["Offline Airplane Mode", "Cached static UI shell", "100% offline bundled build + local GGUF models"],
-                ["Daily App Updates", "Instant on page refresh", "Layer 1 live web sync + Layer 2 signed binary updater"],
-              ].map(([cap, web, desktop]) => (
-                <tr key={cap}>
-                  <td className="py-3 pr-4 font-bold text-[#f7f7fc]">{cap}</td>
-                  <td className="py-3 px-4 text-[#a6a6c4]">{web}</td>
-                  <td className="py-3 pl-4 text-[#00ffa3] font-medium flex items-center gap-1.5">
-                    <Check className="h-3.5 w-3.5 shrink-0" /> {desktop}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Detected RAM SOTA Nov 2026 Models + Port Tester */}
-      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <section id="installer" className="space-y-5 rounded-[30px] border border-white/10 bg-[#17121b] p-5 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-              <Cpu className="h-5 w-5 text-[#ff5678]" /> Recommended for Your Hardware · {ramCatalog.label} ({engine.ramGb} GB RAM)
-            </h2>
-            <p className="text-xs text-[#a6a6c4]">
-              One-click launch commands for KoboldCpp (:5001), Fish Audio Drama 3 (:5002), Ollama (:11434), and ComfyUI (:8188).
-            </p>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e9adbd]">From official GitHub Releases</p>
+            <h2 className="mt-1 font-display text-2xl font-semibold sm:text-3xl">Download VelvetMotion</h2>
+            <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-400">Choose your computer. The installer contains the desktop interface; AI model downloads are separate.</p>
           </div>
-          <button
-            type="button"
-            onClick={() => void engine.refresh().then(() => setProbeToast("Probed :5001, :5002, :11434, :8188, and Home Engine :8787."))}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#ff5678]/45 bg-[#ff5678]/15 px-3.5 py-1.5 text-xs font-bold text-[#ff8aa1] hover:bg-[#ff5678]/25"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Test Local Connection
+          <span role="status" className={"rounded-full border px-3 py-1.5 text-[11px] font-semibold " + (releaseStatus === "ready" ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-200" : "border-amber-300/20 bg-amber-300/10 text-amber-200")}>
+            {releaseStatus === "checking" ? "Checking published installers…" : releaseStatus === "ready" ? release?.tag_name + " · Published" : "Release check unavailable"}
+          </span>
+        </div>
+
+        {isMobile && <p className="rounded-xl border border-[#edb4c1]/25 bg-[#b95b7a]/10 p-3 text-xs text-[#f2c8d2]">
+          You are browsing on a mobile device. These are desktop installers; open this page on a Windows, Mac or Linux computer. On mobile, use the website in your browser.
+        </p>}
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Computer platform">
+          {(Object.keys(DESKTOP_PLATFORMS) as DesktopPlatform[]).map((key) => (
+            <button key={key} type="button" aria-pressed={platform === key} onClick={() => setPlatform(key)}
+              className={"rounded-2xl border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-pink-200 " +
+                (platform === key ? "border-[#e3a9bb]/65 bg-[#b96685]/20" : "border-white/10 bg-white/[.03] hover:border-white/25")}>
+              <Monitor className="mb-3 h-4 w-4 text-[#e5acbf]" />
+              <span className="block text-xs font-semibold">{DESKTOP_PLATFORMS[key].title}</span>
+              <span className="mt-1 block text-[10px] text-zinc-400">{DESKTOP_PLATFORMS[key].subtitle}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-[23px] border border-[#e7adbc]/15 bg-gradient-to-r from-[#2b1a29] to-[#1c1521] p-4 sm:p-5">
+          <div className="max-w-xl">
+            <h3 className="text-sm font-semibold text-white">{DESKTOP_PLATFORMS[platform].title}</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[#ccbbc8]">{DESKTOP_PLATFORMS[platform].help}</p>
+            {installer && <p className="mt-2 text-[11px] text-[#eebdca]">{installer.name} · {humanFileSize(installer.size)}</p>}
+          </div>
+          {installer ? (
+            <a href={installer.browser_download_url}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-gradient-to-r from-[#d27796] to-[#ac5f86] px-6 py-3 text-sm font-bold text-white transition hover:brightness-110">
+              <ArrowDownToLine className="h-4 w-4" /> Download installer
+            </a>
+          ) : (
+            <a href={RELEASES_PAGE} target="_blank" rel="noopener noreferrer"
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:border-pink-300/40">
+              Browse releases <ExternalLink className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          This release page does not promise unattended updates: signing and updater configuration must be completed and verified first.
+          Check official GitHub Releases for newer installers.
+        </p>
+      </section>
+
+      <section className="space-y-5 rounded-[30px] border border-white/10 bg-[#17121b] p-5 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e9adbd]">Your local studio</p>
+            <h2 className="mt-1 font-display text-2xl font-semibold">Use your own RAM and GPU.</h2>
+            <p className="mt-2 max-w-xl text-xs text-zinc-400">Connect compatible AI software you run locally. Detecting a service port does not confirm a model is loaded or its content capabilities.</p>
+          </div>
+          <button type="button" onClick={() => void engine.refresh()}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3.5 py-2 text-[11px] text-zinc-200 hover:border-white/35">
+            <RefreshCw className="h-3.5 w-3.5" /> Test connections
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          {connections.map((c) => (
+            <div key={c.title} className="rounded-[19px] border border-white/10 bg-white/[.025] p-3">
+              <span className={"inline-block h-2 w-2 rounded-full " + (c.status ? "bg-emerald-400" : "bg-zinc-600")} aria-hidden="true" />
+              <p className="mt-2 text-xs font-semibold">{c.title}</p>
+              <p className="mt-0.5 text-[10px] text-zinc-400">{c.status ? "Port reachable" : "Not detected"}</p>
+              <p className="mt-1 text-[10px] text-zinc-500">{c.detail}</p>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-[11px] text-[#d3bbca]">Hardware estimate: {ram.label}. Model sizes depend on the real available RAM and VRAM; the browser estimate may be inaccurate.</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(Object.keys(LOCAL_COMPUTE_MODES) as LocalComputeMode[]).map((mode) => (
+            <button key={mode} type="button" aria-pressed={computeMode === mode}
+              onClick={() => { setComputeMode(mode); saveLocalComputeMode(mode); }}
+              className={"rounded-[19px] border p-4 text-left transition " + (computeMode === mode ? "border-[#dfa8b8]/60 bg-[#b15b80]/15" : "border-white/10 bg-white/[.025] hover:border-white/25")}>
+              <p className="text-sm font-semibold">{LOCAL_COMPUTE_MODES[mode].title}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{LOCAL_COMPUTE_MODES[mode].detail}</p>
+              <p className="mt-2 text-[10px] text-[#efb9c7]">{LOCAL_COMPUTE_MODES[mode].maxTokens} max output tokens</p>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
           {[
-            ["KoboldCpp :5001", engine.koboldOnline],
-            ["Fish Drama :5002", engine.fishOnline],
-            ["Ollama :11434", engine.ollamaOnline],
-            ["ComfyUI :8188", engine.comfyOnline],
-            ["Home Engine :8787", engine.homeEngineOnline],
-          ].map(([lbl, on]) => (
-            <div
-              key={String(lbl)}
-              className={`rounded-xl border px-3 py-2 text-center font-semibold ${
-                on ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300" : "border-white/10 bg-[#141418] text-zinc-400"
-              }`}
-            >
-              ● {lbl}
-            </div>
-          ))}
+            { title: "01 / Install", desc: "Download a language model and local runtime separately.", url: "https://ollama.com/download", icon: HardDrive },
+            { title: "02 / Configure", desc: "Pick your local provider in AI settings and start its server.", url: "/?view=advanced", icon: Cpu },
+            { title: "03 / Create", desc: "Use an available chat, image, voice or video workflow.", url: "/studio/", icon: Film },
+          ].map((step) => {
+            const Icon = step.icon;
+            return <a key={step.title} href={step.url}
+              className="group rounded-2xl border border-white/10 bg-gradient-to-br from-[#2b1a27] to-[#141018] p-4 transition hover:border-[#e8b3bf]/35">
+              <Icon className="h-5 w-5 text-[#ecc0c8]" />
+              <h3 className="mt-3 text-xs font-bold">{step.title}</h3>
+              <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{step.desc}</p>
+              <ArrowUpRight className="mt-3 h-4 w-4 text-[#eeafbf] transition group-hover:translate-x-1" />
+            </a>;
+          })}
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {ramCatalog.presets.map((preset) => (
-            <div key={preset.id} className="rounded-2xl border border-white/10 bg-[#141418] p-4 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-bold text-white">{preset.name}</span>
-                <span className="shrink-0 rounded-full bg-[#ff5678]/20 border border-[#ff5678]/40 px-2 py-0.5 text-[10px] font-bold text-[#ff8aa1]">
-                  {preset.badge}
-                </span>
-              </div>
-              <p className="text-xs text-[#a6a6c4] leading-relaxed">{preset.description}</p>
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-[#0d0d11] px-3 py-2 font-mono text-[11px] text-zinc-300">
-                <span className="truncate">{preset.launchCommand}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(preset.launchCommand);
-                    setCopiedId(preset.id);
-                    setProbeToast(`Copied ${preset.name} command.`);
-                    setTimeout(() => setCopiedId(null), 1500);
-                  }}
-                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-[#ff5678]/45 bg-[#ff5678]/15 px-2.5 py-1 text-[11px] font-sans font-bold text-white"
-                >
-                  {copiedId === preset.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                  {copiedId === preset.id ? "Copied" : "Copy Launch Command"}
-                </button>
-              </div>
-            </div>
-          ))}
+      <section className="space-y-4 rounded-[28px] border border-[#dba6b7]/20 bg-gradient-to-br from-[#241726] to-[#151019] p-5 sm:p-7">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#e4b4c1]/25 bg-[#be6b8a]/15">
+            <HardDrive className="h-5 w-5 text-[#eac1cb]" />
+          </span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e7b3c0]">Optional local companion bridge</p>
+            <h2 className="font-display text-xl font-semibold text-white">Your machine, your runtime.</h2>
+          </div>
         </div>
+        <p className="max-w-3xl text-xs leading-6 text-[#d0beca]">
+          Already installed Ollama, KoboldCpp or ComfyUI? The optional Python Home Engine can discover running
+          local services. It does not install AI models or start a public tunnel. Download the Python engine and a
+          matching launcher into the <strong>same folder</strong>; review the source before running it.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a href="/downloads/velvetmotion_home_engine.py" download
+            className="inline-flex items-center gap-2 rounded-full bg-[#c66d8b] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#d4809b]">
+            <Download className="h-3.5 w-3.5" /> Home Engine Python
+          </a>
+          <a href="/downloads/start-velvet-engine.bat" download
+            className="inline-flex items-center gap-2 rounded-full border border-[#e5b7c5]/30 bg-white/5 px-4 py-2.5 text-xs font-semibold text-[#f0d1db] hover:bg-white/10">
+            Windows launcher
+          </a>
+          <a href="/downloads/start-velvet-engine.command" download
+            className="inline-flex items-center gap-2 rounded-full border border-[#e5b7c5]/30 bg-white/5 px-4 py-2.5 text-xs font-semibold text-[#f0d1db] hover:bg-white/10">
+            macOS / Linux launcher
+          </a>
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          Requires Python 3 and local inference software. By default, the bridge binds to 127.0.0.1:8787,
+          disables cloud fallback and returns clear errors if no model is installed.
+        </p>
+      </section>
 
-        {probeToast && <p className="text-xs font-semibold text-emerald-300">{probeToast}</p>}
+      <LocalSetupWizard status={engine} onRefresh={engine.refresh} />
 
-        {/* Desktop Model Manager · DavidAU NEO GGUFs with Direct Hugging Face Downloads */}
-        <div className="pt-2 space-y-3 border-t border-white/10">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-sm font-extrabold text-white">
-                Desktop Model Manager · DavidAU NEO Imatrix GGUFs (IQ4_XS)
-              </h3>
-              <p className="text-[11px] text-[#a6a6c4]">
-                Direct Hugging Face IQ4_XS GGUF downloads for optimal RAM vs. emotional nuance, pre-paired with Class 1–4 samplers + Anti-Slop.
+      <section className="grid gap-3 md:grid-cols-3">
+        {[
+          { title: "Your local models", detail: "Inference stays on your device only when you explicitly use an installed local provider.", icon: Cpu },
+          { title: "Distinct voices", detail: "Connect a compatible local neural speech service for natural companion audio.", icon: Mic2 },
+          { title: "Image and video", detail: "Run compatible media workflows locally, subject to available models and hardware.", icon: Waves },
+        ].map((feature) => {
+          const Icon = feature.icon;
+          return <div key={feature.title} className="rounded-[24px] border border-white/10 bg-[#17121b] p-5">
+            <Icon className="h-5 w-5 text-[#eab4c0]" />
+            <h3 className="mt-3 font-display text-base font-semibold">{feature.title}</h3>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-400">{feature.detail}</p>
+          </div>;
+        })}
+      </section>
+
+      {engine.isDesktop && (
+        <section className="space-y-3 rounded-[24px] border border-[#e8bbca]/20 bg-[#2a1a2b] p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="max-w-2xl">
+              <h2 className="font-display text-lg font-semibold text-white">Signed desktop updates</h2>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-300">
+                {signedUpdaterEnabled
+                  ? "This desktop build supports verified updates. It can check for and install a cryptographically signed update when the app starts."
+                  : "This installed desktop build does not have a signed updater configured. Download newer versions from the official GitHub Releases page until a signed build is available."}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <a
-                href={DAVIDAU_RESOURCES.samplersGuide}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2.5 py-1 text-[10px] font-bold text-[#00f5ff] hover:bg-[#00f5ff]/20"
-              >
-                Samplers Guide <ExternalLink className="h-3 w-3" />
+            {signedUpdaterEnabled ? (
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-pink-300/25 px-3 py-2 text-xs text-pink-100">
+                <input type="checkbox" checked={autoUpdateOnLaunch} className="accent-[#d98da7]"
+                  onChange={(e) => {
+                    setAutoUpdateOnLaunch(e.target.checked);
+                    try { localStorage.setItem("vm:auto-signed-desktop-updates", e.target.checked ? "on" : "off"); } catch { /* private mode */ }
+                  }} />
+                Auto-install verified updates on launch
+              </label>
+            ) : (
+              <a href={RELEASES_PAGE} target="_blank" rel="noopener noreferrer"
+                className="rounded-full border border-[#e5bbca]/30 px-4 py-2 text-xs font-semibold text-pink-100 hover:border-pink-300/60">
+                Official downloads
               </a>
-              <a
-                href={DAVIDAU_RESOURCES.autoCorrectTool}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-[#ff1e8e]/40 bg-[#ff1e8e]/10 px-2.5 py-1 text-[10px] font-bold text-[#ff8aa1] hover:bg-[#ff1e8e]/20"
-              >
-                AI Autocorrect &amp; Low-Quant <ExternalLink className="h-3 w-3" />
-              </a>
-              <a
-                href={DAVIDAU_RESOURCES.antiSlopRepo}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#141418] px-2.5 py-1 text-[10px] font-bold text-zinc-200 hover:border-[#00f5ff]"
-              >
-                Anti-Slop <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
+            )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {DAVIDAU_RECOMMENDED_GGUFS.map((gguf) => (
-              <div key={gguf.id} className="rounded-2xl border border-[#ff1e8e]/30 bg-[#141418] p-4 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold text-white">{gguf.name}</span>
-                  <span className="shrink-0 rounded-full border border-[#00f5ff]/40 bg-[#00f5ff]/10 px-2.5 py-0.5 text-[10px] font-bold text-[#00f5ff]">
-                    {gguf.ramLabel}
-                  </span>
-                </div>
-                <p className="text-xs text-[#a6a6c4] leading-relaxed">{gguf.note}</p>
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-                  <span className="rounded-full border border-white/10 bg-[#0d0d11] px-2.5 py-1 text-[10px] font-semibold text-zinc-300">
-                    Sampler: {DAVIDAU_SAMPLER_PRESETS[gguf.recommendedPreset].label}
-                  </span>
-                  <a
-                    href={gguf.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full neon-btn-primary px-3.5 py-1.5 text-xs font-bold text-white"
-                  >
-                    <Download className="h-3.5 w-3.5" /> Hugging Face GGUF <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          <p className="text-[11px] text-zinc-500">
+            Installation never runs from an unsigned source. Existing sessions are not automatically restarted mid-conversation.
+          </p>
+        </section>
+      )}
 
-      {/* Self-Hosted Home Server & RAM/GPU Supplement Engine */}
-      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-3 border border-[#00f5ff]/30">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-[#00f5ff]" /> VelvetMotion Home Engine (:8787 + Quick Tunnel)
-            </h2>
-            <p className="text-xs text-[#a6a6c4]">
-              Zero-dependency Python bridge tapping into your PC&apos;s RAM/GPU (KoboldCpp, Ollama, ComfyUI) with Cloudflare Quick Tunnel support.
-            </p>
-          </div>
-          <span
-            className={`rounded-full px-3 py-1 text-[11px] font-bold border ${
-              engine.homeEngineOnline
-                ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
-                : "border-white/15 bg-[#141418] text-zinc-300"
-            }`}
-          >
-            {engine.homeEngineOnline ? "● Connected (:8787)" : "○ Offline (Run Launcher)"}
-          </span>
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-xs">
-          <a
-            href="/downloads/velvetmotion_home_engine.py"
-            download
-            className="inline-flex items-center gap-1.5 rounded-full neon-btn-primary px-4 py-2 font-bold text-white"
-          >
-            <Download className="h-3.5 w-3.5" /> velvetmotion_home_engine.py
-          </a>
-          <a
-            href="/downloads/start-velvet-engine.bat"
-            download
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-[#141418] px-4 py-2 font-semibold text-white hover:border-[#ff5678]"
-          >
-            <Download className="h-3.5 w-3.5" /> Windows Launcher (.bat)
-          </a>
-          <a
-            href="/downloads/start-velvet-engine.command"
-            download
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-[#141418] px-4 py-2 font-semibold text-white hover:border-[#00f5ff]"
-          >
-            <Download className="h-3.5 w-3.5" /> macOS Launcher (.command)
-          </a>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-[#0d0d11] px-3 py-2 font-mono text-[11px] text-zinc-300">
-          python3 velvetmotion_home_engine.py
-          {engine.homeTunnelUrl ? ` · Tunnel live: ${engine.homeTunnelUrl}` : ""}
-        </div>
-      </section>
-
-      {/* SOTA Voice Engines */}
-      <section className="rounded-3xl neon-glass p-5 sm:p-6 space-y-3">
-        <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
-          <Volume2 className="h-5 w-5 text-[#ff5678]" /> Neural Voice Engines (Browser WebGPU &amp; Local Audio.cpp)
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {VOICE_ENGINE_OPTIONS.map((v) => (
-            <div key={v.id} className="rounded-2xl border border-white/10 bg-[#141418] p-3.5 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold text-white">{v.label}</span>
-                <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-bold text-[#ff8aa1]">
-                  {v.footprint}
-                </span>
-              </div>
-              <div className="text-[10px] font-bold text-emerald-300">{v.badge}</div>
-              <p className="text-[11px] text-[#a6a6c4] leading-snug">{v.description}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 3-Step Local RAM Guide */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="space-y-3 rounded-[26px] border border-white/10 bg-[#17121b] p-5 sm:p-7">
+        <h2 className="font-display text-xl font-semibold">Before you install</h2>
         {[
-          {
-            tier: "8 GB Lite",
-            color: "border-white/15",
-            steps: "Install Ollama or KoboldCpp with a 4B–8B Q4_K_M GGUF chat model and keep Cloud Free enabled for portraits.",
-          },
-          {
-            tier: "16 GB Balanced",
-            color: "border-[#ff1e8e]/45",
-            steps: "Run 12B Q4_K_M GGUF unfiltered chat alongside local SDXL / FLUX GGUF portraits via ComfyUI on port 8188.",
-          },
-          {
-            tier: "32 GB+ Ultra",
-            color: "border-[#00f5ff]/55",
-            steps: "Unlock 24B–32B GGUF chat, full-precision FLUX Dev portraits, Kokoro-82M neural TTS, and local FramePack/Wan 2.2 video.",
-          },
-        ].map((card, i) => (
-          <div key={card.tier} className={`rounded-3xl neon-glass border ${card.color} p-5 space-y-2`}>
-            <div className="text-[10px] font-black uppercase tracking-wider text-[#00f5ff] flex items-center gap-1">
-              <Cpu className="h-3.5 w-3.5" /> Step {i + 1} · {card.tier}
-            </div>
-            <p className="text-xs text-[#f7f7fc] leading-relaxed">{card.steps}</p>
-          </div>
+          ["Does the installer include AI models?", "No. It bundles the desktop interface. You can install Ollama, KoboldCpp, ComfyUI and compatible models separately; your hardware needs determine what will run."],
+          ["Will the app run offline?", "The bundled interface and configured local models can work offline for supported features. Account login, cloud generation and remote sync still need internet access."],
+          ["Are automatic updates already signed?", "No verified updater signing key is configured in the current source. Use official GitHub Releases for manually installed updates until signed distribution is validated."],
+          ["Are my pictures always stored locally?", "Not necessarily. A local model can process data on your device, while selected cloud providers and sync features may receive uploads. Review provider choices before submitting personal information."],
+        ].map(([question, answer]) => (
+          <details key={question} className="group rounded-[16px] border border-white/10 bg-white/[.025] px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-white marker:text-[#dba3b7]">{question}</summary>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-400">{answer}</p>
+          </details>
         ))}
       </section>
 
-      <div className="rounded-2xl border border-white/10 bg-[#0c0c16] p-4 flex items-center gap-3 text-xs text-[#a6a6c4]">
-        <Shield className="h-5 w-5 text-[#00ffa3] shrink-0" />
-        <span>
-          Mobile PWA users on iOS or Android can install directly from their browser Share/Install menu for an edge-to-edge full-screen OLED experience.
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-[#e4b0bb]/20 bg-[#281b29] px-5 py-4 text-xs text-[#e5d1d9]">
+        <span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-[#ddb4be]" /> Downloads are linked only to the official VelvetMotion GitHub repository.</span>
+        <a href={RELEASES_PAGE} rel="noopener noreferrer" target="_blank" className="inline-flex items-center gap-1.5 font-semibold text-[#f0c0ca] hover:text-white">
+          All releases <ExternalLink className="h-3.5 w-3.5" />
+        </a>
       </div>
-    </div>
+    </main>
   );
 }

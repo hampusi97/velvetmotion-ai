@@ -21,6 +21,7 @@ export interface LocalEngineStatus {
   isDesktop: boolean;
   koboldOnline: boolean;
   fishOnline: boolean;
+  kokoroOnline: boolean;
   ollamaOnline: boolean;
   comfyOnline: boolean;
   homeEngineOnline: boolean;
@@ -83,13 +84,13 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     if (Number.isFinite(mem) && mem > 0) ramGb = mem;
   }
 
-  let nativePorts: { koboldOnline?: boolean; fishOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
+  let nativePorts: { koboldOnline?: boolean; fishOnline?: boolean; kokoroOnline?: boolean; ollamaOnline?: boolean; comfyOnline?: boolean } | null = null;
   if (desktop && window.__TAURI_INTERNALS__?.invoke) {
     try {
       const [specsRes, portsRes] = await Promise.all([
         window.__TAURI_INTERNALS__.invoke<SystemSpecs>("get_system_specs").catch(() => null),
         window.__TAURI_INTERNALS__
-          .invoke<{ koboldOnline: boolean; fishOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
+          .invoke<{ koboldOnline: boolean; fishOnline: boolean; kokoroOnline: boolean; ollamaOnline: boolean; comfyOnline: boolean }>("probe_local_engines")
           .catch(() => null),
       ]);
       specs = specsRes;
@@ -130,9 +131,10 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     }
   };
 
-  const [koboldHttp, fishHttp, ollamaHttp, comfyHttp, homeHealth] = await Promise.all([
+  const [koboldHttp, fishHttp, kokoroHttp, ollamaHttp, comfyHttp, homeHealth] = await Promise.all([
     nativePorts?.koboldOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5001/api/v1/model"),
     nativePorts?.fishOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:5002/health"),
+    nativePorts?.kokoroOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8880/docs"),
     nativePorts?.ollamaOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:11434/api/tags"),
     nativePorts?.comfyOnline ? Promise.resolve(true) : probeEndpoint("http://127.0.0.1:8188/system_stats"),
     probeHomeHealth(),
@@ -149,6 +151,7 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
   }
   const koboldOnline = Boolean(nativePorts?.koboldOnline || koboldHttp || homeHealth?.engines?.koboldcpp);
   const fishOnline = Boolean(nativePorts?.fishOnline || fishHttp);
+  const kokoroOnline = Boolean(nativePorts?.kokoroOnline || kokoroHttp);
   const ollamaOnline = Boolean(nativePorts?.ollamaOnline || ollamaHttp || homeHealth?.engines?.ollama);
   const comfyOnline = Boolean(nativePorts?.comfyOnline || comfyHttp || homeHealth?.engines?.comfyui);
 
@@ -156,11 +159,12 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
     isDesktop: desktop,
     koboldOnline,
     fishOnline,
+    kokoroOnline,
     ollamaOnline,
     comfyOnline,
     homeEngineOnline,
     homeTunnelUrl: homeHealth?.publicTunnelUrl || null,
-    anyLocalOnline: koboldOnline || fishOnline || ollamaOnline || comfyOnline || homeEngineOnline,
+    anyLocalOnline: koboldOnline || fishOnline || kokoroOnline || ollamaOnline || comfyOnline || homeEngineOnline,
     ramGb,
     ramTier: ramTierForGb(ramGb),
     specs,
@@ -184,40 +188,60 @@ export async function triggerBossKey(): Promise<boolean> {
   return false;
 }
 
-export async function checkDesktopUpdate(): Promise<{ available: boolean; version?: string; note: string }> {
-  const configuredRepo = process.env.NEXT_PUBLIC_PUBLIC_RELEASES_REPO?.trim();
-  const repos = Array.from(
-    new Set(
-      [configuredRepo, "hampusi97/velvetmotion-ai", "hampusi97/velvetmotion-releases"].filter(
-        (r): r is string => Boolean(r)
-      )
-    )
-  );
-  for (const repo of repos) {
-    try {
-      const res = await fetch(`https://github.com/${repo}/releases/latest/download/latest.json`, {
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const manifest = (await res.json()) as { version?: string };
-        return {
-          available: Boolean(manifest.version),
-          version: manifest.version,
-          note: manifest.version
-            ? `Latest desktop build v${manifest.version} is live on GitHub Releases.`
-            : "Web layer updates automatically on reload.",
-        };
-      }
-    } catch {
-      /* network or CORS; try next endpoint */
-    }
+/** Compare only numeric stable release versions, never assume "up to date" on a network error. */
+function compareDesktopVersions(installed: string, published: string): number {
+  const parse = (v: string) => v.replace(/^v/i, "").split(".").slice(0, 3).map((n) => Number(n));
+  const a = parse(installed);
+  const b = parse(published);
+  if (a.length < 3 || b.length < 3 || [...a, ...b].some((n) => !Number.isInteger(n))) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1;
   }
-  return {
-    available: false,
-    note: isTauriDesktop()
-      ? "Already on the latest daily Web + Desktop build."
-      : "Running Cloudflare Web build — updates apply live on every reload.",
-  };
+  return 0;
+}
+
+export async function checkDesktopUpdate(): Promise<{ available: boolean; version?: string; note: string }> {
+  const desktop = isTauriDesktop();
+  let installed: string | null = null;
+  if (desktop && window.__TAURI_INTERNALS__?.invoke) {
+    try {
+      installed = await window.__TAURI_INTERNALS__.invoke<string>("desktop_app_version");
+    } catch { /* May be an older installed desktop build. */ }
+  }
+  try {
+    const res = await fetch("https://api.github.com/repos/hampusi97/velvetmotion-ai/releases/latest", {
+      cache: "no-store",
+      headers: { Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error("GitHub API unavailable");
+    const json = (await res.json()) as { tag_name?: string; assets?: Array<{ name?: string }> };
+    const published = json.tag_name;
+    if (!published || !Array.isArray(json.assets) || !json.assets.length) throw new Error("No installers published");
+    if (!desktop) return {
+      available: false,
+      version: published,
+      note: "Latest published desktop installer: " + published + ". See the Download page for your operating system.",
+    };
+    if (!installed) return {
+      available: false,
+      version: published,
+      note: "Published desktop version: " + published + ". Installed version could not be read; compare manually on GitHub Releases.",
+    };
+    const newer = compareDesktopVersions(installed, published) < 0;
+    return {
+      available: newer,
+      version: published,
+      note: newer
+        ? "A newer desktop installer (" + published + ") is published. Your installed version is " + installed + ". Download it manually from official GitHub Releases."
+        : "Installed version: " + installed + ". Latest GitHub release: " + published + ". No verified signed auto-updater is configured.",
+    };
+  } catch {
+    return {
+      available: false,
+      note: "Could not check GitHub Releases. The installed version may be outdated; retry online or check the official releases page.",
+    };
+  }
 }
 
 export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Promise<void> } {
@@ -225,6 +249,7 @@ export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Pro
     isDesktop: false,
     koboldOnline: false,
     fishOnline: false,
+    kokoroOnline: false,
     ollamaOnline: false,
     comfyOnline: false,
     homeEngineOnline: false,

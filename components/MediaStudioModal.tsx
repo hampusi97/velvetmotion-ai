@@ -12,6 +12,9 @@ import {
 } from '@/lib/canvasVideoExporter';
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
+import { getMediaSettings } from '@/lib/mediaSettings';
+import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
+import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
 import { assertCompliance } from '@/lib/complianceFilter';
 import { useLocalEngineStatus } from '@/lib/localEngineBridge';
 import { addToGallery, getGallery, loadChat, saveChat } from '@/lib/storage';
@@ -120,6 +123,14 @@ export default function MediaStudioModal({
   const [charVibe, setCharVibe] = useState('');
   const [charGreeting, setCharGreeting] = useState('');
   const [fictionalConfirmed, setFictionalConfirmed] = useState(false);
+  const [uploadSourceKind, setUploadSourceKind] = useState<'fictional' | 'self' | null>(null);
+  const [uploadedAdultMode, setUploadedAdultMode] = useState(false);
+  const [customVoice, setCustomVoice] = useState<VoiceDesign>(DEFAULT_VOICE_DESIGN);
+  const [referenceBusy, setReferenceBusy] = useState(false);
+  const [referenceResult, setReferenceResult] = useState<string | null>(null);
+  const [uploadRightsConfirmed, setUploadRightsConfirmed] = useState(false);
+  const [videoIsGenerative, setVideoIsGenerative] = useState(false);
+  const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm' | 'unknown'>('unknown');
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -216,7 +227,41 @@ export default function MediaStudioModal({
     }
   }
 
+  async function handleGenerateReferenceVariant() {
+    if (!uploadedPreview || uploadSourceKind !== 'fictional' || !uploadRightsConfirmed) {
+      setErrorMsg('This feature requires an original fictional adult image and confirmed usage rights.');
+      return;
+    }
+    setReferenceBusy(true);
+    setErrorMsg(null);
+    setStatusMsg('Requesting a reference-aware variation from your configured image model...');
+    try {
+      const response = await generateFictionalReferenceVariation({
+        referenceImage: uploadedPreview,
+        prompt: customPrompt.trim() || charVibe.trim() || 'cinematic portrait with soft evening lighting',
+        adultMode: uploadedAdultMode,
+        sourceType: 'fictional',
+      });
+      setReferenceResult(response.imageUrl);
+      setVideoSourceUrl(response.imageUrl);
+      setStatusMsg(`New fictional portrait generated with ${response.engine}. You can animate it or use it as this companion’s avatar.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Reference image generation failed.');
+      setStatusMsg(null);
+    } finally {
+      setReferenceBusy(false);
+    }
+  }
+
   async function handleGenerateVideo() {
+    const derivedFromUpload = Boolean(uploadedPreview && (
+      videoSourceUrl === uploadedPreview ||
+      (referenceResult && videoSourceUrl === referenceResult)
+    ));
+    if (derivedFromUpload && (!uploadSourceKind || !uploadRightsConfirmed)) {
+      setErrorMsg('Choose the image source and confirm that you have permission to use it before animating.');
+      return;
+    }
     setVideoBusy(true);
     setErrorMsg(null);
     setStatusMsg(null);
@@ -227,13 +272,27 @@ export default function MediaStudioModal({
         motionId,
         durationSec,
         speed: videoSpeed,
-        prompt: `${companion.name} ${customPrompt}`,
+        // A real-person photograph may only be used for a neutral, nonsexual animation.
+        prompt: derivedFromUpload && uploadSourceKind === 'self'
+          ? 'Nonsexual portrait animation, subtle natural blink, gentle head turn, fully clothed, natural lighting'
+          : `${companion.name} ${customPrompt}`,
+        sourceType: derivedFromUpload
+          ? uploadSourceKind === 'fictional' ? 'fictional' : 'real-person'
+          : 'unspecified',
+        adultMode: derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode,
         comfyOnline: localEngine.comfyOnline,
-        videoBackendUrl,
+        videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
       });
       setGeneratedVideoUrl(res.videoUrl);
       setVideoEngineUsed(res.engine);
-      setStatusMsg(`Rendered ${durationSec}s @ ${videoSpeed}x via ${res.engine}!`);
+      setVideoIsGenerative(res.isGenerative);
+      setVideoFormat(res.videoFormat);
+      if (res.isGenerative) {
+        setStatusMsg(`Generated ${durationSec}s via ${res.engine}.`);
+      } else {
+        setStatusMsg(`Created ${durationSec}s animated-still effect, not generative AI video.`);
+        setErrorMsg(res.warning || 'Set up a compatible video backend to generate motion.');
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Video rendering failed.');
     } finally {
@@ -243,38 +302,61 @@ export default function MediaStudioModal({
 
   async function processFile(file: File) {
     setErrorMsg(null);
-    const webpData = await compressUploadToWebp(file);
-    setUploadedPreview(webpData);
-    setVideoSourceUrl(webpData);
-
-    if (file.name.toLowerCase().endsWith('.json')) {
-      const txt = await file.text();
-      const parsed = parseCardV2Json(txt);
+    setStatusMsg(null);
+    const isJson = file.type === 'application/json' || file.name.toLowerCase().endsWith('.json');
+    const isImage = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+    if (!isJson && !isImage) {
+      setErrorMsg('Choose PNG, JPG, WebP, or a Character Card V2 JSON file.');
+      return;
+    }
+    if (file.size > (isJson ? 1024 * 1024 : 12 * 1024 * 1024)) {
+      setErrorMsg(isJson ? 'Character cards must be under 1 MB.' : 'Pictures must be under 12 MB.');
+      return;
+    }
+    // Never attempt to decode JSON as a photograph.
+    if (isJson) {
+      const parsed = parseCardV2Json(await file.text());
       if (parsed.ok) {
         setCharName(parsed.character.name);
         setCharAge(parsed.character.age);
         setCharVibe(parsed.character.personality);
         setCharGreeting(parsed.character.initialMessage);
-        setStatusMsg('Imported Character Card Spec V2 JSON!');
+        setStatusMsg('Imported character card. Add a portrait to animate it.');
       } else {
         setErrorMsg(parsed.error);
       }
       return;
     }
 
-    const rawBuf = await file.arrayBuffer();
-    const charaRaw = extractCharaFromPngBuffer(rawBuf);
-    if (charaRaw) {
-      const parsed = parseCardV2Json(charaRaw, webpData);
-      if (parsed.ok) {
-        setCharName(parsed.character.name);
-        setCharAge(parsed.character.age);
-        setCharVibe(parsed.character.personality);
-        setCharGreeting(parsed.character.initialMessage);
-        setStatusMsg('Extracted Character Card V2 PNG metadata!');
-      } else {
-        setErrorMsg(parsed.error);
+    try {
+      const webpData = await compressUploadToWebp(file);
+      setUploadedPreview(webpData);
+      setReferenceResult(null);
+      setVideoSourceUrl(webpData);
+      setUploadSourceKind(null);
+      setUploadRightsConfirmed(false);
+      setUploadedAdultMode(false);
+      setFictionalConfirmed(false);
+      setGeneratedVideoUrl(null);
+      setStatusMsg('Portrait loaded locally. Confirm permission, then animate or create a fictional companion.');
+
+      if (file.type === 'image/png') {
+        const charaRaw = extractCharaFromPngBuffer(await file.arrayBuffer());
+        if (charaRaw) {
+          const parsed = parseCardV2Json(charaRaw, webpData);
+          if (parsed.ok) {
+            setCharName(parsed.character.name);
+            setCharAge(parsed.character.age);
+            setCharVibe(parsed.character.personality);
+            setCharGreeting(parsed.character.initialMessage);
+            setStatusMsg('Character Card V2 portrait imported; confirm the source before continuing.');
+          } else {
+            setErrorMsg(parsed.error);
+          }
+        }
       }
+    } catch {
+      setErrorMsg('Could not decode this image. Please try another PNG, JPG, or WebP.');
     }
   }
 
@@ -311,8 +393,8 @@ export default function MediaStudioModal({
   }
 
   function handleSaveUploadedCompanion() {
-    if (!uploadedPreview || !charName.trim() || !fictionalConfirmed) {
-      setErrorMsg('Upload fictional/AI art, enter a name, and confirm 18+ fictional character.');
+    if (!uploadedPreview || !charName.trim() || !fictionalConfirmed || !uploadRightsConfirmed || uploadSourceKind !== 'fictional') {
+      setErrorMsg('Creating a companion from a portrait requires original fictional adult artwork and confirmation that you own or can use it. Real-person photos can only be used for nonsexual animations.');
       return;
     }
     const check = assertCompliance(`${charName} ${charVibe} ${charGreeting}`);
@@ -331,7 +413,7 @@ export default function MediaStudioModal({
       tagline: charVibe.trim() || 'Custom companion created in Pro Media Studio',
       portraitUrl: uploadedPreview,
       visualDna: `${Math.max(18, charAge)}-year-old fictional woman, ${charVibe.trim() || 'stylish candid portrait, warm lighting'}`,
-      voiceId: 'af_heart',
+      voiceId: customVoice.voiceId,
       voiceSampleLine: charGreeting.trim() || `Hey... I'm ${charName.trim()}. Ready to talk?`,
       personality: charVibe.trim() || 'Playful, affectionate, expressive.',
       backstory: charVibe.trim() || 'Created directly in your private VelvetMotion studio.',
@@ -360,7 +442,7 @@ export default function MediaStudioModal({
             initialMessage: created.greeting,
             tags: ['Custom', created.category],
             intimacy: 55,
-            voice: { label: created.voiceId, pitch: 1, rate: 0.96, style: created.personality },
+            voice: { label: created.voiceId, pitch: customVoice.pitch, rate: customVoice.rate, style: created.personality },
             voiceId: created.voiceId,
             visualDna: created.visualDna,
             personality: created.personality,
@@ -640,7 +722,7 @@ export default function MediaStudioModal({
       {tab === 'video' && (
         <div className="space-y-3 text-xs">
           <p className="text-[11px] text-[#a6a6c4]">
-            Render looping `.webm` motion Shorts at $0 in-browser—or accelerate automatically with FramePack / Wan 2.2 / LTX-2 on ComfyUI (:8188).
+            A connected AI video workflow creates new motion. Without one, the browser exports a pan/zoom animated still. Choose a portrait or upload one first.
           </p>
 
           <div>
@@ -651,6 +733,7 @@ export default function MediaStudioModal({
               className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white outline-none focus:border-[#ff5678]"
             >
               {generatedPhoto && <option value={generatedPhoto}>Latest Studio Photo</option>}
+              {uploadedPreview && <option value={uploadedPreview}>My uploaded portrait</option>}
               {FLAGSHIP_COMPANIONS.map((c) => (
                 <option key={c.id} value={c.portraitUrl}>
                   {c.name} — Flagship Portrait
@@ -722,18 +805,38 @@ export default function MediaStudioModal({
             </div>
           </div>
 
+          {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && (
+            <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
+              <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
+              <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
+              <label className="mt-2 flex items-start gap-2">
+                <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
+                <span>I own or have permission to animate this image and all depicted people are adults.</span>
+              </label>
+            </div>
+          )}
+          {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && uploadSourceKind === 'fictional' && (
+            <label className="flex items-center justify-between rounded-xl border border-fuchsia-300/20 bg-black/30 p-3 text-[11px] text-pink-100">
+              <span>18+ mode for original fictional adult artwork
+                <small className="mt-0.5 block text-zinc-400">Requires a compatible model; not a guarantee of content.</small>
+              </span>
+              <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="accent-[#dc789c]" />
+            </label>
+          )}
           <button
             type="button"
             disabled={videoBusy}
             onClick={() => void handleGenerateVideo()}
             className="w-full rounded-full neon-btn-primary py-2.5 text-xs font-bold text-white disabled:opacity-50"
           >
-            {videoBusy ? `Rendering ${durationSec}s @ ${videoSpeed}x .webm clip...` : `Generate ${durationSec}s Video Clip (.webm)`}
+            {videoBusy ? `Processing ${durationSec}s clip...` : `Create ${durationSec}s Video · AI if connected`}
           </button>
           {generatedVideoUrl && (
             <div className="space-y-2 pt-2 text-center">
               {videoEngineUsed && (
-                <p className="text-[10px] font-bold text-[#00f5ff]">{videoEngineUsed}</p>
+                <p className="text-[10px] font-bold text-[#00f5ff]">
+                  {videoIsGenerative ? 'AI-generated motion' : 'Animated still'} · {videoEngineUsed}
+                </p>
               )}
               <video
                 src={generatedVideoUrl}
@@ -747,17 +850,24 @@ export default function MediaStudioModal({
               <div className="flex flex-wrap justify-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleSaveToCollection(videoSourceUrl, 'shorts-video')}
+                  onClick={() => {
+                    if (!generatedVideoUrl) return;
+                    if (generatedVideoUrl.startsWith('blob:')) {
+                      setErrorMsg('This is a temporary video URL. Download the clip to keep it; permanent video storage is not connected yet.');
+                      return;
+                    }
+                    handleSaveToCollection(generatedVideoUrl, 'video');
+                  }}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/45 bg-[#2a1820] px-3.5 py-1.5 text-xs font-bold text-white"
                 >
                   <BookmarkPlus className="h-3.5 w-3.5" /> Save to Shorts / Collection
                 </button>
                 <a
                   href={generatedVideoUrl}
-                  download={`velvetmotion-short-${Date.now()}.webm`}
+                  download={`velvetmotion-short.${videoFormat === 'mp4' ? 'mp4' : 'webm'}`}
                   className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold text-white"
                 >
-                  <Download className="h-3.5 w-3.5" /> Download .webm
+                  <Download className="h-3.5 w-3.5" /> Download clip
                 </a>
               </div>
             </div>
@@ -784,6 +894,92 @@ export default function MediaStudioModal({
               </>
             )}
           </button>
+          {uploadedPreview && (
+            <div className="rounded-2xl border border-pink-400/25 bg-pink-400/10 p-3 space-y-3">
+              <p className="font-bold text-pink-200">Use this portrait</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className="flex items-start gap-2 text-zinc-200">
+                  <input type="radio" checked={uploadSourceKind === 'fictional'} onChange={() => { setUploadSourceKind('fictional'); setUploadedAdultMode(false); }} name="studio-photo-source" />
+                  <span>Original fictional adult / AI-created character</span>
+                </label>
+                <label className="flex items-start gap-2 text-zinc-200">
+                  <input type="radio" checked={uploadSourceKind === 'self'} onChange={() => { setUploadSourceKind('self'); setUploadedAdultMode(false); }} name="studio-photo-source" />
+                  <span>My own adult selfie (nonsexual animation only)</span>
+                </label>
+              </div>
+              <label className="flex items-start gap-2 text-zinc-200">
+                <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
+                <span>I own or have rights to use this image, and every depicted person is an adult. Selfies must show me, not someone else.</span>
+              </label>
+              {uploadSourceKind === 'fictional' && (
+                <label className="flex items-center justify-between gap-3 rounded-xl border border-pink-300/25 bg-black/25 p-3">
+                  <span>
+                    <strong className="block text-xs text-pink-200">18+ fictional fantasy mode</strong>
+                    <span className="mt-0.5 block text-[10px] text-zinc-400">
+                      Pass an adult-mode request to a compatible configured video model. Only original fictional adults qualify.
+                    </span>
+                  </span>
+                  <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="h-4 w-4 accent-[#dc789c]" />
+                </label>
+              )}
+              {uploadSourceKind === 'fictional' && (
+                <div className="space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
+                  <label className="block text-[11px] text-zinc-300">
+                    Change the setting, outfit, composition, or mood
+                    <textarea
+                      rows={2}
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      placeholder="For example: cinematic portrait, satin evening dress, warm lantern glow"
+                      className="mt-1 w-full rounded-xl border border-white/15 bg-[#0b0910] px-3 py-2 text-xs text-white"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!uploadRightsConfirmed || referenceBusy}
+                    onClick={() => void handleGenerateReferenceVariant()}
+                    className="w-full rounded-full border border-[#e8b9ba]/40 bg-[#ad4969]/25 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    {referenceBusy ? 'Generating with reference model...' : 'Generate new fictional portrait'}
+                  </button>
+                  <p className="text-[10px] text-zinc-500">
+                    Requires an img2img endpoint in Advanced Media or compatible local ComfyUI reference nodes. Your original source image is sent only to that chosen provider when you click Generate.
+                  </p>
+                  {referenceResult && (
+                    <div className="space-y-2">
+                      <SafeImage src={referenceResult} alt="New fictional portrait from your selected model" className="mx-auto h-52 w-40 rounded-xl object-cover" />
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button"
+                          onClick={() => {
+                            setUploadedPreview(referenceResult);
+                            setVideoSourceUrl(referenceResult);
+                            setReferenceResult(null);
+                            setStatusMsg('Generated image selected as the fictional companion portrait.');
+                          }}
+                          className="rounded-full border border-pink-300/40 px-3 py-2 text-xs font-semibold text-pink-100">
+                          Use as companion portrait
+                        </button>
+                        <button type="button" onClick={() => { setVideoSourceUrl(referenceResult); setTab('video'); }}
+                          className="rounded-full border border-white/25 px-3 py-2 text-xs text-white">
+                          Animate generated image
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                disabled={!uploadSourceKind || !uploadRightsConfirmed}
+                onClick={() => { setVideoSourceUrl(uploadedPreview); setTab('video'); }}
+                className="rounded-full border border-[#ff5678]/50 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+              >
+                <Film className="inline-block h-3.5 w-3.5 mr-1" /> Animate this photo
+              </button>
+              <p className="text-[10px] text-zinc-400">Video is only generated when a compatible video model is connected. Your upload stays in this browser unless you save a companion or submit it to a configured AI provider.</p>
+            </div>
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -842,6 +1038,11 @@ export default function MediaStudioModal({
             className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white placeholder:text-zinc-500 focus:border-[#ff1e8e] focus:outline-none"
           />
 
+          {uploadedPreview && uploadSourceKind === 'fictional' && (
+            <VoiceDesigner value={customVoice} onChange={setCustomVoice} compact
+              sample={charGreeting.trim() || `Hi! I'm ${charName.trim() || "your companion"}. It's lovely to meet you.`} />
+          )}
+
           <label className="flex items-start gap-2 text-[11px] text-zinc-300">
             <input
               type="checkbox"
@@ -849,7 +1050,7 @@ export default function MediaStudioModal({
               onChange={(e) => setFictionalConfirmed(e.target.checked)}
               className="mt-0.5 accent-[#ff1e8e]"
             />
-            <span>I confirm this image depicts a consenting fictional adult (18+) and is not a real person without consent.</span>
+            <span>I confirm this is an original fictional adult (18+) character. Real-person photos cannot be converted into sexualized AI companions.</span>
           </label>
 
           <button

@@ -125,6 +125,10 @@ export function loadWebSpeechVoices(timeoutMs = 700): Promise<SpeechSynthesisVoi
 }
 
 let activeAudio: HTMLAudioElement | null = null;
+let activeAudioUrl: string | null = null;
+let activeAudioDone: (() => void) | null = null;
+let activeSpeechRequest: AbortController | null = null;
+let speechGeneration = 0;
 
 if (typeof window !== "undefined") {
   window.addEventListener("vm:boss-key-mute", () => {
@@ -154,12 +158,19 @@ export function setPreferredVoiceEngine(id: VoiceEngineId): void {
 }
 
 export function stopNeuralSpeech() {
+  speechGeneration += 1;
+  activeSpeechRequest?.abort();
+  activeSpeechRequest = null;
   try {
     activeAudio?.pause();
-    activeAudio = null;
   } catch {
     /* ignore */
   }
+  activeAudioDone?.();
+  activeAudioDone = null;
+  activeAudio = null;
+  if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
+  activeAudioUrl = null;
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     try {
       window.speechSynthesis.cancel();
@@ -169,15 +180,22 @@ export function stopNeuralSpeech() {
   }
 }
 
+/**
+ * Wait for actual neural audio playback to complete before reporting success.
+ * Returning true when an HTTP response is received (or audio.play rejects)
+ * makes hands-free calls listen over the companion's voice.
+ */
 async function tryLocalTtsEndpoint(
   endpoint: string,
   model: string,
   text: string,
   voiceId: string,
+  generation: number,
 ): Promise<boolean> {
+  const ctrl = new AbortController();
+  activeSpeechRequest = ctrl;
+  const timeout = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 950);
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -189,19 +207,37 @@ async function tryLocalTtsEndpoint(
       }),
       signal: ctrl.signal,
     });
-    clearTimeout(t);
-    if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      activeAudio = audio;
-      await audio.play().catch(() => undefined);
-      return true;
-    }
+    if (!res.ok || speechGeneration !== generation) return false;
+    const blob = await res.blob();
+    if (blob.size < 512 || speechGeneration !== generation) return false;
+
+    const objectUrl = URL.createObjectURL(blob);
+    const audio = new Audio(objectUrl);
+    activeAudio = audio;
+    activeAudioUrl = objectUrl;
+    return await new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (played: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (activeAudioDone === cancelPlayback) activeAudioDone = null;
+        if (activeAudio === audio) activeAudio = null;
+        if (activeAudioUrl === objectUrl) activeAudioUrl = null;
+        URL.revokeObjectURL(objectUrl);
+        resolve(played && speechGeneration === generation);
+      };
+      const cancelPlayback = () => finish(false);
+      activeAudioDone = cancelPlayback;
+      audio.onended = () => finish(true);
+      audio.onerror = () => finish(false);
+      void audio.play().catch(() => finish(false));
+    });
   } catch {
-    /* Fall back smoothly */
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    if (activeSpeechRequest === ctrl) activeSpeechRequest = null;
   }
-  return false;
 }
 
 export async function speakWithNeuralVoice(
@@ -211,6 +247,7 @@ export async function speakWithNeuralVoice(
   const clean = cleanSpeechText(text).slice(0, 420);
   if (!clean || typeof window === "undefined") return { engine: "none", label: "Muted" };
   stopNeuralSpeech();
+  const generation = speechGeneration;
 
   const selected = opts.engineOverride || getPreferredVoiceEngine();
   const femaleKokoroVoice = normalizeFemaleKokoroVoice(opts.voiceId);
@@ -222,6 +259,7 @@ export async function speakWithNeuralVoice(
       "fish-drama-3",
       clean,
       femaleKokoroVoice,
+      generation,
     );
     if (okFish) return { engine: "fish-drama-3", label: "Fish Drama 3 Local" };
   }
@@ -233,17 +271,33 @@ export async function speakWithNeuralVoice(
       selected === "reverb-tts-webgpu" ? "reverb" : selected === "kitten-tts-2-pico" ? "kitten-2" : "kokoro",
       clean,
       femaleKokoroVoice,
+      generation,
     );
     if (okKokoro) {
       if (selected === "reverb-tts-webgpu") return { engine: "reverb-webgpu", label: "Reverb-TTS WebGPU" };
       if (selected === "kitten-tts-2-pico") return { engine: "kitten-pico", label: "Kitten-TTS-2 Pico" };
       return { engine: "kokoro", label: "Kokoro-82M Neural" };
     }
+    // Many Kokoro servers do not provide the optional Reverb/Kitten model IDs.
+    // Prefer an actual Kokoro neural response over an immediate robotic browser fallback.
+    if (selected === "reverb-tts-webgpu" || selected === "kitten-tts-2-pico") {
+      if (speechGeneration !== generation) return { engine: "none", label: "Stopped" };
+      const kokoroFallback = await tryLocalTtsEndpoint(
+        "http://127.0.0.1:8880/v1/audio/speech",
+        "kokoro",
+        clean,
+        femaleKokoroVoice,
+        generation,
+      );
+      if (kokoroFallback) return { engine: "kokoro", label: "Kokoro-82M (neural fallback)" };
+    }
   }
 
   // 3. Guaranteed Web Speech API fallback (strictly female voice, awaits onvoiceschanged)
+  if (speechGeneration !== generation) return { engine: "none", label: "Stopped" };
   if ("speechSynthesis" in window) {
     const voices = await loadWebSpeechVoices();
+    if (speechGeneration !== generation) return { engine: "none", label: "Stopped" };
     return new Promise((resolve) => {
       try {
         const u = new SpeechSynthesisUtterance(clean);
@@ -253,16 +307,8 @@ export async function speakWithNeuralVoice(
         u.rate = (opts.rate ?? (opts.whispery ? Math.max(0.76, preset.rate - 0.1) : preset.rate)) * speedBias;
         const fem = selectFemaleEnglishVoice(voices);
         if (fem) u.voice = fem;
-        const fallbackLabel =
-          selected === "reverb-tts-webgpu"
-            ? "Reverb Fallback HD"
-            : selected === "kitten-tts-2-pico"
-              ? "Kitten-2 Fallback HD"
-              : selected === "fish-drama-3-local"
-                ? "Drama Fallback HD"
-                : "Kokoro / WebSpeech HD";
-        u.onend = () => resolve({ engine: "webspeech", label: fallbackLabel });
-        u.onerror = () => resolve({ engine: "webspeech", label: fallbackLabel });
+        u.onend = () => resolve({ engine: "webspeech", label: "Browser voice (fallback)" });
+        u.onerror = () => resolve({ engine: "none", label: "Browser voice unavailable" });
         window.speechSynthesis.speak(u);
       } catch {
         resolve({ engine: "none", label: "Unavailable" });

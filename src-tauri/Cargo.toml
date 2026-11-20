@@ -1,22 +1,27 @@
 [package]
 name = "velvetmotion-desktop"
 version = "1.0.4"
-description = "VelvetMotion AI Hybrid Hyper-Neon Companion Desktop App"
+description = "VelvetMotion AI Private Atelier Desktop"
 authors = ["VelvetMotion"]
 edition = "2021"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+default = []
+# Only release builds that embed a trusted public key may enable the updater.
+signed-updater = ["dep:tauri-plugin-updater"]
+
 [dependencies]
 tauri = { version = "2", features = ["tray-icon"] }
-tauri-plugin-updater = "2"
 tauri-plugin-http = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
+tauri-plugin-updater = { version = "2.10", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0.33"

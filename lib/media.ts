@@ -152,8 +152,13 @@ export async function resolveBestMediaUrl(
   }
 
   const prompt = buildPrompt(character, mood, extra);
-  const seed = randomGenerationSeed();
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
+  // A shared face seed keeps companion identity more stable across generations.
+  const seed = settings?.aggressiveFaceLock
+    ? Math.max(1, faceSeed(character))
+    : randomGenerationSeed();
+  // Never route mature requests through the general-purpose, SFW-only worker.
+  const requiresAdultEngine = NSFW_MOODS.has(mood) || /\b(nude|nudity|explicit|nsfw|sexual)\b/i.test(extra);
   const routerSettings = typeof window !== "undefined" ? loadRouterSettings() : { provider: "auto" as const };
   const errors: string[] = [];
 
@@ -167,7 +172,7 @@ export async function resolveBestMediaUrl(
     // Priority 1A: Local ComfyUI Bridge (:8188 SFW creative outfit/scene portraits) when online
     const comfyBase = (settings?.localImageBase || "http://127.0.0.1:8188").trim();
     const comfyProbe = await probeComfyUi(comfyBase);
-    if (comfyProbe.online && !NSFW_MOODS.has(mood)) {
+    if (comfyProbe.online && !requiresAdultEngine) {
       try {
         const blobUrl = await generateComfySfwPortrait({
           comfyUrl: comfyBase,
@@ -216,19 +221,21 @@ export async function resolveBestMediaUrl(
     }
 
     // Priority 2: Cloudflare Image Worker (Flux-1-Schnell GET /generate?prompt=...&steps=8&seed=...)
-    const worker = await fetchWorkerImage(prompt, { steps: 8, seed });
-    if (worker.ok) {
-      reportImg("cf-flux");
-      return { url: worker.url, note: "Cloudflare Flux-1-Schnell", seed, engine: "cf-flux" };
+    if (!requiresAdultEngine) {
+      const worker = await fetchWorkerImage(prompt, { steps: 8, seed });
+      if (worker.ok) {
+        reportImg("cf-flux");
+        return { url: worker.url, note: "Cloudflare Flux-1-Schnell", seed, engine: "cf-flux" };
+      }
+      errors.push(`Flux Worker (${worker.reason}): ${worker.detail}`);
     }
-    errors.push(`Flux Worker (${worker.reason}): ${worker.detail}`);
 
     // Priority 3: AI Horde Fallback (strictly capped <= 512x768, 20 steps, n=1 for 0-kudos compatibility)
     try {
       const horde = await generateHordeImage({
         prompt,
         seed,
-        nsfw: NSFW_MOODS.has(mood),
+        nsfw: requiresAdultEngine,
         width: 512,
         height: 768,
         steps: 20,
@@ -246,7 +253,7 @@ export async function resolveBestMediaUrl(
       errors.push(e instanceof Error ? e.message : "AI Horde failed");
     }
 
-    const reason = errors.join(" · ") || "All live generators offline or rate-limited";
+    const reason = errors.join(" · ") || "All compatible image generators are offline, unsupported, or rate-limited";
     return {
       url: staticPortraitUrl(character.id || "chloe"),
       note: "Live generation unavailable",

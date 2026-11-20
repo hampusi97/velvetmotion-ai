@@ -8,6 +8,7 @@
  *  5. Context-Aware In-Character Fallback
  */
 import { assertCompliance } from "./complianceFilter";
+import { localComputeBudget } from "./localComputePreferences";
 import { reportGenerationSpeed } from "./localEngineBridge";
 import {
   buildDynamicSystemPrompt,
@@ -163,7 +164,7 @@ async function callHordeText(persona: CompanionPersona, history: RouterMessage[]
     .join("\n");
   const prompt = `${systemPrompt(persona)}\n\n${transcript}\n${persona.name}:`;
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 9000);
+  const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
     const res = await fetch("https://aihorde.net/api/v2/generate/text/async", {
       method: "POST",
@@ -185,8 +186,8 @@ async function callHordeText(persona: CompanionPersona, history: RouterMessage[]
     if (!res.ok) return "";
     const { id } = (await res.json()) as { id?: string };
     if (!id) return "";
-    for (let i = 0; i < 6; i++) {
-      await new Promise((r) => setTimeout(r, 1200));
+    for (let i = 0; i < 18; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
       const s = await fetch(`https://aihorde.net/api/v2/generate/text/status/${id}`);
       if (!s.ok) continue;
       const st = (await s.json()) as {
@@ -244,6 +245,11 @@ async function tryOpenAIChatTiers(
   companionName: string,
 ): Promise<{ text: string; providerUsed: string } | null> {
   const settings = loadRouterSettings();
+  // Respect explicit engine choice. Never silently send local-only chats to cloud.
+  const allowLocal = settings.provider === "auto" || settings.provider === "local";
+  const allowCustom = settings.provider === "auto" || settings.provider === "custom";
+  const allowOpenRouter = settings.provider === "auto" || settings.provider === "openrouter";
+  const localBudget = localComputeBudget();
   const presetId: SamplerPresetId = settings.samplerPreset || "roleplay-balanced";
   const enableAntiSlop = settings.enableAntiSlop !== false;
   const measure = (text: string, providerUsed: string, startedMs: number) => {
@@ -254,37 +260,37 @@ async function tryOpenAIChatTiers(
   };
 
   // Tier 1: Local KoboldCpp (127.0.0.1:5001)
-  if (typeof window !== "undefined") {
+  if (allowLocal && typeof window !== "undefined") {
     const t0 = Date.now();
     const koboldRaw = await fetchOpenAICompat("http://127.0.0.1:5001/v1/chat/completions", chatMessages, {
       model: "koboldcpp",
-      timeoutMs: 2500,
-      samplerPayload: buildSamplerPayload("koboldcpp", presetId, enableAntiSlop),
+      timeoutMs: localBudget.timeoutMs,
+      samplerPayload: { ...buildSamplerPayload("koboldcpp", presetId, enableAntiSlop), max_tokens: localBudget.maxTokens },
     });
     const koboldClean = sanitizeCompanionReply(koboldRaw, companionName);
     if (koboldClean) return measure(koboldClean, "koboldcpp-local", t0);
   }
 
   // Tier 2: Local Ollama (127.0.0.1:11434 or configured URL)
-  if (typeof window !== "undefined") {
+  if (allowLocal && typeof window !== "undefined") {
     const t0 = Date.now();
     const ollamaBase = (settings.ollamaUrl || "http://127.0.0.1:11434").replace(/\/+$/, "");
     const ollamaRaw = await fetchOpenAICompat(`${ollamaBase}/v1/chat/completions`, chatMessages, {
       model: settings.ollamaModel || "llama3.1:8b",
-      timeoutMs: 3200,
-      samplerPayload: buildSamplerPayload("ollama", presetId, enableAntiSlop),
+      timeoutMs: localBudget.timeoutMs,
+      samplerPayload: { ...buildSamplerPayload("ollama", presetId, enableAntiSlop), max_tokens: localBudget.maxTokens },
     });
     const ollamaClean = sanitizeCompanionReply(ollamaRaw, companionName);
     if (ollamaClean) return measure(ollamaClean, "ollama-local", t0);
   }
 
   // Tier 2.5: VelvetMotion Home Engine (:8787 or Cloudflared Quick Tunnel URL)
-  if (typeof window !== "undefined") {
+  if (allowLocal && typeof window !== "undefined") {
     const t0 = Date.now();
     const homeBase = (settings.homeEngineUrl || "http://127.0.0.1:8787").replace(/\/+$/, "");
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const timer = setTimeout(() => ctrl.abort(), localBudget.timeoutMs);
       const res = await fetch(`${homeBase}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -294,6 +300,7 @@ async function tryOpenAIChatTiers(
           samplerPreset: presetId,
           enableAntiSlop,
           ...buildSamplerPayload("koboldcpp", presetId, enableAntiSlop),
+          max_tokens: localBudget.maxTokens,
         }),
         signal: ctrl.signal,
       });
@@ -309,24 +316,24 @@ async function tryOpenAIChatTiers(
   }
 
   // Tier 3: User BYOK Custom endpoint or OpenRouter API Key
-  if (settings.customBaseUrl) {
+  if (allowCustom && settings.customBaseUrl) {
     const t0 = Date.now();
     const base = settings.customBaseUrl.replace(/\/+$/, "");
     const customRaw = await fetchOpenAICompat(`${base}/chat/completions`, chatMessages, {
       apiKey: settings.customApiKey,
       model: settings.customModel || "local",
-      timeoutMs: 8000,
+      timeoutMs: 30000,
       samplerPayload: buildSamplerPayload("custom", presetId, enableAntiSlop),
     });
     const customClean = sanitizeCompanionReply(customRaw, companionName);
     if (customClean) return measure(customClean, "byok-custom", t0);
   }
 
-  if (settings.openRouterApiKey) {
+  if (allowOpenRouter && settings.openRouterApiKey) {
     const orRaw = await fetchOpenAICompat("https://openrouter.ai/api/v1/chat/completions", chatMessages, {
       apiKey: settings.openRouterApiKey,
       model: settings.customModel || "meta-llama/llama-3.1-8b-instruct:free",
-      timeoutMs: 9000,
+      timeoutMs: 30000,
       headers: {
         "HTTP-Referer": "https://velvetmotion-ai.hampusi97.workers.dev",
         "X-Title": "VelvetMotion AI",
@@ -377,14 +384,17 @@ export async function generateCompanionReply(
   if (llmRes) return llmRes;
 
   // Tier 4: Free Cloud Route (AI Horde text)
-  const hordeRaw = await callHordeText(persona, history);
-  const hordeClean = sanitizeCompanionReply(hordeRaw, persona.name);
-  if (hordeClean) return { text: hordeClean, providerUsed: "ai-horde" };
+  const provider = loadRouterSettings().provider;
+  if (provider === "auto" || provider === "ai-horde") {
+    const hordeRaw = await callHordeText(persona, history);
+    const hordeClean = sanitizeCompanionReply(hordeRaw, persona.name);
+    if (hordeClean) return { text: hordeClean, providerUsed: "ai-horde" };
+  }
 
-  // Tier 5: Context-Aware In-Character Fallback
+  // Never disguise a connection failure as a generated conversational reply.
   return {
-    text: buildContextAwareFallback(history, persona),
-    providerUsed: "context-fallback",
+    text: "The AI model isn't responding right now. Check your selected provider in Settings and retry. Your message wasn't answered by an AI model.",
+    providerUsed: "provider-unavailable",
   };
 }
 
@@ -412,9 +422,8 @@ export async function continueCompanionScene(
   const llmRes = await tryOpenAIChatTiers(steeringMessages, persona.name);
   if (llmRes) return llmRes;
 
-  const first = persona.name.split(/\s+/)[0] || persona.name;
   return {
-    text: `*${first} lets that line linger in the quiet between you, leaning in a fraction closer.* “Your turn—keep going with me.”`,
-    providerUsed: "continue-fallback",
+    text: "The AI model isn't responding. Check your provider settings and retry continuing the scene.",
+    providerUsed: "provider-unavailable",
   };
 }

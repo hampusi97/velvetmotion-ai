@@ -50,6 +50,7 @@ import { SettingsAndBackupDrawer } from "@/components/SettingsAndBackupDrawer";
 import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
+import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
 import { ProactiveToast } from "@/components/ProactiveToast";
 import { Penthouse3DSuite } from "@/components/Penthouse3DSuite";
 import { Joi3DStage } from "@/components/Joi3DStage";
@@ -190,12 +191,8 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("autostart") === "1") {
-        localStorage.setItem("velvet-age", "true");
-        setAdult(true);
-      } else {
-        setAdult(localStorage.getItem("velvet-age") === "true");
-      }
+      // Query parameters must never silently bypass the adult confirmation gate.
+      setAdult(localStorage.getItem("velvet-age") === "true");
       const qView = params.get("view") as ShellRouteView | null;
       if (qView && pathname === "/") setView(qView);
       const qId = params.get("companion") || params.get("id");
@@ -347,7 +344,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               </div>
               <h1 className="text-3xl font-black text-white neon-text-glow">VelvetMotion AI</h1>
               <p className="text-sm text-[#a6a6c4] leading-relaxed">
-                Hyper-Neon uncensored companion studio. Fictional consenting adults 18+ only. Zero server logging.
+                A private-first AI companion studio for adults. Local and selected cloud AI options; review our privacy policy before sharing chats or images.
               </p>
               <div className="flex gap-4 justify-center text-xs text-[#a6a6c4]">
                 <Link href="/terms/" className="underline hover:text-[#00f5ff]">Terms</Link>
@@ -574,6 +571,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <MobileBottomNav active={view} onNavigate={navigate} />
       <InstallPrompt />
       <LiveUpdateBanner />
+      <DesktopAutoUpdater />
       <SettingsAndBackupDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>

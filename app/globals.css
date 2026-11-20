@@ -3,17 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --vm-bg: #111114;
-  --vm-surface: rgba(24, 24, 28, 0.92);
-  --vm-surface-elevated: rgba(31, 31, 37, 0.96);
-  --vm-pink: #ff5678;
-  --vm-magenta: #f43f72;
+  /* Bundled fontsource fonts: no external font fetch during builds. */
+  --font-sans: "Outfit Variable";
+  --font-display: "Fraunces Variable";
+  --vm-bg: #0e0b12;
+  --vm-surface: rgba(27, 20, 31, 0.94);
+  --vm-surface-elevated: rgba(35, 25, 39, 0.96);
+  --vm-pink: #d7809d;
+  --vm-magenta: #bd638b;
   --vm-cyan: #22d3ee;
   --vm-violet: #a855f7;
   --vm-emerald: #10b981;
   --vm-text: #ffffff;
-  --vm-text-muted: #9ca3af;
-  --vm-glow-pink: 0 8px 24px rgba(255, 86, 120, 0.34);
+  --vm-text-muted: #b5a6b4;
+  --vm-glow-pink: 0 8px 24px rgba(190, 94, 139, 0.20);
   --vm-glow-cyan: 0 4px 16px rgba(34, 211, 238, 0.25);
   --vm-glow-violet: 0 6px 20px rgba(168, 85, 247, 0.28);
 
@@ -41,8 +44,8 @@ html, body {
   pointer-events: none;
   z-index: 0;
   background:
-    radial-gradient(640px circle at 12% 8%, rgba(255, 86, 120, 0.08), transparent 64%),
-    radial-gradient(560px circle at 88% 85%, rgba(168, 85, 247, 0.06), transparent 64%);
+    radial-gradient(680px circle at 12% 8%, rgba(190, 94, 139, 0.11), transparent 64%),
+    radial-gradient(570px circle at 88% 85%, rgba(157, 111, 191, 0.065), transparent 64%);
 }
 
 [data-neon="subtle"] .vm-ambient-mesh {
@@ -61,8 +64,8 @@ html, body {
 
 .neon-glass:hover,
 .glass-card:hover {
-  border-color: rgba(255, 86, 120, 0.55);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 18px rgba(255, 86, 120, 0.14);
+  border-color: rgba(224, 166, 191, 0.42);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34), 0 0 20px rgba(212, 121, 158, 0.08);
 }
 
 [data-neon="subtle"] .neon-glass:hover,
@@ -76,27 +79,27 @@ html, body {
   position: relative;
   border-radius: 1.25rem;
   padding: 1px;
-  background: linear-gradient(135deg, rgba(255, 86, 120, 0.38), rgba(255, 255, 255, 0.08), rgba(168, 85, 247, 0.24));
+  background: linear-gradient(135deg, rgba(231, 185, 187, 0.34), rgba(255, 255, 255, 0.07), rgba(177, 135, 194, 0.19));
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
 .neon-border-sweep > .neon-sweep-inner {
   border-radius: calc(1.25rem - 1px);
-  background: #17171c;
+  background: #19121e;
   height: 100%;
   width: 100%;
 }
 
-/* Primary Coral-Pink CTA (candy.ai signature rose gradient) */
+/* VelvetMotion original rose velvet CTA design token */
 .neon-btn-primary,
 .btn-candy,
 .candy-cta {
-  background: linear-gradient(135deg, #ff5d80 0%, #f43b6b 100%);
+  background: linear-gradient(135deg, #d3829e 0%, #a65b85 100%);
   color: #ffffff;
   font-weight: 700;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    0 6px 20px rgba(255, 86, 120, 0.36);
+    0 6px 22px rgba(156, 66, 108, 0.22);
   transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
 }
 
@@ -106,7 +109,7 @@ html, body {
   filter: brightness(1.06);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 8px 26px rgba(255, 86, 120, 0.48);
+    0 8px 27px rgba(166, 78, 121, 0.30);
 }
 
 .neon-btn-primary:active,
@@ -118,7 +121,7 @@ html, body {
 /* Subtle Warm Editorial Heading Accent */
 .neon-text-glow,
 .neon-text {
-  text-shadow: 0 2px 14px rgba(255, 86, 120, 0.25);
+  text-shadow: 0 2px 15px rgba(214, 149, 176, 0.18);
 }
 
 [data-neon="subtle"] .neon-text-glow,
@@ -136,8 +139,8 @@ html, body {
 .girl-card:hover,
 .candy-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(255, 86, 120, 0.65);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 86, 120, 0.18);
+  border-color: rgba(229, 166, 190, 0.46);
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.44), 0 0 19px rgba(198, 119, 155, 0.12);
 }
 
 .girl-card:active {
@@ -162,10 +165,10 @@ html, body {
 }
 
 .chip-active {
-  background: #2a1820;
+  background: #33202f;
   color: #ffffff;
-  border-color: #ff5678 !important;
-  box-shadow: 0 0 0 1px rgba(255, 86, 120, 0.35);
+  border-color: #d998b3 !important;
+  box-shadow: 0 0 0 1px rgba(217, 152, 179, 0.25);
 }
 
 /* Scrollbar helpers */
@@ -186,4 +189,60 @@ html, body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* VelvetMotion Private Atelier — original editorial motion system. */
+:root {
+  --vm-champagne: #e8c6ac;
+  --vm-atelier-rose: #d88da3;
+  --vm-atelier-ink: #0d0a11;
+  --vm-atelier-lilac: #a78bfa;
+}
+
+@keyframes vm-atelier-kenburns {
+  from { transform: scale(1.03) translate3d(-1.2%, 0, 0); }
+  to { transform: scale(1.14) translate3d(1.2%, -1.2%, 0); }
+}
+
+.vm-portrait-card {
+  isolation: isolate;
+  --vm-pointer-x: 50%;
+  --vm-pointer-y: 50%;
+}
+.vm-portrait-photo {
+  transform: scale(1.03);
+  will-change: transform;
+}
+.vm-portrait-photo[data-playing="true"] {
+  animation: vm-atelier-kenburns 14s ease-in-out infinite alternate;
+  animation-delay: var(--vm-motion-delay, 0s);
+}
+.vm-portrait-card:hover .vm-portrait-photo {
+  animation-play-state: paused;
+  transform: scale(1.075);
+  transition: transform 650ms cubic-bezier(.2, .85, .25, 1);
+}
+.vm-portrait-light {
+  background: radial-gradient(circle 260px at var(--vm-pointer-x) var(--vm-pointer-y), rgba(245, 202, 204, .14), transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-portrait-photo,
+  .vm-portrait-photo[data-playing="true"],
+  .vm-portrait-card:hover .vm-portrait-photo {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto;
+  }
+  .vm-portrait-light { display: none; }
+}
+
+/* Premium editorial hover motion for the desktop companion collage. */
+.vm-download-motion {
+  animation: vm-atelier-kenburns 21s ease-in-out infinite alternate;
+  transform-origin: center center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vm-download-motion { animation: none !important; transform: none !important; }
 }

@@ -1,0 +1,53 @@
+name: Desktop Native Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+      - "public/downloads/velvetmotion_home_engine.py"
+      - "components/DownloadDesktopView.tsx"
+      - "lib/desktopRelease*"
+      - ".github/workflows/desktop-validate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-desktop:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev pkg-config
+      - name: Install Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Validate installer link selection
+        run: npx tsx --test lib/desktopRelease.test.ts
+      - name: Validate Home Engine Python syntax
+        run: python3 -m py_compile public/downloads/velvetmotion_home_engine.py
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      - name: Build native desktop frontend
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: "1"
+      - name: Type-check native desktop app
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Type-check signed updater build
+        run: cargo check --manifest-path src-tauri/Cargo.toml --features signed-updater

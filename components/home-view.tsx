@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ChevronRight, Lock, Search, Sparkles } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Heart, Lock, Pause, Play, Search, Sparkles } from "lucide-react";
 import { riseContainer, riseItem } from "@/lib/motion";
 import { sections, type SectionId } from "@/lib/sections";
 import { FeatureCard } from "./feature-card";
@@ -11,10 +11,11 @@ import { DailyFeed } from "./DailyFeed";
 import { FeaturedPair } from "./FeaturedPair";
 import { ProactiveInbox } from "./ProactiveInbox";
 import { CandyGirlCard } from "./CandyGirlCard";
+import { ExperienceRail } from "./ExperienceRail";
+import { CinematicPortraitShowcase } from "./CinematicPortraitShowcase";
 import { SafeImage } from "./SafeImage";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { claimDailyDropReward, getDailyDropClaimState } from "@/lib/progression";
-import { getEdgeStreak } from "@/lib/streaks";
 import { CHARACTERS, characterCategories, filterCharacters } from "@/lib/characters";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { getTimeMood } from "@/lib/timeMood";
@@ -62,20 +63,27 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
   onOpenCustomCharacter?: (character: Character) => void;
 }) {
   const reduce = useReducedMotion();
-  const { coins, refresh } = useCoinsStore();
+  const { refresh } = useCoinsStore();
   const [dailyDrop, setDailyDrop] = useState<DailyDropEntry | null>(null);
   const [spotlight, setSpotlight] = useState<CommunitySpotlightItem[]>([]);
   const [timeMood] = useState(() => getTimeMood());
   const [dropState, setDropState] = useState({ streak: 0, claimedToday: false });
   const [claimMsg, setClaimMsg] = useState("");
-  const [streak, setStreak] = useState(0);
   const [homeCategory, setHomeCategory] = useState("All");
   const [privateOnly, setPrivateOnly] = useState(false);
   const [homeQuery, setHomeQuery] = useState("");
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
+  const [showAllCompanions, setShowAllCompanions] = useState(false);
+  const [rosterSort, setRosterSort] = useState<"featured" | "name">("featured");
   const [heroIdx, setHeroIdx] = useState(0);
+  const [heroPaused, setHeroPaused] = useState(false);
 
   useEffect(() => {
-    setStreak(getEdgeStreak());
+    try {
+      const saved = JSON.parse(localStorage.getItem("vm:favorite-companions") || "[]") as unknown;
+      setFavoriteIds(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : []);
+    } catch { setFavoriteIds([]); }
     setDropState(getDailyDropClaimState());
     void fetch("/data/daily-drops.json")
       .then((r) => (r.ok ? r.json() : []))
@@ -95,7 +103,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
   }, []);
 
   useEffect(() => {
-    const t = setInterval(() => setHeroIdx((i) => (i + 1) % Math.min(CHARACTERS.length, 6)), 6000);
+    const t = reduce || heroPaused ? null : setInterval(() => setHeroIdx((i) => (i + 1) % Math.min(CHARACTERS.length, 6)), 8500);
     const onStyleTab = (e: Event) => {
       const tab = (e as CustomEvent<"girls" | "anime" | "all">).detail;
       if (tab === "anime") {
@@ -108,10 +116,10 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
     };
     window.addEventListener("vm:style-tab", onStyleTab);
     return () => {
-      clearInterval(t);
+      if (t) clearInterval(t);
       window.removeEventListener("vm:style-tab", onStyleTab);
     };
-  }, []);
+  }, [reduce, heroPaused]);
 
   const claimDrop = () => {
     const res = claimDailyDropReward(dailyDrop?.bonusCoins || 25);
@@ -123,13 +131,25 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
   };
 
   const categories = useMemo(() => ["All", ...characterCategories()], []);
-  const featured = useMemo(() => {
-    const list = filterCharacters({ query: homeQuery, category: homeCategory });
+  const filteredRoster = useMemo(() => {
+    let list = filterCharacters({ query: homeQuery, category: homeCategory });
     if (privateOnly) {
-      return list.filter((c) => c.intimacy >= 50 || /suite|private|boudoir|after/i.test(c.kink + c.tagline)).slice(0, 22);
+      list = list.filter((c) => c.intimacy >= 50 || /suite|private|boudoir|after/i.test(c.kink + c.tagline));
     }
-    return list.slice(0, 22);
-  }, [homeQuery, homeCategory, privateOnly]);
+    if (favoriteOnly) list = list.filter((c) => favoriteIds.includes(c.id));
+    if (rosterSort === "name") {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return list;
+  }, [homeQuery, homeCategory, privateOnly, favoriteOnly, favoriteIds, rosterSort]);
+  const featured = showAllCompanions ? filteredRoster : filteredRoster.slice(0, 18);
+  const toggleFavorite = (id: string) => {
+    setFavoriteIds((old) => {
+      const next = old.includes(id) ? old.filter((x) => x !== id) : [...old, id];
+      try { localStorage.setItem("vm:favorite-companions", JSON.stringify(next)); } catch { /* private mode */ }
+      return next;
+    });
+  };
   const hero = CHARACTERS[heroIdx % CHARACTERS.length];
   const heroImage = heroIdx % 6 === 0 ? "/promos/hero-banner.webp" : staticPortraitUrl(hero.id);
 
@@ -138,7 +158,7 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
     featured.forEach((c, idx) => {
       if (idx === 2) cells.push({ kind: "shorts" });
       if (idx === 8) cells.push({ kind: "private" });
-      cells.push({ kind: "char", character: c, isNew: idx < 5 });
+      cells.push({ kind: "char", character: c, isNew: (c.tags || []).some((t) => t.toUpperCase() === "NEW") });
     });
     if (featured.length < 3) cells.push({ kind: "shorts" });
     if (featured.length < 9) cells.push({ kind: "private" });
@@ -152,74 +172,109 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
 
   return (
     <motion.div data-motion variants={riseContainer} initial={reduce ? false : "hidden"} animate="show" className="space-y-6">
-      {/* candy.ai-inspired Obsidian Editorial Hero Carousel */}
-      <motion.section variants={riseItem} className="rounded-2xl overflow-hidden border border-white/[0.08] bg-[#16161b] shadow-2xl">
-        <div className="relative aspect-[16/7] sm:aspect-[16/5] min-h-[185px]">
+      {/* Original VelvetMotion Private Atelier editorial hero. Motion is pausable. */}
+      <motion.section variants={riseItem}
+        className="relative isolate overflow-hidden rounded-[31px] border border-[#e3b0bf]/20 bg-[#170e1c] shadow-[0_30px_85px_rgba(0,0,0,.35)]">
+        <div className="relative min-h-[365px] sm:min-h-[430px] lg:min-h-[505px]">
           <SafeImage
             src={heroImage}
-            alt={hero.name}
-            className="absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-500"
+            alt={hero.name + " — fictional adult companion"}
+            className="absolute inset-0 h-full w-full object-cover object-[center_20%] transition-opacity duration-500 sm:object-[center_23%]"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#111114] via-[#111114]/75 to-transparent" />
-          <div className="relative z-10 flex h-full flex-col justify-center p-5 sm:px-10 max-w-xl">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#ff5678] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white">
-                ✦ Featured
-              </span>
-              <span className="text-[11px] font-semibold text-zinc-300">{timeMood.badge}</span>
-            </div>
-            <h1 className="font-display text-3xl sm:text-5xl font-black text-white leading-none tracking-tight">
-              {heroIdx % 6 === 0 ? "Your Free AI Companion Studio" : hero.name}
-            </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-zinc-300 line-clamp-2">
-              {heroIdx % 6 === 0
-                ? "Zero daily caps · Editable Memory Vault · Voice calls & downloadable Local GPU Ultra desktop app."
-                : hero.tagline}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              <button
-                type="button"
-                onClick={() => onOpenGirl?.(hero.id)}
-                className="rounded-full neon-btn-primary px-6 py-2 text-xs sm:text-sm font-bold"
-              >
-                Chat with {hero.name.split(" ")[0]}
-              </button>
-              <Link
-                href="/create/"
-                className="rounded-full border border-white/15 bg-black/50 backdrop-blur-md px-5 py-2 text-xs sm:text-sm font-semibold text-white hover:border-[#ff5678]/60"
-              >
-                Create Character
-              </Link>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#130d18]/95 via-[#180f1e]/85 to-[#170d18]/20 sm:via-[#180f1e]/70" aria-hidden="true" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0b0912]/70 via-transparent to-[#201324]/30" aria-hidden="true" />
+          <div className="pointer-events-none absolute -left-28 top-1/3 h-72 w-72 rounded-full bg-[#b54a76]/10 blur-[95px]" aria-hidden="true" />
+
+          <div className="relative z-10 flex min-h-[365px] flex-col justify-center px-6 py-12 sm:min-h-[430px] sm:px-12 lg:min-h-[505px] lg:px-16">
+            <div className="max-w-[570px]">
+              <p className="inline-flex items-center gap-2 rounded-full border border-[#edd0ca]/25 bg-[#241522]/50 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.2em] text-[#f6d8d1] backdrop-blur-lg">
+                <Sparkles className="h-3.5 w-3.5" /> VelvetMotion · Private Atelier
+              </p>
+              <h1 className="mt-5 font-display text-[35px] font-semibold leading-[1.07] tracking-[-.03em] text-[#fff7f3] sm:text-5xl lg:text-[62px]">
+                {heroIdx % 6 === 0 ? (
+                  <>Every story
+                    <span className="block bg-gradient-to-r from-[#f8d3b8] via-[#f1a6c0] to-[#ceb5ec] bg-clip-text text-transparent">
+                      begins with a spark.
+                    </span>
+                  </>
+                ) : (
+                  <>Meet <span className="bg-gradient-to-r from-[#f4cfbe] to-[#edaac8] bg-clip-text text-transparent">{hero.name}</span>.</>
+                )}
+              </h1>
+              <p className="mt-4 max-w-[480px] text-sm leading-7 text-[#e4d5dc] sm:text-base">
+                {heroIdx % 6 === 0
+                  ? "Discover original fictional companions, build your own characters, create memories, and explore image, voice, and video tools through compatible AI engines."
+                  : hero.tagline}
+              </p>
+              <p className="mt-3 text-[11px] font-medium uppercase tracking-[.17em] text-[#dbabbc]">
+                Fictional adults · Personalized stories · Local AI optional
+              </p>
+              <div className="mt-7 flex flex-wrap gap-2.5">
+                <button type="button" onClick={() => onOpenGirl?.(hero.id)}
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#d37c96] to-[#a5537e] px-6 py-3 text-xs font-bold text-white shadow-[0_8px_30px_rgba(152,44,95,.27)] transition hover:brightness-110 sm:text-sm">
+                  Meet {hero.name.split(" ")[0]} <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <Link href="/create/"
+                  className="inline-flex items-center gap-2 rounded-full border border-[#edd0d3]/30 bg-black/25 px-5 py-3 text-xs font-semibold text-white backdrop-blur-lg transition hover:border-[#eac1d1]/65 sm:text-sm">
+                  Design a companion
+                </Link>
+                <Link href="/studio/"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[.055] px-5 py-3 text-xs font-medium text-[#f1d3dd] backdrop-blur-lg transition hover:border-white/35 sm:text-sm">
+                  Open Studio
+                </Link>
+              </div>
             </div>
           </div>
 
-          {/* Centered Hero Pagination Dots matching candy.ai */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={`Slide ${i + 1}`}
-                onClick={() => setHeroIdx(i)}
-                className={`h-1.5 rounded-full transition-all ${i === heroIdx % 6 ? "w-5 bg-[#ff5678]" : "w-1.5 bg-white/40 hover:bg-white/70"}`}
-              />
-            ))}
+          <div className="absolute bottom-4 right-4 z-20 flex items-center gap-3 rounded-full border border-white/15 bg-[#180f1d]/75 px-3 py-2 backdrop-blur-xl sm:bottom-6 sm:right-7">
+            <div className="flex gap-1.5" aria-label="Featured companion selection">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <button key={i} type="button" aria-label={`Show featured slide ${i + 1}`}
+                  aria-pressed={heroIdx % 6 === i} onClick={() => setHeroIdx(i)}
+                  className={`h-2 rounded-full transition-all ${heroIdx % 6 === i ? "w-6 bg-[#ecc4ca]" : "w-2 bg-white/35 hover:bg-white/70"}`}
+                />
+              ))}
+            </div>
+            <span className="h-4 w-px bg-white/20" />
+            <button type="button" aria-label={heroPaused ? "Resume hero rotation" : "Pause hero rotation"}
+              aria-pressed={heroPaused} onClick={() => setHeroPaused((v) => !v)}
+              className="text-[#f6d4dc] transition hover:text-white">
+              {heroPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+            </button>
           </div>
         </div>
       </motion.section>
 
-      {/* Explore Featured Characters > (candy.ai Primary Grid + Interleaved SHORTS & Private Content Cards) */}
+      <motion.section variants={riseItem}>
+        <ExperienceRail />
+      </motion.section>
+
+      {onOpenGirl && (
+        <motion.section variants={riseItem}>
+          <CinematicPortraitShowcase
+            companions={featured.slice(0, 3).map((c) => ({
+              id: c.id,
+              name: c.name,
+              tagline: c.tagline,
+              category: c.category,
+            }))}
+            onOpenCompanion={(id) => onOpenGirl(id)}
+          />
+        </motion.section>
+      )}
+
+      {/* Explore characters and original VelvetMotion experiences */}
       {onOpenGirl && (
         <motion.section variants={riseItem} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-display text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-1.5">
-              <span className="text-[#ff5c7c]">Explore</span>
-              <span className="text-white">Featured Characters</span>
+              <span className="text-[#e8b6c0]">Explore</span>
+              <span className="text-white">The Atelier</span>
               <ChevronRight className="h-5 w-5 text-zinc-400" />
             </h2>
             <div className="flex items-center gap-2 text-xs">
-              <span className="rounded-full border border-white/10 bg-[#1a1a1f] px-2.5 py-1 text-[11px] font-semibold text-zinc-300 tabular-nums">
-                🔥 {Math.max(streak, dropState.streak)}d streak · 🪙 {coins}
+              <span className="rounded-full border border-white/10 bg-[#241b26] px-3 py-1 text-[11px] font-semibold text-[#e8c7d3] tabular-nums">
+                {filteredRoster.length} fictional adult companions
               </span>
               <Link href="/discover/" className="rounded-full border border-[#ff5678]/40 bg-[#2a1820] px-3 py-1 text-[11px] font-bold text-[#ff8aa1] hover:bg-[#ff5678]/25">
                 Swipe Discover →
@@ -264,6 +319,12 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
               <Lock className="h-3 w-3 text-[#ff5678]" /> Private Content
             </button>
 
+            <button type="button" aria-pressed={favoriteOnly}
+              onClick={() => setFavoriteOnly((v) => !v)}
+              className={"shrink-0 inline-flex items-center gap-1 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition " + (favoriteOnly ? "border-[#e6a6b9] bg-[#8d3e61]/25 text-pink-100" : "border-white/10 bg-[#241c28] text-zinc-300 hover:border-white/25")}>
+              <Heart className="h-3 w-3" /> Saved ({favoriteIds.length})
+            </button>
+
             {categories
               .filter((c) => c !== "All")
               .map((cat) => (
@@ -285,7 +346,22 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
             <div className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 bg-gradient-to-l from-[#111114] to-transparent" />
           </div>
 
-          {/* 6-Column Editorial Photo Grid with Interleaved SHORTS & Private Content Promo Tiles */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[11px] text-zinc-400">
+              Showing {featured.length} of {filteredRoster.length} companions · Tap a portrait to enter her world
+            </p>
+            <label className="flex items-center gap-2 text-[11px] text-zinc-300">
+              Sort
+              <select aria-label="Sort companions" value={rosterSort}
+                onChange={(e) => setRosterSort(e.target.value as "featured" | "name")}
+                className="rounded-xl border border-white/10 bg-[#241b26] px-3 py-2 text-xs text-white">
+                <option value="featured">Featured</option>
+                <option value="name">Name A–Z</option>
+              </select>
+            </label>
+          </div>
+
+          {/* Responsive Atelier character portraits and experience tiles */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
             {exploreCells.map((cell) => {
               if (cell.kind === "shorts") {
@@ -344,10 +420,25 @@ export function HomeView({ onNavigate, onOpenGirl, onOpenDual, onOpenCustomChara
                   character={cell.character}
                   onSelect={() => onOpenGirl(cell.character.id)}
                   isNew={cell.isNew}
+                  isFavorite={favoriteIds.includes(cell.character.id)}
+                  onToggleFavorite={() => toggleFavorite(cell.character.id)}
                 />
               );
             })}
           </div>
+          {filteredRoster.length === 0 && (
+            <div className="rounded-2xl border border-white/10 bg-[#211923] p-8 text-center text-sm text-zinc-300">
+              No companions match these filters. Try another category or clear your search.
+            </div>
+          )}
+          {filteredRoster.length > 18 && (
+            <div className="flex justify-center pt-3">
+              <button type="button" onClick={() => setShowAllCompanions((v) => !v)}
+                className="rounded-full border border-[#e5a9b8]/40 bg-[#9b4a6d]/15 px-6 py-3 text-sm font-semibold text-[#f7d7df] transition hover:border-[#e5a9b8]/80 hover:bg-[#9b4a6d]/25">
+                {showAllCompanions ? "Show fewer companions" : "Explore all " + filteredRoster.length + " companions"}
+              </button>
+            </div>
+          )}
         </motion.section>
       )}
 

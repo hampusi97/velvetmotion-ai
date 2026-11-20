@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
-import { BadgeCheck, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Heart, Search, Sparkles } from "lucide-react";
 import { filterCharacters, type Character } from "@/lib/characters";
-import { FLAGSHIP_COMPANIONS } from "@/data/companions";
-import { staticPortraitUrl, onPortraitError } from "@/lib/portraitFallback";
+import { CandyGirlCard } from "@/components/CandyGirlCard";
 
 interface CharacterRosterProps {
   romanceMode: boolean;
@@ -23,74 +22,118 @@ interface CharacterRosterProps {
 export function CharacterRoster({
   romanceMode, query, category, tag, categories, tags, onQuery, onCategory, onTag, onSelect, onBack,
 }: CharacterRosterProps) {
-  const visible = useMemo(() => filterCharacters({ query, category, tag: tag ?? undefined }), [query, category, tag]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [savedOnly, setSavedOnly] = useState(false);
+  const [sort, setSort] = useState<"featured" | "name">("featured");
+  const [showTags, setShowTags] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("vm:favorite-companions") || "[]") as unknown;
+      setFavorites(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === "string") : []);
+    } catch { setFavorites([]); }
+  }, []);
+
+  const visible = useMemo(() => {
+    let list = filterCharacters({ query, category, tag: tag || undefined });
+    if (savedOnly) list = list.filter((c) => favorites.includes(c.id));
+    if (sort === "name") list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    return list;
+  }, [query, category, tag, savedOnly, favorites, sort]);
+
+  const toggleFavorite = (character: Character) => {
+    setFavorites((old) => {
+      const next = old.includes(character.id)
+        ? old.filter((id) => id !== character.id)
+        : [...old, character.id];
+      try { localStorage.setItem("vm:favorite-companions", JSON.stringify(next)); } catch { /* storage optional */ }
+      return next;
+    });
+  };
 
   return (
-    <div>
-      <button onClick={onBack} className="text-pink-400 text-sm hover:text-pink-300">← Home</button>
-      <div className="mt-3 mb-5">
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-pink-300 to-fuchsia-300 bg-clip-text text-transparent">
-          {romanceMode ? "Romance" : "Explore Featured Characters"}
-        </h2>
-        <p className="text-zinc-400 text-sm mt-1">{visible.length} companions · 21+ fictional · custom voices, memory chat & galleries</p>
-      </div>
+    <main className="mx-auto max-w-6xl space-y-6 pb-16 text-white">
+      <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-xs font-semibold text-[#edb5c3] hover:text-white">
+        <ArrowLeft className="h-4 w-4" /> Return to the Atelier
+      </button>
 
-      <div className="relative mb-3">
-        <input value={query} onChange={(e) => onQuery(e.target.value)} placeholder="Search companions…" className="w-full px-4 py-3 pr-10 rounded-2xl bg-zinc-900/80 border border-white/10 text-sm outline-none focus:border-pink-500" />
-        {query && <button type="button" onClick={() => onQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white text-lg">×</button>}
-      </div>
+      <header className="rounded-[27px] border border-[#e8b8c3]/15 bg-gradient-to-r from-[#301c2c]/80 to-[#15111c] px-5 py-7 sm:px-8 sm:py-9">
+        <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.22em] text-[#e6b8c5]">
+          <Sparkles className="h-3.5 w-3.5" /> VelvetMotion / Discover
+        </p>
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+          {romanceMode ? "Find a new connection." : "Meet your next muse."}
+        </h1>
+        <p className="mt-2 max-w-xl text-xs leading-6 text-[#cabbc8]">
+          Discover distinct fictional adult characters, explore their personalities, and create a story on your terms.
+          Voice previews and media generation depend on a compatible connected model.
+        </p>
+      </header>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {categories.map((item) => (
-          <button key={item} onClick={() => onCategory(item)} className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium border transition ${
-            category === item ? "bg-gradient-to-r from-pink-600 to-fuchsia-600 border-transparent text-white" : "bg-zinc-900/80 border-white/10 text-zinc-300"
-          }`}>{item}</button>
-        ))}
-      </div>
+      <section aria-label="Filter companions" className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[190px] flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+            <input type="search" aria-label="Search companions" value={query}
+              onChange={(e) => onQuery(e.target.value)} placeholder="Search by name, mood or personality"
+              className="w-full rounded-[16px] border border-white/10 bg-[#241b27] py-3 pl-10 pr-4 text-xs text-white outline-none transition placeholder:text-zinc-400 focus:border-[#e7afbd]/70" />
+          </div>
+          <button type="button" aria-pressed={savedOnly} onClick={() => setSavedOnly((old) => !old)}
+            className={"inline-flex items-center gap-2 rounded-[16px] border px-4 py-3 text-xs font-semibold transition " +
+              (savedOnly ? "border-[#edacbf]/70 bg-[#a14b70]/20 text-[#ffdfec]" : "border-white/10 bg-[#241b27] text-zinc-300 hover:border-white/30")}>
+            <Heart className="h-3.5 w-3.5" /> Saved ({favorites.length})
+          </button>
+          <select aria-label="Sort companions" value={sort} onChange={(e) => setSort(e.target.value as "featured" | "name")}
+            className="rounded-[16px] border border-white/10 bg-[#241b27] px-4 py-3 text-xs text-zinc-200">
+            <option value="featured">Featured order</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-4">
-        <button onClick={() => onTag(null)} className={`shrink-0 px-3 py-1 rounded-full text-xs border ${tag === null ? "border-pink-400 text-pink-300" : "border-zinc-800 text-zinc-400"}`}>Any</button>
-        {tags.map((item) => (
-          <button key={item} onClick={() => onTag(tag === item ? null : item)} className={`shrink-0 px-3 py-1 rounded-full text-xs border ${tag === item ? "bg-pink-500/20 border-pink-400 text-pink-200" : "border-zinc-800 text-zinc-400"}`}>{item}</button>
-        ))}
-      </div>
-
-      {visible.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/60 p-6 text-center text-sm text-zinc-400">No matches. Try another filter or clear search.</div>
-      ) : (
-        <div className="grid grid-rows-2 grid-flow-col auto-cols-[31%] sm:auto-cols-[22%] md:auto-cols-[18%] lg:auto-cols-[15%] gap-2 overflow-x-auto snap-x snap-mandatory pb-2">
-          {visible.map((character, i) => (
-            <button key={character.id} onClick={() => onSelect(character)} className="girl-card candy-card group relative aspect-[3/4.6] w-full snap-start overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 text-left">
-              <img
-                src={staticPortraitUrl(character.id)}
-                alt={character.name}
-                loading="lazy"
-                onError={onPortraitError}
-                className="absolute inset-0 h-full w-full object-cover object-top group-hover:scale-[1.04] transition duration-500"
-              />
-              {i < 4 && <span className="absolute top-0 left-0 inline-flex items-center gap-0.5 rounded-tl-2xl rounded-br-xl bg-gradient-to-r from-pink-500 to-rose-500 px-1.5 py-0.5 text-[9px] font-bold text-white">✦ NEW</span>}
-              <span className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/60 backdrop-blur flex items-center justify-center text-[10px] text-white">▶</span>
-              <div className="absolute inset-x-0 bottom-0 p-2 candy-scrim">
-                <div className="flex items-center gap-1">
-                  <span className="truncate text-[13px] font-semibold text-white">{character.name.split(" ")[0]}</span>
-                  <span className="text-[11px] text-zinc-400">{character.age}</span>
-                  <BadgeCheck className="h-3 w-3 text-pink-400" />
-                </div>
-              </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar" role="group" aria-label="Category">
+          {categories.map((item) => (
+            <button key={item} type="button" aria-pressed={category === item} onClick={() => onCategory(item)}
+              className={"shrink-0 rounded-full border px-4 py-2 text-[11px] font-semibold transition " +
+                (category === item ? "border-[#e2a9b7]/70 bg-[#a35c78]/25 text-[#ffe1ec]" : "border-white/10 bg-[#211922] text-zinc-300 hover:border-white/25")}>
+              {item}
             </button>
           ))}
         </div>
-      )}
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => onSelect(visible[0])} className="rounded-2xl border-2 border-fuchsia-500/80 bg-gradient-to-br from-fuchsia-950 to-zinc-950 p-3 text-left shadow-[0_0_20px_rgba(217,70,239,0.25)]">
-          <div className="text-lg font-bold text-fuchsia-300">SHORTS</div>
-          <div className="mt-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-center text-xs font-semibold text-white py-1.5">Watch</div>
+        <button type="button" aria-expanded={showTags} onClick={() => setShowTags((v) => !v)}
+          className="text-[11px] font-semibold text-[#e4b6c1] hover:text-white">
+          {showTags ? "Hide mood filters −" : tag ? "Mood filter: " + tag + " · Edit" : "More mood filters +"}
         </button>
-        <button type="button" onClick={() => onSelect(visible[1] || visible[0])} className="rounded-2xl border-2 border-pink-500/80 bg-gradient-to-br from-pink-950 to-zinc-950 p-3 text-left shadow-[0_0_20px_rgba(236,72,153,0.25)]">
-          <div className="text-lg font-bold text-pink-300 italic">Private Content</div>
-          <div className="mt-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-center text-xs font-semibold text-white py-1.5">Unlock</div>
-        </button>
+        {showTags && (
+          <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-white/10 bg-[#17121b] p-3">
+            <button type="button" onClick={() => onTag(null)}
+              className={"rounded-full border px-3 py-1.5 text-[10px] " + (!tag ? "border-pink-300 bg-pink-300/10 text-white" : "border-white/10 text-zinc-300")}>Any mood</button>
+            {tags.map((item) => (
+              <button key={item} type="button" onClick={() => onTag(tag === item ? null : item)}
+                className={"rounded-full border px-3 py-1.5 text-[10px] " + (tag === item ? "border-pink-300 bg-pink-300/10 text-white" : "border-white/10 text-zinc-300")}>{item}</button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-[#d6c0cb]">{visible.length} fictional adult companions</p>
+        <span className="text-[10px] uppercase tracking-[.17em] text-zinc-500">Private Atelier</span>
       </div>
-    </div>
+
+      {visible.length > 0 ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+          {visible.map((character) => (
+            <CandyGirlCard key={character.id} character={character} onSelect={onSelect}
+              isNew={(character.tags || []).some((t) => t.toUpperCase() === "NEW")}
+              isFavorite={favorites.includes(character.id)}
+              onToggleFavorite={toggleFavorite} />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-[22px] border border-white/10 bg-[#1a1520] p-10 text-center text-sm text-zinc-400">
+          No companions match these filters. Try another category, or turn off Saved.
+        </div>
+      )}
+    </main>
   );
 }

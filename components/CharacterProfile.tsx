@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HardDrive, Mail, Video, CheckCircle2, AlertTriangle, ImageIcon, Sparkles } from "lucide-react";
 import type { Character } from "@/lib/characters";
 import { characterPortraitUrl } from "@/lib/portraits";
-import { characterGallery, characterMediaUrl, resolveCharacterAvatar } from "@/lib/media";
+import { characterGallery, characterMediaUrl, resolveBestMediaUrl, resolveCharacterAvatar, type MediaMood } from "@/lib/media";
 import { speak } from "@/lib/speech";
 import { auth, getAccessToken, googleSignIn } from "@/lib/firebase";
 
@@ -44,9 +44,44 @@ export function CharacterProfile({
   const [newActInput, setNewActInput] = useState("");
   const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [renderedGallery, setRenderedGallery] = useState<Record<string, string>>({});
+  const [renderingMood, setRenderingMood] = useState<MediaMood | null>(null);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
 
   const gallery = characterGallery(character);
   const portraitSrc = resolveCharacterAvatar(character);
+  const selectedGalleryMood = gallery[activeGalleryIndex]?.mood;
+  const heroSrc = (selectedGalleryMood && renderedGallery[`${character.id}:${selectedGalleryMood}`]) || portraitSrc;
+
+  useEffect(() => {
+    setActiveGalleryIndex(0);
+    setLightbox(null);
+    setGalleryError(null);
+  }, [character.id]);
+
+  const generateGalleryImage = async (mood: MediaMood, index: number) => {
+    if (renderingMood) return;
+    setActiveGalleryIndex(index);
+    setGalleryError(null);
+    const key = `${character.id}:${mood}`;
+    if (renderedGallery[key]) {
+      setLightbox(renderedGallery[key]);
+      return;
+    }
+    setRenderingMood(mood);
+    try {
+      const result = await resolveBestMediaUrl(character, mood);
+      if (result.isFallback || !result.url) {
+        throw new Error(result.error || result.note || "No compatible image model responded.");
+      }
+      setRenderedGallery((prev) => ({ ...prev, [key]: result.url }));
+      setLightbox(result.url);
+    } catch (err) {
+      setGalleryError(err instanceof Error ? err.message : "Image generation failed.");
+    } finally {
+      setRenderingMood(null);
+    }
+  };
 
   const ensureToken = async (): Promise<string | null> => {
     const existing = await getAccessToken();
@@ -183,10 +218,10 @@ export function CharacterProfile({
       {/* Main hero portrait */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={gallery[activeGalleryIndex]?.url || portraitSrc}
+        src={heroSrc}
         alt={`${character.name} portrait`}
         className="mt-4 w-full max-w-md h-[28rem] object-cover rounded-2xl bg-zinc-900 border border-white/10 cursor-pointer"
-        onClick={() => setLightbox(gallery[activeGalleryIndex]?.url || portraitSrc)}
+        onClick={() => setLightbox(heroSrc)}
       />
 
       {/* NSFW Gallery strip */}
@@ -203,7 +238,7 @@ export function CharacterProfile({
             <button
               key={item.mood}
               type="button"
-              onClick={() => setActiveGalleryIndex(idx)}
+              onClick={() => void generateGalleryImage(item.mood, idx)}
               className={`relative shrink-0 w-20 h-28 rounded-xl overflow-hidden border-2 transition ${
                 activeGalleryIndex === idx
                   ? "border-pink-500 ring-2 ring-pink-500/40"
@@ -212,20 +247,29 @@ export function CharacterProfile({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={item.url}
+                src={renderedGallery[`${character.id}:${item.mood}`] || portraitSrc}
                 alt={item.label}
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
               <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-center py-0.5 text-pink-200">
-                {item.label}
+                {renderingMood === item.mood
+                  ? "Generating..."
+                  : renderedGallery[`${character.id}:${item.mood}`]
+                    ? item.label
+                    : `Generate ${item.label}`}
               </span>
             </button>
           ))}
         </div>
         <p className="text-[11px] text-zinc-500 mt-1">
-          Beauty → Lingerie → Nude → Explicit → Sex. Faces stay consistent. Tap any to enlarge.
+          Tap a category to generate a new image. Until it renders, thumbnails show the original portrait. Consistent identity requires a reference-aware model, not just a seed.
         </p>
+        {galleryError && (
+          <p className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" role="alert">
+            Image unavailable: {galleryError}
+          </p>
+        )}
       </div>
 
       <div className="mt-4 flex items-end justify-between gap-3">
@@ -271,12 +315,10 @@ export function CharacterProfile({
             type="button"
             onClick={() => {
               const idx = gallery.findIndex((g) => g.mood === mood);
-              if (idx >= 0) {
-                setActiveGalleryIndex(idx);
-                setLightbox(gallery[idx].url);
-              }
+              if (idx >= 0) void generateGalleryImage(mood, idx);
             }}
-            className="px-3 py-1.5 rounded-xl text-xs font-medium border border-pink-500/40 bg-pink-500/10 text-pink-200 hover:bg-pink-500/20 capitalize"
+            disabled={renderingMood !== null}
+            className="px-3 py-1.5 rounded-xl text-xs font-medium border border-pink-500/40 bg-pink-500/10 text-pink-200 hover:bg-pink-500/20 capitalize disabled:opacity-50"
           >
             {mood === "sex" ? "Sex Pose" : mood}
           </button>
