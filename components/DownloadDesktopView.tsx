@@ -322,6 +322,16 @@ export function DownloadDesktopView() {
           </div>
         </div>
         <p className="max-w-3xl text-xs leading-6 text-[#d0beca]">
+          <div className="rounded-2xl border border-[#e9adbd]/30 bg-[#e9adbd]/5 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e9adbd]">One-click local host</p>
+            <h3 className="mt-1 text-lg font-semibold">Host the site on your PC</h3>
+            <p className="mt-1 text-xs text-zinc-400">Download, double-click, and open http://127.0.0.1:8787. Uses your RAM/GPU if Ollama, KoboldCpp or ComfyUI is running. Requires Python 3.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a href="/downloads/start-velvet-engine.bat" download className="rounded-full bg-[#e9adbd] px-4 py-2 text-xs font-semibold text-black hover:bg-[#f2c8d2]">Windows (.bat)</a>
+              <a href="/downloads/start-velvet-engine.command" download className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-white/40">Mac (.command)</a>
+              <a href="/downloads/velvetmotion_home_engine.py" download className="rounded-full border border-white/20 px-4 py-2 text-xs text-white hover:border-white/40">Python only</a>
+            </div>
+          </div>
           Already installed Ollama, KoboldCpp or ComfyUI? The optional Python Home Engine can discover running
           local services. It does not install AI models or start a public tunnel. Download the Python engine and a
           matching launcher into the <strong>same folder</strong>; review the source before running it.
