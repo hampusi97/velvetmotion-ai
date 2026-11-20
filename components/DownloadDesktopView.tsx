@@ -52,6 +52,7 @@ export function DownloadDesktopView() {
     { title: "Ollama", status: engine.ollamaOnline, detail: "Local conversation" },
     { title: "KoboldCpp", status: engine.koboldOnline, detail: "Local conversation" },
     { title: "ComfyUI", status: engine.comfyOnline, detail: "Image workflows" },
+    { title: "SD web UI", status: false, detail: "Local NSFW (:7860)" },
     { title: "Fish voice", status: engine.fishOnline, detail: "Local neural voice" },
     { title: "Kokoro", status: engine.kokoroOnline, detail: "Local neural voice" },
     { title: "Home Engine", status: engine.homeEngineOnline, detail: "Optional bridge" },
