@@ -85,8 +85,8 @@ export function CoinWallet({
           <span className="mb-2 text-sm text-[#d6b6c6]">demo credits</span>
         </div>
         <p className="mt-5 max-w-2xl text-xs leading-6 text-zinc-300">
-          These are optional browser-game points only. They aren't money, don't verify purchases,
-          and don't pay a connected AI provider. Real model availability and costs depend on your configured engine.
+          These are optional browser-game points only. They are not money, do not verify purchases,
+          and do not pay a connected AI provider. Real model availability and costs depend on your configured engine.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <button type="button" onClick={daily} disabled={!dailyAvailable}
