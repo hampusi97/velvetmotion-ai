@@ -1339,7 +1339,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         )}
 
         {/* Explicit State Scene Selfies Panel + Action Controls + Gift Strip + Pinned Composer */}
-        <div className="shrink-0 border-t border-white/10 bg-[#05050a]/95 px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-1.5">
+        <div className="shrink-0 border-t border-white/10 bg-[#05050a]/95 px-2 pt-1.5 pb-[max(4.5rem,env(safe-area-inset-bottom)+3.5rem)] lg:pb-[max(0.5rem,env(safe-area-inset-bottom))] space-y-1.5">
           <div className="flex items-center justify-between gap-2 px-1">
             <button
               type="button"
