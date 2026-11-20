@@ -14,6 +14,7 @@ concurrency:
 
 permissions:
   contents: read
+  checks: read
 
 jobs:
   build-and-deploy:
@@ -44,6 +45,9 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
+      - name: Validate Cloudflare Git deployment verifier
+        run: node --test scripts/verify-cloudflare-git-deploy.test.mjs
+
       - name: Build static export
         run: npm run build
         env:
@@ -59,25 +63,32 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: versions upload --preview-alias pr-${{ github.event.pull_request.number }}
 
-      # A production push MUST never appear successful when deployment was skipped.
-      - name: Verify Cloudflare credentials for production
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        run: |
-          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
-            echo "::error::Automatic production deploy is not active. Configure repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID."
-            exit 1
-          fi
+      # Cloudflare's own GitHub integration already deploys this Worker and Pages.
+      # If a second Wrangler deployment is not configured, verify the provider's
+      # completed success check for *this exact SHA* instead of falsely failing CI.
+      # This is not satisfied by a passing build, a preview, or a previous deploy.
+      - name: Verify native Cloudflare Git deployment without Wrangler secrets
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CF_TOKEN == '' && env.CF_ACCOUNT == ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/verify-cloudflare-git-deploy.mjs
 
-      - name: Automatically deploy every successful main commit
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Reject incomplete Wrangler credential configuration
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && ((env.CF_TOKEN != '' && env.CF_ACCOUNT == '') || (env.CF_TOKEN == '' && env.CF_ACCOUNT != ''))
+        run: |
+          echo "::error::Only one Cloudflare Wrangler credential is configured. Add both CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID or leave both unset for native Git deployment."
+          exit 1
+
+      - name: Automatically deploy with Wrangler only when both credentials are present
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
 
-      - name: Record the deployed commit
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      - name: Record direct Wrangler deployment
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
         run: |
           echo "### VelvetMotion automatic website deploy" >> "$GITHUB_STEP_SUMMARY"
           echo "Commit: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"

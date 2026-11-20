@@ -1688,7 +1688,13 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
           </div>
 
           {/* Pinned Bottom Composer */}
-          <div className="flex gap-1.5 sm:gap-2 px-1">
+          <form
+            className="flex gap-1.5 sm:gap-2 px-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+          >
             <button
               type="button"
               onClick={() => setGamesOpen((g) => !g)}
@@ -1710,7 +1716,7 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  void send();
+                  e.currentTarget.form?.requestSubmit();
                 }
               }}
               rows={1}
@@ -1718,14 +1724,13 @@ export function CharacterChat({ character, romanceMode, initialDraft, onBack, on
               className="flex-1 rounded-2xl bg-[#0c0c16] border border-white/15 px-4 py-2.5 text-sm text-white resize-none outline-none focus:border-[#ff1e8e]"
             />
             <button
-              type="button"
+              type="submit"
               disabled={busy || !input.trim()}
-              onClick={() => void send()}
               className="px-4 sm:px-5 rounded-2xl neon-btn-primary font-bold text-sm text-white disabled:opacity-45"
             >
               Send
             </button>
-          </div>
+          </form>
         </div>
       </section>
 
