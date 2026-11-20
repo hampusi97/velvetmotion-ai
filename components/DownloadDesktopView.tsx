@@ -242,6 +242,41 @@ export function DownloadDesktopView() {
         </div>
       </section>
 
+      <section className="space-y-4 rounded-[28px] border border-[#dba6b7]/20 bg-gradient-to-br from-[#241726] to-[#151019] p-5 sm:p-7">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#e4b4c1]/25 bg-[#be6b8a]/15">
+            <HardDrive className="h-5 w-5 text-[#eac1cb]" />
+          </span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#e7b3c0]">Optional local companion bridge</p>
+            <h2 className="font-display text-xl font-semibold text-white">Your machine, your runtime.</h2>
+          </div>
+        </div>
+        <p className="max-w-3xl text-xs leading-6 text-[#d0beca]">
+          Already installed Ollama, KoboldCpp or ComfyUI? The optional Python Home Engine can discover running
+          local services. It does not install AI models or start a public tunnel. Download the Python engine and a
+          matching launcher into the <strong>same folder</strong>; review the source before running it.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a href="/downloads/velvetmotion_home_engine.py" download
+            className="inline-flex items-center gap-2 rounded-full bg-[#c66d8b] px-4 py-2.5 text-xs font-semibold text-white hover:bg-[#d4809b]">
+            <Download className="h-3.5 w-3.5" /> Home Engine Python
+          </a>
+          <a href="/downloads/start-velvet-engine.bat" download
+            className="inline-flex items-center gap-2 rounded-full border border-[#e5b7c5]/30 bg-white/5 px-4 py-2.5 text-xs font-semibold text-[#f0d1db] hover:bg-white/10">
+            Windows launcher
+          </a>
+          <a href="/downloads/start-velvet-engine.command" download
+            className="inline-flex items-center gap-2 rounded-full border border-[#e5b7c5]/30 bg-white/5 px-4 py-2.5 text-xs font-semibold text-[#f0d1db] hover:bg-white/10">
+            macOS / Linux launcher
+          </a>
+        </div>
+        <p className="text-[11px] text-zinc-500">
+          Requires Python 3 and local inference software. By default, the bridge binds to 127.0.0.1:8787,
+          disables cloud fallback and returns clear errors if no model is installed.
+        </p>
+      </section>
+
       <section className="grid gap-3 md:grid-cols-3">
         {[
           { title: "Your local models", detail: "Inference stays on your device only when you explicitly use an installed local provider.", icon: Cpu },
