@@ -190,3 +190,50 @@ html, body {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* VelvetMotion Private Atelier — original editorial motion system. */
+:root {
+  --vm-champagne: #e8c6ac;
+  --vm-atelier-rose: #d88da3;
+  --vm-atelier-ink: #0d0a11;
+  --vm-atelier-lilac: #a78bfa;
+}
+
+@keyframes vm-atelier-kenburns {
+  from { transform: scale(1.03) translate3d(-1.2%, 0, 0); }
+  to { transform: scale(1.14) translate3d(1.2%, -1.2%, 0); }
+}
+
+.vm-portrait-card {
+  isolation: isolate;
+  --vm-pointer-x: 50%;
+  --vm-pointer-y: 50%;
+}
+.vm-portrait-photo {
+  transform: scale(1.03);
+  will-change: transform;
+}
+.vm-portrait-photo[data-playing="true"] {
+  animation: vm-atelier-kenburns 14s ease-in-out infinite alternate;
+  animation-delay: var(--vm-motion-delay, 0s);
+}
+.vm-portrait-card:hover .vm-portrait-photo {
+  animation-play-state: paused;
+  transform: scale(1.075);
+  transition: transform 650ms cubic-bezier(.2, .85, .25, 1);
+}
+.vm-portrait-light {
+  background: radial-gradient(circle 260px at var(--vm-pointer-x) var(--vm-pointer-y), rgba(245, 202, 204, .14), transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-portrait-photo,
+  .vm-portrait-photo[data-playing="true"],
+  .vm-portrait-card:hover .vm-portrait-photo {
+    animation: none !important;
+    transform: none !important;
+    will-change: auto;
+  }
+  .vm-portrait-light { display: none; }
+}
