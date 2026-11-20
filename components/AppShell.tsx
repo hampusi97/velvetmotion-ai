@@ -190,12 +190,8 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("autostart") === "1") {
-        localStorage.setItem("velvet-age", "true");
-        setAdult(true);
-      } else {
-        setAdult(localStorage.getItem("velvet-age") === "true");
-      }
+      // Query parameters must never silently bypass the adult confirmation gate.
+      setAdult(localStorage.getItem("velvet-age") === "true");
       const qView = params.get("view") as ShellRouteView | null;
       if (qView && pathname === "/") setView(qView);
       const qId = params.get("companion") || params.get("id");
