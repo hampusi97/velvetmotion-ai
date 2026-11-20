@@ -1,17 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 use sysinfo::System;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Emitter, Manager, Url,
+    AppHandle, Emitter, Manager,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-
-const LIVE_WEB_URL: &str = "https://velvetmotion-ai.hampusi97.workers.dev";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,18 +75,8 @@ fn toggle_boss_key(app: AppHandle) {
     }
 }
 
-fn check_live_web_reachable() -> bool {
-    if let Ok(mut addrs) = "velvetmotion-ai.hampusi97.workers.dev:443".to_socket_addrs() {
-        if let Some(addr) = addrs.next() {
-            return TcpStream::connect_timeout(&addr, Duration::from_millis(1400)).is_ok();
-        }
-    }
-    false
-}
-
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_os::init())
@@ -127,20 +115,10 @@ fn main() {
 
             let _ = app.global_shortcut().register("CmdOrCtrl+Shift+H");
 
-            // Layer 1 Instant Daily Web Update (falls back to bundled ../out if offline)
-            #[cfg(not(debug_assertions))]
-            {
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    if check_live_web_reachable() {
-                        if let Some(win) = handle.get_webview_window("main") {
-                            if let Ok(url) = Url::parse(LIVE_WEB_URL) {
-                                let _ = win.navigate(url);
-                            }
-                        }
-                    }
-                });
-            }
+            // Always render the bundled local UI. Never silently navigate the
+            // privileged native window to a remotely editable website.
+            // Install new builds manually from verified GitHub Releases until
+            // a signed updater channel is configured and audited.
 
             Ok(())
         })
