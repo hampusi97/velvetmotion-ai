@@ -9,7 +9,7 @@ import {
 } from "@/lib/sillyTavernImport";
 import { parseCharacterCardFile } from "@/lib/pngCardDecode";
 import { compactCardPortrait } from "@/lib/avatarOptimize";
-import { parseCharacterLorebook, saveLorebook } from "@/lib/lorebook";
+import { loadLorebook, parseCharacterLorebook, saveLorebook } from "@/lib/lorebook";
 
 export function CardImport({
   onHome,
@@ -110,6 +110,9 @@ export function CardImport({
               <div className="min-w-0">
                 <div className="font-medium text-cream">{c.name}</div>
                 <div className="text-xs text-zinc-500 truncate">{c.tagline}</div>
+                <div className="mt-1 text-[10px] text-fuchsia-200/80">
+                  {loadLorebook(c.id).length > 0 ? `${loadLorebook(c.id).length} contextual lore entries` : "Character profile imported"}
+                </div>
               </div>
             </button>
           ))}
