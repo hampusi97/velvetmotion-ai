@@ -14,9 +14,12 @@ const assets = [
 const signature = "a".repeat(96);
 const signedManifest = {
   version: "1.0.15",
-  platforms: Object.fromEntries(["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"].map((p) =>
-    [p, { signature, url: prefix + "signed-" + p + ".zip" }]
-  )),
+  platforms: {
+    "windows-x86_64": { signature, url: prefix + "VelvetMotion.AI_1.0.15_x64-setup.exe" },
+    "darwin-aarch64": { signature, url: prefix + "VelvetMotion.AI_1.0.15_aarch64.dmg" },
+    "darwin-x86_64": { signature, url: prefix + "VelvetMotion.AI_1.0.15_x64.dmg" },
+    "linux-x86_64": { signature, url: prefix + "VelvetMotion.AI_1.0.15_amd64.AppImage" },
+  },
 };
 
 test("accepts all supported installers before publishing unsigned release", () => {
@@ -37,4 +40,16 @@ test("refuses incomplete or mis-versioned signed releases", () => {
 test("rejects forged release artifact URLs", () => {
   const platforms = { ...signedManifest.platforms, "windows-x86_64": { signature, url: "https://example.net/evil.exe" } };
   assert.throws(() => verifyDesktopRelease({ tag, assets, signed: true, manifest: { ...signedManifest, platforms } }), /Untrusted/);
+});
+
+test("blocks stale installers when release tag has advanced", () => {
+  const stale = assets.map((name) => name.replaceAll("1.0.15", "1.0.14"));
+  assert.throws(() => verifyDesktopRelease({ tag, assets: stale, signed: false }), /Windows x64/);
+});
+test("blocks a signed manifest pointing to an asset that was never uploaded", () => {
+  const platforms = {
+    ...signedManifest.platforms,
+    "windows-x86_64": { signature, url: prefix + "not-uploaded.zip" },
+  };
+  assert.throws(() => verifyDesktopRelease({ tag, assets, signed: true, manifest: { ...signedManifest, platforms } }), /missing release asset/);
 });

@@ -17,7 +17,7 @@ The web app is a static Next.js export. It does not ship an LLM, a TTS model, a 
 - Browser autoplay, browser CORS, and HTTPS-to-localhost restrictions may prevent local TTS despite a running server.
 
 ## Images
-- **Local ComfyUI:** `http://127.0.0.1:8188` plus a *real installed compatible image checkpoint/workflow*.
+- **Local ComfyUI:** `http://127.0.0.1:8188` plus a *real installed compatible image checkpoint/workflow*. When Studio detects the local server, it can try port 8188 without a duplicate settings entry and discovers installed `CheckpointLoaderSimple` checkpoints before dispatch; CORS permission may still be necessary in a regular browser.
 - **General-purpose cloud worker:** used for ordinary images, not mature-mode requests.
 - **AI Horde:** optional image generation with `nsfw: true` only for appropriate adult requests; only workers accepting that type of request can run it. Free queues, active models, and moderation decisions vary. No model names are hard-coded unless a user explicitly selects them.
 - **Face identity:** the same per-character seed is used when aggressive face lock is enabled. A seed alone does not provide face identity fidelity; a compatible reference-image workflow/IP-Adapter is better.
@@ -38,7 +38,13 @@ In **Advanced media**, configure `img2vidUrl` with a bridge that accepts an HTTP
 }
 ```
 
-The bridge must respond with JSON such as `{"videoUrl":"https://example.com/render.mp4"}`, or with a direct `video/*` response. Add authentication on your bridge if exposed publicly; do not put private server secrets in frontend code.
+The bridge can respond immediately with JSON such as `{"videoUrl":"https://example.com/render.mp4"}`, or with direct `video/*` bytes. For **long-running video generation**, it can instead reply `202 Accepted` with a same-origin status URL:
+
+```json
+{"state":"queued","statusUrl":"/jobs/my-job-123"}
+```
+
+Studio polls that URL every two seconds (up to 40 polls). When the job finishes, respond with `{"state":"completed","videoUrl":"https://example.com/render.mp4"}` (or `{"state":"failed","error":"..."}` when it fails). The polling endpoint must be on the same origin as the configured video URL and return a playable HTTP(S) video URL on completion; an inaccessible remote `blob:` URL will not work. This is a simple HTTP contract for a **separately installed** model/bridge, not a built-in ComfyUI video graph. Add authentication on your bridge if exposed publicly; do not put private server secrets in frontend code.
 
 Without that endpoint, VelvetMotion can export a **pan/zoom WebM animated still**. This is a useful fallback but not generative video or genuine movement. The UI now labels it accordingly.
 
