@@ -8,6 +8,7 @@ import {
   saveImportedCharacter,
 } from "@/lib/sillyTavernImport";
 import { parseCharacterCardFile } from "@/lib/pngCardDecode";
+import { compactCardPortrait } from "@/lib/avatarOptimize";
 import { parseCharacterLorebook, saveLorebook } from "@/lib/lorebook";
 
 export function CardImport({
@@ -42,21 +43,18 @@ export function CardImport({
       }
       // Prefer PNG itself as avatar when image card
       if (file.type === "image/png" || file.name.toLowerCase().endsWith(".png")) {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(String(r.result));
-          r.onerror = reject;
-          r.readAsDataURL(file);
-        });
-        character.avatar = dataUrl;
+        character.avatar = await compactCardPortrait(file);
       }
-      saveImportedCharacter(character);
+      if (!saveImportedCharacter(character)) {
+        setError("Character could not be saved: browser storage is full or unavailable.");
+        return;
+      }
       const lore = parseCharacterLorebook(raw);
       const loreSaved = lore.length === 0 || saveLorebook(character.id, lore);
       setList(loadImportedCharacters());
       setOk(`Imported ${character.name} — ${lore.length} lorebook entries${loreSaved ? " saved" : " could not be saved (local storage full)"}; ready to chat.`);
-    } catch {
-      setError("Invalid file.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Invalid file.");
     }
   };
 
