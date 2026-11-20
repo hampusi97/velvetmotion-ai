@@ -22,6 +22,7 @@ import { saveCustomCompanionDB, saveGalleryDB } from '@/lib/db';
 import { emitVaultUpdated } from '@/lib/firebaseSync';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
 import { SafeImage } from '@/components/SafeImage';
+import { AtelierStoryboard } from '@/components/AtelierStoryboard';
 
 interface MediaStudioModalProps {
   isOpen: boolean;
@@ -470,7 +471,7 @@ export default function MediaStudioModal({
     <div
       className={
         standalone
-          ? 'mx-auto w-full max-w-2xl rounded-3xl neon-glass bg-[#0c0c16]/90 p-5 sm:p-6 text-[#f7f7fc] space-y-4'
+          ? 'mx-auto w-full max-w-6xl rounded-3xl neon-glass bg-[#0c0c16]/90 p-5 sm:p-6 text-[#f7f7fc] space-y-4'
           : 'max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl sm:rounded-3xl neon-glass bg-[#0c0c16]/95 p-5 text-[#f7f7fc] shadow-2xl space-y-4'
       }
       onDragOver={(e) => e.preventDefault()}
@@ -1060,6 +1061,12 @@ export default function MediaStudioModal({
           >
             Create Companion &amp; Add to Roster
           </button>
+        </div>
+      )}
+
+      {standalone && (
+        <div className="mt-8 border-t border-white/10 pt-8">
+          <AtelierStoryboard />
         </div>
       )}
     </div>
