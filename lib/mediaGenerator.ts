@@ -7,7 +7,8 @@
  *  3. Cloud Free Fallback: AI Horde (aihorde.net)
  */
 import { assertCompliance } from "./complianceFilter";
-import { generateLocalImage } from "./comfyClient";
+import { generateLocalImage, tryComfyDirect } from "./comfyClient";
+import { getMediaSettings } from "./mediaSettings";
 import { fetchWorkerImage } from "./imageWorker";
 import { generateHordeImage } from "./aiHorde";
 import { remoteImageToStableDataUrl } from "./imageStore";
@@ -40,9 +41,9 @@ async function tryKoboldSdTxt2Img(
   seed: number,
   negativePrompt?: string,
 ): Promise<string | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 35000);
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 35000);
     const res = await fetch("http://127.0.0.1:5001/sdapi/v1/txt2img", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -56,7 +57,6 @@ async function tryKoboldSdTxt2Img(
       }),
       signal: ctrl.signal,
     });
-    clearTimeout(timer);
     if (!res.ok) return null;
     const data = (await res.json()) as { images?: string[] };
     const b64 = data.images?.[0];
@@ -64,6 +64,8 @@ async function tryKoboldSdTxt2Img(
     return b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -80,35 +82,51 @@ export async function generateStudioPicture(
   const requiresAdultEngine = Boolean(req.nsfw) || /\b(nsfw|nude|nudity|explicit|sexual|lingerie)\b/i.test(req.prompt);
   const parsedSeed = req.seed ?? Math.floor(Math.random() * 90000 + 1000);
   const t0 = performance.now();
+  const settings = getMediaSettings();
+  const failures: string[] = [];
   let imageUrl: string | null = null;
   let engine = "Cloud Free";
 
-  // 1A. Local Ultra ComfyUI (:8188)
-  if (req.localEngine?.comfyOnline) {
-    const localRes = await generateLocalImage({
-      prompt: req.prompt,
-      seed: parsedSeed,
-      width: req.width,
-      height: req.height,
-      characterId: req.characterId,
-      negative: req.negativePrompt,
-    });
-    if (localRes.ok && localRes.imageUrl) {
-      imageUrl = localRes.imageUrl;
-      engine = "Local Ultra ComfyUI";
+  // An auto-discovered ComfyUI on :8188 works without a second manual settings
+  // entry. A custom configured backend is used only when "prefer local" is on.
+  const localRequest = {
+    prompt: req.prompt,
+    seed: parsedSeed,
+    width: req.width,
+    height: req.height,
+    characterId: req.characterId,
+    negative: req.negativePrompt,
+  };
+  if (req.localEngine?.comfyOnline || (settings.preferLocal && settings.localImageBase)) {
+    try {
+      const localRes = settings.preferLocal && settings.localImageBase
+        ? await generateLocalImage(localRequest)
+        : await tryComfyDirect("http://127.0.0.1:8188", localRequest);
+      if (localRes.ok && localRes.imageUrl) {
+        imageUrl = localRes.imageUrl;
+        engine = localRes.note;
+      } else {
+        failures.push("Local image model: " + localRes.note);
+      }
+    } catch (error) {
+      failures.push("Local image model: " + (error instanceof Error ? error.message : "unavailable"));
     }
   }
 
-  // 1B. Local KoboldCpp SD / FLUX (:5001)
+  // Some KoboldCpp instances support text-only inference, not SD. Test the
+  // actual image route rather than assuming a listening port is sufficient.
   if (!imageUrl && req.localEngine?.koboldOnline) {
     const koboldImg = await tryKoboldSdTxt2Img(req.prompt, req.width, req.height, parsedSeed, req.negativePrompt);
     if (koboldImg) {
       imageUrl = koboldImg;
       engine = "Local KoboldCpp SD";
+    } else {
+      failures.push("KoboldCpp: image endpoint unavailable");
     }
   }
 
-  // 2. Cloudflare Flux Image Worker
+  // The general Cloudflare model is not used for adult media. It may also hit
+  // rate limits; preserve the reason instead of silently claiming success.
   if (!imageUrl && !requiresAdultEngine) {
     const cf = await fetchWorkerImage(req.prompt, {
       baseUrl: req.imageWorkerUrl,
@@ -117,21 +135,37 @@ export async function generateStudioPicture(
     if (cf.ok) {
       imageUrl = cf.url;
       engine = "Cloudflare Flux";
+    } else {
+      failures.push("Cloudflare image model: " + (cf.reason === "quota" ? "quota exhausted" : cf.reason));
     }
   }
 
-  // 3. AI Horde Free Fallback
+  // Only report success when a provider returned an actual image.
   if (!imageUrl) {
-    const horde = await generateHordeImage({
-      prompt: req.prompt,
-      seed: parsedSeed,
-      nsfw: requiresAdultEngine,
-      width: req.width,
-      height: req.height,
-      steps: 25,
-    });
-    imageUrl = await remoteImageToStableDataUrl(horde.url).catch(() => horde.url);
-    engine = "AI Horde Cloud Free";
+    try {
+      const horde = await generateHordeImage({
+        prompt: req.prompt,
+        seed: parsedSeed,
+        nsfw: requiresAdultEngine,
+        width: req.width,
+        height: req.height,
+        steps: 20,
+      });
+      if (!/^https:\/\/|^data:image\//i.test(horde.url)) {
+        throw new Error("Provider returned an invalid image URL");
+      }
+      imageUrl = await remoteImageToStableDataUrl(horde.url).catch(() => horde.url);
+      engine = horde.note;
+    } catch (error) {
+      failures.push("AI Horde: " + (error instanceof Error ? error.message : "unavailable"));
+    }
+  }
+
+  if (!imageUrl) {
+    throw new Error(
+      "No image was generated. " + failures.join("; ").slice(0, 500) +
+      ". Check your model connection or try again when the cloud provider is available.",
+    );
   }
 
   const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
