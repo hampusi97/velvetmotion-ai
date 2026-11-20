@@ -75,55 +75,67 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
     const next: Msg[] = [...messages, { role: "user", content: text }];
     setMessages(next);
 
-    // 1. Companion A replies to the user first
-    setTypingSpeaker({ name: a.name.split(" ")[0], slot: 0 });
-    const historyA: RouterMessage[] = next.slice(-10).map((m) => ({
-      role: m.role === "user" ? "user" : "assistant",
-      text: m.name ? `[${m.name}]: ${m.content}` : m.content,
-    }));
-    const resA = await generateCompanionReply(historyA, {
-      id: a.id,
-      name: a.name,
-      age: a.age,
-      tagline: a.tagline,
-      personality: `${a.personality}. You are in a lively 2-on-1 chat alongside ${b.name}; playfully compete for the user's attention.`,
-    });
+    // Both turns use the same connected model router as solo chat. Recover
+    // safely from outages so the group composer never gets stuck "typing".
+    try {
+      setTypingSpeaker({ name: a.name.split(" ")[0], slot: 0 });
+      const historyA: RouterMessage[] = next.slice(-10).map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        text: m.name ? `[${m.name}]: ${m.content}` : m.content,
+      }));
+      const resA = await generateCompanionReply(historyA, {
+        id: a.id,
+        name: a.name,
+        age: a.age,
+        tagline: a.tagline,
+        personality: `${a.personality}. You are in a lively two-companion fictional-adult chat alongside ${b.name}. Respect everyone's boundaries and respond naturally.`,
+      });
+      if (resA.providerUsed === "provider-unavailable") {
+        setErrorMsg(resA.text);
+        return;
+      }
 
-    const msgA: Msg = {
-      role: "girl",
-      characterId: a.id,
-      name: a.name,
-      slot: 0,
-      content: resA.text,
-    };
-    const afterA = [...next, msgA];
-    setMessages(afterA);
-    earnCompanionXp(a.id, 4);
+      const msgA: Msg = {
+        role: "girl",
+        characterId: a.id,
+        name: a.name,
+        slot: 0,
+        content: resA.text,
+      };
+      const afterA = [...next, msgA];
+      setMessages(afterA);
+      earnCompanionXp(a.id, 4);
 
-    // 2. Companion B receives Companion A's reply in her context and reacts to her + user
-    setTypingSpeaker({ name: b.name.split(" ")[0], slot: 1 });
-    const historyB: RouterMessage[] = afterA.slice(-10).map((m) => ({
-      role: m.role === "user" ? "user" : "assistant",
-      text: m.name ? `[${m.name}]: ${m.content}` : m.content,
-    }));
-    const resB = await generateCompanionReply(historyB, {
-      id: b.id,
-      name: b.name,
-      age: b.age,
-      tagline: b.tagline,
-      personality: `${b.personality}. React directly to what ${a.name.split(" ")[0]} just said ("${resA.text.slice(0, 90)}") with playful banter and teasing rivalry while captivating the user.`,
-    });
+      setTypingSpeaker({ name: b.name.split(" ")[0], slot: 1 });
+      const historyB: RouterMessage[] = afterA.slice(-10).map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        text: m.name ? `[${m.name}]: ${m.content}` : m.content,
+      }));
+      const resB = await generateCompanionReply(historyB, {
+        id: b.id,
+        name: b.name,
+        age: b.age,
+        tagline: b.tagline,
+        personality: `${b.personality}. React directly to ${a.name} and the user in a fictional-adult two-companion conversation. Maintain your own motivations and voice.`,
+      });
+      if (resB.providerUsed === "provider-unavailable") {
+        setErrorMsg(`${a.name} replied, but the model is unavailable for ${b.name}. Check your provider in Settings.`);
+        return;
+      }
+      setMessages([...afterA, {
+        role: "girl",
+        characterId: b.id,
+        name: b.name,
+        slot: 1,
+        content: resB.text,
+      }]);
+      earnCompanionXp(b.id, 4);
+    } catch {
+      setErrorMsg("The group AI provider failed. Check local/cloud model settings and retry.");
+    } finally {
+      setTypingSpeaker(null);
+    }
 
-    const msgB: Msg = {
-      role: "girl",
-      characterId: b.id,
-      name: b.name,
-      slot: 1,
-      content: resB.text,
-    };
-    setMessages([...afterA, msgB]);
-    earnCompanionXp(b.id, 4);
-    setTypingSpeaker(null);
   };
 
   if (!started) {
