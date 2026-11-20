@@ -8,8 +8,11 @@ import {
   saveImportedCharacter,
 } from "@/lib/sillyTavernImport";
 import { parseCharacterCardFile } from "@/lib/pngCardDecode";
-import { compactCardPortrait } from "@/lib/avatarOptimize";
+import { compactCardPortrait, rasterizeStarterIllustration } from "@/lib/avatarOptimize";
 import { loadLorebook, parseCharacterLorebook, saveLorebook } from "@/lib/lorebook";
+import { generateLocalImage } from "@/lib/comfyClient";
+import { getMediaSettings } from "@/lib/mediaSettings";
+import { ORIGINAL_STARTER_COMPANIONS } from "@/lib/originalStarterCompanions";
 
 export function CardImport({
   onHome,
@@ -20,10 +23,63 @@ export function CardImport({
 }) {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [portraitBusyId, setPortraitBusyId] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [list, setList] = useState<Character[]>(() =>
     typeof window !== "undefined" ? loadImportedCharacters() : [],
   );
+
+  const addStarter = async (character: Character) => {
+    setError(null);
+    setOk(null);
+    let avatar: string;
+    try {
+      avatar = await rasterizeStarterIllustration(character.avatar);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not prepare the new companion illustration.");
+      return;
+    }
+    if (!saveImportedCharacter({ ...character, avatar })) {
+      setError("Could not add the companion. Browser storage is full or disabled.");
+      return;
+    }
+    setList(loadImportedCharacters());
+    setOk(`Added ${character.name} to your imported library. Original illustrated avatar is a placeholder; generate or import a portrait later.`);
+  };
+
+  const generateStarterPortrait = async (character: Character) => {
+    if (portraitBusyId) return;
+    setPortraitBusyId(character.id);
+    setError(null);
+    setOk(null);
+    try {
+      const settings = getMediaSettings();
+      const generated = await generateLocalImage({
+        prompt: character.figure + ", original fictional adult, tasteful cinematic portrait, natural lighting, consistent face, head and shoulders",
+        seed: Math.floor(Math.random() * 1_000_000_000) + 1,
+        width: 512,
+        height: 768,
+      }, settings.localImageBase || "http://127.0.0.1:8188");
+      if (!generated.ok || !generated.imageUrl) {
+        throw new Error(generated.note || "Your local image model did not return a portrait.");
+      }
+      if (!/^data:image\/(?:png|jpeg|webp);base64,/i.test(generated.imageUrl) || generated.imageUrl.length > 14_000_000) {
+        throw new Error("The local generator must return an image data URL. Update your backend or generate a smaller portrait.");
+      }
+      const response = await fetch(generated.imageUrl);
+      const blob = await response.blob();
+      const avatar = await compactCardPortrait(new File([blob], "starter-portrait.png", { type: blob.type || "image/png" }));
+      if (!saveImportedCharacter({ ...character, avatar })) {
+        throw new Error("Portrait was generated but browser storage could not save it.");
+      }
+      setList(loadImportedCharacters());
+      setOk(`Generated a unique portrait for ${character.name} using ${generated.note}. Saved to your character library.`);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Local portrait generation failed.");
+    } finally {
+      setPortraitBusyId(null);
+    }
+  };
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -89,6 +145,45 @@ export function CardImport({
           }}
         />
       </label>
+
+      <section aria-labelledby="starter-title" className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="starter-title" className="text-lg font-semibold text-pink-100">Original starter companions</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-400">
+              Six new fictional adult personalities created for VelvetMotion, not copied from third-party games.
+              Preview and add only the ones you want. Illustrations are placeholders for portraits you generate.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full border border-pink-300/20 bg-pink-500/10 px-2 py-1 text-[10px] text-pink-200">6 ORIGINAL</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {ORIGINAL_STARTER_COMPANIONS.map((character) => {
+            const saved = list.find((item) => item.id === character.id);
+            const alreadyAdded = Boolean(saved);
+            return (
+              <article key={character.id} className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#2d2031] to-[#16101b]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={saved?.avatar || character.avatar} alt={`Portrait or illustrated placeholder for ${character.name}`}
+                  className="aspect-[3/4] w-full object-cover" loading="lazy" />
+                <div className="space-y-1.5 p-2.5">
+                  <p className="truncate text-xs font-semibold text-white">{character.name} · {character.age}</p>
+                  <p className="line-clamp-2 min-h-8 text-[10px] leading-4 text-zinc-300">{character.tagline}</p>
+                  <button type="button" onClick={() => alreadyAdded ? onOpen(saved || character) : void addStarter(character)}
+                    className="w-full rounded-lg border border-pink-300/30 bg-pink-500/15 px-2 py-2 text-[11px] font-semibold text-pink-100 hover:bg-pink-500/30">
+                    {alreadyAdded ? "Start chatting" : "Add companion"}
+                  </button>
+                  <button type="button" disabled={portraitBusyId !== null}
+                    onClick={() => void generateStarterPortrait(character)}
+                    className="w-full rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-[10px] font-medium text-zinc-200 hover:bg-white/10 disabled:opacity-50">
+                    {portraitBusyId === character.id ? "Generating locally…" : "Generate unique portrait"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       {ok && <p role="status" className="text-sm text-emerald-400">{ok}</p>}

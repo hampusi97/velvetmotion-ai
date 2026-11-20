@@ -88,7 +88,7 @@ export async function generateFictionalReferenceVariation({
     }
   }
 
-  if (settings.localImageBase && settings.localImageMode === "comfy") {
+  if (settings.localImageBase && (settings.localImageMode === "comfy" || settings.localImageMode === "forge")) {
     const local = await generateLocalImage({
       prompt: fullPrompt,
       seed,
@@ -97,12 +97,12 @@ export async function generateFictionalReferenceVariation({
       referenceImageBase64: referenceImage,
     });
     if (!local.ok || !local.imageUrl) {
-      throw new Error(local.note || "Local ComfyUI did not generate an image.");
+      throw new Error(local.note || "The configured local reference-image backend did not generate an image.");
     }
     return { imageUrl: local.imageUrl, engine: local.note };
   }
 
   throw new Error(
-    "No reference-aware image model configured. In Advanced Media set an img2img endpoint or enable compatible local ComfyUI with reference nodes.",
+    "No reference-aware image model configured. In Advanced Media set an img2img endpoint, use A1111 / Forge with --api, or configure compatible ComfyUI reference-image nodes.",
   );
 }

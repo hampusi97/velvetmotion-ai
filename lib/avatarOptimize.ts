@@ -43,3 +43,35 @@ export async function compactCardPortrait(file: File): Promise<string> {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
 }
+
+/** Only display raster images from user-created/imported cards in public roster surfaces.
+ * Untrusted SVG and external URLs do not bypass SafeImage's restrictions.
+ */
+export function safeCompanionAvatarUrl(candidate: string | undefined): string | null {
+  if (!candidate) return null;
+  if (/^data:image\/(?:png|jpeg|webp);base64,[a-zA-Z0-9+/]+={0,2}$/i.test(candidate) && candidate.length <= 2_000_000) return candidate;
+  if (/^\/portraits\/[a-zA-Z0-9_-]+\.(?:jpg|jpeg|png|webp)$/.test(candidate)) return candidate;
+  return null;
+}
+
+/** Turn an original built-in SVG illustration into a raster thumbnail the safe image system accepts. */
+export async function rasterizeStarterIllustration(svgDataUrl: string): Promise<string> {
+  if (!svgDataUrl.startsWith("data:image/svg+xml;charset=utf-8,") || typeof document === "undefined") {
+    throw new Error("No built-in illustration available for conversion.");
+  }
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Could not prepare the built-in avatar."));
+    img.src = svgDataUrl;
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = 240;
+  canvas.height = 315;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas is unavailable for avatar conversion.");
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const data = canvas.toDataURL("image/png");
+  if (!safeCompanionAvatarUrl(data)) throw new Error("Could not safely encode the new avatar.");
+  return data;
+}

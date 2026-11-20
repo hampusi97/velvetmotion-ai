@@ -5,6 +5,7 @@
  */
 
 import { getMediaSettings } from "./mediaSettings";
+import { generateA1111Image } from "./a1111Client";
 import { blobToDataUrl } from "./imageStore";
 
 export type LocalGenRequest = {
@@ -97,38 +98,20 @@ export function buildComfyWorkflowGraph(opts: ComfyWorkflowOptions): Record<stri
   return graph;
 }
 
-/** Try Forge/A1111 txt2img style API */
+/** The A1111 and Forge backends share the documented Stable Diffusion WebUI API. */
 async function tryForge(base: string, req: LocalGenRequest): Promise<LocalGenResult> {
-  try {
-    const res = await fetch(`${base.replace(/\/$/, "")}/sdapi/v1/txt2img`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: req.prompt,
-        negative_prompt: req.negative || DEFAULT_NEG,
-        seed: req.seed,
-        width: req.width || 768,
-        height: req.height || 1152,
-        steps: 20,
-        cfg_scale: 5,
-      }),
-      signal: AbortSignal.timeout(120000),
-    });
-    if (!res.ok) return { ok: false, note: `Forge HTTP ${res.status}` };
-    const data = await res.json();
-    const b64 = data.images?.[0];
-    if (!b64) return { ok: false, note: "No image in Forge response" };
-    return {
-      ok: true,
-      imageUrl: b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`,
-      note: "Local Forge/A1111",
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      note: `Forge failed (CORS or offline): ${e instanceof Error ? e.message : "error"}`,
-    };
-  }
+  const settings = getMediaSettings();
+  return generateA1111Image({
+    baseUrl: base,
+    prompt: req.prompt,
+    negativePrompt: req.negative || DEFAULT_NEG,
+    seed: req.seed,
+    width: req.width,
+    height: req.height,
+    checkpoint: req.checkpoint || settings.a1111Checkpoint,
+    initImage: req.referenceImageBase64,
+    denoisingStrength: settings.a1111Denoise,
+  });
 }
 
 /** Generic prompt-url style: POST {prompt,seed} → {url|image} */
@@ -278,7 +261,7 @@ export async function generateLocalImage(
     }
   }
 
-  if (s.localImageMode === "forge") return tryForge(base, req);
+  if (s.localImageMode === "forge") return tryForge(base, { ...req, referenceImageBase64: refPhoto });
   if (s.localImageMode === "prompt-url" && !base.includes(":8188")) {
     return tryCustom(base, req);
   }

@@ -7,6 +7,7 @@
 
 import type { Character } from "./charactersTypes";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
 import { getCharacterFaceSeed, getMediaSettings } from "./mediaSettings";
 import { loadRouterSettings } from "./chatRouter";
 import { generateComfySfwPortrait, probeComfyUi } from "./comfyBridge";
@@ -135,9 +136,9 @@ async function tryHomeEngineImage(
   }
 }
 
-export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age">, _mood: MediaMood = "beauty", _extra = "", _opts?: { seedOverride?: number; preferStatic?: boolean }): string {
-  // Static safe portrait reference
-  return staticPortraitUrl(character.id || "chloe");
+export function characterMediaUrl(character: Pick<Character, "id" | "name" | "figure" | "age"> & Partial<Pick<Character, "avatar">>, _mood: MediaMood = "beauty", _extra = "", _opts?: { seedOverride?: number; preferStatic?: boolean }): string {
+  // Prefer safe self-owned raster thumbnails for imported/custom characters.
+  return safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id || "chloe");
 }
 
 export async function resolveBestMediaUrl(
