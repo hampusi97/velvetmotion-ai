@@ -36,3 +36,21 @@ test("uses a completed asynchronous video render from the configured provider", 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("resolves a relative video result URL against the configured provider", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ videoUrl: "/clips/generated.mp4" });
+  try {
+    const result = await generateStudioVideoClip({
+      imageUrl: "https://images.example.test/original-art.jpg",
+      motionId: "slow-zoom-blink",
+      durationSec: 3,
+      speed: 1,
+      sourceType: "fictional",
+      videoBackendUrl: "https://video.example.test/generate",
+    });
+    assert.equal(result.isGenerative, true);
+    assert.equal(result.videoUrl, "https://video.example.test/clips/generated.mp4");
+  } finally { globalThis.fetch = originalFetch; }
+});
