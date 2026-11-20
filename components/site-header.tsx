@@ -21,6 +21,7 @@ const NAV_LINKS = [
   { href: "/shorts/", label: "Shorts", id: "shorts" },
   { href: "/studio/", label: "Studio", id: "studio" },
   { href: "/download/", label: "Desktop", id: "download" },
+  { href: "/guide/", label: "Guide", id: "guide" },
 ];
 
 export function SiteHeader({
@@ -327,7 +328,8 @@ export function SiteHeader({
               { href: "/private/", label: "Private Content" },
               { href: "/create/", label: "Create Character" },
               { href: "/studio/", label: "Media Studio" },
-              { href: "/download/", label: "Desktop App (⚡ ULTRA)" },
+              { href: "/download/", label: "Desktop App" },
+              { href: "/guide/", label: "How it Works" },
             ].map((item) => (
               <Link
                 key={item.href}
