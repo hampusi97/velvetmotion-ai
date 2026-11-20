@@ -171,18 +171,29 @@ export default function MediaStudioModal({
 
   async function handleGeneratePhoto() {
     const preset = SCENE_PRESETS.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
-    const prompt = [
-      companion.visualDna,
-      preset.suffix,
-      studioStyle,
-      cameraStyle,
-      lightingStyle,
-      wardrobeStyle,
-      customPrompt.trim(),
-      `aspect ${aspect.id}, photorealistic lighting, consenting adult 21+`,
-    ]
-      .filter(Boolean)
-      .join(', ');
+    const custom = customPrompt.trim();
+    const prompt = custom
+      ? [
+          custom,
+          preset.suffix,
+          studioStyle,
+          cameraStyle,
+          lightingStyle,
+          `aspect ${aspect.id}, photorealistic lighting, consenting adult 21+`,
+        ]
+          .filter(Boolean)
+          .join(', ')
+      : [
+          companion.visualDna,
+          preset.suffix,
+          studioStyle,
+          cameraStyle,
+          lightingStyle,
+          wardrobeStyle,
+          `aspect ${aspect.id}, photorealistic lighting, consenting adult 21+`,
+        ]
+          .filter(Boolean)
+          .join(', ');
     const parsedSeed = Number(seedLock) || Math.floor(Math.random() * 90000 + 1000);
     const wantsNsfw = nsfwMode || preset.nsfw;
     const safeNegative = negativePrompt.trim().slice(0, 360);

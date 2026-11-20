@@ -88,12 +88,25 @@ type PromptCharacter = Pick<Character, "id" | "name" | "figure" | "age"> & { vis
 
 function buildPrompt(character: PromptCharacter, mood: MediaMood, extra = ""): string {
   const visualDna = character.visualDna || character.figure || "beautiful adult woman with unique distinctive face, natural features, photoreal";
+  const userScene = extra.trim();
+  // When the user asks for a specific scene, put that first so it is not overridden by face-lock boilerplate.
+  if (userScene.length > 12) {
+    return [
+      userScene,
+      visualDna,
+      `adult woman ${character.age || 24} years old, 21+`,
+      MOOD_PROMPTS[mood],
+      "photoreal, high detail, natural skin",
+    ]
+      .filter(Boolean)
+      .join(". ");
+  }
   return [
     visualDna,
     `adult woman ${character.age || 24} years old, 21+`,
     `${character.name}, same face every shot, consistent identity lock, unique facial features, distinctive look`,
     MOOD_PROMPTS[mood],
-    extra,
+    userScene,
     "looking at viewer, sharp focused eyes, natural proportions, high detail skin texture with pores, photoreal, no plastic skin, no AI artifacts",
   ]
     .filter(Boolean)

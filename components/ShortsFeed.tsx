@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, Heart, MessageCircle, Pause, Play, Volume2 } from "lucide-react";
 import { CHARACTERS } from "@/lib/characters";
 import { SHORTS_GENRES, SHORTS_SERIES } from "@/lib/shortsCatalog";
@@ -8,7 +8,7 @@ import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { speakWithNeuralVoice } from "@/lib/kokoroTts";
 import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
 
-const kenburns = `@keyframes kenburns { 0% { transform: scale(1) translate(0,0); } 50% { transform: scale(1.1) translate(-1.5%,-1%); } 100% { transform: scale(1) translate(0,0); } } .animate-kenburns { animation: kenburns 11s ease-in-out infinite; }`;
+const kenburns = `@keyframes kenburns { 0% { transform: scale(1) translate(0,0); } 50% { transform: scale(1.18) translate(-3%,-2%); } 100% { transform: scale(1) translate(0,0); } } .animate-kenburns { animation: kenburns 11s ease-in-out infinite; }`;
 
 export function ShortsFeed({
   onHome,
@@ -23,6 +23,40 @@ export function ShortsFeed({
   const [likedIds, setLikedIds] = useState<Record<string, boolean>>({});
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [exportNote, setExportNote] = useState<string | null>(null);
+  const [active, setActive] = useState(0);
+  const feedRef = useRef<HTMLDivElement>(null);
+
+  const goTo = useCallback((dir: 1 | -1) => {
+    const el = feedRef.current;
+    if (!el) return;
+    const cards = el.querySelectorAll("section");
+    if (!cards.length) return;
+    setActive((i) => {
+      const next = Math.max(0, Math.min(cards.length - 1, i + dir));
+      cards[next]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") { e.preventDefault(); goTo(1); }
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") { e.preventDefault(); goTo(-1); }
+    };
+    const onWheel = (e: WheelEvent) => {
+      const el = feedRef.current;
+      if (!el || !el.contains(e.target as Node)) return;
+      if (Math.abs(e.deltaY) < 12) return;
+      e.preventDefault();
+      goTo(e.deltaY > 0 ? 1 : -1);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("wheel", onWheel);
+    };
+  }, [goTo]);
 
   const exportClip = async (seriesId: string, portraitUrl: string, title: string) => {
     if (exportingId) return;
@@ -94,7 +128,7 @@ export function ShortsFeed({
       </div>
 
       {/* Full-height CSS snap-y snap-mandatory vertical feed */}
-      <div className="h-[76dvh] snap-y snap-mandatory overflow-y-auto no-scrollbar space-y-4 rounded-3xl">
+      <div ref={feedRef} className="h-[76dvh] snap-y snap-mandatory overflow-y-auto no-scrollbar space-y-4 rounded-3xl">
         {items.map(({ series, ep, character, portrait }, idx) => {
           const liked = Boolean(likedIds[series.id]);
           const animDur = pace === 1.5 ? "7s" : "11s";
@@ -118,6 +152,10 @@ export function ShortsFeed({
                 {items[idx + 1] && <link rel="preload" as="image" href={items[idx + 1].portrait} />}
 
                 <div className="absolute inset-0 bg-gradient-to-t from-[#05050a] via-black/25 to-black/30" />
+                <div className="absolute left-3 top-3 z-20 rounded-full border border-[#00ffa3]/40 bg-black/70 px-2.5 py-0.5 text-[10px] font-bold text-[#00ffa3]">
+                  {paused ? "Paused" : "Playing"} · Motion
+                </div>
+
 
                 {/* Neon Glass Right-Side Action Rail */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2.5">
