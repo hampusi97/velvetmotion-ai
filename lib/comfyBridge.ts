@@ -135,7 +135,10 @@ export async function generateComfySfwPortrait(req: ComfyImageRequest): Promise<
     if (!info.online) {
       throw new Error('Local ComfyUI is offline on port 8188.');
     }
-    checkpointName = info.checkpoints[0] ?? 'sd_xl_base_1.0.safetensors';
+    if (!info.checkpoints.length) {
+      throw new Error('ComfyUI is online but has no compatible checkpoint installed. Install a checkpoint and choose it in Studio.');
+    }
+    checkpointName = info.checkpoints[0];
   }
 
   const workflow = buildSfwPortraitWorkflow({ ...req, checkpointName });
@@ -146,20 +149,23 @@ export async function generateComfySfwPortrait(req: ComfyImageRequest): Promise<
   });
 
   if (!queueRes.ok) {
-    throw new Error(`ComfyUI rejected workflow (HTTP ${queueRes.status})`);
+    const detail = await queueRes.text().catch(() => '');
+    throw new Error(`ComfyUI rejected workflow (HTTP ${queueRes.status}): ${detail.slice(0, 300)}`);
   }
 
-  const { prompt_id: promptId } = (await queueRes.json()) as { prompt_id: string };
+  const { prompt_id: promptId } = (await queueRes.json()) as { prompt_id?: string };
+  if (!promptId) throw new Error('ComfyUI did not return a prompt ID.');
 
   // Poll /history/{promptId} up to 60 seconds
   for (let attempt = 0; attempt < 60; attempt++) {
     await new Promise((r) => setTimeout(r, 1000));
-    const histRes = await fetch(`${base}/history/${promptId}`);
+    const histRes = await fetch(`${base}/history/${encodeURIComponent(promptId)}`);
     if (!histRes.ok) continue;
 
     const hist = (await histRes.json()) as Record<
       string,
       {
+        status?: { status_str?: string };
         outputs?: Record<
           string,
           { images?: Array<{ filename: string; subfolder: string; type: string }> }
@@ -167,6 +173,9 @@ export async function generateComfySfwPortrait(req: ComfyImageRequest): Promise<
       }
     >;
 
+    if (hist[promptId]?.status?.status_str === 'error') {
+      throw new Error('ComfyUI reported a failed generation. Check the local ComfyUI logs.');
+    }
     const outputs = hist[promptId]?.outputs;
     if (!outputs) continue;
 
