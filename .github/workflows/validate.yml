@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: node --test scripts/verify-desktop-release.test.mjs
       - run: node --test scripts/desktopCsp.test.mjs
+      - run: node --test scripts/verify-cloudflare-git-deploy.test.mjs
       - run: npx tsx --test lib/storyboard.test.ts
       - run: npx tsx --test lib/mediaGenerator.test.ts
       - run: npx tsx --test lib/canvasVideoExporter.test.ts
