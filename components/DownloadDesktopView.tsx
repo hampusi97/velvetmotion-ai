@@ -355,7 +355,7 @@ export function DownloadDesktopView() {
           })}
         </div>
         <p className="text-[11px] text-zinc-500">
-          Your device's estimated memory tier is {ramCatalog.label}. Browser memory reports are approximate and sometimes unavailable.
+          Your device&apos;s estimated memory tier is {ramCatalog.label}. Browser memory reports are approximate and sometimes unavailable.
           For reliable local inference, install a compatible runtime and a model that fits your actual RAM and GPU memory.
         </p>
       </section>
