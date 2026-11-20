@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { CHARACTERS, type Character, fallbackReply } from "@/lib/characters";
+import { CHARACTERS, type Character } from "@/lib/characters";
+import { generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { assertCompliance } from "@/lib/complianceFilter";
 import { characterMediaUrl } from "@/lib/media";
 import { speak } from "@/lib/speech";
 import { FantasyCodePanel } from "./FantasyCodePanel";
@@ -27,6 +29,7 @@ export function DualGirlChat({
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const a = CHARACTERS.find((c) => c.id === aId) as Character | undefined;
   const b = CHARACTERS.find((c) => c.id === bId) as Character | undefined;
@@ -51,61 +54,59 @@ export function DualGirlChat({
   const send = async () => {
     const text = input.trim();
     if (!text || !a || !b || busy) return;
+    const guard = assertCompliance(text);
+    if (!guard.ok) {
+      setErrorMsg(guard.reason);
+      return;
+    }
+
     setInput("");
     setBusy(true);
+    setErrorMsg(null);
     const next: Msg[] = [...messages, { role: "user", content: text }];
     setMessages(next);
 
+    // Static-export builds have no /api/chat server route. Use the same real
+    // local/cloud provider router as one-on-one and group chat. A failed model
+    // is NEVER replaced with a fake, pre-written "AI" reply.
+    const toHistory = (turns: Msg[]): RouterMessage[] =>
+      turns.slice(-12).map((m) => ({
+        role: m.role === "user" ? "user" : "assistant",
+        text: m.name ? `[${m.name}]: ${m.content}` : m.content,
+      }));
+
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          characterId: a.id,
-          partnerCharacterId: b.id,
-          messages: next.slice(-10).map((m) => ({
-            role: m.role === "user" ? "user" : "assistant",
-            content: m.content,
-          })),
-          intimacy: 75,
-        }),
+      const replyA = await generateCompanionReply(toHistory(next), {
+        id: a.id,
+        name: a.name,
+        age: a.age,
+        tagline: a.tagline,
+        personality: `${a.personality}. You are part of a shared, consensual fictional-adult scene with ${b.name}. Stay in character, address the user's latest message, and give ${b.name} space to respond.`,
+        backstory: a.background,
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.groupReplies) && data.groupReplies.length >= 2) {
-          const turnA = data.groupReplies[0];
-          const turnB = data.groupReplies[1];
-          setMessages([
-            ...next,
-            { role: "a", name: turnA.characterName || a.name, content: turnA.content },
-            { role: "b", name: turnB.characterName || b.name, content: turnB.content },
-          ]);
-          return;
-        }
+      if (replyA.providerUsed === "provider-unavailable") {
+        setErrorMsg(replyA.text);
+        return;
       }
-      const replyA = fallbackReply(a, text, false);
-      const replyB = fallbackReply(
-        b,
-        `${text} (responding as the second girl in a dual scene with ${a.name})`,
-        false,
-      );
-      setMessages([
-        ...next,
-        { role: "a", name: a.name, content: replyA },
-        { role: "b", name: b.name, content: replyB },
-      ]);
+
+      const afterA: Msg[] = [...next, { role: "a", name: a.name, content: replyA.text }];
+      setMessages(afterA);
+
+      const replyB = await generateCompanionReply(toHistory(afterA), {
+        id: b.id,
+        name: b.name,
+        age: b.age,
+        tagline: b.tagline,
+        personality: `${b.personality}. You are in a consensual fictional-adult shared scene alongside ${a.name}. React meaningfully to what the user and ${a.name} just said; keep your own character identity.`,
+        backstory: b.background,
+      });
+      if (replyB.providerUsed === "provider-unavailable") {
+        setErrorMsg(`${a.name} replied, but ${b.name}'s model connection is unavailable. Check your configured AI provider.`);
+        return;
+      }
+      setMessages([...afterA, { role: "b", name: b.name, content: replyB.text }]);
     } catch {
-      const replyA = fallbackReply(a, text, false);
-      const replyB = fallbackReply(
-        b,
-        `${text} (responding as the second girl in a dual scene with ${a.name})`,
-        false,
-      );
-      setMessages([
-        ...next,
-        { role: "a", name: a.name, content: replyA },
-        { role: "b", name: b.name, content: replyB },
-      ]);
+      setErrorMsg("Could not connect to the selected AI provider. Check the model in Settings, then retry.");
     } finally {
       setBusy(false);
     }
@@ -213,7 +214,8 @@ export function DualGirlChat({
             </div>
           </div>
         ))}
-        {busy && <div className="text-xs text-zinc-500">Both typing…</div>}
+        {busy && <div className="text-xs text-zinc-500">Generating the conversation using your selected model…</div>}
+        {errorMsg && <div role="alert" className="rounded-xl border border-rose-300/25 bg-rose-900/15 p-3 text-xs text-rose-200">{errorMsg}</div>}
       </div>
       <div className="flex gap-2 pt-2">
         <input
