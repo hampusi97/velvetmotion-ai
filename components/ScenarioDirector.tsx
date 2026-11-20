@@ -102,6 +102,9 @@ export function ScenarioDirector({
   const [category, setCategory] = useState<ScenarioCategory | "All">("All");
   const [selectedId, setSelectedId] = useState(SCENARIOS[0].id);
   const [tone, setTone] = useState<Tone>("cinematic");
+  const [pace, setPace] = useState<"slow" | "natural" | "fast">("natural");
+  const [fadeToBlack, setFadeToBlack] = useState(false);
+  const [boundaries, setBoundaries] = useState("");
   const chosen = SCENARIOS.find((s) => s.id === selectedId) ?? SCENARIOS[0];
   const visible = SCENARIOS.filter((s) => category === "All" || s.category === category);
 
@@ -159,6 +162,41 @@ export function ScenarioDirector({
               </button>
             ))}
           </div>
+          <div className="grid gap-2 rounded-2xl border border-[#e5a4bb]/15 bg-[#211723]/70 p-3 sm:grid-cols-2">
+            <label className="block text-[11px] text-zinc-300">
+              Story pacing
+              <select
+                value={pace}
+                onChange={(e) => setPace(e.target.value as "slow" | "natural" | "fast")}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#121118] px-2 py-2 text-xs text-white"
+              >
+                <option value="slow">Slow · character-first</option>
+                <option value="natural">Natural · responsive</option>
+                <option value="fast">Fast · move the story</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/15 px-3 py-2 text-[11px] text-zinc-200">
+              <input type="checkbox" checked={fadeToBlack} onChange={(e) => setFadeToBlack(e.target.checked)}
+                className="accent-[#d784a4]" />
+              Fade to black for intimate moments
+            </label>
+            <label className="sm:col-span-2 text-[11px] text-zinc-300">
+              My story boundaries (optional, not saved to an account)
+              <input
+                type="text"
+                maxLength={160}
+                value={boundaries}
+                onChange={(e) => setBoundaries(e.target.value)}
+                placeholder="For example: avoid humiliation; keep communication mutual"
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#121118] px-3 py-2 text-xs text-white placeholder:text-zinc-500"
+              />
+            </label>
+            <p className="sm:col-span-2 text-[10px] leading-relaxed text-zinc-500">
+              These are instructions to the chosen AI provider, not a guarantee of model behavior.
+              Fictional adult consent and the selected provider’s rules always apply.
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="flex items-center gap-2 text-[11px] text-zinc-300">
               <Sparkles className="h-3.5 w-3.5 text-pink-300" />
@@ -183,7 +221,18 @@ export function ScenarioDirector({
                   : tone === "high-stakes"
                     ? "Make decisions feel consequential, but preserve user agency."
                     : "Use cinematic pacing and strong atmosphere.";
-                onStart(`${chosen.starter} ${toneInstruction} All characters are fictional adults, and the user controls their own role.`);
+                const paceInstruction = pace === "slow"
+                  ? "Use slow, layered, character-driven pacing."
+                  : pace === "fast"
+                    ? "Move the scene forward decisively, but always let the user choose their actions."
+                    : "Use responsive natural dialogue and let choices shape the pacing.";
+                const intimacyInstruction = fadeToBlack
+                  ? "Fade to black before intimate action and continue with emotional aftermath."
+                  : "Respect the connected model's adult-fiction rules and content limitations.";
+                const boundaryInstruction = boundaries.trim()
+                  ? `User-defined limits to respect: ${boundaries.trim().slice(0, 160)}.`
+                  : "";
+                onStart(`${chosen.starter} ${toneInstruction} ${paceInstruction} ${intimacyInstruction} ${boundaryInstruction} All characters are consenting fictional adults, and the user controls their own role.`);
                 setOpen(false);
               }}
             >
