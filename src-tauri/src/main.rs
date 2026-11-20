@@ -35,6 +35,11 @@ fn port_open(port: u16) -> bool {
 }
 
 #[tauri::command]
+fn desktop_app_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+#[tauri::command]
 fn get_system_specs() -> SystemSpecs {
     let mut sys = System::new_all();
     sys.refresh_memory();
@@ -92,6 +97,7 @@ fn main() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            desktop_app_version,
             get_system_specs,
             probe_local_engines,
             toggle_boss_key
