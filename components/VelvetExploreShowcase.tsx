@@ -64,6 +64,12 @@ const AFTER_DARK_CARDS = AFTER_DARK_COMPANIONS.map((profile) => toShowcaseCard(
 ));
 
 const ARCHETYPE_HAIR: Record<string, ShowcaseCompanion['hair']> = {
+  'selene-vega': 'Black',
+  'romy-bell': 'Red',
+  'talia-james': 'Black',
+  'dani-reyes': 'Brunette',
+  'elara-shah': 'Black',
+  'beck-carver': 'Blonde',
   'mara-graves': 'Black',
   'vesna-nox': 'Red',
   'blair-hartwell': 'Blonde',
