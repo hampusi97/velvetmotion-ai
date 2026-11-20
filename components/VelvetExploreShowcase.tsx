@@ -337,6 +337,7 @@ export default function VelvetExploreShowcase() {
   const [heroIdx, setHeroIdx] = useState(0);
   const [query, setQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [filterSheet, setFilterSheet] = useState(false);
 
   useEffect(() => {
     const onStyleTab = (e: Event) => {
@@ -459,7 +460,9 @@ export default function VelvetExploreShowcase() {
             </Link>
           </div>
 
-          <div className="mt-4 flex items-center gap-2.5 overflow-x-auto pb-2 no-scrollbar">
+          <div className="mt-4 flex items-center gap-2.5">
+            <button type="button" onClick={() => setFilterSheet(true)} className="lg:hidden shrink-0 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white">Filters</button>
+            <div className="hidden lg:flex items-center gap-2.5 overflow-x-auto pb-2 no-scrollbar flex-1">
             <div className="relative min-w-[180px] sm:min-w-[210px]">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
               <input
@@ -489,6 +492,7 @@ export default function VelvetExploreShowcase() {
                 </button>
               );
             })}
+          </div>
           </div>
 
           {/* 6-COLUMN PORTRAIT GRID WITH INTERLEAVED NEON PROMO TILES */}
@@ -710,6 +714,22 @@ export default function VelvetExploreShowcase() {
           </div>
         </section>
       </div>
+      {filterSheet && (
+        <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setFilterSheet(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute bottom-0 inset-x-0 rounded-t-3xl bg-[#141418] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold">Filters</p>
+              <button type="button" onClick={() => setFilterSheet(false)} className="text-zinc-400">✕</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {FILTER_PILLS.map((pill) => (
+                <button key={pill} type="button" onClick={() => { setActiveFilter(pill); setFilterSheet(false); }} className={`rounded-full px-4 py-2 text-xs font-semibold ${activeFilter === pill ? 'bg-pink-500 text-white' : 'border border-white/15 text-zinc-300'}`}>{pill}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -14,7 +14,8 @@ export function InstallPrompt() {
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferred(e);
-      setShow(true);
+      // Delay so it doesn't cover the first interaction
+      setTimeout(() => setShow(true), 8000);
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -23,7 +24,7 @@ export function InstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-sm rounded-2xl border border-pink-500/40 bg-zinc-950 p-4 shadow-2xl">
+    <div className="fixed bottom-24 left-4 right-4 z-50 mx-auto max-w-sm lg:bottom-6 rounded-2xl border border-pink-500/40 bg-zinc-950 p-4 shadow-2xl">
       <p className="text-sm font-medium text-white">Add VelvetMotion to your home screen</p>
       <p className="mt-1 text-xs text-zinc-400">Full screen, faster, no browser bar.</p>
       <div className="mt-3 flex gap-2">
