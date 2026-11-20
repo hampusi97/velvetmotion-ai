@@ -337,6 +337,7 @@ export function DownloadDesktopView() {
               <a href="https://github.com/LostRuins/koboldcpp" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">KoboldCpp</a>
               <a href="https://github.com/Comfy-Org/ComfyUI" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">ComfyUI (images)</a>
               <a href="https://github.com/ciredark/LAIGFE" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">LAIGFE full installer</a>
+              <a href="https://github.com/AUTOMATIC1111/stable-diffusion-webui" target="_blank" rel="noreferrer" className="rounded-full border border-white/15 px-3 py-1 text-[11px] text-zinc-200 hover:border-white/35">SD web UI (:7860)</a>
             </div>
             <p className="mt-2 text-[10px] text-zinc-500">Start the launcher, then open the site. If a local engine is running, NSFW selfies use your GPU.</p>
           </div>

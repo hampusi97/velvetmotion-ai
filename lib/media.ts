@@ -174,6 +174,41 @@ export async function resolveBestMediaUrl(
     // Priority 1A: Local ComfyUI Bridge (:8188 SFW creative outfit/scene portraits) when online
     const comfyBase = (settings?.localImageBase || "http://127.0.0.1:8188").trim();
     const comfyProbe = await probeComfyUi(comfyBase);
+
+    // MyGirlGPT-style: Stable Diffusion web UI on :7860
+    let sdOnline = false;
+    try {
+      const sd = await fetch("http://127.0.0.1:7860/sdapi/v1/options", { signal: AbortSignal.timeout(800) });
+      sdOnline = sd.ok;
+    } catch { /* offline */ }
+    if (sdOnline && requiresAdultEngine) {
+      try {
+        const body = {
+          prompt,
+          negative_prompt: "clothes, clothing, dress, shirt, bra, underwear, censored, blurry, low quality",
+          steps: 20,
+          width: 512,
+          height: 768,
+          cfg_scale: 7,
+          seed,
+        };
+        const res = await fetch("http://127.0.0.1:7860/sdapi/v1/txt2img", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          const data = await res.json() as { images?: string[] };
+          if (data.images?.[0]) {
+            const dataUrl = `data:image/png;base64,${data.images[0]}`;
+            reportImg("sd-webui");
+            return { url: dataUrl, note: "Local SD web UI (:7860)", seed, engine: "sd-webui" };
+          }
+        }
+      } catch (e) {
+        errors.push(e instanceof Error ? e.message : "SD web UI failed");
+      }
+    }
     if (comfyProbe.online) {
       try {
         const blobUrl = await generateComfySfwPortrait({
