@@ -40,6 +40,8 @@ export function DownloadDesktopView() {
   const [computeMode, setComputeMode] = useState<LocalComputeMode>("balanced");
   const [motion, setMotion] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [signedUpdaterEnabled, setSignedUpdaterEnabled] = useState(false);
+  const [autoUpdateOnLaunch, setAutoUpdateOnLaunch] = useState(true);
   const engine = useLocalEngineStatus();
   const ram = getRecommendedPresetsForRam(engine.ramGb);
   const installer = release ? chooseDesktopInstaller(release.assets, platform) : null;
@@ -56,6 +58,11 @@ export function DownloadDesktopView() {
     setPlatform(detectDesktopPlatform(navigator.userAgent));
     setIsMobile(/iphone|ipad|ipod|android/i.test(navigator.userAgent));
     setComputeMode(getLocalComputeMode());
+    try { setAutoUpdateOnLaunch(localStorage.getItem("vm:auto-signed-desktop-updates") !== "off"); } catch { /* storage disabled */ }
+    if (window.__TAURI_INTERNALS__?.invoke) {
+      void window.__TAURI_INTERNALS__.invoke<boolean>("desktop_signed_updates_enabled")
+        .then(setSignedUpdaterEnabled).catch(() => setSignedUpdaterEnabled(false));
+    }
     const controller = new AbortController();
     const load = async () => {
       try {
@@ -295,6 +302,39 @@ export function DownloadDesktopView() {
           </div>;
         })}
       </section>
+
+      {engine.isDesktop && (
+        <section className="space-y-3 rounded-[24px] border border-[#e8bbca]/20 bg-[#2a1a2b] p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="max-w-2xl">
+              <h2 className="font-display text-lg font-semibold text-white">Signed desktop updates</h2>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-300">
+                {signedUpdaterEnabled
+                  ? "This desktop build supports verified updates. It can check for and install a cryptographically signed update when the app starts."
+                  : "This installed desktop build does not have a signed updater configured. Download newer versions from the official GitHub Releases page until a signed build is available."}
+              </p>
+            </div>
+            {signedUpdaterEnabled ? (
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-pink-300/25 px-3 py-2 text-xs text-pink-100">
+                <input type="checkbox" checked={autoUpdateOnLaunch} className="accent-[#d98da7]"
+                  onChange={(e) => {
+                    setAutoUpdateOnLaunch(e.target.checked);
+                    try { localStorage.setItem("vm:auto-signed-desktop-updates", e.target.checked ? "on" : "off"); } catch { /* private mode */ }
+                  }} />
+                Auto-install verified updates on launch
+              </label>
+            ) : (
+              <a href={RELEASES_PAGE} target="_blank" rel="noopener noreferrer"
+                className="rounded-full border border-[#e5bbca]/30 px-4 py-2 text-xs font-semibold text-pink-100 hover:border-pink-300/60">
+                Official downloads
+              </a>
+            )}
+          </div>
+          <p className="text-[11px] text-zinc-500">
+            Installation never runs from an unsigned source. Existing sessions are not automatically restarted mid-conversation.
+          </p>
+        </section>
+      )}
 
       <section className="space-y-3 rounded-[26px] border border-white/10 bg-[#17121b] p-5 sm:p-7">
         <h2 className="font-display text-xl font-semibold">Before you install</h2>
