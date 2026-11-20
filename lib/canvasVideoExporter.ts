@@ -199,12 +199,18 @@ type VideoBackendResponse = {
   error?: string;
 };
 
-function videoUrlFromResponse(data: VideoBackendResponse): string | null {
+function videoUrlFromResponse(data: VideoBackendResponse, endpoint: string): string | null {
   const url = data.videoUrl || data.url || data.video ||
     (typeof data.output === "string" ? data.output : data.output?.videoUrl || data.output?.url) ||
     data.result?.videoUrl || data.result?.url;
   // A blob: URL created in a remote server process is not usable by a browser.
-  return typeof url === "string" && /^(https?:\/\/|data:video\/)/i.test(url) ? url : null;
+  if (typeof url !== "string") return null;
+  if (/^(https?:\/\/|data:video\/)/i.test(url)) return url;
+  if (url.startsWith("/") && !url.startsWith("//")) {
+    const resolved = new URL(url, endpoint);
+    if (resolved.origin === new URL(endpoint).origin) return resolved.toString();
+  }
+  return null;
 }
 
 /** Accept async video jobs only from the same origin as the configured API. */
@@ -227,7 +233,7 @@ async function pollVideoJob(initial: VideoBackendResponse, endpoint: string, sig
     const response = await fetch(url, { signal, cache: "no-store" });
     if (!response.ok) throw new Error(`Video job status HTTP ${response.status}`);
     const current = (await response.json()) as VideoBackendResponse;
-    const finished = videoUrlFromResponse(current);
+    const finished = videoUrlFromResponse(current, endpoint);
     if (finished) return finished;
     const status = (current.state || current.status || "").toLowerCase();
     if (["failed", "error", "cancelled", "canceled"].includes(status) || current.error) {
@@ -286,7 +292,7 @@ export async function generateStudioVideoClip(
         };
       }
       const data = (await res.json()) as VideoBackendResponse;
-      const url = videoUrlFromResponse(data) ||
+      const url = videoUrlFromResponse(data, endpoint) ||
         ((data.statusUrl || data.status_url) ? await pollVideoJob(data, endpoint, ctrl.signal) : null);
       if (url) {
         return {
