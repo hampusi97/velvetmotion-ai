@@ -63,3 +63,11 @@ test("refuses to verify without a full GitHub commit SHA or token", async () => 
     fetcher:async()=>{throw new Error("should not fetch");},
   }),/are required/);
 });
+
+test("newest check run wins after a Cloudflare provider rerun for the same commit", () => {
+  const old = { ...success(WORKER_CHECK), id: 111 };
+  const newer = { name:WORKER_CHECK, id: 222, status:"completed", conclusion:"failure" };
+  const result = evaluateDeployChecks([newer,old,success(PAGES_CHECK)]);
+  assert.equal(result.provider,"pages");
+  assert.match(result.warning,/Workers native build did not succeed/);
+});
