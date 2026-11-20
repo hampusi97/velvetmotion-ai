@@ -99,7 +99,7 @@ export default function FeatureGuidePage() {
             Explore every possibility.<span className="block bg-gradient-to-r from-[#f6d0bd] via-[#ecb4cf] to-[#bfb5e9] bg-clip-text text-transparent">Know what is real.</span>
           </h1>
           <p className="relative mt-5 max-w-2xl text-sm leading-7 text-[#ddcbd6]">
-            A guide to VelvetMotion's fictional adult companions, conversations, pictures, video, voices and desktop app.
+            A guide to VelvetMotion&apos;s fictional adult companions, conversations, pictures, video, voices and desktop app.
             Some experiences run immediately. Others need compatible local or cloud AI services. We label the difference.
           </p>
         </section>
