@@ -10,6 +10,7 @@ import {
 import { parseCharacterCardFile } from "@/lib/pngCardDecode";
 import { compactCardPortrait } from "@/lib/avatarOptimize";
 import { loadLorebook, parseCharacterLorebook, saveLorebook } from "@/lib/lorebook";
+import { ORIGINAL_STARTER_COMPANIONS } from "@/lib/originalStarterCompanions";
 
 export function CardImport({
   onHome,
@@ -24,6 +25,17 @@ export function CardImport({
   const [list, setList] = useState<Character[]>(() =>
     typeof window !== "undefined" ? loadImportedCharacters() : [],
   );
+
+  const addStarter = (character: Character) => {
+    setError(null);
+    setOk(null);
+    if (!saveImportedCharacter(character)) {
+      setError("Could not add the companion. Browser storage is full or disabled.");
+      return;
+    }
+    setList(loadImportedCharacters());
+    setOk(`Added ${character.name} to your imported library. Original illustrated avatar is a placeholder; generate or import a portrait later.`);
+  };
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -89,6 +101,39 @@ export function CardImport({
           }}
         />
       </label>
+
+      <section aria-labelledby="starter-title" className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="starter-title" className="text-lg font-semibold text-pink-100">Original starter companions</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-400">
+              Six new fictional adult personalities created for VelvetMotion, not copied from third-party games.
+              Preview and add only the ones you want. Illustrations are placeholders for portraits you generate.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full border border-pink-300/20 bg-pink-500/10 px-2 py-1 text-[10px] text-pink-200">6 ORIGINAL</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {ORIGINAL_STARTER_COMPANIONS.map((character) => {
+            const alreadyAdded = list.some((item) => item.id === character.id);
+            return (
+              <article key={character.id} className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-[#2d2031] to-[#16101b]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={character.avatar} alt={`Illustrated placeholder for ${character.name}`}
+                  className="aspect-[3/4] w-full object-cover" loading="lazy" />
+                <div className="space-y-1.5 p-2.5">
+                  <p className="truncate text-xs font-semibold text-white">{character.name} · {character.age}</p>
+                  <p className="line-clamp-2 min-h-8 text-[10px] leading-4 text-zinc-300">{character.tagline}</p>
+                  <button type="button" onClick={() => alreadyAdded ? onOpen(character) : addStarter(character)}
+                    className="w-full rounded-lg border border-pink-300/30 bg-pink-500/15 px-2 py-2 text-[11px] font-semibold text-pink-100 hover:bg-pink-500/30">
+                    {alreadyAdded ? "Start chatting" : "Add companion"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
 
       {error && <p role="alert" className="text-sm text-red-400">{error}</p>}
       {ok && <p role="status" className="text-sm text-emerald-400">{ok}</p>}
