@@ -4,7 +4,7 @@
  */
 
 export const PORTRAIT_BY_ID: Record<string, string> = {
-  // 12 Flagship Companions (.webp)
+  // Flagship companions (.webp)
   "chloe-parker": "/portraits/chloe-parker.webp",
   "maya-solis": "/portraits/maya-solis.webp",
   "sloane-kensington": "/portraits/sloane-kensington.webp",
@@ -17,6 +17,9 @@ export const PORTRAIT_BY_ID: Record<string, string> = {
   "nadine-okoye": "/portraits/nadine-okoye.webp",
   "claire-bennett": "/portraits/claire-bennett.webp",
   "yumi-chen": "/portraits/yumi-chen.webp",
+  "imani-reed": "/portraits/imani-reed.webp",
+  "renata-costa": "/portraits/renata-costa.webp",
+  "celeste-voss": "/portraits/celeste-voss.webp",
 
   // 36 Distinct Roster Companions (.jpg)
   "nova-g": "/portraits/nova-g.jpg",

@@ -23,6 +23,13 @@ import { saveCustomCompanionDB, saveGalleryDB } from '@/lib/db';
 import { emitVaultUpdated } from '@/lib/firebaseSync';
 import { extractCharaFromPngBuffer, parseCardV2Json } from '@/lib/characterCardV2';
 import { SafeImage } from '@/components/SafeImage';
+import {
+  composeCompanionVideoPrompt,
+  DEFAULT_COMPANION_VIDEO_SCENE,
+  validateCompanionVideoPrompt,
+  VIDEO_SCENE_LIMITS,
+  VIDEO_SCENE_PRESETS,
+} from '@/lib/companionVideoPrompt';
 import { AtelierStoryboard } from '@/components/AtelierStoryboard';
 
 interface MediaStudioModalProps {
@@ -116,13 +123,17 @@ export default function MediaStudioModal({
   const [photoRevealed, setPhotoRevealed] = useState(true);
   const [engineBadge, setEngineBadge] = useState<string | null>(null);
 
-  const [videoSourceUrl, setVideoSourceUrl] = useState<string>(FLAGSHIP_COMPANIONS[0].portraitUrl);
+  const [videoSourceUrl, setVideoSourceUrl] = useState(() =>
+    FLAGSHIP_COMPANIONS.find((profile) => profile.id === activeChatCompanionId)?.portraitUrl ?? FLAGSHIP_COMPANIONS[0].portraitUrl,
+  );
   const [motionId, setMotionId] = useState<VideoMotionPreset['id']>(VIDEO_MOTION_PRESETS[0].id);
   const [durationSec, setDurationSec] = useState<3 | 5 | 8>(5);
   const [videoSpeed, setVideoSpeed] = useState<0.75 | 1 | 1.25>(1);
   const [videoMode, setVideoMode] = useState<'ai' | 'animated-still'>('ai');
   const [videoResolution, setVideoResolution] = useState<480 | 720 | 1080>(720);
-  const [videoDirection, setVideoDirection] = useState('');
+  const [videoScene, setVideoScene] = useState(DEFAULT_COMPANION_VIDEO_SCENE);
+  const [videoScenePreset, setVideoScenePreset] = useState('');
+  const [copiedPrompt, setCopiedPrompt] = useState('');
   const [videoAdultMode, setVideoAdultMode] = useState(false);
   const videoAbort = useRef<AbortController | null>(null);
   const [videoBusy, setVideoBusy] = useState(false);
@@ -188,6 +199,27 @@ export default function MediaStudioModal({
     FLAGSHIP_COMPANIONS.some((c) => c.portraitUrl === videoSourceUrl) ||
     (generatedPhoto && videoSourceUrl === generatedPhoto),
   );
+
+  const fictionalVideoSource = uploadVideoSource
+    ? uploadSourceKind === 'fictional' && uploadRightsConfirmed
+    : knownFictionalVideoSource;
+  const usesAdultVideoMode = fictionalVideoSource && (uploadVideoSource ? uploadedAdultMode : videoAdultMode);
+  const videoPrompt = composeCompanionVideoPrompt(videoScene, fictionalVideoSource, usesAdultVideoMode);
+
+  async function copyVideoPrompt() {
+    const error = validateCompanionVideoPrompt(videoPrompt, usesAdultVideoMode);
+    if (error) {
+      setErrorMsg(error);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(videoPrompt);
+      setCopiedPrompt(videoPrompt);
+      setErrorMsg(null);
+    } catch {
+      setErrorMsg('Clipboard access is unavailable. Select the prompt preview to copy it manually.');
+    }
+  }
 
   async function handleGeneratePhoto() {
     const preset = scenePresets.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
@@ -306,7 +338,13 @@ export default function MediaStudioModal({
       setErrorMsg('Choose the image source and confirm that you have permission to use it before animating.');
       return;
     }
-    const fictionalSource = derivedFromUpload ? uploadSourceKind === 'fictional' : knownFictionalVideoSource;
+    if (videoMode === 'ai') {
+      const error = validateCompanionVideoPrompt(videoPrompt, usesAdultVideoMode);
+      if (error) {
+        setErrorMsg(error);
+        return;
+      }
+    }
     if (videoAbort.current) return;
     const request = new AbortController();
     videoAbort.current = request;
@@ -320,16 +358,9 @@ export default function MediaStudioModal({
         motionId,
         durationSec,
         speed: videoSpeed,
-        // A real-person photograph may only be used for a neutral, nonsexual animation.
-        prompt: !fictionalSource
-          ? 'Nonsexual portrait animation, subtle natural blink, gentle head turn, fully clothed, natural lighting'
-          : videoDirection.trim() || 'Natural character movement, consistent face, smooth camera, stable lighting',
-        sourceType: derivedFromUpload
-          ? uploadSourceKind === 'fictional' ? 'fictional' : 'real-person'
-          : knownFictionalVideoSource ? 'fictional' : 'unspecified',
-        adultMode: videoMode === 'ai' && (derivedFromUpload
-          ? uploadSourceKind === 'fictional' && uploadedAdultMode
-          : knownFictionalVideoSource && videoAdultMode),
+        prompt: videoMode === 'ai' ? videoPrompt : undefined,
+        sourceType: fictionalVideoSource ? 'fictional' : derivedFromUpload && uploadSourceKind === 'self' ? 'real-person' : 'unspecified',
+        adultMode: videoMode === 'ai' && usesAdultVideoMode,
         mode: videoMode,
         resolution: videoMode === 'ai' ? videoResolution : undefined,
         signal: request.signal,
@@ -886,12 +917,7 @@ export default function MediaStudioModal({
                     <option value={480}>480p</option><option value={720}>720p</option><option value={1080}>1080p</option>
                   </select>
                 </label>
-                <label className="block text-zinc-300">Motion direction
-                  <input value={videoDirection} onChange={(e) => setVideoDirection(e.target.value)} maxLength={500}
-                    placeholder="Slow dolly-in, soft window light"
-                    className="mt-1 w-full rounded-lg border border-white/15 bg-zinc-950 p-2" />
-                </label>
-                <p className="text-[11px] text-zinc-400">Your model determines the final resolution. Uploads and saved images without confirmed fictional provenance use neutral motion.</p>
+                <p className="text-[11px] text-zinc-400">Your model determines the final resolution.</p>
               </div>
             )}
           </div>
@@ -900,6 +926,74 @@ export default function MediaStudioModal({
               <input type="checkbox" checked={videoAdultMode} onChange={(e) => setVideoAdultMode(e.target.checked)} />
               18+ fictional companion mode
             </label>
+          )}
+
+          {uploadVideoSource && (
+            <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
+              <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
+              <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
+              <label className="mt-2 flex items-start gap-2">
+                <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
+                <span>I own or have permission to animate this image and all depicted people are adults.</span>
+              </label>
+            </div>
+          )}
+          {videoMode === 'ai' && uploadVideoSource && uploadSourceKind === 'fictional' && (
+            <label className="flex items-center justify-between rounded-xl border border-fuchsia-300/20 bg-black/30 p-3 text-[11px] text-pink-100">
+              <span>18+ mode for original fictional adult artwork
+                <small className="mt-0.5 block text-zinc-400">Requires a compatible model; not a guarantee of content.</small>
+              </span>
+              <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="accent-[#dc789c]" />
+            </label>
+          )}
+          {videoMode === 'ai' && (
+            <section aria-labelledby="video-prompt-heading" className="space-y-3 rounded-2xl border border-rose-200/20 bg-[#221522] p-4">
+              <h3 id="video-prompt-heading" className="font-display text-lg text-rose-50">Scene prompt</h3>
+              {fictionalVideoSource ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {VIDEO_SCENE_PRESETS.filter((preset) => !preset.adult || usesAdultVideoMode).map((preset) => (
+                      <button key={preset.id} type="button" aria-pressed={videoScenePreset === preset.id}
+                        onClick={() => { setVideoScene(preset.scene); setVideoScenePreset(preset.id); }}
+                        className={`rounded-full border px-3 py-2 text-xs ${videoScenePreset === preset.id ? 'border-rose-200/70 bg-rose-200/20 text-white' : 'border-white/15 text-rose-100 hover:bg-white/10'}`}>
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="block text-rose-100">Action
+                    <textarea value={videoScene.action} rows={3} maxLength={VIDEO_SCENE_LIMITS.action}
+                      placeholder="Describe what happens during the shot."
+                      onChange={(event) => {
+                        setVideoScene({ ...videoScene, action: event.target.value });
+                        setVideoScenePreset('');
+                      }}
+                      className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-sm text-white" />
+                  </label>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {(['setting', 'camera', 'lighting'] as const).map((field) => (
+                      <label key={field} className="block capitalize text-rose-100">{field}
+                        <input value={videoScene[field]} maxLength={VIDEO_SCENE_LIMITS[field]}
+                          onChange={(event) => {
+                            setVideoScene({ ...videoScene, [field]: event.target.value });
+                            setVideoScenePreset('');
+                              }}
+                          className="mt-1 block w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-white" />
+                      </label>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-zinc-300">Unconfirmed and real-person sources use neutral portrait motion.</p>
+              )}
+              <details className="rounded-xl border border-white/15 bg-black/20 p-3">
+                <summary className="cursor-pointer text-rose-100">Preview the prompt your model receives</summary>
+                <p className="mt-2 whitespace-pre-wrap leading-relaxed text-zinc-200">{videoPrompt}</p>
+                <button type="button" onClick={() => void copyVideoPrompt()}
+                  className="mt-3 rounded-full border border-rose-200/30 px-3 py-2 text-rose-100 hover:bg-rose-200/10">
+                  {copiedPrompt === videoPrompt ? 'Copied' : 'Copy prompt'}
+                </button>
+              </details>
+            </section>
           )}
 
           <div className="space-y-1.5">
@@ -957,24 +1051,6 @@ export default function MediaStudioModal({
             </div>
           </div>
 
-          {uploadVideoSource && (
-            <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
-              <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
-              <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
-              <label className="mt-2 flex items-start gap-2">
-                <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
-                <span>I own or have permission to animate this image and all depicted people are adults.</span>
-              </label>
-            </div>
-          )}
-          {videoMode === 'ai' && uploadVideoSource && uploadSourceKind === 'fictional' && (
-            <label className="flex items-center justify-between rounded-xl border border-fuchsia-300/20 bg-black/30 p-3 text-[11px] text-pink-100">
-              <span>18+ mode for original fictional adult artwork
-                <small className="mt-0.5 block text-zinc-400">Requires a compatible model; not a guarantee of content.</small>
-              </span>
-              <input type="checkbox" checked={uploadedAdultMode} onChange={(e) => setUploadedAdultMode(e.target.checked)} className="accent-[#dc789c]" />
-            </label>
-          )}
           <button
             type="button"
             disabled={videoBusy}

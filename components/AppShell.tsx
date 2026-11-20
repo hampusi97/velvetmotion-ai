@@ -130,6 +130,7 @@ function ComingSoon3DCard({ onBack }: { onBack: () => void }) {
 export function AppShell({ initialView = "home" }: { initialView?: ShellRouteView }) {
   const pathname = usePathname() || "/";
   const [view, setView] = useState<ShellRouteView>(initialView);
+  const [studioInitialTab, setStudioInitialTab] = useState<"photo" | "video">("photo");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
@@ -195,6 +196,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       setAdult(localStorage.getItem("velvet-age") === "true");
       const qView = params.get("view") as ShellRouteView | null;
       if (qView && pathname === "/") setView(qView);
+      if (pathname.startsWith("/studio")) setStudioInitialTab(params.get("mode") === "video" ? "video" : "photo");
       const qId = params.get("companion") || params.get("id");
       if (qId) {
         const resolved = getCharacter(qId);
@@ -287,6 +289,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       lastSearchRef.current = searchStr;
       const params = new URLSearchParams(searchStr);
       const qView = params.get("view") as ShellRouteView | null;
+      if (pathname.startsWith("/studio")) setStudioInitialTab(params.get("mode") === "video" ? "video" : "photo");
       const qId = params.get("companion") || params.get("id");
       if (window.location.pathname === "/") {
         if (qView) {
@@ -498,6 +501,8 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               <MediaStudioModal
                 isOpen={true}
                 standalone={true}
+                key={`${selected?.id || ""}:${studioInitialTab}`}
+                initialTab={studioInitialTab}
                 activeChatCompanionId={selected?.id}
                 onClose={() => setView("home")}
                 onDropIntoChat={(id, imgUrl, cap) => {

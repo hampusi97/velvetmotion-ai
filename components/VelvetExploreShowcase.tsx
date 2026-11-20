@@ -10,11 +10,9 @@ import {
   Flame,
   Play,
   ChevronRight,
-  Check,
-  MessageCircle,
-  Volume2,
 } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
+import { AFTER_DARK_COMPANIONS } from '@/data/companions';
 
 export interface ShowcaseCompanion {
   id: string;
@@ -22,20 +20,31 @@ export interface ShowcaseCompanion {
   age: number;
   portrait: string;
   fallbackPortrait?: string;
-  category: 'Caucasian' | 'Latina' | 'Asian' | 'European' | 'South Asian' | 'Mixed';
+  category?: 'Caucasian' | 'Black' | 'Latina' | 'Asian' | 'European' | 'South Asian' | 'Mixed';
   hair: 'Blonde' | 'Brunette' | 'Black' | 'Red' | 'Colorful';
   isNew?: boolean;
-  verified?: boolean;
   hasPrivate?: boolean;
-  hasVideo?: boolean;
-  hasVoice?: boolean;
   tagline: string;
+  role?: string;
 }
 
 const FALLBACK_PORTRAIT = '/portraits/nova.jpg';
 
 /** Verified files confirmed inside `public/portraits/` in hampusi97/velvetmotion-ai */
+const AFTER_DARK_CARDS: ShowcaseCompanion[] = AFTER_DARK_COMPANIONS.map((profile) => ({
+  id: profile.id,
+  name: profile.name,
+  age: profile.age,
+  portrait: profile.portraitUrl,
+  category: profile.id === 'imani-reed' ? 'Black' : profile.id === 'renata-costa' ? 'Latina' : undefined,
+  hair: profile.id === 'renata-costa' ? 'Brunette' : 'Black',
+  isNew: true,
+  role: profile.archetype,
+  tagline: profile.tagline,
+}));
+
 export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
+  ...AFTER_DARK_CARDS,
   {
     id: 'chloe',
     name: 'Chloe',
@@ -44,9 +53,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'Caucasian',
     hair: 'Brunette',
     isNew: true,
-    verified: true,
-    hasVideo: true,
-    hasVoice: true,
     tagline: 'Late-night penthouse energy',
   },
   {
@@ -57,8 +63,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'South Asian',
     hair: 'Black',
     isNew: true,
-    verified: true,
-    hasVideo: true,
     hasPrivate: true,
     tagline: 'Playful, bold & unforgettable',
   },
@@ -71,7 +75,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     hair: 'Brunette',
     isNew: true,
     hasPrivate: true,
-    hasVideo: true,
     tagline: 'Velvet lounge confessions',
   },
   {
@@ -82,8 +85,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'Mixed',
     hair: 'Colorful',
     hasPrivate: true,
-    hasVideo: true,
-    hasVoice: true,
     tagline: 'Neon café rebel',
   },
   {
@@ -94,8 +95,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'Asian',
     hair: 'Black',
     hasPrivate: true,
-    hasVideo: true,
-    hasVoice: true,
     tagline: 'Tokyo midnight arcade',
   },
   {
@@ -105,9 +104,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     portrait: '/portraits/mia.jpg',
     category: 'Caucasian',
     hair: 'Blonde',
-    verified: true,
-    hasVideo: true,
-    hasVoice: true,
     tagline: 'Golden hour tease',
   },
   {
@@ -119,7 +115,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     hair: 'Black',
     isNew: true,
     hasPrivate: true,
-    hasVideo: true,
     tagline: 'Midnight rooftop drinks',
   },
   {
@@ -130,8 +125,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'European',
     hair: 'Blonde',
     isNew: true,
-    hasVideo: true,
-    hasVoice: true,
     tagline: 'Nordic charm after dark',
   },
   {
@@ -142,7 +135,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'Latina',
     hair: 'Brunette',
     hasPrivate: true,
-    hasVideo: true,
     tagline: 'VIP lounge regular',
   },
   {
@@ -153,8 +145,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'European',
     hair: 'Blonde',
     hasPrivate: true,
-    hasVideo: true,
-    hasVoice: true,
     tagline: 'After-party whisperer',
   },
   {
@@ -164,8 +154,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     portrait: '/portraits/nova.jpg',
     category: 'Asian',
     hair: 'Black',
-    verified: true,
-    hasVideo: true,
     hasPrivate: true,
     tagline: 'Cyber-neon muse',
   },
@@ -177,7 +165,6 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     category: 'Caucasian',
     hair: 'Brunette',
     hasPrivate: true,
-    hasVoice: true,
     tagline: 'Sharp wit, softer side',
   },
 ];
@@ -308,7 +295,7 @@ const SHORTS_EPISODES = [
   },
 ];
 
-const FILTER_PILLS = ['All', 'Private Content', 'Caucasian', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
+const FILTER_PILLS = ['All', 'After Hours', 'New arrivals', 'Private Content', 'Caucasian', 'Black', 'Latina', 'Asian', 'European', 'Blonde', 'Brunette'];
 
 function SafePortrait({
   src,
@@ -349,10 +336,11 @@ export default function VelvetExploreShowcase() {
     return SHOWCASE_COMPANIONS.filter((c) => {
       const matchesQuery =
         !query.trim() ||
-        c.name.toLowerCase().includes(query.toLowerCase()) ||
-        c.tagline.toLowerCase().includes(query.toLowerCase());
+        [c.name, c.tagline, c.role].some((value) => value?.toLowerCase().includes(query.trim().toLowerCase()));
       if (!matchesQuery) return false;
       if (activeFilter === 'All') return true;
+      if (activeFilter === 'New arrivals') return Boolean(c.isNew);
+      if (activeFilter === 'After Hours') return AFTER_DARK_CARDS.some(({ id }) => id === c.id);
       if (activeFilter === 'Private Content') return Boolean(c.hasPrivate);
       if (activeFilter === 'Blonde' || activeFilter === 'Brunette') return c.hair === activeFilter;
       return c.category === activeFilter;
@@ -361,7 +349,7 @@ export default function VelvetExploreShowcase() {
 
   const activeHero = HERO_SLIDES[heroIdx] ?? HERO_SLIDES[0];
 
-  // Build interleaved grid with Neon SHORTS card at index 2 and Private Content card at index 9
+  // Keep discovery promos in the unfiltered catalog.
   const gridItems = useMemo(() => {
     const out: Array<
       | { type: 'companion'; data: ShowcaseCompanion }
@@ -369,17 +357,18 @@ export default function VelvetExploreShowcase() {
       | { type: 'promo-private' }
     > = [];
 
+    const showPromos = activeFilter === 'All' && !query.trim();
     filtered.forEach((c, idx) => {
-      if (idx === 2) out.push({ type: 'promo-shorts' });
-      if (idx === 8) out.push({ type: 'promo-private' });
+      if (showPromos && idx === 4) out.push({ type: 'promo-shorts' });
+      if (showPromos && idx === 7) out.push({ type: 'promo-private' });
       out.push({ type: 'companion', data: c });
     });
 
-    if (filtered.length > 0 && filtered.length <= 2) {
-      out.push({ type: 'promo-shorts' });
-    }
     return out;
-  }, [filtered]);
+  }, [activeFilter, filtered, query]);
+
+  const isBrowsingAll = activeFilter === 'All' && !query.trim();
+  const mobileRows = isBrowsingAll ? 2 : 1;
 
   return (
     <div className="min-h-screen bg-[#08080e] text-[#f7f7fc] pb-16">
@@ -441,11 +430,7 @@ export default function VelvetExploreShowcase() {
         {/* EXPLORE FEATURED CHARACTERS HEADER + FILTER BAR */}
         <section className="mt-6">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight">
-              <span className="text-[#ff4d8d]">Explore</span>{' '}
-              <span className="text-white">Featured Characters</span>
-              <ChevronRight className="ml-1 inline h-5 w-5 text-white/50" />
-            </h2>
+            <h2 className="font-display text-3xl tracking-tight text-rose-50 sm:text-4xl">Meet the cast</h2>
             <Link
               href="/discover/"
               className="shrink-0 text-xs font-semibold text-[#00f5ff] hover:underline"
@@ -461,7 +446,8 @@ export default function VelvetExploreShowcase() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search"
+                aria-label="Search companions"
+                placeholder="Name or personality"
                 className="w-full rounded-full border border-white/10 bg-[#151520] py-2 pl-10 pr-4 text-sm text-white placeholder-white/40 outline-none focus:border-[#ff1e8e]"
               />
             </div>
@@ -472,6 +458,7 @@ export default function VelvetExploreShowcase() {
                 <button
                   key={pill}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => setActiveFilter(pill)}
                   className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
                     active
@@ -486,15 +473,17 @@ export default function VelvetExploreShowcase() {
             })}
           </div>
 
-          {/* 6-COLUMN PORTRAIT GRID WITH INTERLEAVED NEON PROMO TILES */}
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {!gridItems.length && <p role="status" className="mt-4 text-sm text-zinc-300">No companions match that search.</p>}
+          <div aria-label="Companion portraits"
+            style={{ '--cast-columns': Math.max(1, Math.ceil(gridItems.length / mobileRows)) } as React.CSSProperties}
+            className="mt-4 grid grid-cols-[repeat(var(--cast-columns),minmax(104px,31%))] gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory sm:grid-cols-3 sm:overflow-visible md:grid-cols-4 lg:grid-cols-6">
             {gridItems.map((item) => {
               if (item.type === 'promo-shorts') {
                 return (
                   <Link
                     key="promo-shorts"
                     href="/shorts/"
-                    className="group relative flex aspect-[2/3] flex-col items-center justify-between overflow-hidden rounded-2xl border-2 border-[#a855f7]/80 bg-gradient-to-b from-[#1a0b2e] via-[#120b24] to-[#0b0718] p-4 shadow-[0_0_24px_rgba(168,85,247,0.45)] transition hover:-translate-y-1"
+                    className="group relative flex aspect-[2/3] snap-start flex-col items-center justify-between overflow-hidden rounded-2xl border-2 border-[#a855f7]/80 bg-gradient-to-b from-[#1a0b2e] via-[#120b24] to-[#0b0718] p-4 shadow-[0_0_24px_rgba(168,85,247,0.45)] transition hover:-translate-y-1"
                   >
                     <div className="mt-2 text-center">
                       <span className="block text-2xl font-black tracking-wider text-white drop-shadow-[0_0_14px_rgba(0,245,255,0.9)]">
@@ -519,7 +508,7 @@ export default function VelvetExploreShowcase() {
                   <Link
                     key="promo-private"
                     href="/private/"
-                    className="group relative flex aspect-[2/3] flex-col items-center justify-between overflow-hidden rounded-2xl border border-[#ff1e8e]/70 bg-[#140b18] p-4 shadow-[0_0_22px_rgba(255,30,142,0.35)] transition hover:-translate-y-1"
+                    className="group relative flex aspect-[2/3] snap-start flex-col items-center justify-between overflow-hidden rounded-2xl border border-[#ff1e8e]/70 bg-[#140b18] p-4 shadow-[0_0_22px_rgba(255,30,142,0.35)] transition hover:-translate-y-1"
                   >
                     <SafePortrait
                       src="/portraits/scarlett.jpg"
@@ -544,63 +533,37 @@ export default function VelvetExploreShowcase() {
 
               const c = item.data;
               return (
-                <Link
-                  key={c.id}
-                  href={`/chat/?companion=${c.id}`}
-                  className="group relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-[#13131d] transition duration-300 hover:-translate-y-1 hover:border-[#ff1e8e]/75 hover:shadow-[0_0_24px_rgba(255,30,142,0.32)]"
-                >
-                  <SafePortrait
-                    src={c.portrait}
-                    alt={`${c.name}, ${c.age}`}
-                    className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
+                <article key={c.id} className="relative aspect-[2/3] snap-start">
+                  <Link
+                    href={`/chat/?companion=${c.id}`}
+                    aria-label={`Chat with ${c.name}, ${c.age}`}
+                    className="group relative block h-full overflow-hidden rounded-[1.15rem] border border-rose-100/15 bg-[#19101a] focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300 motion-safe:transition motion-safe:hover:-translate-y-1 hover:border-rose-300/60"
+                  >
+                    <SafePortrait
+                      src={c.portrait}
+                      alt=""
+                      className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
 
-                  {/* Top-Left NEW Pill */}
-                  {c.isNew && (
-                    <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#ff1e8e] to-[#ff4d8d] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-[0_0_12px_rgba(255,30,142,0.7)]">
-                      <Sparkles className="h-2.5 w-2.5" />
-                      NEW
-                    </span>
-                  )}
-
-                  {/* Top-Right Compact Frosted Icon Stack */}
-                  <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5">
-                    {c.hasPrivate && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/90 backdrop-blur-md border border-white/10">
-                        <Lock className="h-3.5 w-3.5" />
-                      </span>
+                    {c.isNew && (
+                      <span className="absolute left-2 top-2 rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold text-[#3b1a2d]">New</span>
                     )}
-                    {c.hasVideo && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/90 backdrop-blur-md border border-white/10">
-                        <Film className="h-3.5 w-3.5" />
+                    <div className="absolute inset-x-2.5 bottom-2.5 sm:inset-x-3 sm:bottom-3">
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="truncate font-display text-[1.05rem] tracking-tight text-white sm:text-2xl">{c.name}</span>
+                        <span className="shrink-0 text-xs text-rose-100/80">{c.age}</span>
                       </span>
-                    )}
-                    {c.hasVoice && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/90 backdrop-blur-md border border-white/10">
-                        <Volume2 className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Clean Bottom Identity (Name + Age + Verified Check) */}
-                  <div className="absolute inset-x-3 bottom-3 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="truncate text-base font-extrabold text-white">
-                        {c.name}
-                      </span>
-                      <span className="text-sm font-medium text-white/75">{c.age}</span>
-                      {c.verified && (
-                        <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff1e8e] text-white">
-                          <Check className="h-2.5 w-2.5 stroke-[3]" />
-                        </span>
-                      )}
+                      <span className="mt-0.5 line-clamp-2 text-[10px] font-medium leading-tight text-rose-50/80 sm:text-xs">{c.role || c.tagline}</span>
                     </div>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#ff1e8e]/90 text-white opacity-0 transition group-hover:opacity-100 shadow-[0_0_12px_rgba(255,30,142,0.8)]">
-                      <MessageCircle className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
-                </Link>
+                  </Link>
+                  {c.role && (
+                    <Link href={`/studio/?companion=${c.id}&mode=video`} aria-label={`Create a video with ${c.name}`}
+                      className="absolute right-1.5 top-1.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-rose-200/40 bg-[#271927]/90 text-rose-100 hover:bg-[#5a2b43] focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-300">
+                      <Film className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  )}
+                </article>
               );
             })}
           </div>
@@ -664,7 +627,7 @@ export default function VelvetExploreShowcase() {
                 <Link
                   key={ep.id}
                   href={ep.href}
-                  className="group relative flex aspect-[2/3] flex-col items-center justify-center overflow-hidden rounded-2xl border border-[#ff1e8e]/60 bg-gradient-to-b from-[#1f0c18] to-[#0e0912] p-5 text-center shadow-[0_0_24px_rgba(255,30,142,0.28)] transition hover:-translate-y-1"
+                  className="group relative flex aspect-[2/3] snap-start flex-col items-center justify-center overflow-hidden rounded-2xl border border-[#ff1e8e]/60 bg-gradient-to-b from-[#1f0c18] to-[#0e0912] p-5 text-center shadow-[0_0_24px_rgba(255,30,142,0.28)] transition hover:-translate-y-1"
                 >
                   <span className="absolute left-2.5 top-2.5 rounded-full bg-[#ff1e8e] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
                     NEW EPISODES

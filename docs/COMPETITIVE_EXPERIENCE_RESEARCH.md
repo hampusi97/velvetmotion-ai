@@ -1,6 +1,6 @@
 # VelvetMotion Private Atelier — Competitive Experience Research
 
-Last research pass: 2026-11-19 (reference links may evolve). This document guides **original UX and engineering**, not copying competitor source, art, names, or design assets.
+Last research pass: 2026-11-20 (reference links may evolve). This document guides **original UX and engineering**, not copying competitor source, art, names, or design assets.
 
 ## Sources and useful patterns
 
@@ -75,3 +75,16 @@ Do not assume competitor marketing claims are independently verified. Confirm mo
 6. Model outages show actionable errors and never spend credits for fake media.
 7. Audio preview and saved voice preferences actually affect newly created fictional companions.
 8. UI remains usable with motion off, screen readers and keyboard navigation.
+
+## November 20 follow-up
+
+| Reference | What to apply in VelvetMotion |
+|---|---|
+| [Candy AI video builder](https://everai.zendesk.com/hc/en-us/articles/64285000268057-What-is-Build-Your-Video) | Let a user assemble a scene from a few choices, then refine the exact prompt before sending it. |
+| [Kindroid selfie and video tools](https://kindroid.ai/v2/docs/selfies-video-selfies-avatars/) | Make the first frame a visible part of the video flow. Carry a selected portrait or generated photo through to the clip. |
+| [Nomi](https://nomi.ai/) and [SillyTavern World Info](https://github.com/SillyTavern/SillyTavern-Docs/blob/main/Usage/worldinfo.md) | Give each fictional companion a distinct persona and let users edit the memories or lore that carry between scenes. |
+| [Wan2.2](https://github.com/Wan-Video/Wan2.2) and [LTX-Video](https://github.com/Lightricks/LTX-Video) | Benchmark image-to-video workflows on the same portraits. Wan lists 480p and 720p image-to-video support. LTX includes reference and keyframe options. Record actual output dimensions and model policy for the workflow in use. |
+
+The After Hours collection tests three archetypes with original fictional adults. Imani is a jazz lounge host, Renata a surf coach, and Celeste a costume designer. Use opt-in aggregate measures, such as profile-to-chat starts and repeat visits, before promoting an archetype as popular.
+
+Next priorities are a one-tap path from a character's chat to a scene draft, private render history with prompt and first-frame reuse, and a side-by-side model benchmark for facial consistency, flicker, motion, latency, and cost.

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { generateStudioVideoClip, type StudioVideoRequest } from "./canvasVideoExporter";
+import {
+  composeCompanionVideoPrompt,
+  NEUTRAL_PORTRAIT_MOTION,
+  validateCompanionVideoPrompt,
+  VIDEO_SCENE_PRESETS,
+} from "./companionVideoPrompt";
 import { buildGuidedSession } from "./guidedSession";
 import { generateStudioPicture } from "./mediaGenerator";
 
@@ -67,4 +73,26 @@ test("JOI drafts map model cues to the selected session length", () => {
   assert.deepEqual(session.steps.map((step) => step.suggestedSeconds), [60, 120, 60]);
   assert.throws(() => buildGuidedSession('["One cue"]', persona, "gentle", 4), /three usable cues/);
   assert.throws(() => buildGuidedSession('["Start slowly.", "Use a deepfake.", "Take a breath."]', persona, "gentle", 4), /strictly prohibited/);
+});
+
+test("18+ video presets produce an editable fictional prompt and require 18+ mode", () => {
+  const preset = VIDEO_SCENE_PRESETS.find(({ id }) => id === "after-hours");
+  assert.ok(preset);
+  const prompt = composeCompanionVideoPrompt({ ...preset.scene, camera: "locked tripod" }, true, true);
+  assert.match(prompt, /Camera: locked tripod/);
+  assert.match(prompt, /Setting: a private boudoir suite/);
+  assert.equal(validateCompanionVideoPrompt(prompt, true), null);
+  assert.match(validateCompanionVideoPrompt(prompt, false) ?? "", /Enable 18\+ mode/);
+  assert.equal(composeCompanionVideoPrompt(preset.scene, false, true), NEUTRAL_PORTRAIT_MOTION);
+  assert.match(validateCompanionVideoPrompt("A celebrity nude video", true) ?? "", /strictly prohibited/);
+});
+
+test("a fully filled scene fits the local video bridge", () => {
+  const prompt = composeCompanionVideoPrompt({
+    action: "a".repeat(800),
+    setting: "b".repeat(200),
+    camera: "c".repeat(200),
+    lighting: "d".repeat(200),
+  }, true, true);
+  assert.ok(prompt.length <= 600);
 });
