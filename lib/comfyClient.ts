@@ -5,6 +5,7 @@
  */
 
 import { getMediaSettings } from "./mediaSettings";
+import { blobToDataUrl } from "./imageStore";
 
 export type LocalGenRequest = {
   prompt: string;
@@ -173,15 +174,6 @@ async function tryCustom(base: string, req: LocalGenRequest): Promise<LocalGenRe
   }
 }
 
-async function blobToDataUrlLocal(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : "");
-    reader.onerror = () => reject(new Error("blob read failed"));
-    reader.readAsDataURL(blob);
-  });
-}
-
 /** Direct ComfyUI workflow runner (works in browser with --enable-cors-header or Tauri desktop). */
 export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Promise<LocalGenResult> {
   const base = baseUrl.replace(/\/$/, "");
@@ -252,7 +244,7 @@ export async function tryComfyDirect(baseUrl: string, req: LocalGenRequest): Pro
             signal: AbortSignal.timeout(10000),
           });
           if (!viewRes.ok) continue;
-          const dataUrl = await blobToDataUrlLocal(await viewRes.blob());
+          const dataUrl = await blobToDataUrl(await viewRes.blob());
           if (dataUrl) {
             return { ok: true, imageUrl: dataUrl, note: "Local ComfyUI (RTX/GPU)" };
           }
