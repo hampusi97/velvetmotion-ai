@@ -9,6 +9,7 @@ test("catalog contains five unique models and only official Ollama tags offer a 
     assert.match(model.modelPage, /^https:\/\/huggingface\.co\//);
     assert.ok(model.licenseNote.length > 4);
     assert.equal(Boolean(model.ollamaTag), Boolean(model.setupCommand));
+    assert.ok(Boolean(model.ollamaTag) !== Boolean(model.serverModelId), "each model needs exactly one runtime path");
   }
   assert.ok(isOfficialOllamaPreset("hermes3:8b"));
   assert.ok(!isOfficialOllamaPreset("unverified:8b"));
