@@ -161,13 +161,13 @@ export function stopNeuralSpeech() {
   speechGeneration += 1;
   activeSpeechRequest?.abort();
   activeSpeechRequest = null;
-  activeAudioDone?.();
-  activeAudioDone = null;
   try {
     activeAudio?.pause();
   } catch {
     /* ignore */
   }
+  activeAudioDone?.();
+  activeAudioDone = null;
   activeAudio = null;
   if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
   activeAudioUrl = null;
