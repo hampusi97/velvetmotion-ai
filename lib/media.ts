@@ -154,9 +154,11 @@ export async function resolveBestMediaUrl(
   const prompt = buildPrompt(character, mood, extra);
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
   // A shared face seed keeps companion identity more stable across generations.
-  const seed = settings?.aggressiveFaceLock
+  const base = settings?.aggressiveFaceLock
     ? Math.max(1, faceSeed(character))
     : randomGenerationSeed();
+  // Add a random offset so each generation differs even with face lock on.
+  const seed = (base + Math.floor(Math.random() * 999_999)) % 2_000_000_000 || 1;
   // Never route mature requests through the general-purpose, SFW-only worker.
   const requiresAdultEngine = NSFW_MOODS.has(mood) || /\b(nude|nudity|explicit|nsfw|sexual)\b/i.test(extra);
   const routerSettings = typeof window !== "undefined" ? loadRouterSettings() : { provider: "auto" as const };

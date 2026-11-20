@@ -1498,6 +1498,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 {chip}
               </button>
             ))}
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void generate("nude", "NSFW Selfie", 0, "nude selfie, soft light, looking at camera")}
+              className="rounded-full border border-pink-500/40 bg-pink-500/10 px-3 py-1 text-[11px] font-medium text-pink-200 hover:bg-pink-500/20 transition disabled:opacity-45"
+            >
+              NSFW selfie
+            </button>
           </div>
 
           {/* Pinned Bottom Composer */}
