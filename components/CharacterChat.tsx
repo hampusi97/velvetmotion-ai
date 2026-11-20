@@ -525,6 +525,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     const next = [...messages, userMsg];
     persist(next);
     setBusy(true);
+    // Force a paint so the user bubble is visible before the reply
+    await new Promise((r) => setTimeout(r, 40));
 
     try {
       const kinks = getKinks(character.id);
@@ -1301,9 +1303,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             </div>
           )}
 
-          {busy && !generatingPhoto && (
+          {busy && (
             <div className="flex items-center gap-2 text-xs text-[#00f5ff] animate-pulse px-2">
-              <Sparkles className="h-3.5 w-3.5" /> {character.name.split(" ")[0]} is typing...
+              <Sparkles className="h-3.5 w-3.5" /> {character.name.split(" ")[0]} is thinking...
             </div>
           )}
           <div ref={bottomRef} />
