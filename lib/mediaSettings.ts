@@ -13,6 +13,12 @@ export type MediaBackendSettings = {
   a1111Denoise: number;
   /** Optional img2vid endpoint that accepts image URL + prompt */
   img2vidUrl: string;
+  /** Use a local ComfyUI API-format video workflow when no generic video endpoint is set. */
+  comfyVideoEnabled: boolean;
+  comfyVideoBase: string;
+  comfyVideoWorkflowJson: string;
+  comfyVideoImageNodeId: string;
+  comfyVideoPromptNodeId: string;
   /** Optional reference-aware img2img bridge URL for original fictional artwork. */
   img2imgUrl: string;
   /** Pollinations / external API key if needed for video */
@@ -32,6 +38,11 @@ const DEFAULTS: MediaBackendSettings = {
   a1111Checkpoint: "",
   a1111Denoise: 0.55,
   img2vidUrl: "",
+  comfyVideoEnabled: false,
+  comfyVideoBase: "http://127.0.0.1:8188",
+  comfyVideoWorkflowJson: "",
+  comfyVideoImageNodeId: "",
+  comfyVideoPromptNodeId: "",
   img2imgUrl: "",
   pollinationsKey: "",
   preferLocal: false,
