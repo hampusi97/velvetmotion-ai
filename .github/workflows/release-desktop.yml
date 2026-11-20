@@ -148,6 +148,27 @@ jobs:
     needs: [prepare, publish-tauri]
     runs-on: ubuntu-latest
     steps:
+      - name: Check out release verification script
+        uses: actions/checkout@v4
+
+      - name: Verify complete installers and signed manifests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          UPDATE_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+        run: |
+          set -euo pipefail
+          # The draft release is not visible to updater clients. Verify all four
+          # platforms BEFORE making it the public "latest" release.
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name]' > "$RUNNER_TEMP/assets.json"
+          if [[ -n "$UPDATE_PUBLIC_KEY" ]]; then
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'latest.json' --output "$RUNNER_TEMP/latest.json"
+            node scripts/verify-desktop-release.mjs "$TAG" "$RUNNER_TEMP/assets.json" signed "$RUNNER_TEMP/latest.json"
+          else
+            node scripts/verify-desktop-release.mjs "$TAG" "$RUNNER_TEMP/assets.json" unsigned
+          fi
+
       - name: Publish release only after ALL four operating systems succeed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
