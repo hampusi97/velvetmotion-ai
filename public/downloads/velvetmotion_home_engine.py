@@ -5,18 +5,11 @@ VelvetMotion AI — Local Home Server & RAM/GPU Supplement Engine
 Run on your own Windows / macOS / Linux PC:
     python3 velvetmotion_home_engine.py
 
-What it does automatically:
-  1. Hosts the VelvetMotion AI static build (`./out`) on http://127.0.0.1:8787
-  2. Exposes a CORS-enabled Local AI Supplement API (/api/health, /api/chat, /api/image, /api/video)
-     that taps into your PC's local RAM & GPU via:
-       - KoboldCpp (http://127.0.0.1:5001) — GGUF LLMs + SD/FLUX in local RAM/VRAM
-       - Ollama    (http://127.0.0.1:11434) — Local GGUF LLMs
-       - ComfyUI   (http://127.0.0.1:8188)  — FLUX/SDXL IP-Adapter/PuLID + FramePack/Wan 2.2 video
-  3. Automatically falls back to your Cloudflare Image Worker (GET /generate) if no local GPU
-     server is running, so photo buttons NEVER fail.
-  4. If `cloudflared` is installed, automatically opens a FREE public HTTPS Quick Tunnel
-     (https://xxxx.trycloudflare.com) so your live website on Cloudflare OR Vercel can connect
-     straight to your PC's RAM/GPU from anywhere!
+Default: binds only to 127.0.0.1:8787, connects to locally running
+KoboldCpp, Ollama, and ComfyUI, and optionally serves the bundled static UI.
+No public tunnel is started. There is no remote authentication system; do not
+put this service on the public internet.
+
 """
 
 import http.server
@@ -24,11 +17,8 @@ import json
 import os
 import random
 import re
-import shutil
 import socketserver
-import subprocess
 import sys
-import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -44,7 +34,17 @@ KOBOLD_URL = os.environ.get("KOBOLD_URL", "http://127.0.0.1:5001")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 COMFY_URL = os.environ.get("COMFY_URL", "http://127.0.0.1:8188")
 
-TUNNEL_URL = None
+# Only explicitly allowed first-party UIs may read responses via browser CORS.
+ALLOWED_ORIGINS = {
+    "https://velvetmotion-ai.hampusi97.workers.dev",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8787",
+    "http://127.0.0.1:8787",
+    "tauri://localhost",
+    "http://tauri.localhost",
+}
+MAX_JSON_BYTES = 128 * 1024
 
 ANTI_SLOP_BAN_PHRASES = [
     "shivers down my spine",
@@ -173,14 +173,28 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
         directory = str(STATIC_DIR) if STATIC_DIR.exists() else os.getcwd()
         super().__init__(*args, directory=directory, **kwargs)
 
+    def request_origin_allowed(self):
+        origin = self.headers.get("Origin", "")
+        site = self.headers.get("Sec-Fetch-Site", "")
+        return (not origin or origin in ALLOWED_ORIGINS) and (
+            site != "cross-site" or origin in ALLOWED_ORIGINS
+        )
+
     def end_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
+        origin = self.headers.get("Origin", "")
+        if origin in ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("X-Content-Type-Options", "nosniff")
         super().end_headers()
 
     def do_OPTIONS(self):
-        self.send_response(204)
+        if not self.request_origin_allowed():
+            self.send_response(403)
+        else:
+            self.send_response(204)
         self.end_headers()
 
     def send_json(self, code, payload):
@@ -193,10 +207,15 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
 
     def read_json_body(self):
         length = int(self.headers.get("Content-Length", "0"))
+        if length < 0 or length > MAX_JSON_BYTES:
+            raise ValueError("Body exceeds local request limit")
         raw = self.rfile.read(length) if length > 0 else b"{}"
         return json.loads(raw.decode("utf-8") or "{}")
 
     def do_GET(self):
+        if not self.request_origin_allowed():
+            self.send_json(403, {"error": "Origin not allowed"})
+            return
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/health":
             total_ram, avail_ram = get_ram_gb()
@@ -210,7 +229,7 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
                 "availableRamGb": avail_ram,
                 "cpuCores": os.cpu_count() or 4,
                 "engines": {"koboldcpp": kobold, "ollama": ollama, "comfyui": comfy},
-                "publicTunnelUrl": TUNNEL_URL,
+                "publicTunnelUrl": None,
                 "hostingStaticOut": STATIC_DIR.exists(),
             })
             return
@@ -226,11 +245,14 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if not self.request_origin_allowed():
+            self.send_json(403, {"error": "Origin not allowed"})
+            return
         parsed = urllib.parse.urlparse(self.path)
         try:
             body = self.read_json_body()
         except Exception:
-            self.send_json(400, {"error": "Invalid JSON body"})
+            self.send_json(400, {"error": "Invalid or oversized JSON body"})
             return
 
         if parsed.path == "/api/chat":
@@ -243,11 +265,9 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_image_generation(prompt, steps, seed)
             return
         if parsed.path == "/api/video":
-            comfy = probe(f"{COMFY_URL}/system_stats")
-            self.send_json(200, {
-                "mode": "local-comfyui" if comfy else "browser-canvas-webm",
-                "comfyOnline": comfy,
-                "message": "Local ComfyUI ready for FramePack/Wan 2.2" if comfy else "Use instant browser WebM exporter fallback",
+            self.send_json(501, {
+                "error": "No video generation workflow installed. Configure a real image-to-video model bridge.",
+                "comfyOnline": probe(f"{COMFY_URL}/system_stats"),
             })
             return
 
@@ -320,7 +340,12 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as exc:
                 print(f"[VelvetEngine] Local KoboldCpp image fallback: {exc}")
 
-        # 2. Seamless Cloudflare Image Worker fallback (always works!)
+        # Adult-mode requests must not silently route through the general-use worker.
+        if re.search(r"\\b(nsfw|nudity|nude|explicit|sexual)\\b", prompt, re.IGNORECASE):
+            self.send_json(503, {"error": "No compatible local adult image model is online."})
+            return
+
+        # 2. General-purpose cloud image fallback (availability not guaranteed)
         try:
             qs = urllib.parse.urlencode({"prompt": prompt[:1500], "steps": steps, "seed": seed})
             url = f"{CF_IMAGE_WORKER}/generate?{qs}"
@@ -338,26 +363,6 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
             self.send_json(502, {"error": f"Image generation failed: {exc}"})
 
 
-def start_cloudflare_tunnel():
-    global TUNNEL_URL
-    if not shutil.which("cloudflared"):
-        print("ℹ️  Tip: Install `cloudflared` (free) to auto-expose your PC to Vercel & Cloudflare Workers.")
-        return
-    proc = subprocess.Popen(
-        ["cloudflared", "tunnel", "--url", f"http://127.0.0.1:{PORT}"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-    for line in proc.stdout:
-        match = re.search(r"https://[a-z0-9-]+\.trycloudflare\.com", line)
-        if match:
-            TUNNEL_URL = match.group(0)
-            print(f"\n🌐 PUBLIC HTTPS TUNNEL READY (paste into VelvetMotion Settings or Vercel):")
-            print(f"   {TUNNEL_URL}\n")
-            break
-
-
 def main():
     total_ram, avail_ram = get_ram_gb()
     print("=" * 68)
@@ -369,7 +374,7 @@ def main():
     print(f"• Local Engines:    KoboldCpp={probe(KOBOLD_URL + '/api/v1/model')} | Ollama={probe(OLLAMA_URL + '/api/tags')} | ComfyUI={probe(COMFY_URL + '/system_stats')}")
     print("=" * 68)
 
-    threading.Thread(target=start_cloudflare_tunnel, daemon=True).start()
+    print("• Network:          loopback-only; no public tunnel is started")
 
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("127.0.0.1", PORT), VelvetEngineHandler) as httpd:
