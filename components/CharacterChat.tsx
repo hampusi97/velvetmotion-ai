@@ -115,6 +115,7 @@ function toVaultCategory(cat: CompanionMemoryItem["category"]): MemoryCategory {
   return "About You";
 }
 import { SafeImage } from "@/components/SafeImage";
+import { ScenarioDirector } from "@/components/ScenarioDirector";
 import { useDelayedLingerieDrop } from "@/components/ChatExtrasHooks";
 
 type ChatMessage = StoredMessage & {
@@ -1444,6 +1445,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               </div>
             </div>
           )}
+
+          <ScenarioDirector
+            key={character.id}
+            companionName={character.name}
+            disabled={busy}
+            onStart={(prompt) => { void send(prompt); }}
+          />
 
           <ChatMiniGames
             open={gamesOpen}
