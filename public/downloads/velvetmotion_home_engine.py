@@ -341,7 +341,7 @@ class VelvetEngineHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"[VelvetEngine] Local KoboldCpp image fallback: {exc}")
 
         # Adult-mode requests must not silently route through the general-use worker.
-        if re.search(r"\\b(nsfw|nudity|nude|explicit|sexual)\\b", prompt, re.IGNORECASE):
+        if re.search(r"\b(nsfw|nudity|nude|explicit|sexual)\b", prompt, re.IGNORECASE):
             self.send_json(503, {"error": "No compatible local adult image model is online."})
             return
 
