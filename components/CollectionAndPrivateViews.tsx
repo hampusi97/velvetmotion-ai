@@ -32,7 +32,7 @@ export function CollectionGalleryView({
             My Collection &amp; Saved Selfies
           </h1>
           <p className="text-xs text-[#a6a6c4]">
-            All generated portraits, unlocked scene selfies, and clips stored locally in IndexedDB.
+            Saved portraits and eligible clips from this device. Browser storage can be cleared; download important media to keep a separate copy.
           </p>
         </div>
         {onOpenStudio && (
