@@ -104,6 +104,10 @@ export default function MediaStudioModal({
   const [aspectId, setAspectId] = useState<(typeof ASPECT_RATIOS)[number]['id']>('2:3');
   const [seedLock, setSeedLock] = useState<string>('');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [cameraStyle, setCameraStyle] = useState("cinematic 85mm portrait lens");
+  const [lightingStyle, setLightingStyle] = useState("warm rose-gold studio");
+  const [wardrobeStyle, setWardrobeStyle] = useState("elegant evening fashion");
+  const [negativePrompt, setNegativePrompt] = useState("watermarks, extra fingers, distorted faces");
   const [nsfwMode, setNsfwMode] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
@@ -163,6 +167,9 @@ export default function MediaStudioModal({
       companion.visualDna,
       preset.suffix,
       studioStyle,
+      cameraStyle,
+      lightingStyle,
+      wardrobeStyle,
       customPrompt.trim(),
       `aspect ${aspect.id}, photorealistic lighting, consenting adult 21+`,
     ]
@@ -170,13 +177,14 @@ export default function MediaStudioModal({
       .join(', ');
     const parsedSeed = Number(seedLock) || Math.floor(Math.random() * 90000 + 1000);
     const wantsNsfw = nsfwMode || preset.nsfw;
+    const safeNegative = negativePrompt.trim().slice(0, 360);
 
     setPhotoBusy(true);
     setErrorMsg(null);
     setStatusMsg(null);
 
     try {
-      if (!wantsNsfw) {
+      if (!wantsNsfw && !safeNegative) {
         const comfyInfo = await probeComfyUi();
         if (comfyInfo.online) {
           setComfyCheckpoints(comfyInfo.checkpoints);
@@ -213,6 +221,7 @@ export default function MediaStudioModal({
         characterId: companion.id,
         imageWorkerUrl,
         localEngine,
+        negativePrompt,
       });
 
       setGeneratedPhoto(result.imageUrl);
@@ -617,6 +626,45 @@ export default function MediaStudioModal({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="grid gap-2 rounded-2xl border border-[#e8b1c4]/20 bg-[#241923]/55 p-3 sm:grid-cols-3">
+            <label className="text-[11px] text-zinc-300">Camera lens
+              <select value={cameraStyle} onChange={(e) => setCameraStyle(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white">
+                <option value="cinematic 85mm portrait lens">85mm portrait</option>
+                <option value="editorial 35mm film still">35mm film</option>
+                <option value="clean 50mm fashion photography">50mm fashion</option>
+                <option value="wide 24mm environmental shot">24mm wide</option>
+              </select>
+            </label>
+            <label className="text-[11px] text-zinc-300">Lighting direction
+              <select value={lightingStyle} onChange={(e) => setLightingStyle(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white">
+                <option value="warm rose-gold studio">Rose-gold studio</option>
+                <option value="cinematic candlelight shadows">Candlelight</option>
+                <option value="dramatic moonlit window">Moonlight</option>
+                <option value="luxury softbox fashion lighting">Editorial softbox</option>
+              </select>
+            </label>
+            <label className="text-[11px] text-zinc-300">Wardrobe
+              <select value={wardrobeStyle} onChange={(e) => setWardrobeStyle(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white">
+                <option value="elegant evening fashion">Evening fashion</option>
+                <option value="silk robe, tasteful boudoir photography">Silk robe</option>
+                <option value="luxury tailored couture">Tailored couture</option>
+                <option value="cozy casual knitwear">Casual knitwear</option>
+              </select>
+            </label>
+            <label className="block text-[11px] text-zinc-300 sm:col-span-3">
+              Negative prompt (supported local engines)
+              <input value={negativePrompt} maxLength={360} onChange={(e) => setNegativePrompt(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-white/15 bg-[#151019] p-2 text-xs text-white" />
+            </label>
+            <p className="text-[10px] leading-relaxed text-zinc-500 sm:col-span-3">
+              A locked seed helps repeat conditions but does not guarantee identical faces. Facial reference adapters and compatible models are required for visual consistency.
+              Negative prompts are passed to local engines that support them; cloud providers may ignore them.
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
