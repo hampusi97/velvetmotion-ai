@@ -25,6 +25,7 @@ struct SystemSpecs {
 struct LocalPortStatus {
     kobold_online: bool,
     fish_online: bool,
+    kokoro_online: bool,
     ollama_online: bool,
     comfy_online: bool,
 }
@@ -58,6 +59,7 @@ fn probe_local_engines() -> LocalPortStatus {
     LocalPortStatus {
         kobold_online: port_open(5001),
         fish_online: port_open(5002),
+        kokoro_online: port_open(8880),
         ollama_online: port_open(11434),
         comfy_online: port_open(8188),
     }
