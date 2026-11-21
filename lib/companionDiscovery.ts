@@ -19,6 +19,68 @@ export type CompanionDiscovery = {
   visualStyle: (typeof VISUAL_STYLES)[number];
 };
 
+export type CompanionLibraryFilters = {
+  query: string;
+  category: string;
+  tag: string | null;
+  interest: string;
+  conversation: string;
+  visualStyle: string;
+  savedOnly: boolean;
+  sort: "featured" | "name";
+};
+
+export const DEFAULT_COMPANION_LIBRARY_FILTERS: CompanionLibraryFilters = {
+  query: "",
+  category: "All",
+  tag: null,
+  interest: "",
+  conversation: "",
+  visualStyle: "",
+  savedOnly: false,
+  sort: "featured",
+};
+
+export const MAX_COMPANION_QUERY_LENGTH = 160;
+
+function canonicalOption(value: string | null, options: readonly string[]) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && options.find((option) => option.toLowerCase() === normalized);
+}
+
+export function readCompanionLibraryFilters(
+  params: URLSearchParams,
+  options: { categories: readonly string[]; tags: readonly string[]; interests: readonly string[] },
+): CompanionLibraryFilters {
+  return {
+    query: (params.get("q") || "").trim().slice(0, MAX_COMPANION_QUERY_LENGTH),
+    category: canonicalOption(params.get("category"), options.categories) || "All",
+    tag: canonicalOption(params.get("tag"), options.tags) || null,
+    interest: canonicalOption(params.get("interest"), options.interests) || "",
+    conversation: canonicalOption(params.get("conversation"), CONVERSATION_TYPES) || "",
+    visualStyle: canonicalOption(params.get("style"), VISUAL_STYLES) || "",
+    savedOnly: params.get("saved") === "1",
+    sort: params.get("sort") === "name" ? "name" : "featured",
+  };
+}
+
+export function writeCompanionLibraryFilters(params: URLSearchParams, filters: CompanionLibraryFilters) {
+  const values = {
+    q: filters.query.trim().slice(0, MAX_COMPANION_QUERY_LENGTH),
+    category: filters.category === "All" ? "" : filters.category,
+    tag: filters.tag,
+    interest: filters.interest,
+    conversation: filters.conversation,
+    style: filters.visualStyle,
+    saved: filters.savedOnly ? "1" : "",
+    sort: filters.sort === "featured" ? "" : filters.sort,
+  };
+  for (const [key, value] of Object.entries(values)) {
+    if (value) params.set(key, value);
+    else params.delete(key);
+  }
+}
+
 const INTERESTS: Record<string, RegExp> = {
   Art: /\b(art|artist|gallery|illustrat\w*)\b/i,
   Books: /\b(book\w*|literary|poet\w*|reading)\b/i,

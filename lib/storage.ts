@@ -175,6 +175,31 @@ export function loadChat(characterId: string): StoredMessage[] {
   }
 }
 
+export function hasUserMessage(messages: unknown): boolean {
+  return Array.isArray(messages) && messages.some((message: unknown) => {
+    if (!message || typeof message !== "object") return false;
+    const { role, content } = message as Partial<StoredMessage>;
+    return role === "user" && typeof content === "string" && Boolean(content.trim());
+  });
+}
+
+/** Discover older chats that are present only in localStorage. */
+export function listLocalConversationIds(characterIds: ReadonlySet<string>, limit: number): string[] {
+  if (typeof window === "undefined" || limit <= 0) return [];
+  const found: string[] = [];
+  try {
+    for (let index = localStorage.length - 1; index >= 0 && found.length < limit; index--) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith(CHAT_PREFIX)) continue;
+      const id = key.slice(CHAT_PREFIX.length);
+      if (characterIds.has(id) && hasUserMessage(loadChat(id))) found.push(id);
+    }
+  } catch {
+    /* Storage may be unavailable. */
+  }
+  return found;
+}
+
 export function saveChat(characterId: string, messages: StoredMessage[]) {
   if (typeof window === "undefined") return;
   try {

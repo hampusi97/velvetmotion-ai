@@ -47,6 +47,57 @@ test("Settings shares the current engine status and can refresh it", async ({ pa
   expect(probes).toBe(2);
 });
 
+test("Explore search is visible and opens the matching catalog profile", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Find your companion", exact: true })).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Search companions" });
+  await expect(search).toBeVisible();
+  await search.fill("Chloe");
+  const cards = page.getByRole("list", { name: "Companion portraits" });
+  const chat = cards.getByRole("link", { name: "Chat with Chloe, 22", exact: true });
+  await expect(chat).toHaveAttribute("href", "/chat/?companion=chloe-parker");
+  await chat.click();
+  await expect(page.getByPlaceholder("Message Chloe...", { exact: true })).toBeVisible();
+});
+
+test("Library links restore search and discrete filters through browser history", async ({ page, context }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Companion Library", exact: true }).click();
+  const search = page.getByRole("searchbox", { name: "Search companions" });
+  const personality = page.getByRole("group", { name: "Personality" });
+  const sweetheart = personality.getByRole("button", { name: "Sweetheart", exact: true });
+  await search.fill("Chloe");
+  await sweetheart.click();
+  await expect(search).toHaveValue("Chloe");
+  await expect(sweetheart).toHaveAttribute("aria-pressed", "true");
+  const saved = page.getByRole("button", { name: /^Saved/ });
+  await saved.click();
+  await expect(page).toHaveURL(/saved=1/);
+  await expect(saved).toHaveAttribute("aria-pressed", "true");
+  await page.goBack();
+  await expect(saved).toHaveAttribute("aria-pressed", "false");
+  await expect(search).toHaveValue("Chloe");
+  await expect(sweetheart).toHaveAttribute("aria-pressed", "true");
+  await page.goForward();
+  await expect(saved).toHaveAttribute("aria-pressed", "true");
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("button", { name: "Copy filter link" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Filter link copied." })).toBeVisible();
+  const shareUrl = new URL(await page.evaluate(() => navigator.clipboard.readText()));
+  expect(shareUrl.pathname).toBe("/companions/");
+  expect(Object.fromEntries(shareUrl.searchParams)).toEqual({ q: "Chloe", category: "Sweetheart", saved: "1" });
+  await page.goto(shareUrl.href);
+  await expect(search).toHaveValue("Chloe");
+  await expect(sweetheart).toHaveAttribute("aria-pressed", "true");
+  await expect(saved).toHaveAttribute("aria-pressed", "true");
+  await saved.click();
+  await page.getByRole("button", { name: /Meet Chloe/ }).first().click();
+  await page.getByRole("button", { name: "Sweetheart", exact: true }).click();
+  await expect(page).toHaveURL(/tag=Sweetheart/);
+  await expect(sweetheart).toHaveAttribute("aria-pressed", "false");
+  await expect(search).toHaveValue("Chloe");
+});
+
 test("discovery filters and favorites persist, with an actionable empty state", async ({
   page,
 }, info) => {
@@ -63,8 +114,9 @@ test("discovery filters and favorites persist, with an actionable empty state", 
     .click();
   await page.getByRole("button", { name: /Saved 1/ }).click();
   await expect(page.locator("article.girl-card")).toHaveCount(1);
+  await expect(page).toHaveURL(/\?saved=1/);
   await page.reload();
-  await page.getByRole("button", { name: /Saved 1/ }).click();
+  await expect(page.getByRole("button", { name: /Saved 1/ })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("article.girl-card")).toHaveCount(1);
   await page
     .getByRole("button", { name: "Clear all filters", exact: true })
@@ -258,4 +310,27 @@ test("offline chat keeps the user message and retries without fabricated replies
     ),
   ).toHaveLength(0);
   expect(messages.filter((m) => m.role === "assistant")).toHaveLength(1); // The declared opening line only.
+
+  await page.evaluate(() => localStorage.removeItem("vm-chat-chloe-parker"));
+  await page.goto("/");
+  const shelf = page.getByRole("region", { name: "Continue chatting" });
+  await expect(shelf.getByRole("link", { name: "Continue chat with Chloe" })).toBeVisible();
+  await expect(shelf.getByText("How is your evening going?")).toHaveCount(0);
+  await shelf.getByRole("link", { name: "Continue chat with Chloe" }).click();
+  await expect(page.getByText("How is your evening going?", { exact: true }).first()).toBeVisible();
+});
+
+test("Explore resumes legacy conversations and skips unopened threads", async ({ page }) => {
+  await page.goto("/");
+  const shelf = page.getByRole("region", { name: "Continue chatting" });
+  await expect(page.getByRole("button", { name: "Open Settings & Backup" })).toBeVisible();
+  await expect(shelf).toHaveCount(0);
+  await page.evaluate(() => {
+    localStorage.setItem("vm-chat-chloe-parker", JSON.stringify([{ role: "assistant", content: "An opening greeting" }]));
+    localStorage.setItem("vm-chat-maya-solis", JSON.stringify([{ role: "user", content: "Can we pick up our weekend plans?" }]));
+  });
+  await page.reload();
+  await expect(shelf.getByRole("link", { name: "Continue chat with Maya" })).toBeVisible();
+  await expect(shelf.getByRole("link", { name: "Continue chat with Chloe" })).toHaveCount(0);
+  await expect(shelf.getByText("Can we pick up our weekend plans?")).toHaveCount(0);
 });

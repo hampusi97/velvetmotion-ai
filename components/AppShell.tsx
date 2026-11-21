@@ -18,6 +18,7 @@ import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import VelvetExploreShowcase from "@/components/VelvetExploreShowcase";
+import { ContinueChatShelf } from "@/components/ContinueChatShelf";
 import { CharacterRoster } from "@/components/CharacterRoster";
 import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
 import { SupporterBanner } from "@/components/SupporterBanner";
@@ -379,7 +380,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               : containerClass + (suppressFooter ? " flex-1 py-2 min-w-0" : " flex-1 py-6 min-w-0")
           }
         >
-          {view === "home" && <VelvetExploreShowcase />}
+          {view === "home" && <VelvetExploreShowcase returning={<ContinueChatShelf />} />}
 
           {(view === "girls" || view === "romance") && (
             <CharacterRoster
@@ -412,6 +413,12 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               onUpdate={setCustomCharacter}
               onStudio={() => setStudioModalOpen(true)}
               onTag={(t) => {
+                if (pathname === "/companions/" || pathname === "/companions") {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete("category");
+                  url.searchParams.set("tag", t);
+                  window.history.replaceState(window.history.state, "", url);
+                }
                 setTag(t);
                 setCategory("All");
                 setView("girls");

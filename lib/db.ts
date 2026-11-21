@@ -3,6 +3,7 @@
  * Static-export safe; browser-only.
  */
 import Dexie, { type Table } from "dexie";
+import { hasUserMessage } from "./storage";
 
 export interface ChatRow {
   id: string;
@@ -112,6 +113,16 @@ export async function loadChatDB(characterId: string): Promise<unknown[] | null>
   if (!d) return null;
   const row = await d.chats.get(characterId);
   return row?.messages ?? null;
+}
+
+/** Return recent thread IDs without exposing conversation text to the storefront. */
+export async function listRecentConversationIds(characterIds: ReadonlySet<string>, limit: number): Promise<string[]> {
+  const d = getDb();
+  if (!d || limit <= 0) return [];
+  return d.chats.orderBy("updatedAt").reverse()
+    .filter((row) => characterIds.has(row.id) && hasUserMessage(row.messages))
+    .limit(limit)
+    .primaryKeys();
 }
 
 export async function saveMemoryDB(characterId: string, facts: string[]) {

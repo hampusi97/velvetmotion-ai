@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowUpRight,
+  Copy,
   Heart,
   Search,
   SlidersHorizontal,
@@ -19,9 +21,14 @@ import {
 } from "@/lib/companionLibrary";
 import {
   CONVERSATION_TYPES,
+  DEFAULT_COMPANION_LIBRARY_FILTERS,
+  MAX_COMPANION_QUERY_LENGTH,
   VISUAL_STYLES,
   discoveryFor,
   discoverCompanions,
+  readCompanionLibraryFilters,
+  writeCompanionLibraryFilters,
+  type CompanionLibraryFilters,
 } from "@/lib/companionDiscovery";
 import { CandyGirlCard } from "@/components/CandyGirlCard";
 import { SafeImage } from "@/components/SafeImage";
@@ -40,26 +47,37 @@ interface CharacterRosterProps {
 
 const selectClass = "vm-field w-full py-3 text-sm";
 
+function isLibraryPath(pathname: string) {
+  return pathname === "/companions/" || pathname === "/companions";
+}
+
 export function CharacterRoster({
   romanceMode,
-  query,
-  category,
-  tag,
+  query: parentQuery,
+  category: parentCategory,
+  tag: parentTag,
   onQuery,
   onCategory,
   onTag,
   onSelect,
   onBack,
 }: CharacterRosterProps) {
-  const [characters, setCharacters] = useState<Character[]>(CHARACTERS);
+  const [loadedCharacters, setCharacters] = useState<Character[] | null>(null);
+  const characters = loadedCharacters ?? CHARACTERS;
   const [favorites, setFavorites] = useState<string[]>([]);
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [sort, setSort] = useState<"featured" | "name">("featured");
+  const [filters, setFilters] = useState<CompanionLibraryFilters>(() => ({
+    ...DEFAULT_COMPANION_LIBRARY_FILTERS,
+    query: parentQuery,
+    category: parentCategory,
+    tag: parentTag,
+  }));
+  const { query, category, tag, interest, conversation, visualStyle, savedOnly, sort } = filters;
   const [expanded, setExpanded] = useState(false);
-  const [interest, setInterest] = useState("");
-  const [conversation, setConversation] = useState("");
-  const [visualStyle, setVisualStyle] = useState("");
   const [notice, setNotice] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
+  const routeSearch = useSearchParams()?.toString();
+  const lastAppliedSearch = useRef<string | null>(null);
+  const editingSearch = useRef(false);
 
   useEffect(() => {
     const refresh = () => {
@@ -91,31 +109,75 @@ export function CharacterRoster({
         .sort(),
     [characters],
   );
+  const applyFilters = useCallback((next: CompanionLibraryFilters) => {
+    setFilters(next);
+    setCopyStatus("");
+    if (parentQuery !== next.query) onQuery(next.query);
+    if (parentCategory !== next.category) onCategory(next.category);
+    if (parentTag !== next.tag || parentCategory !== next.category) onTag(next.tag);
+  }, [onCategory, onQuery, onTag, parentCategory, parentQuery, parentTag]);
+
+  useEffect(() => {
+    if (!loadedCharacters) return;
+    const syncFromUrl = () => {
+      const url = new URL(window.location.href);
+      const previousSearch = url.search;
+      if (!isLibraryPath(url.pathname) || lastAppliedSearch.current === previousSearch) return;
+
+      const previousParams = url.searchParams.toString();
+      const next = readCompanionLibraryFilters(url.searchParams, { categories, tags, interests });
+      writeCompanionLibraryFilters(url.searchParams, next);
+      if (url.searchParams.toString() !== previousParams) {
+        lastAppliedSearch.current = url.search;
+        window.history.replaceState(window.history.state, "", url);
+      } else {
+        lastAppliedSearch.current = previousSearch;
+      }
+      applyFilters(next);
+    };
+    const onPopState = () => {
+      editingSearch.current = false;
+      syncFromUrl();
+    };
+    // Next.js route updates and native history events can arrive independently.
+    syncFromUrl();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [applyFilters, categories, interests, loadedCharacters, routeSearch, tags]);
+
+  const changeFilters = (patch: Partial<CompanionLibraryFilters>, searchEdit = false) => {
+    const next = { ...filters, ...patch };
+    applyFilters(next);
+    if (!searchEdit) editingSearch.current = false;
+    const url = new URL(window.location.href);
+    if (!isLibraryPath(url.pathname)) return;
+    const previousParams = url.searchParams.toString();
+    writeCompanionLibraryFilters(url.searchParams, next);
+    if (url.searchParams.toString() === previousParams) return;
+    lastAppliedSearch.current = url.search;
+    // Keep typing in one history entry so Back returns to the previous search.
+    if (searchEdit && editingSearch.current) window.history.replaceState(window.history.state, "", url);
+    else window.history.pushState(window.history.state, "", url);
+    editingSearch.current = searchEdit;
+  };
+
+  const copyFilterLink = async () => {
+    const { protocol, hostname, origin } = window.location;
+    const base = protocol === "tauri:" || hostname === "tauri.localhost"
+      ? "https://velvetmotion-ai.hampusi97.workers.dev"
+      : origin;
+    const url = new URL("/companions/", base);
+    writeCompanionLibraryFilters(url.searchParams, filters);
+    try {
+      await navigator.clipboard.writeText(url.href);
+      setCopyStatus("Filter link copied.");
+    } catch {
+      setCopyStatus(url.href);
+    }
+  };
   const visible = useMemo(
-    () =>
-      discoverCompanions(characters, {
-        query,
-        category,
-        tag,
-        interest,
-        conversation,
-        visualStyle,
-        favorites,
-        savedOnly,
-        sort,
-      }),
-    [
-      characters,
-      query,
-      category,
-      tag,
-      interest,
-      conversation,
-      visualStyle,
-      favorites,
-      savedOnly,
-      sort,
-    ],
+    () => discoverCompanions(characters, { ...filters, favorites }),
+    [characters, filters, favorites],
   );
   const activeCount = [
     category !== "All",
@@ -125,15 +187,7 @@ export function CharacterRoster({
     visualStyle,
     savedOnly,
   ].filter(Boolean).length;
-  const clearFilters = () => {
-    onQuery("");
-    onCategory("All");
-    onTag(null);
-    setInterest("");
-    setConversation("");
-    setVisualStyle("");
-    setSavedOnly(false);
-  };
+  const clearFilters = () => changeFilters({ ...DEFAULT_COMPANION_LIBRARY_FILTERS, sort });
   const toggleFavorite = (character: Character) => {
     try {
       setFavorites(toggleFavoriteCompanion(character.id));
@@ -215,7 +269,9 @@ export function CharacterRoster({
             <input
               type="search"
               value={query}
-              onChange={(e) => onQuery(e.target.value)}
+              maxLength={MAX_COMPANION_QUERY_LENGTH}
+              onChange={(e) => changeFilters({ query: e.target.value }, true)}
+              onBlur={() => { editingSearch.current = false; }}
               placeholder="A name, an interest, a little intrigue…"
               className="vm-field w-full py-3.5 text-sm"
               style={{ paddingLeft: "2.75rem" }}
@@ -224,7 +280,7 @@ export function CharacterRoster({
           <button
             type="button"
             aria-pressed={savedOnly}
-            onClick={() => setSavedOnly((v) => !v)}
+            onClick={() => changeFilters({ savedOnly: !savedOnly })}
             className={
               "vm-secondary-button " +
               (savedOnly
@@ -260,7 +316,7 @@ export function CharacterRoster({
               key={item}
               type="button"
               aria-pressed={category === item}
-              onClick={() => onCategory(item)}
+              onClick={() => changeFilters({ category: item, tag: null })}
               className={
                 "vm-filter-chip " +
                 (category === item ? "vm-filter-active" : "")
@@ -280,7 +336,7 @@ export function CharacterRoster({
               <select
                 aria-label="Interests"
                 value={interest}
-                onChange={(e) => setInterest(e.target.value)}
+                onChange={(e) => changeFilters({ interest: e.target.value })}
                 className={selectClass}
               >
                 <option value="">Any interest</option>
@@ -294,7 +350,7 @@ export function CharacterRoster({
               <select
                 aria-label="Conversation"
                 value={conversation}
-                onChange={(e) => setConversation(e.target.value)}
+                onChange={(e) => changeFilters({ conversation: e.target.value })}
                 className={selectClass}
               >
                 <option value="">Any conversation</option>
@@ -308,7 +364,7 @@ export function CharacterRoster({
               <select
                 aria-label="Visual style"
                 value={visualStyle}
-                onChange={(e) => setVisualStyle(e.target.value)}
+                onChange={(e) => changeFilters({ visualStyle: e.target.value })}
                 className={selectClass}
               >
                 <option value="">Any style</option>
@@ -322,7 +378,7 @@ export function CharacterRoster({
               <select
                 aria-label="Mood"
                 value={tag || ""}
-                onChange={(e) => onTag(e.target.value || null)}
+                onChange={(e) => changeFilters({ tag: e.target.value || null })}
                 className={selectClass}
               >
                 <option value="">Any mood</option>
@@ -333,14 +389,18 @@ export function CharacterRoster({
             </label>
           </div>
         )}
-        {(activeCount > 0 || query) && (
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="vm-text-button text-xs"
-          >
-            <X className="h-3.5 w-3.5" /> Clear all filters
-          </button>
+        {(activeCount > 0 || query || sort !== DEFAULT_COMPANION_LIBRARY_FILTERS.sort) && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {(activeCount > 0 || query) && (
+              <button type="button" onClick={clearFilters} className="vm-text-button text-xs">
+                <X className="h-3.5 w-3.5" /> Clear all filters
+              </button>
+            )}
+            <button type="button" onClick={() => void copyFilterLink()} className="vm-text-button text-xs">
+              <Copy className="h-3.5 w-3.5" /> Copy filter link
+            </button>
+            {copyStatus && <span role="status" className="min-w-0 break-all text-xs text-[#cbb4d8]">{copyStatus}</span>}
+          </div>
         )}
         {notice && (
           <p role="alert" className="text-sm text-amber-200">
@@ -359,7 +419,7 @@ export function CharacterRoster({
           <select
             aria-label="Sort companions"
             value={sort}
-            onChange={(e) => setSort(e.target.value as "featured" | "name")}
+            onChange={(e) => changeFilters({ sort: e.target.value === "name" ? "name" : "featured" })}
             className="rounded-lg border border-white/10 bg-[#17121f] px-3 py-2 text-xs text-white"
           >
             <option value="featured">Featured</option>
