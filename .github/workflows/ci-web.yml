@@ -45,8 +45,8 @@ jobs:
       - name: TypeScript typecheck
         run: npx tsc --noEmit
 
-      - name: Validate Cloudflare Git deployment verifier
-        run: node --test scripts/verify-cloudflare-git-deploy.test.mjs
+      - name: Validate Cloudflare deployment verifiers
+        run: node --test scripts/verify-cloudflare-git-deploy.test.mjs scripts/verify-cloudflare-public-commit.test.mjs
 
       - name: Build static export
         run: npm run build
@@ -68,6 +68,7 @@ jobs:
       # completed success check for *this exact SHA* instead of falsely failing CI.
       # This is not satisfied by a passing build, a preview, or a previous deploy.
       - name: Verify native Cloudflare Git deployment without Wrangler secrets
+        id: native_cloudflare
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CF_TOKEN == '' && env.CF_ACCOUNT == ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,3 +95,14 @@ jobs:
           echo "Commit: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "Site: https://velvetmotion-ai.hampusi97.workers.dev" >> "$GITHUB_STEP_SUMMARY"
           echo "Deployment was performed only after audit, lint, TypeScript and build passed." >> "$GITHUB_STEP_SUMMARY"
+      # Provider status proves its build finished, but not what users currently
+      # receive over HTTPS. Check the actual public origin and exact build SHA.
+      # Stable Workers/Pages hostnames were verified in the Cloudflare account.
+      - name: Verify public production serves this exact commit
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          VERIFIED_PROVIDER: ${{ steps.native_cloudflare.outputs.provider }}
+          WORKERS_PRODUCTION_URL: https://velvetmotion-ai.hampusi97.workers.dev
+          PAGES_PRODUCTION_URL: https://velvetmotion-ai.pages.dev
+        run: node scripts/verify-cloudflare-public-commit.mjs
+
