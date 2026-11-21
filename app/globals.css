@@ -265,3 +265,53 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .girl-card, .girl-card * { transition: none !important; transform: none !important; }
 }
+
+/* Live Video Portrait Card Motion (breathing + handheld camera drift + ambient light shimmer) */
+@keyframes vm-live-camera-breathe {
+  0% {
+    transform: scale(1.04) translate3d(0%, 0%, 0) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.075) translate3d(-1.1%, -0.8%, 0) rotate(-0.35deg);
+  }
+  50% {
+    transform: scale(1.095) translate3d(0.7%, -1.4%, 0) rotate(0.25deg);
+  }
+  75% {
+    transform: scale(1.068) translate3d(1.1%, 0.5%, 0) rotate(0.4deg);
+  }
+  100% {
+    transform: scale(1.04) translate3d(0%, 0%, 0) rotate(0deg);
+  }
+}
+
+@keyframes vm-live-ambient-sweep {
+  0%, 100% {
+    opacity: 0.16;
+    background: radial-gradient(circle at 30% 25%, rgba(255, 77, 141, 0.22), transparent 60%);
+  }
+  50% {
+    opacity: 0.32;
+    background: radial-gradient(circle at 70% 35%, rgba(255, 210, 230, 0.2), transparent 62%);
+  }
+}
+
+.vm-live-video-loop {
+  animation: vm-live-camera-breathe 5.4s ease-in-out infinite;
+  animation-delay: var(--vm-live-delay, 0s);
+  transform-origin: 50% 24%;
+  will-change: transform;
+}
+
+.vm-live-light-sweep {
+  animation: vm-live-ambient-sweep 4.2s ease-in-out infinite;
+  animation-delay: var(--vm-live-delay, 0s);
+  mix-blend-mode: screen;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-live-video-loop,
+  .vm-live-light-sweep {
+    animation: none !important;
+  }
+}

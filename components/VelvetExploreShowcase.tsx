@@ -5,31 +5,35 @@ import Link from 'next/link';
 import {
   Search,
   Lock,
-  Film,
-  Sparkles,
   Flame,
   Play,
   ChevronRight,
   Check,
+  Heart,
   MessageCircle,
-  Volume2,
 } from 'lucide-react';
 import { SafeImage } from '@/components/SafeImage';
+import { LivePortraitVideo } from '@/components/LivePortraitVideo';
 
 export interface ShowcaseCompanion {
   id: string;
   name: string;
   age: number;
   portrait: string;
+  videoUrl?: string;
   fallbackPortrait?: string;
   category: 'Caucasian' | 'Latina' | 'Asian' | 'European' | 'South Asian' | 'Mixed';
   hair: 'Blonde' | 'Brunette' | 'Black' | 'Red' | 'Colorful';
   isNew?: boolean;
+  isLive?: boolean;
   verified?: boolean;
   hasPrivate?: boolean;
   hasVideo?: boolean;
   hasVoice?: boolean;
   tagline: string;
+  likes?: string;
+  messages?: string;
+  handle?: string;
 }
 
 const FALLBACK_PORTRAIT = '/portraits/nova.jpg';
@@ -41,144 +45,204 @@ export const SHOWCASE_COMPANIONS: ShowcaseCompanion[] = [
     name: 'Chloe',
     age: 23,
     portrait: '/portraits/chloe.jpg',
+    videoUrl: '/videos/chloe.mp4',
     category: 'Caucasian',
     hair: 'Brunette',
     isNew: true,
+    isLive: true,
     verified: true,
     hasVideo: true,
     hasVoice: true,
-    tagline: 'Late-night penthouse energy',
+    tagline: 'Your bubbly 23-year-old penthouse neighbor caught up late in silk loungewear...',
+    likes: '543',
+    messages: '158K',
+    handle: '@velvet_ai',
   },
   {
     id: 'priya',
     name: 'Priya',
     age: 25,
     portrait: '/portraits/priya-v.jpg',
+    videoUrl: '/videos/priya.mp4',
     category: 'South Asian',
     hair: 'Black',
     isNew: true,
+    isLive: true,
     verified: true,
     hasVideo: true,
     hasPrivate: true,
-    tagline: 'Playful, bold & unforgettable',
+    tagline: 'Playful, bold & unforgettable—waiting by the bedroom door after midnight...',
+    likes: '412',
+    messages: '94K',
+    handle: '@velvet_ai',
   },
   {
     id: 'elena',
     name: 'Elena',
     age: 27,
     portrait: '/portraits/elena.jpg',
+    videoUrl: '/videos/elena.mp4',
     category: 'European',
     hair: 'Brunette',
     isNew: true,
+    isLive: true,
     hasPrivate: true,
     hasVideo: true,
-    tagline: 'Velvet lounge confessions',
+    tagline: 'Sultry velvet lounge regular who answers the door in only a towel and a smirk...',
+    likes: '629',
+    messages: '182K',
+    handle: '@velvet_ai',
   },
   {
     id: 'delilah',
     name: 'Delilah',
     age: 21,
     portrait: '/portraits/delilah-v.jpg',
+    videoUrl: '/videos/delilah.mp4',
     category: 'Mixed',
     hair: 'Colorful',
+    isLive: true,
     hasPrivate: true,
     hasVideo: true,
     hasVoice: true,
-    tagline: 'Neon café rebel',
+    tagline: 'Neon café rebel who texts you daring mirror videos when she cannot sleep...',
+    likes: '380',
+    messages: '76K',
+    handle: '@velvet_ai',
   },
   {
     id: 'suzu',
     name: 'Suzu',
     age: 21,
     portrait: '/portraits/suzu-m.jpg',
+    videoUrl: '/videos/suzu.mp4',
     category: 'Asian',
     hair: 'Black',
+    isLive: true,
     hasPrivate: true,
     hasVideo: true,
     hasVoice: true,
-    tagline: 'Tokyo midnight arcade',
+    tagline: 'Tokyo midnight arcade crush who pulls you into a private booth after hours...',
+    likes: '495',
+    messages: '124K',
+    handle: '@velvet_ai',
   },
   {
     id: 'mia',
     name: 'Mia',
     age: 24,
     portrait: '/portraits/mia.jpg',
+    videoUrl: '/videos/mia.mp4',
     category: 'Caucasian',
     hair: 'Blonde',
+    isLive: true,
     verified: true,
     hasVideo: true,
     hasVoice: true,
-    tagline: 'Golden hour tease',
+    tagline: 'Sun-kissed blonde tease who flags you down for a spontaneous late-night ride...',
+    likes: '718',
+    messages: '210K',
+    handle: '@velvet_ai',
   },
   {
     id: 'scarlett',
     name: 'Scarlett',
     age: 26,
     portrait: '/portraits/scarlett.jpg',
+    videoUrl: '/videos/scarlett.mp4',
     category: 'Latina',
     hair: 'Black',
     isNew: true,
+    isLive: true,
     hasPrivate: true,
     hasVideo: true,
-    tagline: 'Midnight rooftop drinks',
+    tagline: 'Midnight rooftop drinks turn into a private suite confession with zero filter...',
+    likes: '512',
+    messages: '143K',
+    handle: '@velvet_ai',
   },
   {
     id: 'freya',
     name: 'Freya',
     age: 24,
     portrait: '/portraits/freya.jpg',
+    videoUrl: '/videos/freya.mp4',
     category: 'European',
     hair: 'Blonde',
     isNew: true,
+    isLive: true,
     hasVideo: true,
     hasVoice: true,
-    tagline: 'Nordic charm after dark',
+    tagline: 'Nordic charm after dark—soft whispers and bold eyes locked straight on yours...',
+    likes: '344',
+    messages: '68K',
+    handle: '@velvet_ai',
   },
   {
     id: 'valentina',
     name: 'Valentina',
     age: 27,
     portrait: '/portraits/valentina.jpg',
+    videoUrl: '/videos/valentina.mp4',
     category: 'Latina',
     hair: 'Brunette',
+    isLive: true,
     hasPrivate: true,
     hasVideo: true,
-    tagline: 'VIP lounge regular',
+    tagline: 'VIP lounge regular with a dangerous smile and a habit of getting her way...',
+    likes: '467',
+    messages: '119K',
+    handle: '@velvet_ai',
   },
   {
     id: 'mila',
     name: 'Mila',
     age: 22,
     portrait: '/portraits/mila-s.jpg',
+    videoUrl: '/videos/mila.mp4',
     category: 'European',
     hair: 'Blonde',
+    isLive: true,
     hasPrivate: true,
     hasVideo: true,
     hasVoice: true,
-    tagline: 'After-party whisperer',
+    tagline: 'After-party whisperer who stays behind after everyone else leaves the loft...',
+    likes: '391',
+    messages: '89K',
+    handle: '@velvet_ai',
   },
   {
     id: 'nova',
     name: 'Nova',
     age: 24,
     portrait: '/portraits/nova.jpg',
+    videoUrl: '/videos/nova.mp4',
     category: 'Asian',
     hair: 'Black',
+    isLive: true,
     verified: true,
     hasVideo: true,
     hasPrivate: true,
-    tagline: 'Cyber-neon muse',
+    tagline: 'Cyber-neon muse streaming live from her rain-lit high-rise bedroom...',
+    likes: '842',
+    messages: '264K',
+    handle: '@velvet_ai',
   },
   {
     id: 'sloane',
     name: 'Sloane',
     age: 26,
     portrait: '/portraits/sloane.jpg',
+    videoUrl: '/videos/sloane.mp4',
     category: 'Caucasian',
     hair: 'Brunette',
+    isLive: true,
     hasPrivate: true,
     hasVoice: true,
-    tagline: 'Sharp wit, softer side',
+    tagline: 'Sharp wit in public, completely unguarded the second the door clicks shut...',
+    likes: '428',
+    messages: '105K',
+    handle: '@velvet_ai',
   },
 ];
 
@@ -558,56 +622,54 @@ export default function VelvetExploreShowcase() {
                   href={`/chat/?companion=${c.id}`}
                   className="group relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-[#13131d] transition duration-300 hover:-translate-y-1 hover:border-[#ff1e8e]/75 hover:shadow-[0_0_24px_rgba(255,30,142,0.32)]"
                 >
-                  <SafePortrait
+                  <LivePortraitVideo
                     src={c.portrait}
+                    companionId={c.id}
+                    videoUrl={c.videoUrl}
                     alt={`${c.name}, ${c.age}`}
-                    className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 via-black/35 to-transparent" />
 
-                  {/* Top-Left NEW Pill */}
-                  {c.isNew && (
-                    <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#ff1e8e] to-[#ff4d8d] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-[0_0_12px_rgba(255,30,142,0.7)]">
-                      <Sparkles className="h-2.5 w-2.5" />
-                      NEW
-                    </span>
-                  )}
+                  {/* Top-Left LIVE Video Pill */}
+                  <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full bg-[#ff2a7a]/95 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-[0_0_12px_rgba(255,42,122,0.75)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                    LIVE
+                  </span>
 
-                  {/* Top-Right Compact Frosted Icon Stack */}
-                  <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5">
-                    {c.hasPrivate && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/90 backdrop-blur-md border border-white/10">
-                        <Lock className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                    {c.hasVideo && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/90 backdrop-blur-md border border-white/10">
-                        <Film className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                    {c.hasVoice && (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white/90 backdrop-blur-md border border-white/10">
-                        <Volume2 className="h-3.5 w-3.5" />
-                      </span>
-                    )}
-                  </div>
+                  {/* Top-Right Circular Pink Video Play Badge */}
+                  <span className="absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#ff2a7a] text-white shadow-[0_0_14px_rgba(255,42,122,0.8)] transition-transform duration-300 group-hover:scale-110">
+                    <Play className="h-3.5 w-3.5 fill-white text-white ml-0.5" />
+                  </span>
 
-                  {/* Clean Bottom Identity (Name + Age + Verified Check) */}
-                  <div className="absolute inset-x-3 bottom-3 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="truncate text-base font-extrabold text-white">
+                  {/* Bottom Identity + Story Teaser + Engagement Stats Bar */}
+                  <div className="absolute inset-x-3 bottom-2.5 space-y-1">
+                    <div className="flex items-baseline gap-1.5 truncate">
+                      <span className="truncate text-lg font-extrabold tracking-tight text-white">
                         {c.name}
                       </span>
-                      <span className="text-sm font-medium text-white/75">{c.age}</span>
+                      <span className="text-base font-extrabold text-[#ff3b8b]">{c.age}</span>
                       {c.verified && (
-                        <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff1e8e] text-white">
+                        <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#ff1e8e] text-white self-center">
                           <Check className="h-2.5 w-2.5 stroke-[3]" />
                         </span>
                       )}
                     </div>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#ff1e8e]/90 text-white opacity-0 transition group-hover:opacity-100 shadow-[0_0_12px_rgba(255,30,142,0.8)]">
-                      <MessageCircle className="h-3.5 w-3.5" />
-                    </span>
+
+                    <p className="line-clamp-2 text-[11px] leading-snug text-white/80">
+                      {c.tagline}
+                    </p>
+
+                    <div className="flex items-center justify-between pt-1 text-[10px] font-semibold text-white/75">
+                      <div className="flex items-center gap-2.5">
+                        <span className="inline-flex items-center gap-1">
+                          <Heart className="h-3 w-3 text-white/80" /> {c.likes || '420'}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <MessageCircle className="h-3 w-3 text-white/80" /> {c.messages || '95K'}
+                        </span>
+                      </div>
+                      <span className="truncate text-[10px] text-white/55">{c.handle || '@velvet_ai'}</span>
+                    </div>
                   </div>
                 </Link>
               );
@@ -695,10 +757,9 @@ export default function VelvetExploreShowcase() {
                   href={ep.href}
                   className="group relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 bg-[#13131d] transition hover:-translate-y-1 hover:border-[#ff1e8e]/80"
                 >
-                  <SafePortrait
+                  <LivePortraitVideo
                     src={ep.image}
                     alt={ep.title}
-                    className="h-full w-full object-cover object-top transition duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
                   <span className="absolute left-2.5 top-2.5 rounded-full bg-[#ff1e8e] px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white">
