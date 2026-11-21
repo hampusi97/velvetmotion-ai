@@ -10,8 +10,7 @@ import { getUser, login, logout, type LocalUser } from "@/lib/auth";
 import { useCoinsStore } from "@/lib/coinsStore";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
-import { emailPasswordSignIn, emailPasswordSignUp, googleSignIn, initAuth, signInAnonymousGuest, auth } from "@/lib/firebase";
-import { emitVaultUpdated } from "@/lib/firebaseSync";
+import { emitVaultUpdated, scheduleCloudStartup } from "@/lib/firebaseSync";
 
 const NAV_LINKS = [
   { href: "/", label: "Explore", id: "home" },
@@ -64,30 +63,40 @@ export function SiteHeader({
     setSoundOn(isUiSoundEnabled());
     const onSound = () => setSoundOn(isUiSoundEnabled());
     window.addEventListener("vm:ui-sound-changed", onSound);
-    const unsubAuth = initAuth((fbUser) => {
-      const nextUser: LocalUser = {
-        username:
-          fbUser.displayName ||
-          (fbUser.isAnonymous ? `cloud-${fbUser.uid.slice(0, 5)}` : fbUser.email?.split("@")[0]) ||
-          "VelvetMember",
-        joinedAt: Date.now(),
-        uid: fbUser.uid,
-        email: fbUser.email,
-        isFirebase: true,
-      };
-      try {
-        localStorage.setItem("vm-user", JSON.stringify(nextUser));
-      } catch {
-        /* ignore */
-      }
-      setUser(nextUser);
-      setLoginOpen(false);
-      onUserChange?.(nextUser);
-      emitVaultUpdated();
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    const cancelStartup = scheduleCloudStartup(() => {
+      void import("@/lib/firebase").then(({ initAuth }) => {
+        if (cancelled) return;
+        unsubscribe = initAuth((fbUser) => {
+          if (cancelled) return;
+          const nextUser: LocalUser = {
+            username:
+              fbUser.displayName ||
+              (fbUser.isAnonymous ? `cloud-${fbUser.uid.slice(0, 5)}` : fbUser.email?.split("@")[0]) ||
+              "VelvetMember",
+            joinedAt: Date.now(),
+            uid: fbUser.uid,
+            email: fbUser.email,
+            isFirebase: true,
+          };
+          try {
+            localStorage.setItem("vm-user", JSON.stringify(nextUser));
+          } catch {
+            /* ignore */
+          }
+          setUser(nextUser);
+          setLoginOpen(false);
+          onUserChange?.(nextUser);
+          emitVaultUpdated();
+        });
+      }).catch(() => {});
     });
     return () => {
+      cancelled = true;
+      cancelStartup();
       window.removeEventListener("vm:ui-sound-changed", onSound);
-      unsubAuth();
+      unsubscribe?.();
     };
   }, [onUserChange]);
 
@@ -149,6 +158,7 @@ export function SiteHeader({
       return;
     }
     try {
+      const { emailPasswordSignIn, emailPasswordSignUp } = await import("@/lib/firebase");
       const res =
         authMode === "signup"
           ? await emailPasswordSignUp(cleanEmail, password, name.trim() || undefined)
@@ -162,6 +172,7 @@ export function SiteHeader({
   const doGoogleAuth = async () => {
     setAuthError(null);
     try {
+      const { googleSignIn } = await import("@/lib/firebase");
       const res = await googleSignIn();
       if (res?.user) {
         applyFirebaseUser(res.user);
@@ -176,6 +187,7 @@ export function SiteHeader({
   const doAnonymousCloudSync = async () => {
     setAuthError(null);
     try {
+      const { signInAnonymousGuest } = await import("@/lib/firebase");
       const res = await signInAnonymousGuest();
       applyFirebaseUser(res.user);
     } catch (err) {
@@ -279,7 +291,6 @@ export function SiteHeader({
                   setLoginOpen(true);
                 } else {
                   logout();
-                  void auth.signOut().catch(() => {});
                   const g = { username: `guest${Date.now().toString(36).slice(-4)}`, joinedAt: Date.now(), email: null };
                   setUser(g);
                   onUserChange?.(g);

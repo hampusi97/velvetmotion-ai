@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 export type RamTier = "8 GB Lite" | "16 GB Balanced" | "32 GB+ Ultra";
 
@@ -40,6 +40,7 @@ let latestMetrics: SpeedMetrics = {};
 export function reportGenerationSpeed(next: SpeedMetrics) {
   latestMetrics = { ...latestMetrics, ...next };
   if (typeof window !== "undefined") {
+    publishStatus({ ...currentStatus, metrics: latestMetrics });
     window.dispatchEvent(new CustomEvent("vm:engine-metrics", { detail: latestMetrics }));
   }
 }
@@ -132,10 +133,7 @@ export async function probeLocalEngines(): Promise<LocalEngineStatus> {
 
   const probeHomeHealth = async () => {
     try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 900);
-      const res = await fetch(`${homeEngineBase}/api/health`, { signal: ctrl.signal });
-      clearTimeout(t);
+      const res = await fetch(`${homeEngineBase}/api/health`, { signal: AbortSignal.timeout(900) });
       if (!res.ok) return null;
       return (await res.json()) as {
         totalRamGb?: number;
@@ -265,45 +263,70 @@ export async function checkDesktopUpdate(): Promise<{ available: boolean; versio
   }
 }
 
+const initialStatus: LocalEngineStatus = {
+  isDesktop: false,
+  koboldOnline: false,
+  fishOnline: false,
+  kokoroOnline: false,
+  ollamaOnline: false,
+  comfyOnline: false,
+  a1111Online: false,
+  homeEngineOnline: false,
+  homeTunnelUrl: null,
+  anyLocalOnline: false,
+  ramGb: 8,
+  ramTier: "8 GB Lite",
+  specs: null,
+  checking: true,
+  metrics: {},
+};
+
+const PROBE_INTERVAL_MS = 15_000;
+const subscribers = new Set<() => void>();
+let currentStatus = initialStatus;
+let refreshInFlight: Promise<void> | null = null;
+let lastProbeAt = 0;
+let probeTimer: number | undefined;
+
+function publishStatus(status: LocalEngineStatus) {
+  currentStatus = status;
+  for (const notify of subscribers) notify();
+}
+
+function refresh(): Promise<void> {
+  if (!refreshInFlight) {
+    lastProbeAt = Date.now();
+    refreshInFlight = probeLocalEngines()
+      .then((next) => publishStatus({ ...next, metrics: latestMetrics }))
+      .catch(() => publishStatus({ ...currentStatus, checking: false }))
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
+}
+
+function refreshIfVisible() {
+  if (!document.hidden && Date.now() - lastProbeAt >= PROBE_INTERVAL_MS) void refresh();
+}
+
+function subscribe(notify: () => void) {
+  subscribers.add(notify);
+  if (subscribers.size === 1) {
+    refreshIfVisible();
+    probeTimer = window.setInterval(refreshIfVisible, PROBE_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+  }
+  return () => {
+    subscribers.delete(notify);
+    if (subscribers.size === 0) {
+      window.clearInterval(probeTimer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    }
+  };
+}
+
 export function useLocalEngineStatus(): LocalEngineStatus & { refresh: () => Promise<void> } {
-  const [status, setStatus] = useState<LocalEngineStatus>({
-    isDesktop: false,
-    koboldOnline: false,
-    fishOnline: false,
-    kokoroOnline: false,
-    ollamaOnline: false,
-    comfyOnline: false,
-    a1111Online: false,
-    homeEngineOnline: false,
-    homeTunnelUrl: null,
-    anyLocalOnline: false,
-    ramGb: 8,
-    ramTier: "8 GB Lite",
-    specs: null,
-    checking: true,
-    metrics: latestMetrics,
-  });
-
-  const refresh = useCallback(async () => {
-    const next = await probeLocalEngines();
-    setStatus(next);
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(() => {
-      void refresh();
-    }, 15000);
-    const onMetrics = (e: Event) => {
-      const detail = (e as CustomEvent<SpeedMetrics>).detail;
-      setStatus((prev) => ({ ...prev, metrics: detail || latestMetrics }));
-    };
-    window.addEventListener("vm:engine-metrics", onMetrics);
-    return () => {
-      clearInterval(id);
-      window.removeEventListener("vm:engine-metrics", onMetrics);
-    };
-  }, [refresh]);
-
+  const status = useSyncExternalStore(subscribe, () => currentStatus, () => initialStatus);
   return { ...status, refresh };
 }

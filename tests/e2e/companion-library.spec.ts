@@ -26,6 +26,27 @@ test.beforeEach(async ({ context }) => {
   });
 });
 
+test("Settings shares the current engine status and can refresh it", async ({ page }) => {
+  let probes = 0;
+  await page.route("http://127.0.0.1:8787/api/health", (route) => {
+    probes += 1;
+    return route.fulfill({
+      headers: { "Access-Control-Allow-Origin": "*" },
+      json: { totalRamGb: 32, cpuCores: 8, engines: {} },
+    });
+  });
+
+  await page.goto("/?view=obsolete-view");
+  await expect(page.getByRole("main").getByRole("heading").first()).toBeVisible();
+  await expect.poll(() => probes).toBe(1);
+  await page.getByRole("button", { name: "Open Settings & Backup" }).click();
+  await expect(page.getByText(/HW: 32 GB RAM/)).toBeVisible();
+  expect(probes).toBe(1);
+  await page.getByRole("button", { name: "Test Local Connection" }).click();
+  await expect(page.getByText(/Probed :5001/)).toBeVisible();
+  expect(probes).toBe(2);
+});
+
 test("discovery filters and favorites persist, with an actionable empty state", async ({
   page,
 }, info) => {

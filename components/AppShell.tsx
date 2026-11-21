@@ -19,7 +19,6 @@ import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import VelvetExploreShowcase from "@/components/VelvetExploreShowcase";
 import { CharacterRoster } from "@/components/CharacterRoster";
-import { CollectionGalleryView, PrivateContentView } from "@/components/CollectionAndPrivateViews";
 import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
 import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt, installPromptOverlapsComposer } from "@/components/InstallPrompt";
@@ -46,6 +45,8 @@ const EdgeTimer = dynamic(() => import("@/components/EdgeTimer").then(m => m.Edg
 const SpicyScenarioSimulator = dynamic(() => import("@/components/SpicyScenarioSimulator").then(m => m.SpicyScenarioSimulator), { loading: LoadingPanel });
 const TributeBrowser = dynamic(() => import("@/components/TributeBrowser").then(m => m.TributeBrowser), { loading: LoadingPanel });
 const StoryPackBrowser = dynamic(() => import("@/components/content/StoryPackBrowser").then(m => m.StoryPackBrowser), { loading: LoadingPanel });
+const CollectionGalleryView = dynamic(() => import("@/components/CollectionAndPrivateViews").then(m => m.CollectionGalleryView), { loading: LoadingPanel });
+const PrivateContentView = dynamic(() => import("@/components/CollectionAndPrivateViews").then(m => m.PrivateContentView), { loading: LoadingPanel });
 const JoiBrowser = dynamic(() => import("@/components/content/JoiBrowser").then(m => m.JoiBrowser), { loading: LoadingPanel });
 const CardImport = dynamic(() => import("@/components/CardImport").then(m => m.CardImport), { loading: LoadingPanel });
 const ShareImport = dynamic(() => import("@/components/ShareImport").then(m => m.ShareImport), { loading: LoadingPanel });
@@ -61,44 +62,18 @@ const SettingsAndBackupDrawer = dynamic(() => import("@/components/SettingsAndBa
 const Penthouse3DSuite = dynamic(() => import("@/components/Penthouse3DSuite").then(m => m.Penthouse3DSuite), { loading: LoadingPanel });
 const Joi3DStage = dynamic(() => import("@/components/Joi3DStage").then(m => m.Joi3DStage), { loading: LoadingPanel });
 
-export type ShellRouteView =
-  | "home"
-  | "discover"
-  | "tinder"
-  | "chat"
-  | "profile"
-  | "girls"
-  | "romance"
-  | "group"
-  | "dual"
-  | "shorts"
-  | "collection"
-  | "gallery"
-  | "private"
-  | "create"
-  | "studio"
-  | "download"
-  | "blindfold"
-  | "room"
-  | "roulette"
-  | "strip"
-  | "edge"
-  | "scenario"
-  | "tribute"
-  | "packs"
-  | "joi"
-  | "import"
-  | "share"
-  | "lounge"
-  | "vault"
-  | "my-girls"
-  | "wallet"
-  | "advanced"
-  | "terms"
-  | "privacy"
-  | "safety"
-  | "penthouse"
-  | "joi3d";
+const SHELL_VIEWS = [
+  "home", "discover", "tinder", "chat", "profile", "girls", "romance", "group", "dual",
+  "shorts", "collection", "gallery", "private", "create", "studio", "download", "blindfold",
+  "room", "roulette", "strip", "edge", "scenario", "tribute", "packs", "joi", "import", "share",
+  "lounge", "vault", "my-girls", "wallet", "advanced", "terms", "privacy", "safety", "penthouse", "joi3d",
+] as const;
+
+export type ShellRouteView = typeof SHELL_VIEWS[number];
+
+function parseView(value: string | null): ShellRouteView | undefined {
+  return SHELL_VIEWS.find((view) => view === value);
+}
 
 const ENABLE_3D = process.env.NEXT_PUBLIC_ENABLE_3D === "true";
 
@@ -155,7 +130,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   } | null>(null);
 
   const { refresh: refreshCoins } = useCoinsStore();
-  useFirebaseCloudSync();
+  useFirebaseCloudSync(adult === true);
   const [bossPinLocked, setBossPinLocked] = useState(false);
   const [bossPinInput, setBossPinInput] = useState("");
   const [bossPinError, setBossPinError] = useState(false);
@@ -199,7 +174,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       const params = new URLSearchParams(window.location.search);
       // Query parameters must never silently bypass the adult confirmation gate.
       setAdult(localStorage.getItem("velvet-age") === "true");
-      const qView = params.get("view") as ShellRouteView | null;
+      const qView = parseView(params.get("view"));
       if (qView && pathname === "/") setView(qView);
       const qId = params.get("companion") || params.get("id");
       if (qId) {
@@ -274,7 +249,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     setMenuOpen(false);
     if (next === "gallery") setView("collection");
     else if (next === "tinder") setView("discover");
-    else setView(next as ShellRouteView);
+    else setView(parseView(next) ?? "home");
     if (typeof window !== "undefined") window.scrollTo({ top: 0 });
   };
 
@@ -289,7 +264,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       const isInitial = lastSearchRef.current === null;
       lastSearchRef.current = searchStr;
       const params = new URLSearchParams(searchStr);
-      const qView = params.get("view") as ShellRouteView | null;
+      const qView = parseView(params.get("view"));
       const qId = params.get("companion") || params.get("id");
       if (window.location.pathname === "/") {
         if (qView) {
@@ -326,18 +301,18 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     };
   }, [pathname]);
 
-  if (adult === null) return <div className="min-h-screen bg-[#05050a]" />;
+  if (adult === null) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#05050a]">
+        <p role="status" className="text-sm text-rose-100">Opening VelvetMotion…</p>
+      </main>
+    );
+  }
 
   if (!adult) {
     return (
       <main className="min-h-screen bg-[#05050a] text-white relative overflow-hidden">
-        <div className="absolute inset-0 blur-md scale-105 opacity-60 pointer-events-none">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
-            {CHARACTERS.slice(0, 8).map((c) => (
-              <img key={c.id} src={c.avatar} alt="" className="aspect-[2/3] w-full object-cover object-top rounded-2xl" />
-            ))}
-          </div>
-        </div>
+        <div aria-hidden="true" className="absolute inset-0 scale-105 bg-[url('/promos/hero-banner.webp')] bg-cover bg-center opacity-55 blur-md" />
         <div className="absolute inset-0 bg-[#05050a]/75 backdrop-blur-md" />
         <div className="relative z-10 flex items-center justify-center min-h-screen p-6">
           <div className="max-w-md w-full neon-border-sweep">

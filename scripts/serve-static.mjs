@@ -9,7 +9,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const outDir = path.join(root, "out");
-const port = Number(process.env.PORT || 8080);
+const port = Number(process.env.PORT || process.argv[2] || 8080);
 const host = process.env.HOST || "0.0.0.0";
 
 if (!fs.existsSync(outDir)) {
@@ -34,11 +34,11 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml; charset=utf-8",
   ".webm": "video/webm",
+  ".mp4": "video/mp4",
   ".wasm": "application/wasm",
 };
 
-function resolveFile(reqPath) {
-  const cleanUrl = decodeURIComponent((reqPath || "/").split("?")[0]);
+function resolveFile(cleanUrl) {
   const safeRel = path.normalize(cleanUrl).replace(/^(\.\.[/\\])+/, "").replace(/^[/\\]+/, "");
   const candidates = [
     path.join(outDir, safeRel),
@@ -46,33 +46,45 @@ function resolveFile(reqPath) {
     path.join(outDir, `${safeRel}.html`),
   ];
   for (const file of candidates) {
-    if (!file.startsWith(outDir)) continue;
+    if (!file.startsWith(outDir + path.sep)) continue;
     try {
       const stat = fs.statSync(file);
-      if (stat.isFile()) return file;
+      if (stat.isFile()) return { file, status: 200, size: stat.size };
     } catch {
       /* continue */
     }
   }
   const notFound = path.join(outDir, "404.html");
-  return fs.existsSync(notFound) ? notFound : null;
+  return fs.existsSync(notFound) ? { file: notFound, status: 404 } : null;
 }
 
 const server = http.createServer((req, res) => {
-  const target = resolveFile(req.url || "/");
+  let pathname;
+  try {
+    pathname = decodeURIComponent((req.url || "/").split("?")[0]);
+  } catch {
+    res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Invalid URL path");
+    return;
+  }
+  const target = resolveFile(pathname);
   if (!target) {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Not found");
     return;
   }
-  const ext = path.extname(target).toLowerCase();
-  const isNotFoundPage = target.endsWith("404.html") && !(req.url || "").includes("404");
-  const isBuildMeta = target.endsWith("build-meta.json");
-  res.writeHead(isNotFoundPage ? 404 : 200, {
+  const ext = path.extname(target.file).toLowerCase();
+  const isBuildMeta = target.file.endsWith("build-meta.json");
+  res.writeHead(target.status, {
     "Content-Type": MIME[ext] || "application/octet-stream",
+    ...(target.size === undefined ? {} : { "Content-Length": target.size }),
     ...(isBuildMeta ? { "Cache-Control": "no-store" } : {}),
   });
-  fs.createReadStream(target).pipe(res);
+  if (req.method === "HEAD") {
+    res.end();
+    return;
+  }
+  fs.createReadStream(target.file).on("error", () => res.destroy()).pipe(res);
 });
 
 server.listen(port, host, () => {

@@ -7,14 +7,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import {
-  auth,
-  handleFirestoreError,
-  OperationType,
-  readVaultDocFromFirestore,
-  syncVaultDocToFirestore,
-} from "./firebase";
+import type { User } from "firebase/auth";
 import { getCoins, setCoins } from "./storage";
 import { emitCoinsChanged } from "./coinsStore";
 
@@ -97,7 +90,9 @@ function collectLocalVaultSnapshot() {
 }
 
 export async function pushAllLocalStateToFirebase(): Promise<boolean> {
-  if (!auth.currentUser || typeof window === "undefined") return false;
+  if (typeof window === "undefined") return false;
+  const { auth, syncVaultDocToFirestore } = await import("./firebase");
+  if (!auth.currentUser) return false;
   const snap = collectLocalVaultSnapshot();
   if (!snap) return false;
   const now = Date.now();
@@ -122,7 +117,9 @@ export async function pushAllLocalStateToFirebase(): Promise<boolean> {
 }
 
 export async function pullCloudStateAndMerge(): Promise<boolean> {
-  if (!auth.currentUser || typeof window === "undefined") return false;
+  if (typeof window === "undefined") return false;
+  const { auth, handleFirestoreError, OperationType, readVaultDocFromFirestore } = await import("./firebase");
+  if (!auth.currentUser) return false;
   let merged = false;
   try {
     const localTs = Number(window.localStorage.getItem(LAST_LOCAL_WRITE_KEY) || 0);
@@ -208,7 +205,16 @@ export function emitVaultUpdated() {
   }
 }
 
-export function useFirebaseCloudSync() {
+export function scheduleCloudStartup(task: () => void): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(task, { timeout: 1500 });
+    return () => window.cancelIdleCallback(id);
+  }
+  const id = window.setTimeout(task, 0);
+  return () => window.clearTimeout(id);
+}
+
+export function useFirebaseCloudSync(enabled = true) {
   const [status, setStatus] = useState<SyncStatus>({
     signedIn: false,
     uid: null,
@@ -219,7 +225,9 @@ export function useFirebaseCloudSync() {
   });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!enabled) return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const runSync = async (user: User | null) => {
@@ -242,47 +250,64 @@ export function useFirebaseCloudSync() {
         isAnonymous: user.isAnonymous,
         syncing: true,
       }));
-      await pullCloudStateAndMerge();
-      await pushAllLocalStateToFirebase();
-      setStatus((s) => ({
-        ...s,
-        syncing: false,
-        lastSyncedAt: Date.now(),
-      }));
+      let synced = false;
+      try {
+        await pullCloudStateAndMerge();
+        if (!cancelled) synced = await pushAllLocalStateToFirebase();
+      } finally {
+        if (!cancelled) setStatus((s) => s.uid !== user.uid ? s : {
+          ...s,
+          syncing: false,
+          lastSyncedAt: synced ? Date.now() : s.lastSyncedAt,
+        });
+      }
     };
 
-    const unsub = onAuthStateChanged(auth, (u) => {
-      void runSync(u);
+    const cancelStartup = scheduleCloudStartup(() => {
+      void import("./firebase").then(({ auth }) => {
+        if (cancelled) return;
+        const unsubAuth = auth.onAuthStateChanged((user) => { void runSync(user).catch(() => {}); });
+        const schedulePush = () => {
+          if (!auth.currentUser) return;
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            void pushAllLocalStateToFirebase().then((synced) => {
+              if (!cancelled && synced) setStatus((s) => ({ ...s, lastSyncedAt: Date.now() }));
+            }).catch(() => {});
+          }, 2500);
+        };
+        window.addEventListener("vm:coins-changed", schedulePush);
+        window.addEventListener("vm:cloud-sync-request", schedulePush);
+        unsubscribe = () => {
+          unsubAuth();
+          window.removeEventListener("vm:coins-changed", schedulePush);
+          window.removeEventListener("vm:cloud-sync-request", schedulePush);
+        };
+      }).catch(() => {});
     });
 
-    const schedulePush = () => {
-      if (!auth.currentUser) return;
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        void pushAllLocalStateToFirebase().then(() => {
-          setStatus((s) => ({ ...s, lastSyncedAt: Date.now() }));
-        });
-      }, 2500);
-    };
-
-    window.addEventListener("vm:coins-changed", schedulePush);
-    window.addEventListener("vm:cloud-sync-request", schedulePush);
-
     return () => {
-      unsub();
+      cancelled = true;
+      cancelStartup();
+      unsubscribe?.();
       if (debounceTimer) clearTimeout(debounceTimer);
-      window.removeEventListener("vm:coins-changed", schedulePush);
-      window.removeEventListener("vm:cloud-sync-request", schedulePush);
     };
-  }, []);
+  }, [enabled]);
 
   const syncNow = async () => {
-    if (!auth.currentUser) return false;
-    setStatus((s) => ({ ...s, syncing: true }));
-    await pullCloudStateAndMerge();
-    const ok = await pushAllLocalStateToFirebase();
-    setStatus((s) => ({ ...s, syncing: false, lastSyncedAt: Date.now() }));
-    return ok;
+    let synced = false;
+    try {
+      const { auth } = await import("./firebase");
+      if (!auth.currentUser) return false;
+      setStatus((s) => ({ ...s, syncing: true }));
+      await pullCloudStateAndMerge();
+      synced = await pushAllLocalStateToFirebase();
+      return synced;
+    } catch {
+      return false;
+    } finally {
+      setStatus((s) => ({ ...s, syncing: false, lastSyncedAt: synced ? Date.now() : s.lastSyncedAt }));
+    }
   };
 
   return { status, syncNow };

@@ -29,7 +29,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "node scripts/serve-static.mjs",
+    command: "npm start",
     url: "http://127.0.0.1:33003",
     env: { PORT: "33003", HOST: "127.0.0.1" },
     reuseExistingServer: false,
