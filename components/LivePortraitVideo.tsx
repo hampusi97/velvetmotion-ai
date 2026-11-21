@@ -119,7 +119,6 @@ export function LivePortraitVideo({
 
       {resolvedVideo && !videoFailed && (
         <video
-          src={resolvedVideo}
           poster={src || FALLBACK_PORTRAIT}
           autoPlay
           loop
@@ -133,7 +132,10 @@ export function LivePortraitVideo({
           className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-500 group-hover:scale-105 ${
             videoPlaying ? "opacity-100" : "opacity-0"
           }`}
-        />
+        >
+          <source src={resolvedVideo.replace(/\.mp4$/i, ".webm")} type="video/webm" />
+          <source src={resolvedVideo} type="video/mp4" />
+        </video>
       )}
 
       {/* Subtle warm camera light pulse overlay so every portrait feels like a live feed */}
