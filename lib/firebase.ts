@@ -34,6 +34,7 @@ import {
 import firebaseConfig from "../firebase-applet-config.json";
 import blueprint from "../firebase-blueprint.json";
 import { characterPortraitUrl } from "./portraits";
+import { encodeCloudVaultEnvelope } from "./cloudVaultEnvelope";
 
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -784,6 +785,7 @@ export async function syncVaultDocToFirestore(
   if (uid !== user.uid) return false;
   const path = `users/${uid}/vault/${cleanDoc}`;
   try {
+    const envelope = encodeCloudVaultEnvelope(payloadJson, updatedAtMs);
     const ref = doc(db, "users", uid, "vault", cleanDoc);
     const existing = await getDoc(ref).catch(() => null);
     let prevTs = 0;
@@ -802,16 +804,12 @@ export async function syncVaultDocToFirestore(
       }
     }
     if (prevTs > updatedAtMs) return false;
-    const envelope = JSON.stringify({
-      updatedAtMs: Math.floor(updatedAtMs),
-      data: payloadJson.slice(0, 62000),
-    });
     await setDoc(ref, {
       userId: uid,
       id: cleanDoc,
       kind: "snapshot",
       schemaVersion: 1,
-      payload: envelope.slice(0, 65500),
+      payload: envelope,
       updatedAt: serverTimestamp(),
     });
     return true;

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Cloud, Copy, Cpu, Download, ExternalLink, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
-import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
+import { DeviceBackupPanel } from "@/components/DeviceBackupPanel";
 import { loadRouterSettings, saveRouterSettings } from "@/lib/chatRouter";
 import { checkDesktopUpdate, triggerBossKey, useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { isUiSoundEnabled, setUiSoundEnabled } from "@/lib/neonAudio";
@@ -26,6 +26,48 @@ export function SettingsAndBackupDrawer({
   open: boolean;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const controls = () =>
+      Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          "button, input, select, textarea, a[href]",
+        ) || [],
+      ).filter(
+        (element) =>
+          !element.hasAttribute("disabled") &&
+          element.tabIndex >= 0 &&
+          element.getClientRects().length > 0,
+      );
+    controls()[0]?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const nodes = controls();
+      const first = nodes[0];
+      const last = nodes.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      if (previous?.isConnected) previous.focus();
+    };
+  }, [open]);
   const initialRouter = loadRouterSettings();
   const [neon, setNeon] = useState<"hyper" | "subtle">(() => {
     if (typeof document === "undefined") return "hyper";
@@ -70,23 +112,6 @@ export function SettingsAndBackupDrawer({
     } catch {
       /* ignore */
     }
-  };
-
-  const handleExport = async () => {
-    const json = await exportFullBackupJson();
-    const blob = new Blob([json], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `velvetmotion-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setStatusMsg("Full .json backup downloaded (IndexedDB + settings).");
-  };
-
-  const handleImport = async (file: File | null) => {
-    if (!file) return;
-    const text = await file.text();
-    const res = await importFullBackupJson(text);
-    setStatusMsg(`Restored ${res.restoredKeys} settings & ${res.restoredRows} IndexedDB records.`);
   };
 
   const checkInstalledOllama = async () => {
@@ -149,7 +174,7 @@ export function SettingsAndBackupDrawer({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl neon-glass p-6 space-y-5 bg-[#080812]/95">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Settings and backup" className="relative max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl neon-glass p-6 space-y-5 bg-[#080812]/95">
         <button
           type="button"
           aria-label="Close Settings"
@@ -164,7 +189,7 @@ export function SettingsAndBackupDrawer({
             <Sparkles className="h-5 w-5 text-[#ff1e8e]" />
             Settings, Backup &amp; Local Ultra
           </h2>
-          <p className="text-xs text-[#a6a6c4]">100% local-first IndexedDB storage · zero server logging.</p>
+          <p className="text-xs text-[#a6a6c4]">Local storage with optional cloud sync. Review provider settings before sharing private content.</p>
         </div>
 
         {/* Neon Intensity */}
@@ -202,28 +227,7 @@ export function SettingsAndBackupDrawer({
           </label>
         </div>
 
-        {/* 1-Click .json Backup */}
-        <div className="rounded-2xl border border-[#00f5ff]/30 bg-[#00f5ff]/5 p-3.5 space-y-2">
-          <p className="text-xs font-bold text-[#00f5ff]">1-Click Local Backup (.json)</p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void handleExport()}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#00f5ff]/45 bg-[#00f5ff]/15 px-3 py-2 text-xs font-semibold text-[#00f5ff] hover:bg-[#00f5ff]/25"
-            >
-              <Download className="h-3.5 w-3.5" /> Export Backup (.json)
-            </button>
-            <label className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white cursor-pointer hover:border-[#ff1e8e]/50">
-              <Upload className="h-3.5 w-3.5" /> Import Backup
-              <input
-                type="file"
-                accept="application/json"
-                className="hidden"
-                onChange={(e) => void handleImport(e.target.files?.[0] || null)}
-              />
-            </label>
-          </div>
-        </div>
+        <DeviceBackupPanel />
 
         {/* Firebase Cloud Vault Sync */}
         <div className="rounded-2xl border border-[#00ffa3]/30 bg-[#00ffa3]/5 p-3.5 space-y-2">
@@ -250,7 +254,7 @@ export function SettingsAndBackupDrawer({
               <button
                 type="button"
                 disabled={cloudStatus.syncing}
-                onClick={() => void syncNow().then((ok) => setStatusMsg(ok ? "Cloud Vault synced with Firestore." : "Cloud Vault sync completed."))}
+                onClick={() => void syncNow().then((ok) => setStatusMsg(ok ? "Cloud Vault synced with Firestore." : "Cloud sync is incomplete. Some content was not uploaded; keep a local content backup."))}
                 className="rounded-xl border border-[#00ffa3]/50 bg-[#00ffa3]/15 px-3 py-1.5 text-[11px] font-bold text-[#00ffa3] disabled:opacity-50"
               >
                 {cloudStatus.syncing ? "Syncing..." : "Sync Cloud Vault Now"}
