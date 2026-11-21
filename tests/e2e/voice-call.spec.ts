@@ -66,6 +66,11 @@ test("voice calls recover from mic denial and ignore replies after hangup", asyn
     }
 
     Object.defineProperty(window, "SpeechRecognition", { value: Recognition });
+    // Use a matching utterance double so the native voice setter does not
+    // reject the synthetic voice returned by the speech engine double.
+    Object.defineProperty(window, "SpeechSynthesisUtterance", {
+      value: class { constructor(public text: string) {} },
+    });
     Object.defineProperty(window, "speechSynthesis", {
       value: {
         cancel: () => {},
@@ -78,7 +83,8 @@ test("voice calls recover from mic denial and ignore replies after hangup", asyn
     });
     window.addEventListener("qa:voice-output", (event) => {
       const text = (event as CustomEvent<string>).detail;
-      sessionStorage.setItem("qa:last-spoken", text);
+      const spoken = JSON.parse(sessionStorage.getItem("qa:spoken") || "[]");
+      sessionStorage.setItem("qa:spoken", JSON.stringify([...spoken, text]));
     });
   });
 
@@ -110,5 +116,8 @@ test("voice calls recover from mic denial and ignore replies after hangup", asyn
   await sendSpeech("How is your evening going?");
   await expect(dialog.getByText(/The AI model isn't responding/)).toBeVisible();
   await expect(dialog.getByText(/belongs to the old call/)).toHaveCount(0);
-  expect(await page.evaluate(() => sessionStorage.getItem("qa:last-spoken"))).not.toContain("belongs to the old call");
+  const spoken = await page.evaluate(() => JSON.parse(sessionStorage.getItem("qa:spoken") || "[]"));
+  expect(spoken).toHaveLength(2);
+  expect(spoken[0]).toBeTruthy();
+  expect(spoken[1]).toBe(spoken[0]);
 });
