@@ -63,6 +63,29 @@ jobs:
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           echo "Preparing automatic desktop release $TAG"
 
+      # The parallel OS jobs must never race to create separate draft releases
+      # under the same tag. Establish exactly one draft in the prepare job.
+      - name: Create one draft release before parallel platform uploads
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if DRAFT=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' 2>/dev/null); then
+            if [[ "$DRAFT" != "true" ]]; then
+              echo "::error::Release $TAG is already published; refusing to overwrite it."
+              exit 1
+            fi
+            echo "Reusing existing draft release $TAG"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --draft --target "$GITHUB_SHA" \
+              --title "VelvetMotion Desktop $TAG" \
+              --notes "Automatically built from GitHub main. Unsigned installers are published only after four-platform validation; signed automatic updates require configured Tauri updater keys."
+            echo "Created draft release $TAG before starting OS matrix."
+          fi
+
   publish-tauri:
     needs: prepare
     strategy:
@@ -151,6 +174,9 @@ jobs:
       - name: Check out release verification script
         uses: actions/checkout@v4
 
+      - name: Test fail-closed desktop publication gate
+        run: node --test scripts/verify-desktop-release.test.mjs scripts/verify-desktop-release-with-retry.test.mjs
+
       - name: Verify complete installers and signed manifests
         shell: bash
         env:
@@ -161,13 +187,10 @@ jobs:
           set -euo pipefail
           # The draft release is not visible to updater clients. Verify all four
           # platforms BEFORE making it the public "latest" release.
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name]' > "$RUNNER_TEMP/assets.json"
-          if [[ -n "$UPDATE_PUBLIC_KEY" ]]; then
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'latest.json' --output "$RUNNER_TEMP/latest.json"
-            node scripts/verify-desktop-release.mjs "$TAG" "$RUNNER_TEMP/assets.json" signed "$RUNNER_TEMP/latest.json"
-          else
-            node scripts/verify-desktop-release.mjs "$TAG" "$RUNNER_TEMP/assets.json" unsigned
-          fi
+          # GitHub release assets can lag a successful tauri-action upload.
+          # Poll up to three minutes, but never publish unless every installer
+          # (and all signatures when enabled) is actually present on this draft.
+          node scripts/verify-desktop-release-with-retry.mjs
 
       - name: Publish release only after ALL four operating systems succeed
         env:
