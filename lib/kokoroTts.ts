@@ -126,7 +126,7 @@ export function loadWebSpeechVoices(timeoutMs = 700): Promise<SpeechSynthesisVoi
 
 let activeAudio: HTMLAudioElement | null = null;
 let activeAudioUrl: string | null = null;
-let activeAudioDone: (() => void) | null = null;
+let finishActivePlayback: (() => void) | null = null;
 let activeSpeechRequest: AbortController | null = null;
 let speechGeneration = 0;
 
@@ -166,8 +166,8 @@ export function stopNeuralSpeech() {
   } catch {
     /* ignore */
   }
-  activeAudioDone?.();
-  activeAudioDone = null;
+  finishActivePlayback?.();
+  finishActivePlayback = null;
   activeAudio = null;
   if (activeAudioUrl) URL.revokeObjectURL(activeAudioUrl);
   activeAudioUrl = null;
@@ -220,14 +220,14 @@ async function tryLocalTtsEndpoint(
       const finish = (played: boolean) => {
         if (settled) return;
         settled = true;
-        if (activeAudioDone === cancelPlayback) activeAudioDone = null;
+        if (finishActivePlayback === cancelPlayback) finishActivePlayback = null;
         if (activeAudio === audio) activeAudio = null;
         if (activeAudioUrl === objectUrl) activeAudioUrl = null;
         URL.revokeObjectURL(objectUrl);
         resolve(played && speechGeneration === generation);
       };
       const cancelPlayback = () => finish(false);
-      activeAudioDone = cancelPlayback;
+      finishActivePlayback = cancelPlayback;
       audio.onended = () => finish(true);
       audio.onerror = () => finish(false);
       void audio.play().catch(() => finish(false));
@@ -304,6 +304,8 @@ export async function speakWithNeuralVoice(
     if (okFish) return { engine: "fish-drama-3", label: "Fish Drama 3 Local" };
   }
 
+  if (speechGeneration !== generation) return { engine: "none", label: "Stopped" };
+
   // 2. Local Kokoro-82M / OpenAI-compatible TTS server (:8880) unless pure OS fallback requested
   if (selected !== "browser-speech") {
     const okKokoro = await tryLocalTtsEndpoint(
@@ -347,9 +349,21 @@ export async function speakWithNeuralVoice(
         u.rate = (opts.rate ?? (opts.whispery ? Math.max(0.76, preset.rate - 0.1) : preset.rate)) * speedBias;
         const fem = selectFemaleEnglishVoice(voices);
         if (fem) u.voice = fem;
-        u.onend = () => resolve({ engine: "webspeech", label: "Browser voice (fallback)" });
-        u.onerror = () => resolve({ engine: "none", label: "Browser voice unavailable" });
-        window.speechSynthesis.speak(u);
+        const finish = (played: boolean, label: string) => {
+          if (finishActivePlayback === cancelPlayback) finishActivePlayback = null;
+          u.onend = null;
+          u.onerror = null;
+          resolve({ engine: played ? "webspeech" : "none", label });
+        };
+        const cancelPlayback = () => finish(false, "Stopped");
+        finishActivePlayback = cancelPlayback;
+        u.onend = () => finish(true, "Browser voice (fallback)");
+        u.onerror = () => finish(false, "Browser voice unavailable");
+        try {
+          window.speechSynthesis.speak(u);
+        } catch {
+          finish(false, "Browser voice unavailable");
+        }
       } catch {
         resolve({ engine: "none", label: "Unavailable" });
       }
