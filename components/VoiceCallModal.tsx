@@ -19,6 +19,9 @@ import { AmbientMixer } from "@/components/AmbientMixer";
 import { VrmAvatarViewer } from "@/components/VrmAvatarViewer";
 import { saveVrmAvatar, removeVrmAvatar } from "@/lib/vrmAvatarStore";
 import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
+import { buildLorebookContext, loadLorebook } from "@/lib/lorebook";
+import { memoryPromptBlock } from "@/lib/memoryTiers";
+import { detectVoiceAction } from "@/lib/voiceCommands";
 
 interface SpeechRecognitionAlternativeLike {
   transcript?: string;
@@ -39,10 +42,10 @@ interface SpeechRecognitionInstance {
   lang: string;
   onstart: (() => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((ev: { error: string }) => void) | null;
   onresult: ((ev: SpeechRecognitionEventLike) => void) | null;
   start: () => void;
-  stop: () => void;
+  abort: () => void;
 }
 
 export function VoiceCallModal({
@@ -54,7 +57,10 @@ export function VoiceCallModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const [connected, setConnected] = useState(true);
+  const [status, setStatus] = useState("");
+  const [thinking, setThinking] = useState(false);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const endButtonRef = useRef<HTMLButtonElement | null>(null);
   const [muted, setMuted] = useState(false);
   const [whisperMode, setWhisperMode] = useState(() => getTimeMood().whisperBias);
   const [listening, setListening] = useState(false);
@@ -70,7 +76,9 @@ export function VoiceCallModal({
   const [voiceEngine, setVoiceEngine] = useState<VoiceEngineId>(() => getPreferredVoiceEngine());
 
   const recogRef = useRef<SpeechRecognitionInstance | null>(null);
-  const activeRef = useRef(true);
+  const activeRef = useRef(false);
+  const turnRef = useRef(0);
+  const busyRef = useRef(false);
   const mutedRef = useRef(muted);
   const whisperRef = useRef(whisperMode);
   const historyRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([
@@ -101,102 +109,227 @@ export function VoiceCallModal({
     } catch (error) { setVrmNotice(error instanceof Error ? error.message : "Cannot remove VRM avatar."); }
   };
 
-  const stopAll = useCallback(() => {
-    activeRef.current = false;
-    stopNeuralSpeech();
-    try {
-      recogRef.current?.stop();
-    } catch {
-      /* ignore */
-    }
+  const stopMic = useCallback(() => {
+    const rec = recogRef.current;
+    recogRef.current = null;
     setListening(false);
-    setSpeaking(false);
+    try {
+      rec?.abort();
+    } catch {
+      // The browser may already have ended recognition.
+    }
   }, []);
 
-  const startMicLoop = useCallback(() => {
-    if (!activeRef.current || mutedRef.current || typeof window === "undefined") return;
+  const cancelTurn = useCallback(() => {
+    turnRef.current += 1;
+    busyRef.current = false;
+    stopMic();
+    stopNeuralSpeech();
+    setThinking(false);
+    setSpeaking(false);
+  }, [stopMic]);
+
+  const endCall = useCallback(() => {
+    activeRef.current = false;
+    cancelTurn();
+    onClose();
+  }, [cancelTurn, onClose]);
+
+  const startMicLoop = useCallback(function listen() {
+    if (!activeRef.current || mutedRef.current || busyRef.current || recogRef.current) return;
     const w = window as unknown as {
       SpeechRecognition?: new () => SpeechRecognitionInstance;
       webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
     };
     const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!Ctor) return;
+    if (!Ctor) {
+      setStatus("Speech recognition is unavailable here. You can return to text chat.");
+      return;
+    }
+    setStatus("Starting microphone…");
     try {
       const rec = new Ctor();
+      recogRef.current = rec;
       rec.continuous = false;
       rec.interimResults = false;
       rec.lang = "en-US";
-      rec.onstart = () => setListening(true);
-      rec.onerror = () => setListening(false);
-      rec.onend = () => setListening(false);
-      rec.onresult = async (ev) => {
-        const idx = ev.results.length - 1;
-        const spoken = ev.results[idx]?.[0]?.transcript?.trim();
-        if (!spoken || !activeRef.current) return;
-        setTranscript(`You: “${spoken}”`);
-        historyRef.current.push({ role: "user", text: spoken });
-
-        const res = await generateCompanionReply(historyRef.current, {
-          id: character.id,
-          name: character.name,
-          age: character.age,
-          tagline: character.tagline,
-          personality: character.personality,
-          backstory: character.background,
-        });
-        if (!activeRef.current) return;
-        historyRef.current.push({ role: "assistant", text: res.text });
-        setTranscript(res.text);
-        earnCompanionXp(character.id, 6);
-
-        setSpeaking(true);
-        const tts = await speakWithNeuralVoice(res.text, {
-          voiceId: character.voiceId,
-          whispery: whisperRef.current,
-          pitch: character.voice?.pitch,
-          rate: character.voice?.rate,
-        });
-        setEngineUsed(tts.label);
-        setSpeaking(false);
-        if (activeRef.current && !mutedRef.current) startMicLoop();
+      const ownsMic = () => recogRef.current === rec && activeRef.current;
+      rec.onstart = () => {
+        if (!ownsMic()) return;
+        setListening(true);
+        setStatus("");
       };
-      recogRef.current = rec;
+      rec.onerror = ({ error }) => {
+        if (!ownsMic()) return;
+        stopMic();
+        setStatus(
+          error === "not-allowed" || error === "service-not-allowed"
+            ? "Microphone access was denied. Check permissions, then retry."
+            : "Speech recognition stopped. Retry the microphone when you're ready.",
+        );
+      };
+      rec.onend = () => {
+        if (!ownsMic()) return;
+        recogRef.current = null;
+        setListening(false);
+        setStatus("No speech captured. Retry the microphone when you're ready.");
+      };
+      rec.onresult = async ({ results }) => {
+        if (!ownsMic() || mutedRef.current) return;
+        const result = results[results.length - 1];
+        const spoken = result?.[0]?.transcript?.trim();
+        if (!spoken || result.isFinal === false) return;
+        stopMic();
+
+        const action = detectVoiceAction(spoken);
+        if (action === "end-call") {
+          endCall();
+          return;
+        }
+        if (action === "pause-listening") {
+          mutedRef.current = true;
+          setMuted(true);
+          setStatus("");
+          return;
+        }
+        if (action === "resume-listening") {
+          listen();
+          return;
+        }
+
+        const turn = ++turnRef.current;
+        const current = () => activeRef.current && turn === turnRef.current;
+        const userMessage = { role: "user" as const, text: spoken };
+        busyRef.current = true;
+        setStatus("");
+        setThinking(true);
+        setTranscript(`You: “${spoken}”`);
+        let listenAgain = false;
+        try {
+          const reply = await generateCompanionReply([...historyRef.current, userMessage], {
+            id: character.id,
+            name: character.name,
+            age: character.age,
+            tagline: character.tagline,
+            personality: character.personality,
+            backstory: character.background,
+            memoryBlock: [
+              memoryPromptBlock(character.id),
+              buildLorebookContext(loadLorebook(character.id), spoken),
+            ].filter(Boolean).join("\n"),
+          });
+          if (!current()) return;
+          if (reply.providerUsed === "compliance-guard") {
+            setStatus(reply.text);
+            return;
+          }
+          if (reply.providerUsed === "in-character-fallback") {
+            setStatus("The AI model isn't responding. Check your provider, then retry the microphone.");
+            return;
+          }
+
+          historyRef.current.push(userMessage, { role: "assistant", text: reply.text });
+          setTranscript(reply.text);
+          earnCompanionXp(character.id, 6);
+          setThinking(false);
+          setSpeaking(true);
+          const tts = await speakWithNeuralVoice(reply.text, {
+            voiceId: character.voiceId,
+            whispery: whisperRef.current,
+            pitch: character.voice?.pitch,
+            rate: character.voice?.rate,
+          });
+          if (!current()) return;
+          setEngineUsed(tts.label);
+          listenAgain = true;
+        } catch {
+          if (current()) setStatus("The call could not complete this turn. Retry the microphone.");
+        } finally {
+          if (current()) {
+            busyRef.current = false;
+            setThinking(false);
+            setSpeaking(false);
+            if (listenAgain) listen();
+          }
+        }
+      };
       rec.start();
     } catch {
-      setListening(false);
+      stopMic();
+      setStatus("Couldn't start the microphone. Check permissions and retry.");
     }
-  }, [character]);
+  }, [character, endCall, stopMic]);
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement;
+    endButtonRef.current?.focus({ preventScroll: true });
     activeRef.current = true;
-    setConnected(true);
+    mutedRef.current = false;
+    setMuted(false);
+    setStatus("");
     setElapsed(0);
+    setEngineUsed("Starting voice…");
+    const greeting = character.voiceIntro || character.initialMessage || "Hey, glad you called.";
+    setTranscript(greeting);
+    historyRef.current = [{ role: "assistant", text: greeting }];
     const interval = setInterval(() => setElapsed((s) => s + 1), 1000);
-
-    // Speak opening line on call answer
+    const turn = ++turnRef.current;
+    busyRef.current = true;
     setSpeaking(true);
-    void speakWithNeuralVoice(character.voiceIntro || `Hey, glad you called.`, {
-      voiceId: character.voiceId,
-      whispery: whisperRef.current,
-    }).then((r) => {
-      setEngineUsed(r.label);
-      setSpeaking(false);
-      if (activeRef.current && !mutedRef.current) startMicLoop();
-    });
 
-    const onBossMute = () => {
-      stopAll();
-      onClose();
+    void (async () => {
+      const current = () => activeRef.current && turn === turnRef.current;
+      try {
+        const result = await speakWithNeuralVoice(greeting, {
+          voiceId: character.voiceId,
+          whispery: whisperRef.current,
+        });
+        if (current()) setEngineUsed(result.label);
+      } catch {
+        if (current()) setEngineUsed("Voice unavailable");
+      } finally {
+        if (current()) {
+          busyRef.current = false;
+          setSpeaking(false);
+          startMicLoop();
+        }
+      }
+    })();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        endCall();
+      }
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
+        "button:not(:disabled), select:not(:disabled), a[href], input:not(:disabled)",
+      )).filter((control) => control.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      const focused = document.activeElement;
+      if (!dialog.contains(focused) || focused === (event.shiftKey ? first : last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
     };
-    window.addEventListener("vm:boss-key-mute", onBossMute);
+    window.addEventListener("vm:boss-key-mute", endCall);
+    document.addEventListener("keydown", onKeyDown);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener("vm:boss-key-mute", onBossMute);
-      stopAll();
+      window.removeEventListener("vm:boss-key-mute", endCall);
+      document.removeEventListener("keydown", onKeyDown);
+      activeRef.current = false;
+      cancelTurn();
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
     };
-  }, [character, onClose, open, startMicLoop, stopAll]);
+  }, [character, endCall, open, startMicLoop, cancelTurn]);
 
   if (!open) return null;
 
@@ -204,13 +337,13 @@ export function VoiceCallModal({
   const secs = String(elapsed % 60).padStart(2, "0");
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 p-4 backdrop-blur-xl">
-      <div className="w-full max-w-sm neon-border-sweep">
+    <div ref={dialogRef} role="dialog" aria-label={`Voice call with ${character.name}`} aria-modal="true" className="fixed inset-0 z-[80] overflow-y-auto bg-black/90 p-4 backdrop-blur-xl">
+      <div className="mx-auto my-4 w-full max-w-sm neon-border-sweep">
         <div className="neon-sweep-inner p-6 text-center space-y-5">
           <div className="flex items-center justify-between text-[11px] text-[#a6a6c4]">
             <span className="inline-flex items-center gap-1.5 text-[#00ffa3] font-semibold">
               <span className="h-2 w-2 rounded-full bg-[#00ffa3] animate-pulse" />
-              {connected ? `Live · ${mins}:${secs}` : "Ended"}
+              {mins}:{secs}
             </span>
             <span className="rounded-full border border-[#00f5ff]/35 bg-[#00f5ff]/10 px-2.5 py-0.5 text-[#00f5ff]">
               {engineUsed}
@@ -259,13 +392,17 @@ export function VoiceCallModal({
           <div>
             <h2 className="text-xl font-extrabold text-[#f7f7fc]">{character.name}</h2>
             <p className="text-xs text-[#00f5ff] mt-0.5">
-              {speaking ? "Speaking..." : listening ? "Listening hands-free..." : "Tap mic or speak naturally"}
+              {thinking ? "Waiting for AI…" : speaking ? "Speaking…" : listening ? "Listening…" : muted ? "Microphone muted" : "Microphone idle"}
             </p>
           </div>
 
           <div className="min-h-[3.5rem] rounded-2xl border border-white/10 bg-[#05050a]/80 p-3 text-xs text-[#f7f7fc] leading-relaxed">
             {transcript}
           </div>
+          {status && <p role="status" className="text-xs text-amber-200">{status}</p>}
+          <p className="text-xs text-zinc-400">
+            Your browser handles speech recognition and may use an online service.
+          </p>
 
           <AmbientMixer compact={false} />
 
@@ -297,10 +434,8 @@ export function VoiceCallModal({
                 mutedRef.current = nextMuted;
                 setMuted(nextMuted);
                 if (nextMuted) {
-                  try {
-                    recogRef.current?.stop();
-                  } catch {}
-                  setListening(false);
+                  stopMic();
+                  setStatus("");
                 } else {
                   startMicLoop();
                 }
@@ -318,14 +453,14 @@ export function VoiceCallModal({
             <button
               type="button"
               onClick={() => {
-                stopNeuralSpeech();
-                setSpeaking(false);
+                if (busyRef.current) cancelTurn();
                 startMicLoop();
               }}
-              title="Interrupt & speak"
-              className="rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-zinc-200 hover:border-[#00f5ff]/50"
+              disabled={muted || listening}
+              title="Start listening or interrupt the current turn"
+              className="rounded-full border border-white/15 bg-white/5 px-3.5 py-2 text-xs font-semibold text-zinc-200 hover:border-[#00f5ff]/50 disabled:opacity-40"
             >
-              Interrupt
+              {thinking || speaking ? "Interrupt" : "Retry mic"}
             </button>
 
             <button
@@ -347,10 +482,8 @@ export function VoiceCallModal({
 
             <button
               type="button"
-              onClick={() => {
-                stopAll();
-                onClose();
-              }}
+              ref={endButtonRef}
+              onClick={endCall}
               aria-label="End Call"
               className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-600 text-white shadow-[0_0_20px_rgba(225,29,72,0.65)] hover:bg-rose-500"
             >

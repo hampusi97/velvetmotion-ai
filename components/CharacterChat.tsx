@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -203,6 +203,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [showActions, setShowActions] = useState(false);
   const [freeformPrompt, setFreeformPrompt] = useState("");
   const [callOpen, setCallOpen] = useState(false);
+  const closeVoiceCall = useCallback(() => setCallOpen(false), []);
 
   useEffect(() => {
     try {
@@ -1166,7 +1167,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
   return (
     <div className="h-[100dvh] lg:h-[calc(100dvh-4.5rem)] w-full max-w-7xl mx-auto flex flex-col lg:grid lg:grid-cols-[235px_1fr_290px] lg:gap-4 overflow-hidden">
-      <VoiceCallModal character={character} open={callOpen} onClose={() => setCallOpen(false)} />
+      <VoiceCallModal character={character} open={callOpen} onClose={closeVoiceCall} />
       <MemoryVaultDrawer
         open={memoryDrawerOpen}
         onClose={() => setMemoryDrawerOpen(false)}
