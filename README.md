@@ -48,6 +48,10 @@ Provider availability, usage costs, CORS permissions and model licenses depend o
 
 Conversations, profiles and media use browser storage and IndexedDB. Optional signed-in cloud backup can sync data; exports are not encrypted. Review the privacy settings before sharing personal content.
 
+## Private content backups
+
+Settings & Backup includes a preview before restore, conflict choices, portrait-preserving content export, chat branches and storage-failure recovery. Provider/account/PIN settings are excluded. Files are unencrypted; remote media and separate VRM files must be saved separately. See [backup format and recovery](docs/DEVICE_CONTENT_BACKUPS.md).
+
 ## Deployment and desktop
 
 The production build is a static export in `out/`. Cloudflare can deploy through its native Git integration, which CI verifies for the current commit. Direct Wrangler deployment optionally uses repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. A successful application build alone does not establish a successful deployment. Native desktop CI builds installers for Windows, Linux and macOS. Verified in-app updates require owner-controlled signing setup and installation of the first signed release.
