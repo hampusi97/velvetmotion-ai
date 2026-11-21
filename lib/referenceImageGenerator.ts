@@ -5,7 +5,9 @@
  */
 import { assertCompliance } from "./complianceFilter";
 import { generateLocalImage } from "./comfyClient";
+import { blobToDataUrl } from "./imageStore";
 import { getMediaSettings } from "./mediaSettings";
+import { fetchWithRetry } from "./netRetry";
 
 export type ReferenceVariation = {
   imageUrl: string;
@@ -86,6 +88,40 @@ export async function generateFictionalReferenceVariation({
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  if (settings.referenceEndpoint) {
+    const res = await fetchWithRetry(
+      settings.referenceEndpoint,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: referenceImage,
+          prompt: fullPrompt,
+          seed,
+          strength: 0.35,
+        }),
+      },
+      { label: "Configured reference endpoint", attempts: 2, timeoutMs: 90_000 },
+    );
+    const type = res.headers.get("content-type") || "";
+    if (type.startsWith("image/")) {
+      const blob = await res.blob();
+      if (!blob.size) throw new Error("Reference endpoint returned an empty image");
+      return { imageUrl: await blobToDataUrl(blob), engine: "Configured reference endpoint" };
+    }
+    const data = (await res.json()) as {
+      imageUrl?: string;
+      url?: string;
+      image?: string;
+      error?: string;
+    };
+    const url = data.imageUrl || data.url || data.image;
+    if (!url || !/^(https?:\/\/|data:image\/)/i.test(url)) {
+      throw new Error(data.error || "Reference endpoint returned no valid image URL");
+    }
+    return { imageUrl: url, engine: "Configured reference endpoint" };
   }
 
   if (settings.localImageBase && (settings.localImageMode === "comfy" || settings.localImageMode === "forge")) {

@@ -1,7 +1,9 @@
 /**
  * Relationship Levels (Lv. 1-10), XP & Daily Check-in Streaks
- * 100% free local-first progression persisted to localStorage + IndexedDB.
+ * Shim backed by `lib/relationshipState` so all persistence flows through one versioned store.
  */
+export * from "./relationshipState";
+import { loadState, recordVisit, saveState, today } from "./relationshipState";
 import { saveProgressionDB } from "./db";
 import { earnCoins } from "./coinsStore";
 
@@ -29,10 +31,7 @@ export interface CompanionProgression {
   customPromptOverride?: string;
 }
 
-const KEY_PREFIX = "vm_prog_";
-const STREAK_KEY = "vm_daily_streak";
-
-// Cumulative XP thresholds for levels 1 -> 10
+const DAILY_DROP_ID = "global-daily-drop";
 const LEVEL_XP = [0, 30, 80, 150, 240, 360, 520, 720, 960, 1250];
 
 export function levelFromXp(xp: number): number {
@@ -52,52 +51,41 @@ export function levelProgressPercent(xp: number): { level: number; percent: numb
   return { level, percent: pct, nextXp: ceil };
 }
 
+function readXpFromUnlocks(unlocks: string[]): number {
+  const token = unlocks.find((u) => u.startsWith("xp:"));
+  return token ? Number(token.slice(3)) || 0 : 0;
+}
+
 export function getCompanionProgression(characterId: string): CompanionProgression {
-  if (typeof window === "undefined") {
-    return {
-      characterId,
-      xp: 0,
-      level: 1,
-      streakDays: 0,
-      lastActiveDate: "",
-      unlockedMilestones: [],
-    };
-  }
-  try {
-    const raw = localStorage.getItem(KEY_PREFIX + characterId);
-    if (raw) {
-      const parsed = JSON.parse(raw) as CompanionProgression;
-      return {
-        characterId,
-        xp: Number(parsed.xp || 0),
-        level: levelFromXp(Number(parsed.xp || 0)),
-        streakDays: Number(parsed.streakDays || 0),
-        lastActiveDate: parsed.lastActiveDate || "",
-        unlockedMilestones: Array.isArray(parsed.unlockedMilestones) ? parsed.unlockedMilestones : [],
-        customPromptOverride: parsed.customPromptOverride,
-      };
-    }
-  } catch {
-    /* ignore */
-  }
+  const s = loadState(characterId);
+  const xp = readXpFromUnlocks(s.unlocks);
+  const level = levelFromXp(xp);
+  const unlockedMilestones = LEVEL_MILESTONES.filter((m) => level >= m.level).map((m) => m.level);
   return {
     characterId,
-    xp: 0,
-    level: 1,
-    streakDays: 0,
-    lastActiveDate: "",
-    unlockedMilestones: [],
+    xp,
+    level,
+    streakDays: s.streak.current,
+    lastActiveDate: s.streak.lastDay || "",
+    unlockedMilestones,
+    customPromptOverride: s.note,
   };
 }
 
 export function saveCompanionProgression(prog: CompanionProgression) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(KEY_PREFIX + prog.characterId, JSON.stringify(prog));
-    window.dispatchEvent(new Event("vm:cloud-sync-request"));
-  } catch {
-    /* ignore */
-  }
+  const prev = loadState(prog.characterId);
+  const filteredUnlocks = prev.unlocks.filter((u) => !u.startsWith("xp:"));
+  const nextState = {
+    ...prev,
+    note: prog.customPromptOverride ?? prev.note,
+    streak: {
+      current: prog.streakDays,
+      best: Math.max(prev.streak.best, prog.streakDays),
+      lastDay: prog.lastActiveDate || prev.streak.lastDay,
+    },
+    unlocks: [...filteredUnlocks, `xp:${prog.xp}`],
+  };
+  saveState(nextState);
   void saveProgressionDB({
     id: prog.characterId,
     xp: prog.xp,
@@ -113,28 +101,21 @@ export function earnCompanionXp(
   characterId: string,
   xpDelta: number,
 ): { progression: CompanionProgression; leveledUp: boolean; newlyUnlocked: MilestoneUnlock[] } {
+  const visited = recordVisit(loadState(characterId));
+  saveState(visited);
   const prev = getCompanionProgression(characterId);
   const nextXp = Math.max(0, prev.xp + Math.max(0, xpDelta));
   const nextLevel = levelFromXp(nextXp);
   const leveledUp = nextLevel > prev.level;
-  const newlyUnlocked: MilestoneUnlock[] = [];
-  const nextMilestones = new Set(prev.unlockedMilestones);
+  const newlyUnlocked = LEVEL_MILESTONES.filter((m) => nextLevel >= m.level && prev.level < m.level);
 
-  for (const m of LEVEL_MILESTONES) {
-    if (nextLevel >= m.level && !nextMilestones.has(m.level)) {
-      nextMilestones.add(m.level);
-      newlyUnlocked.push(m);
-    }
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
   const next: CompanionProgression = {
     ...prev,
     xp: nextXp,
     level: nextLevel,
-    lastActiveDate: today,
-    streakDays: prev.lastActiveDate === today ? prev.streakDays : prev.streakDays + 1,
-    unlockedMilestones: Array.from(nextMilestones).sort((a, b) => a - b),
+    lastActiveDate: visited.streak.lastDay || today(),
+    streakDays: visited.streak.current,
+    unlockedMilestones: LEVEL_MILESTONES.filter((m) => nextLevel >= m.level).map((m) => m.level),
   };
 
   if (leveledUp) {
@@ -145,33 +126,20 @@ export function earnCompanionXp(
 }
 
 export function getDailyDropClaimState(): { streak: number; claimedToday: boolean } {
-  if (typeof window === "undefined") return { streak: 0, claimedToday: false };
-  const today = new Date().toISOString().slice(0, 10);
-  try {
-    const raw = localStorage.getItem(STREAK_KEY);
-    if (!raw) return { streak: 0, claimedToday: false };
-    const parsed = JSON.parse(raw) as { streak?: number; lastClaim?: string };
-    return {
-      streak: Number(parsed.streak || 0),
-      claimedToday: parsed.lastClaim === today,
-    };
-  } catch {
-    return { streak: 0, claimedToday: false };
-  }
+  const s = loadState(DAILY_DROP_ID);
+  return {
+    streak: s.streak.current,
+    claimedToday: s.streak.lastDay === today(),
+  };
 }
 
 export function claimDailyDropReward(bonusCoins = 25): { ok: boolean; streak: number; coins: number } {
-  const today = new Date().toISOString().slice(0, 10);
-  const state = getDailyDropClaimState();
-  if (state.claimedToday) {
-    return { ok: false, streak: state.streak, coins: 0 };
+  const current = getDailyDropClaimState();
+  if (current.claimedToday) {
+    return { ok: false, streak: current.streak, coins: 0 };
   }
-  const nextStreak = state.streak + 1;
-  try {
-    localStorage.setItem(STREAK_KEY, JSON.stringify({ streak: nextStreak, lastClaim: today }));
-  } catch {
-    /* ignore */
-  }
+  const visited = recordVisit(loadState(DAILY_DROP_ID));
+  saveState(visited);
   const balance = earnCoins(bonusCoins);
-  return { ok: true, streak: nextStreak, coins: balance };
+  return { ok: true, streak: visited.streak.current, coins: balance };
 }

@@ -1,4 +1,5 @@
-/** Relationship stages — Stranger → Soulmate (Aikeya / dating-sim style). */
+/** Relationship stages — Stranger → Soulmate + re-exports from `lib/relationshipState`. */
+export * from "./relationshipState";
 
 export type RelationshipStage =
   | "stranger"

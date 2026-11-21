@@ -8,6 +8,7 @@
  */
 import { assertCompliance } from "./complianceFilter";
 import { generateLocalImage, tryComfyDirect } from "./comfyClient";
+import { lockIdentity } from "./identityLock";
 import { getMediaSettings } from "./mediaSettings";
 import { fetchWorkerImage } from "./imageWorker";
 import { generateConfiguredImage, generatePollinationsImage } from "./imageProviders";
@@ -81,7 +82,9 @@ export async function generateStudioPicture(
   // Detect adult requests even when the user types a custom prompt without
   // enabling Studio's mature-content switch; the generic worker is not suitable.
   const requiresAdultEngine = Boolean(req.nsfw) || /\b(nsfw|nude|nudity|explicit|sexual|lingerie)\b/i.test(req.prompt);
-  const parsedSeed = req.seed ?? Math.floor(Math.random() * 90000 + 1000);
+  const locked = lockIdentity(req.prompt, req.characterId, req.seed);
+  const parsedSeed = locked.seed;
+  const lockedPrompt = locked.prompt;
   const t0 = performance.now();
   const settings = getMediaSettings();
   const failures: string[] = [];
@@ -91,7 +94,7 @@ export async function generateStudioPicture(
   // An auto-discovered ComfyUI on :8188 works without a second manual settings
   // entry. A custom configured backend is used only when "prefer local" is on.
   const localRequest = {
-    prompt: req.prompt,
+    prompt: lockedPrompt,
     seed: parsedSeed,
     width: req.width,
     height: req.height,
@@ -117,7 +120,7 @@ export async function generateStudioPicture(
   // Some KoboldCpp instances support text-only inference, not SD. Test the
   // actual image route rather than assuming a listening port is sufficient.
   if (!imageUrl && req.localEngine?.koboldOnline) {
-    const koboldImg = await tryKoboldSdTxt2Img(req.prompt, req.width, req.height, parsedSeed, req.negativePrompt);
+    const koboldImg = await tryKoboldSdTxt2Img(lockedPrompt, req.width, req.height, parsedSeed, req.negativePrompt);
     if (koboldImg) {
       imageUrl = koboldImg;
       engine = "Local KoboldCpp SD";
@@ -129,7 +132,7 @@ export async function generateStudioPicture(
   // The general Cloudflare model is not used for adult media. It may also hit
   // rate limits; preserve the reason instead of silently claiming success.
   if (!imageUrl && !requiresAdultEngine) {
-    const cf = await fetchWorkerImage(req.prompt, {
+    const cf = await fetchWorkerImage(lockedPrompt, {
       baseUrl: req.imageWorkerUrl,
       seed: parsedSeed,
     });
@@ -145,7 +148,7 @@ export async function generateStudioPicture(
   // because Horde is a queue and routinely exceeds the user's patience.
   if (!imageUrl) {
     const hostedReq = {
-      prompt: req.prompt,
+      prompt: lockedPrompt,
       negativePrompt: req.negativePrompt,
       seed: parsedSeed,
       width: req.width,
@@ -178,7 +181,7 @@ export async function generateStudioPicture(
   if (!imageUrl) {
     try {
       const horde = await generateHordeImage({
-        prompt: req.prompt,
+        prompt: lockedPrompt,
         seed: parsedSeed,
         nsfw: requiresAdultEngine,
         width: req.width,

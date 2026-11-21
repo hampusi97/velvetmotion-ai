@@ -64,6 +64,23 @@ export const FACE_SEEDS: Record<string, string> = {
   "variety-nova": "unique face seed nova-v-v2: Athletic Latina 24, long dark ponytail, sharp smile, warm brown eyes, sporty freckles, photoreal identity lock",
   "variety-kira": "unique face seed kira-v-v2: East Asian woman 26, undercut with longer top, sleeve tattoos, sharp cat eyes, nose stud, photoreal identity lock",
   "variety-delilah": "unique face seed delilah-v-v2: Elegant woman 31, dark hair, sharp brows, full lips, confident gaze, photoreal identity lock",
+  "chloe-parker": "unique face seed chloe-p-v2: Woman 22, warm chestnut waves, soft hazel eyes, natural freckles, cozy knit sweater warmth, photoreal identity lock",
+  "maya-solis": "unique face seed maya-s-v2: Sun-kissed Latina woman 24, long dark wavy hair, glowing bronzed skin, bright playful smile, photoreal identity lock",
+  "sloane-kensington": "unique face seed sloane-k-v2: Woman 28, sleek blonde low bun, ice-blue eyes, sculpted cheekbones, tailored black blazer elegance, photoreal identity lock",
+  "raven-vance": "unique face seed raven-v-v2: Alternative woman 25, jet-black wolf-cut hair, subtle silver septum ring, dark smoky eyeliner, pale porcelain skin, photoreal identity lock",
+  "sora-takahashi": "unique face seed sora-t-v2: Japanese woman 23, glossy dark bob with wispie bangs, warm brown eyes, gaming headset glow, photoreal identity lock",
+  "dalia-moreau": "unique face seed dalia-m-v2: French-Mediterranean woman 29, dark curls, olive skin, deep amber eyes, emerald satin slip dress elegance, photoreal identity lock",
+  "lena-brooks": "unique face seed lena-b-v2: Athletic woman 25, honey-blonde high ponytail, bright green eyes, toned shoulders, sunlit loft warmth, photoreal identity lock",
+  "aria-velasco": "unique face seed aria-v-v2: Spanish woman 26, long espresso waves, full lips, warm terracotta skin, off-shoulder linen dress, photoreal identity lock",
+  "nova-park": "unique face seed nova-pk-v2: Korean-American woman 24, silver-lavender bob, sharp winged liner, futuristic streetwear jacket, photoreal identity lock",
+  "nadine-okoye": "unique face seed nadine-o-v2: Nigerian-British woman 27, rich dark glowing skin, braided updo, gold hoop earrings, ivory silk blouse, photoreal identity lock",
+  "claire-bennett": "unique face seed claire-bn-v2: Woman 24, auburn wavy hair pinned loosely back, thin gold-rimmed glasses, warm green eyes, sage cardigan, photoreal identity lock",
+  "yumi-chen": "unique face seed yumi-c-v2: East Asian woman 23, long silky midnight-blue tinted hair, bright expressive eyes, sakura-pink satin jacket, photoreal identity lock",
+  "camille-laurent": "unique face seed camille-l-v2: French woman 29, dark blunt-cut bob, red lip, sharp cheekbones, cool editorial gaze, photoreal identity lock",
+  "daisy-miller": "unique face seed daisy-m-v2: American woman 23, blonde tousled hair, glossy lips, bright eyes, cropped tank top energy, photoreal identity lock",
+  "yuki-sato": "unique face seed yuki-s-v2: Japanese woman 25, long straight black hair, blunt fringe, pale skin, quiet precise expression, photoreal identity lock",
+  "valeria-cruz": "unique face seed valeria-c-v2: Colombian woman 27, long dark curls, gold hoops, bronze skin, loud warm expression, photoreal identity lock",
+  "claire-beaumont": "unique face seed claire-b-v2: French woman 24, auburn waves pinned loosely, thin gold glasses, green eyes, soft cardigan energy, photoreal identity lock",
 };
 
 export function applyFaceSeed<T extends { id: string; figure?: string }>(c: T): T {

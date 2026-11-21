@@ -6,6 +6,8 @@
  * the framing survives every turn instead of decaying after three messages.
  */
 
+import { loadState } from '@/lib/relationshipState';
+
 export type KinkTag =
   | 'BNWO'
   | 'Pussyfree'
@@ -99,17 +101,17 @@ export function loadStoredKinkStatus(
   companionId: string,
   defaults?: Partial<KinkStatus>,
 ): KinkStatus | null {
-  const base: KinkStatus = { ...DEFAULT_STATUS, ...defaults };
-  if (typeof window === 'undefined') {
-    return defaults ? base : null;
+  const rel = loadState(companionId);
+  if (rel.since || rel.bullName || rel.note || defaults) {
+    return {
+      ...DEFAULT_STATUS,
+      ...defaults,
+      status: rel.since ? rel.status : (defaults?.status ?? rel.status),
+      sphTier: rel.since ? rel.sphTier : (defaults?.sphTier ?? rel.sphTier),
+      since: rel.since ?? defaults?.since,
+      bullName: rel.bullName ?? defaults?.bullName,
+      note: rel.note ?? defaults?.note,
+    };
   }
-  try {
-    const raw = window.localStorage.getItem(`velvet:kink:${companionId}`);
-    if (raw) {
-      return { ...base, ...(JSON.parse(raw) as Partial<KinkStatus>) };
-    }
-  } catch {
-    /* ignore */
-  }
-  return defaults ? base : null;
+  return null;
 }

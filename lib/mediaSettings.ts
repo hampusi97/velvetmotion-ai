@@ -25,6 +25,8 @@ export type MediaBackendSettings = {
   pollinationsKey: string;
   /** Optional hosted POST endpoint for adult-tolerant image generation */
   imageEndpoint: string;
+  /** Optional hosted Kontext-class reference image edit endpoint */
+  referenceEndpoint: string;
   /** Prefer local when set */
   preferLocal: boolean;
   /** Force same face seed from Create photo into every mood */
@@ -48,6 +50,7 @@ const DEFAULTS: MediaBackendSettings = {
   img2imgUrl: "",
   pollinationsKey: "",
   imageEndpoint: process.env.AI_IMAGE_ENDPOINT ?? process.env.NEXT_PUBLIC_AI_IMAGE_ENDPOINT ?? "",
+  referenceEndpoint: process.env.AI_REFERENCE_ENDPOINT ?? process.env.NEXT_PUBLIC_AI_REFERENCE_ENDPOINT ?? "",
   preferLocal: false,
   aggressiveFaceLock: true,
 };

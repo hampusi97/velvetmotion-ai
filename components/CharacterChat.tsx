@@ -87,6 +87,9 @@ import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 import { VoiceCallModal } from "@/components/VoiceCallModal";
 import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories, type MemoryCategory } from "@/components/MemoryVaultDrawer";
 import KinkStatusPanel from "@/components/KinkStatusPanel";
+import ProactiveNudge from "@/components/ProactiveNudge";
+import VoiceNoteButton from "@/components/VoiceNoteButton";
+import { useRelationship } from "@/components/useRelationship";
 import { buildStatusDirective, loadStoredKinkStatus } from "@/data/kinkDoctrine";
 import {
   buildProactiveFollowUp,
@@ -229,6 +232,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
   const [safetyError, setSafetyError] = useState<string | null>(null);
   const [savedToast, setSavedToast] = useState<string | null>(null);
   const [progression, setProgression] = useState<CompanionProgression>(() => getCompanionProgression(character.id));
+  const rel = useRelationship(character.id);
   const [timeMood] = useState(() => getTimeMood());
   const [timeVibe] = useState(() => getLocalTimeVibe());
   const proactiveSentRef = useRef(false);
@@ -525,7 +529,8 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         : undefined,
     );
     const standingBlock = storedKink ? buildStatusDirective(storedKink) : "";
-    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext, standingBlock].filter(Boolean).join("\n");
+    const nicknameBlock = rel.state.nickname ? `Nickname: ${rel.state.nickname}` : "";
+    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext, standingBlock, nicknameBlock].filter(Boolean).join("\n");
     return {
       id: character.id,
       name: character.name,
@@ -1863,6 +1868,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
               <Dices className="h-4 w-4" />
               <span className="hidden sm:inline">Games</span>
             </button>
+            <VoiceNoteButton
+              text={[...messages].reverse().find((m) => m.role === "assistant")?.content}
+              voiceId={character.voiceId}
+              disabled={busy}
+            />
             <textarea
               ref={inputRef}
               value={input}
@@ -1954,6 +1964,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
         {rightTab === "memory" ? (
           <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3">
+            <ProactiveNudge
+              companionId={character.id}
+              name={character.name}
+              portraitUrl={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
+            />
             <KinkStatusPanel
               companionId={character.id}
               bullName={character.kinkDoctrine?.bullName}
