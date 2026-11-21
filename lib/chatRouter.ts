@@ -24,6 +24,7 @@ import {
   buildSamplerPayload,
   type SamplerPresetId,
 } from "./samplerPresets";
+import { freeChat } from "./chatProviders";
 
 export interface RouterMessage {
   role: "user" | "assistant";
@@ -563,6 +564,17 @@ export async function generateCompanionReply(
     const hordeRaw = await callHordeText(persona, history, runtime);
     const hordeClean = sanitizeCompanionReply(hordeRaw, persona.name);
     if (hordeClean) return publishReply(persona, { text: hordeClean, providerUsed: "ai-horde" });
+  }
+
+  // Final hosted keyless provider attempt before falling back to in-character voice
+  if (provider === "auto" && !runtime?.fetchImpl) {
+    try {
+      const freeRaw = await freeChat(chatMessages);
+      const freeClean = sanitizeCompanionReply(freeRaw, persona.name);
+      if (freeClean) return publishReply(persona, { text: freeClean, providerUsed: "pollinations-free" });
+    } catch {
+      /* fall through to in-character fallback */
+    }
   }
 
   const fallback = buildContextAwareFallback(history, persona);

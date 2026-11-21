@@ -10,6 +10,7 @@ import { assertCompliance } from "./complianceFilter";
 import { generateLocalImage, tryComfyDirect } from "./comfyClient";
 import { getMediaSettings } from "./mediaSettings";
 import { fetchWorkerImage } from "./imageWorker";
+import { generateConfiguredImage, generatePollinationsImage } from "./imageProviders";
 import { generateHordeImage } from "./aiHorde";
 import { remoteImageToStableDataUrl } from "./imageStore";
 import { reportGenerationSpeed, type LocalEngineStatus } from "./localEngineBridge";
@@ -137,6 +138,39 @@ export async function generateStudioPicture(
       engine = "Cloudflare Flux";
     } else {
       failures.push("Cloudflare image model: " + (cf.reason === "quota" ? "quota exhausted" : cf.reason));
+    }
+  }
+
+  // Hosted providers that serve adult content. These sit ahead of AI Horde
+  // because Horde is a queue and routinely exceeds the user's patience.
+  if (!imageUrl) {
+    const hostedReq = {
+      prompt: req.prompt,
+      negativePrompt: req.negativePrompt,
+      seed: parsedSeed,
+      width: req.width,
+      height: req.height,
+      nsfw: requiresAdultEngine,
+    };
+
+    if (settings.imageEndpoint) {
+      try {
+        imageUrl = await generateConfiguredImage(settings.imageEndpoint, hostedReq);
+        engine = "Configured image API";
+      } catch (error) {
+        failures.push(
+          "Configured image API: " + (error instanceof Error ? error.message : "failed"),
+        );
+      }
+    }
+
+    if (!imageUrl) {
+      try {
+        imageUrl = await generatePollinationsImage(hostedReq);
+        engine = "Pollinations Flux";
+      } catch (error) {
+        failures.push("Pollinations: " + (error instanceof Error ? error.message : "failed"));
+      }
     }
   }
 

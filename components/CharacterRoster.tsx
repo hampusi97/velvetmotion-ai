@@ -76,7 +76,10 @@ export function CharacterRoster({
   }, []);
 
   const categories = useMemo(
-    () => ["All", ...new Set(characters.map((c) => c.category).sort())],
+    () => [
+      "All",
+      ...new Set([...characters.map((c) => c.category), "BNWO", "JOI", "SPH"].sort()),
+    ],
     [characters],
   );
   const interests = useMemo(

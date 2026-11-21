@@ -23,6 +23,8 @@ export type MediaBackendSettings = {
   img2imgUrl: string;
   /** Pollinations / external API key if needed for video */
   pollinationsKey: string;
+  /** Optional hosted POST endpoint for adult-tolerant image generation */
+  imageEndpoint: string;
   /** Prefer local when set */
   preferLocal: boolean;
   /** Force same face seed from Create photo into every mood */
@@ -45,6 +47,7 @@ const DEFAULTS: MediaBackendSettings = {
   comfyVideoPromptNodeId: "",
   img2imgUrl: "",
   pollinationsKey: "",
+  imageEndpoint: process.env.AI_IMAGE_ENDPOINT ?? process.env.NEXT_PUBLIC_AI_IMAGE_ENDPOINT ?? "",
   preferLocal: false,
   aggressiveFaceLock: true,
 };

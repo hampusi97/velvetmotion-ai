@@ -35,6 +35,7 @@ import { loadLorebook } from "@/lib/lorebook";
 import { exportCharacterCard } from "@/lib/characterCardExport";
 import { speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
 import { MemoryVaultPanel } from "@/components/MemoryVaultDrawer";
+import KinkStatusPanel from "@/components/KinkStatusPanel";
 import { SafeImage } from "@/components/SafeImage";
 
 interface CharacterProfileProps {
@@ -395,6 +396,12 @@ export function CharacterProfile({
                   {character.personality}
                 </p>
               </section>
+              <KinkStatusPanel
+                companionId={character.id}
+                bullName={character.kinkDoctrine?.bullName}
+                defaultStatus={character.kinkDoctrine?.status}
+                defaultSphTier={character.kinkDoctrine?.sphTier}
+              />
               {!!meta.interests.length && (
                 <section>
                   <p className="vm-eyebrow">Common ground</p>
