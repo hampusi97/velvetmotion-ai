@@ -7,9 +7,10 @@ import {
   Cpu, Download, ExternalLink, Film, HardDrive, Laptop, Mic2, Monitor,
   Pause, Play, RefreshCw, ShieldCheck, Sparkles, Waves,
 } from "lucide-react";
+import { DESKTOP_AUTO_UPDATE_PREF, useDesktopUpdateCheck } from "@/components/DesktopAutoUpdater";
 import { SafeImage } from "@/components/SafeImage";
 import { LocalSetupWizard } from "@/components/LocalSetupWizard";
-import { checkDesktopUpdate, useLocalEngineStatus } from "@/lib/localEngineBridge";
+import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import {
   getLocalComputeMode, saveLocalComputeMode, LOCAL_COMPUTE_MODES, type LocalComputeMode,
 } from "@/lib/localComputePreferences";
@@ -45,6 +46,7 @@ export function DownloadDesktopView() {
   const [updateChecking, setUpdateChecking] = useState(false);
   const [updateCheckResult, setUpdateCheckResult] = useState<string | null>(null);
   const [autoUpdateOnLaunch, setAutoUpdateOnLaunch] = useState(true);
+  const checkDesktopUpdate = useDesktopUpdateCheck();
   const engine = useLocalEngineStatus();
   const ram = getRecommendedPresetsForRam(engine.ramGb);
   const installer = release ? chooseDesktopInstaller(release.assets, platform) : null;
@@ -62,7 +64,7 @@ export function DownloadDesktopView() {
     setPlatform(detectDesktopPlatform(navigator.userAgent));
     setIsMobile(/iphone|ipad|ipod|android/i.test(navigator.userAgent));
     setComputeMode(getLocalComputeMode());
-    try { setAutoUpdateOnLaunch(localStorage.getItem("vm:auto-signed-desktop-updates") !== "off"); } catch { /* storage disabled */ }
+    try { setAutoUpdateOnLaunch(localStorage.getItem(DESKTOP_AUTO_UPDATE_PREF) !== "off"); } catch { /* storage disabled */ }
     if (window.__TAURI_INTERNALS__?.invoke) {
       void window.__TAURI_INTERNALS__.invoke<boolean>("desktop_signed_updates_enabled")
         .then(setSignedUpdaterEnabled).catch(() => setSignedUpdaterEnabled(false));
@@ -96,16 +98,7 @@ export function DownloadDesktopView() {
     setUpdateChecking(true);
     setUpdateCheckResult(null);
     try {
-      if (signedUpdaterEnabled && window.__TAURI_INTERNALS__?.invoke) {
-        const result = await window.__TAURI_INTERNALS__.invoke<{ enabled: boolean; available: boolean; version?: string }>("check_signed_desktop_update");
-        setUpdateCheckResult(result.available
-          ? `A signed update ${result.version || ""} is available. The update notification will let you install it safely.`
-          : "No newer signed desktop release is available.");
-        if (result.available) window.dispatchEvent(new Event("vm:check-desktop-updates"));
-      } else {
-        const result = await checkDesktopUpdate();
-        setUpdateCheckResult(result.note);
-      }
+      setUpdateCheckResult(await checkDesktopUpdate());
     } catch {
       setUpdateCheckResult("Could not reach the secure release feed. Check your internet connection and try again.");
     } finally {
@@ -399,7 +392,7 @@ export function DownloadDesktopView() {
                 <input type="checkbox" checked={autoUpdateOnLaunch} className="accent-[#d98da7]"
                   onChange={(e) => {
                     setAutoUpdateOnLaunch(e.target.checked);
-                    try { localStorage.setItem("vm:auto-signed-desktop-updates", e.target.checked ? "on" : "off"); } catch { /* private mode */ }
+                    try { localStorage.setItem(DESKTOP_AUTO_UPDATE_PREF, e.target.checked ? "on" : "off"); } catch { /* private mode */ }
                   }} />
                 Auto-install verified updates on launch · check every 30 minutes
               </label>
