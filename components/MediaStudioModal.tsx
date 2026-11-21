@@ -49,6 +49,17 @@ const SCENE_PRESETS = [
   { id: 'after-hours', label: 'After Hours', suffix: 'intimate candlelit boudoir photography, realistic skin texture, shallow DOF', nsfw: true },
 ] as const;
 
+const SELF_AVATAR_STYLES = [
+  { id: 'portrait', label: 'Portrait', prompt: 'photorealistic portrait, natural skin, soft studio light', nsfw: false },
+  { id: 'lingerie', label: 'Lingerie', prompt: 'wearing elegant lace lingerie, soft bedroom light, photoreal', nsfw: true },
+  { id: 'nude', label: 'Nude', prompt: 'nude, natural body, soft window light, photorealistic skin texture', nsfw: true },
+  { id: 'boudoir', label: 'Boudoir', prompt: 'intimate boudoir pose, silk sheets, candlelight, photoreal', nsfw: true },
+  { id: 'cowgirl', label: 'Cowgirl', prompt: 'cowgirl sex pose, bedroom, natural motion, photoreal adult', nsfw: true },
+  { id: 'doggy', label: 'Doggy', prompt: 'doggy style sex pose, bedroom, photoreal adult', nsfw: true },
+  { id: 'blowjob', label: 'Oral', prompt: 'oral sex scene, photoreal adult, natural lighting', nsfw: true },
+  { id: 'joi', label: 'JOI', prompt: 'looking at camera, dirty talk expression, bedroom, photoreal adult', nsfw: true },
+] as const;
+
 const STUDIO_STYLES = ['Candid Flash', 'Neon Noir', 'Studio Glamour', 'Anime/3D'] as const;
 const QUICK_CHIPS = [
   'silk evening dress',
@@ -137,6 +148,8 @@ export default function MediaStudioModal({
   const [charGreeting, setCharGreeting] = useState('');
   const [fictionalConfirmed, setFictionalConfirmed] = useState(false);
   const [uploadSourceKind, setUploadSourceKind] = useState<'fictional' | 'self' | null>(null);
+  const [selfAdultConsent, setSelfAdultConsent] = useState(false);
+  const [selfStyleId, setSelfStyleId] = useState<(typeof SELF_AVATAR_STYLES)[number]['id']>('portrait');
   const [uploadedAdultMode, setUploadedAdultMode] = useState(false);
   const [customVoice, setCustomVoice] = useState<VoiceDesign>(DEFAULT_VOICE_DESIGN);
   const [referenceBusy, setReferenceBusy] = useState(false);
@@ -330,14 +343,15 @@ export default function MediaStudioModal({
         motionId,
         durationSec,
         speed: videoSpeed,
-        // A real-person photograph may only be used for a neutral, nonsexual animation.
         prompt: derivedFromUpload && uploadSourceKind === 'self'
-          ? 'Nonsexual portrait animation, subtle natural blink, gentle head turn, fully clothed, natural lighting'
+          ? (selfAdultConsent
+              ? `${SELF_AVATAR_STYLES.find(s => s.id === selfStyleId)?.prompt || 'private self-avatar'}, adult, consenting, photoreal`
+              : 'Nonsexual portrait animation, subtle natural blink, gentle head turn, natural lighting')
           : `${companion.name} ${customPrompt}`,
         sourceType: derivedFromUpload
           ? uploadSourceKind === 'fictional' ? 'fictional' : 'real-person'
           : 'unspecified',
-        adultMode: derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode,
+        adultMode: (derivedFromUpload && uploadSourceKind === 'fictional' && uploadedAdultMode) || (uploadSourceKind === 'self' && selfAdultConsent),
         comfyOnline: localEngine.comfyOnline,
         videoBackendUrl: videoBackendUrl || getMediaSettings().img2vidUrl,
         signal: controller.signal,
@@ -944,7 +958,7 @@ export default function MediaStudioModal({
           {uploadedPreview && (videoSourceUrl === uploadedPreview || videoSourceUrl === referenceResult) && (
             <div className="rounded-xl border border-fuchsia-400/30 bg-fuchsia-500/10 p-3 text-[11px] text-zinc-200">
               <p className="font-semibold text-fuchsia-200">Uploaded portrait permissions</p>
-              <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own real-life selfies can be animated nonsexually, never converted into intimate imagery.</p>
+              <p className="mt-1">Original fictional-adult artwork can use adult mode if your video model allows it. Your own selfies stay private. Explicit styles require the self-consent checkbox and prefer a local engine.</p>
               <label className="mt-2 flex items-start gap-2">
                 <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
                 <span>I own or have permission to animate this image and all depicted people are adults.</span>
@@ -1052,13 +1066,53 @@ export default function MediaStudioModal({
                 </label>
                 <label className="flex items-start gap-2 text-zinc-200">
                   <input type="radio" checked={uploadSourceKind === 'self'} onChange={() => { setUploadSourceKind('self'); setUploadedAdultMode(false); }} name="studio-photo-source" />
-                  <span>My own adult selfie (nonsexual animation only)</span>
+                  <span>My own adult selfie (private self-avatar, explicit with consent)</span>
                 </label>
               </div>
               <label className="flex items-start gap-2 text-zinc-200">
                 <input type="checkbox" checked={uploadRightsConfirmed} onChange={(e) => setUploadRightsConfirmed(e.target.checked)} />
                 <span>I own or have rights to use this image, and every depicted person is an adult. Selfies must show me, not someone else.</span>
               </label>
+
+              {uploadSourceKind === 'self' && (
+                <div className="space-y-2 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-3">
+                  <p className="font-bold text-emerald-200">Private Self-Avatar</p>
+                  <p className="text-[10px] text-zinc-400">This stays on your device unless you choose a cloud engine. Explicit styles require consent.</p>
+                  <label className="flex items-start gap-2 text-zinc-200">
+                    <input type="checkbox" checked={selfAdultConsent} onChange={(e) => setSelfAdultConsent(e.target.checked)} />
+                    <span>I confirm this is a photo of me, I am 18+, and I consent to private explicit generation of my own image.</span>
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SELF_AVATAR_STYLES.filter(s => !s.nsfw || selfAdultConsent).map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSelfStyleId(s.id)}
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                          selfStyleId === s.id ? 'border-emerald-300 bg-emerald-400/20 text-white' : 'border-white/15 text-zinc-300'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!selfAdultConsent && SELF_AVATAR_STYLES.find(s => s.id === selfStyleId)?.nsfw}
+                    onClick={() => {
+                      const style = SELF_AVATAR_STYLES.find(s => s.id === selfStyleId);
+                      if (!style) return;
+                      setCustomPrompt(style.prompt);
+                      setNsfwMode(style.nsfw);
+                      setTab('photo');
+                      setStatusMsg(`Self-avatar style set: ${style.label}. Generate on the Photo tab (local engine preferred).`);
+                    }}
+                    className="rounded-full bg-emerald-500/80 px-3 py-1.5 text-[11px] font-bold text-white disabled:opacity-40"
+                  >
+                    Use this style
+                  </button>
+                </div>
+              )}
               {uploadSourceKind === 'fictional' && (
                 <label className="flex items-center justify-between gap-3 rounded-xl border border-pink-300/25 bg-black/25 p-3">
                   <span>
