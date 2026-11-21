@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Volume2, VolumeX, Play, Pause } from "lucide-react";
 import {
   ALL_STORY_PACKS,
@@ -8,7 +9,7 @@ import {
   EXPANDED_STORY_IDS,
   getStoryPack,
 } from "@/lib/content";
-import type { StoryPack, StoryScene } from "@/lib/content/types";
+import type { StoryPack, StoryScene, StoryTag } from "@/lib/content/types";
 import { speak, stopSpeaking } from "@/lib/speech";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 
@@ -24,14 +25,22 @@ function chapterTitle(pack: StoryPack, sceneId: string): string {
   return pack.chapters.find((c) => c.sceneIds.includes(sceneId))?.title ?? "Scene";
 }
 
-export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: string | null }) {
+function storyTagLabel(tag: StoryTag | "ALL") {
+  if (tag === "INTERRACIAL") return "Interracial romance";
+  return tag === "ALL" ? "All stories" : tag;
+}
+
+export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly = false }: {
+  initialPackId?: string | null;
+  initialInterracialOnly?: boolean;
+}) {
   const [packId, setPackId] = useState<string | null>(initialPackId);
   const [sceneId, setSceneId] = useState<string | null>(() => {
     if (!initialPackId) return null;
     return getStoryPack(initialPackId)?.scenes[0]?.id ?? null;
   });
   const [history, setHistory] = useState<string[]>([]);
-  const [tag, setTag] = useState<string>("ALL");
+  const [tag, setTag] = useState<StoryTag | "ALL">(initialInterracialOnly ? "INTERRACIAL" : "ALL");
   const [autoVoice, setAutoVoice] = useState(true);
   const [playing, setPlaying] = useState(false);
 
@@ -48,12 +57,12 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
 
   useEffect(() => () => stopSpeaking(), []);
 
-  const tags = useMemo(() => ["ALL", ...Array.from(new Set(ALL_STORY_PACKS.map((p) => p.tag)))], []);
+  const tags = useMemo(() => ["ALL", ...Array.from(new Set(ALL_STORY_PACKS.map((p) => p.tag)))] as const, []);
   const visible = ALL_STORY_PACKS.filter((p) => tag === "ALL" || p.tag === tag);
   const pack = packId ? getStoryPack(packId) : undefined;
   const scene: StoryScene | undefined = pack && sceneId ? pack.scenes.find((s) => s.id === sceneId) : undefined;
   const face = pack ? faceFor(pack.id) : "chloe";
-  const portrait = staticPortraitUrl(face);
+  const portrait = pack?.character.portraitUrl || staticPortraitUrl(face);
 
   useEffect(() => {
     if (autoVoice && scene && playing) {
@@ -92,14 +101,21 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
       <section className="max-w-lg mx-auto px-1 pb-24">
         <h2 className="text-2xl font-display text-cream mb-1">Stories</h2>
         <p className="text-xs text-zinc-500 mb-4">{CONTENT_DISCLAIMER}</p>
+        {tag === "INTERRACIAL" && (
+          <Link href="/joi/?theme=interracial" className="mb-3 inline-flex text-sm font-medium text-pink-200 underline-offset-4 hover:underline">
+            Browse guided romance sessions
+          </Link>
+        )}
         <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
           {tags.map((item) => (
             <button
               key={item}
+              type="button"
+              aria-pressed={tag === item}
               onClick={() => setTag(item)}
               className={`shrink-0 text-[12px] px-3 py-1.5 rounded-full border ${tag === item ? "bg-pink-600 border-pink-500 text-white" : "bg-zinc-900/80 border-zinc-800 text-zinc-400"}`}
             >
-              {item}
+              {storyTagLabel(item)}
             </button>
           ))}
         </div>
@@ -113,10 +129,10 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
                 onClick={() => openPack(item.id)}
                 className="relative aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 text-left girl-card"
               >
-                <img src={staticPortraitUrl(f)} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                <img src={item.character.portraitUrl || staticPortraitUrl(f)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 <div className="absolute top-2 left-2">
-                  <span className="text-[9px] font-bold bg-pink-600/80 text-white px-1.5 py-0.5 rounded-full">{item.tag}</span>
+                  <span className="text-[9px] font-bold bg-pink-700/90 text-white px-1.5 py-0.5 rounded-full">{storyTagLabel(item.tag)}</span>
                 </div>
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <div className="font-semibold text-sm text-white leading-tight">{item.title}</div>
@@ -164,7 +180,7 @@ export function StoryPackBrowser({ initialPackId = null }: { initialPackId?: str
           </button>
         </div>
         <div className="absolute bottom-4 left-4 right-4">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-pink-300">{pack.tag}</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-pink-300">{storyTagLabel(pack.tag)}</div>
           <h2 className="text-2xl font-display text-white leading-tight">{pack.title}</h2>
           <p className="text-xs text-pink-100/80 mt-0.5">{pack.character.name}, {pack.character.age} · {pack.character.role}</p>
           <div className="mt-2 h-1 w-full rounded-full bg-white/20 overflow-hidden">

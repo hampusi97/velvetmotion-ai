@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Volume2,
   VolumeX,
@@ -17,6 +18,7 @@ import {
   ALL_JOI_PRESETS,
   CONTENT_DISCLAIMER,
   EXPANDED_JOI_IDS,
+  INTERRACIAL_JOI_PRESETS,
   getJoiScenario,
 } from "@/lib/content";
 import { JOI_PHASES, type JoiScenario } from "@/lib/content/types";
@@ -43,6 +45,9 @@ const PHASE_LABEL: Record<(typeof JOI_PHASES)[number], string> = {
   finish: "Finish",
 };
 
+const ROMANCE_PHASE_LABEL = { ...PHASE_LABEL, edge: "Anticipation", peak: "Connection", finish: "Check-in" };
+const interracialSessionIds = new Set(INTERRACIAL_JOI_PRESETS.map((scenario) => scenario.id));
+
 const BPM_MODES = [
   { label: "Slow Tease", bpm: 65 },
   { label: "Steady", bpm: 95 },
@@ -50,11 +55,16 @@ const BPM_MODES = [
   { label: "Frenzy", bpm: 160 },
 ] as const;
 
-export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: string | null }) {
+export function JoiBrowser({ initialScenarioId = null, initialInterracialOnly = false }: {
+  initialScenarioId?: string | null;
+  initialInterracialOnly?: boolean;
+}) {
   const [scenarioId, setScenarioId] = useState<string | null>(initialScenarioId);
+  const [interracialOnly, setInterracialOnly] = useState(initialInterracialOnly);
   const [stepIndex, setStepIndex] = useState(0);
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [autoVoice, setAutoVoice] = useState(true);
+  const [autoVoice, setAutoVoice] = useState(() => !initialScenarioId || !interracialSessionIds.has(initialScenarioId));
+  const [paused, setPaused] = useState(false);
   const [whisperMode, setWhisperMode] = useState(true);
   const [ambienceOn, setAmbienceOn] = useState(false);
   const [beatBpm, setBeatBpm] = useState<number | null>(null);
@@ -72,17 +82,24 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
     ? getJoiScenario(scenarioId)
     : undefined;
   const step = scenario?.steps[stepIndex];
+  const voiceGender = scenario?.persona.voiceGender;
+  const isGuidedRomance = Boolean(scenario && interracialSessionIds.has(scenario.id));
+  const visibleScenarios = interracialOnly ? INTERRACIAL_JOI_PRESETS : ALL_JOI_PRESETS;
 
   useEffect(() => {
     setRemaining(null);
-    if (autoVoice && step) {
+  }, [scenarioId, stepIndex]);
+
+  useEffect(() => {
+    if (autoVoice && step && !paused) {
       speak(`${step.title}. ${step.instruction}`, {
         pitch: 1.04,
         rate: 0.92,
         whispery: whisperMode,
+        gender: voiceGender,
       });
     }
-  }, [scenarioId, stepIndex, autoVoice, step, whisperMode]);
+  }, [autoVoice, step, whisperMode, paused, voiceGender]);
 
   useEffect(() => {
     return () => {
@@ -93,13 +110,33 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
   }, []);
 
   useEffect(() => {
-    if (remaining === null || remaining <= 0) return;
+    if (paused || remaining === null || remaining <= 0) return;
     const timer = setTimeout(
       () => setRemaining((value) => (value === null ? value : value - 1)),
       1000,
     );
     return () => clearTimeout(timer);
-  }, [remaining]);
+  }, [remaining, paused]);
+
+  const stopSessionAudio = () => {
+    stopSpeaking();
+    stopJoiBeat();
+    stopIntimacyAudio();
+    setBeatBpm(null);
+    setBeatPulse(false);
+    setAmbienceOn(false);
+    setCountdownLeft(null);
+  };
+
+  const openScenario = (id: string) => {
+    if (interracialSessionIds.has(id)) {
+      stopSessionAudio();
+      setAutoVoice(false);
+    }
+    setPaused(false);
+    setScenarioId(id);
+    setStepIndex(0);
+  };
 
   const toggleBeat = (bpm: number) => {
     if (beatBpm === bpm) {
@@ -164,7 +201,22 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
           <p className="text-xs text-zinc-400">{CONTENT_DISCLAIMER}</p>
         </div>
 
-        {/* Instant Dirty Talk & Stroke Beat Audio Packs */}
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Guided session filters">
+          {([false, true] as const).map((filter) => (
+            <button key={String(filter)} type="button" aria-pressed={interracialOnly === filter}
+              onClick={() => { if (filter) stopSessionAudio(); setInterracialOnly(filter); }}
+              className={`rounded-full border px-3 py-2 text-xs ${interracialOnly === filter ? "border-pink-500 bg-pink-500/20 text-pink-100" : "border-zinc-700 text-zinc-300"}`}>
+              {filter ? "Interracial romance" : "All sessions"}
+            </button>
+          ))}
+          {interracialOnly && (
+            <Link href="/?view=packs&theme=interracial" className="rounded px-2 py-2 text-sm font-medium text-pink-200 underline-offset-4 hover:underline">
+              Browse interracial stories
+            </Link>
+          )}
+        </div>
+
+        {!interracialOnly && (
         <div className="rounded-3xl border border-pink-500/30 bg-gradient-to-br from-pink-950/35 to-zinc-950 p-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -262,20 +314,20 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
             )}
           </div>
         </div>
+        )}
 
         {/* Full Guided JOI Scenarios */}
         <div className="grid grid-cols-1 gap-2.5">
-          {ALL_JOI_PRESETS.map((item, idx) => {
+          {visibleScenarios.map((item, idx) => {
             const expanded = EXPANDED_JOI_IDS.includes(item.id);
-            const char = CHARACTERS[idx % CHARACTERS.length];
-            const thumb = characterMediaUrl(char, idx % 2 === 0 ? "lingerie" : "nude");
+            const legacyIndex = Math.max(0, idx - INTERRACIAL_JOI_PRESETS.length);
+            const char = CHARACTERS[legacyIndex % CHARACTERS.length];
+            const thumb = item.persona.portraitUrl || characterMediaUrl(char, legacyIndex % 2 === 0 ? "lingerie" : "nude");
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  setScenarioId(item.id);
-                  setStepIndex(0);
-                }}
+                type="button"
+                onClick={() => openScenario(item.id)}
                 className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 text-left hover:border-pink-500/50 active:scale-[0.99] transition"
               >
                 <div className="flex gap-3.5">
@@ -290,7 +342,7 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="font-semibold text-white">{item.label}</div>
                       <span className="text-[10px] rounded-full bg-pink-500/15 border border-pink-500/30 px-2 py-0.5 text-pink-200">
-                        {expanded ? "Voice + Script" : "Audio Pack"}
+                        {interracialSessionIds.has(item.id) ? "Interracial romance" : expanded ? "Voice + Script" : "Audio Pack"}
                       </span>
                     </div>
                     <div className="text-xs text-pink-300 mt-0.5">
@@ -320,9 +372,8 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           onClick={() => {
-            stopSpeaking();
-            stopJoiBeat();
-            setBeatBpm(null);
+            stopSessionAudio();
+            setPaused(false);
             setScenarioId(null);
             setStepIndex(0);
           }}
@@ -331,6 +382,13 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
           ← All JOI scenarios
         </button>
         <div className="flex flex-wrap items-center gap-1.5">
+          {isGuidedRomance && (
+            <button type="button" aria-pressed={paused}
+              onClick={() => { if (!paused) stopSpeaking(); setPaused(!paused); }}
+              className="rounded-full border border-pink-300/35 px-3 py-1 text-xs text-pink-100">
+              {paused ? "Resume session" : "Pause session"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setWhisperMode((w) => !w)}
@@ -348,12 +406,6 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
               const next = !autoVoice;
               setAutoVoice(next);
               if (!next) stopSpeaking();
-              else
-                speak(`${step.title}. ${step.instruction}`, {
-                  pitch: 1.04,
-                  rate: 0.92,
-                  whispery: whisperMode,
-                });
             }}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
               autoVoice
@@ -369,11 +421,16 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
 
       <div className="flex gap-3 items-center">
         <div
-          className={`h-14 w-14 shrink-0 rounded-2xl bg-gradient-to-br ${ACCENT_CLASS[scenario.accent]} ${
+          className={`h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br ${ACCENT_CLASS[scenario.accent]} ${
             beatPulse ? "scale-110 ring-2 ring-pink-400" : ""
           } transition-transform duration-100`}
           aria-hidden
-        />
+        >
+          {scenario.persona.portraitUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={scenario.persona.portraitUrl} alt="" className="h-full w-full object-cover object-top" />
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold truncate">{scenario.label}</h2>
           <p className="text-xs text-zinc-400 mt-0.5">
@@ -382,7 +439,7 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
         </div>
       </div>
 
-      {/* Live Beat + Countdown + Breathing Controls */}
+      {!isGuidedRomance && (
       <div className="rounded-2xl border border-pink-500/25 bg-zinc-900/70 p-3 space-y-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-[11px] font-semibold text-pink-300 flex items-center gap-1.5">
@@ -426,15 +483,16 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
           ))}
         </div>
       </div>
+      )}
 
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
         {JOI_PHASES.map((phase, index) => (
           <div key={phase} className="text-center">
             <div
               className={`h-1.5 rounded-full ${index <= phaseIndex ? "bg-pink-500" : "bg-zinc-800"}`}
             />
             <div className={`text-[10px] mt-1 ${index === phaseIndex ? "text-pink-300" : "text-zinc-600"}`}>
-              {PHASE_LABEL[phase]}
+              {(isGuidedRomance ? ROMANCE_PHASE_LABEL : PHASE_LABEL)[phase]}
             </div>
           </div>
         ))}
@@ -446,11 +504,13 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
           <div className="flex items-center gap-2">
             <button
               type="button"
+              disabled={paused}
               onClick={() =>
                 speak(`${step.title}. ${step.instruction}`, {
                   pitch: 1.04,
                   rate: 0.92,
                   whispery: whisperMode,
+                  gender: voiceGender,
                 })
               }
               className="inline-flex items-center gap-1 rounded-lg border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 text-xs text-pink-200 hover:bg-pink-500/20"
@@ -477,7 +537,9 @@ export function JoiBrowser({ initialScenarioId = null }: { initialScenarioId?: s
 
       <div className="flex items-center justify-between gap-3 text-xs text-zinc-400">
         <span>Suggested {step.suggestedSeconds}s. Skip whenever you want.</span>
-        {remaining === null ? (
+        {paused ? (
+          <span role="status" className="font-medium text-pink-200">Session paused</span>
+        ) : remaining === null ? (
           <button
             onClick={() => setRemaining(step.suggestedSeconds)}
             className="px-3 py-1.5 rounded-full bg-zinc-800 text-zinc-200"

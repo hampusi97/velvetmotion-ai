@@ -112,6 +112,9 @@ function ComingSoon3DCard({ onBack }: { onBack: () => void }) {
 export function AppShell({ initialView = "home" }: { initialView?: ShellRouteView }) {
   const pathname = usePathname() || "/";
   const [view, setView] = useState<ShellRouteView>(initialView);
+  const [storyPackId, setStoryPackId] = useState<string | null>(null);
+  const [guidedScenarioId, setGuidedScenarioId] = useState<string | null>(null);
+  const [interracialOnly, setInterracialOnly] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
@@ -267,6 +270,9 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       const params = new URLSearchParams(searchStr);
       const qView = parseView(params.get("view"));
       const qId = params.get("companion") || params.get("id");
+      setStoryPackId(params.get("pack"));
+      setGuidedScenarioId(params.get("session"));
+      setInterracialOnly(params.get("theme") === "interracial");
       if (window.location.pathname === "/") {
         if (qView) {
           hadQueryViewRef.current = true;
@@ -513,8 +519,8 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "edge" && <EdgeTimer onHome={() => setView("home")} />}
           {view === "scenario" && <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id, p) => openChatById(id, p)} />}
           {view === "tribute" && <TributeBrowser />}
-          {view === "packs" && <StoryPackBrowser />}
-          {view === "joi" && <JoiBrowser />}
+          {view === "packs" && <StoryPackBrowser key={`${storyPackId}:${interracialOnly}`} initialPackId={storyPackId} initialInterracialOnly={interracialOnly} />}
+          {view === "joi" && <JoiBrowser key={`${guidedScenarioId}:${interracialOnly}`} initialScenarioId={guidedScenarioId} initialInterracialOnly={interracialOnly} />}
           {view === "import" && <CardImport onHome={() => setView("home")} onOpen={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "share" && <ShareImport onHome={() => setView("home")} onImport={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}

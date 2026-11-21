@@ -94,6 +94,10 @@ export function selectFemaleEnglishVoice(
   return englishNonMale[0];
 }
 
+export function selectMaleEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  return voices.find((voice) => /^en\b/i.test(voice.lang) && MALE_VOICE_EXCLUSION_RX.test(voice.name));
+}
+
 /** Waits for speechSynthesis `onvoiceschanged` when voices are not loaded immediately. */
 export function loadWebSpeechVoices(timeoutMs = 700): Promise<SpeechSynthesisVoice[]> {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {

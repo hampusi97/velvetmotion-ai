@@ -10,6 +10,7 @@ export type StoryTag =
   | "FANTASY"
   | "SCI-FI"
   | "SPH"
+  | "INTERRACIAL"
   | "BNWO";
 
 export type Accent =
@@ -32,6 +33,7 @@ export interface StoryCharacter {
   age: number;
   role: string;
   summary: string;
+  portraitUrl?: string;
 }
 
 export interface StoryChoice {
@@ -77,6 +79,8 @@ export interface JoiPersona {
   name: string;
   age: number;
   summary: string;
+  portraitUrl?: string;
+  voiceGender?: "female" | "male";
 }
 
 export interface JoiStep {

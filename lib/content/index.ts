@@ -2,9 +2,11 @@ import { CONTENT_DISCLAIMER } from "./disclaimer";
 import { ADDED_JOI } from "./joi/added";
 import { EXPANDED_JOI } from "./joi/expanded";
 import { FETISH_JOI } from "./joi/fetish";
+import { INTERRACIAL_JOI_PRESETS } from "./joi/interracial";
 import { ADDED_STORY_PACKS } from "./story/added";
 import { BNWO_SPH_PACKS } from "./story/bnwo";
 import { EXPANDED_STORY_PACKS } from "./story/expanded";
+import { INTERRACIAL_STORY_PACKS } from "./story/interracial";
 import type { JoiScenario, StoryPack } from "./types";
 
 /**
@@ -16,6 +18,7 @@ import type { JoiScenario, StoryPack } from "./types";
  * can be played instead of only announced.
  */
 export const STORY_PACKS: StoryPack[] = [
+  ...INTERRACIAL_STORY_PACKS,
   ...EXPANDED_STORY_PACKS,
   ...ADDED_STORY_PACKS,
 ];
@@ -26,6 +29,7 @@ export const ALL_STORY_PACKS: StoryPack[] = [
 ];
 
 export const JOI_PRESETS: JoiScenario[] = [
+  ...INTERRACIAL_JOI_PRESETS,
   ...EXPANDED_JOI,
   ...ADDED_JOI,
 ];
@@ -46,5 +50,5 @@ export function getJoiScenario(id: string): JoiScenario | undefined {
   return ALL_JOI_PRESETS.find((scenario) => scenario.id === id);
 }
 
-export { CONTENT_DISCLAIMER, BNWO_SPH_PACKS, FETISH_JOI };
+export { CONTENT_DISCLAIMER, BNWO_SPH_PACKS, FETISH_JOI, INTERRACIAL_JOI_PRESETS };
 export type { JoiScenario, StoryPack } from "./types";

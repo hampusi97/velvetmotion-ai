@@ -4,6 +4,7 @@ import {
   cleanSpeechText,
   loadWebSpeechVoices,
   selectFemaleEnglishVoice,
+  selectMaleEnglishVoice,
 } from "@/lib/kokoroTts";
 
 export type JoiVoiceTrack = {
@@ -112,11 +113,12 @@ export const EXTRA_JOI_TRACKS: JoiVoiceTrack[] = [
 export const ALL_JOI_TRACKS: JoiVoiceTrack[] = [...JOI_DIRTY_TRACKS, ...EXTRA_JOI_TRACKS];
 
 let countdownInterval: ReturnType<typeof setInterval> | null = null;
+let speechRequest = 0;
 
 /** Browser TTS using the character's pitch, rate, and optional breathy whisper delivery. */
 export function speak(
   text: string,
-  voice?: Pick<CharacterVoice, "pitch" | "rate"> & { whispery?: boolean },
+  voice?: Pick<CharacterVoice, "pitch" | "rate"> & { whispery?: boolean; gender?: "female" | "male" },
   callbacks?: { onStart?: () => void; onEnd?: () => void },
 ) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -125,16 +127,17 @@ export function speak(
     callbacks?.onEnd?.();
     return;
   }
+  const request = ++speechRequest;
   window.speechSynthesis.cancel();
   void loadWebSpeechVoices().then((voices) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (request !== speechRequest) return;
     const utterance = new SpeechSynthesisUtterance(clean);
     const basePitch = voice?.pitch ?? 1.08;
     const baseRate = voice?.rate ?? 0.96;
     utterance.pitch = voice?.whispery ? Math.max(0.92, basePitch - 0.08) : Math.max(1.04, basePitch);
     utterance.rate = voice?.whispery ? Math.max(0.76, baseRate - 0.08) : baseRate;
     utterance.volume = voice?.whispery ? 0.85 : 0.95;
-    const preferred = selectFemaleEnglishVoice(voices);
+    const preferred = voice?.gender === "male" ? selectMaleEnglishVoice(voices) : selectFemaleEnglishVoice(voices);
     if (preferred) utterance.voice = preferred;
     utterance.onstart = () => callbacks?.onStart?.();
     utterance.onend = () => callbacks?.onEnd?.();
@@ -144,6 +147,7 @@ export function speak(
 }
 
 export function stopSpeaking() {
+  speechRequest += 1;
   if (countdownInterval) {
     clearInterval(countdownInterval);
     countdownInterval = null;

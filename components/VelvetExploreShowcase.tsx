@@ -324,6 +324,7 @@ export default function VelvetExploreShowcase({ returning }: { returning?: React
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1">
             {([
               ['Create a companion', '/create/'],
+              ['Interracial stories', '/?view=packs&theme=interracial'],
               ['Guided audio', '/joi/'],
               ['Group chat', '/group/'],
             ] as const).map(([label, href]) => (
