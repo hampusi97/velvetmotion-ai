@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Heart, Sparkles, Star, Volume2, X } from 'lucide-react';
+import { Heart, RotateCcw, Sparkles, Star, Volume2, X } from 'lucide-react';
 import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
 import type { Character } from '@/lib/characters';
 import { bumpIntimacy, saveMatch } from '@/lib/storage';
 import { useCoinsStore } from '@/lib/coinsStore';
-import { saveMatchDB } from '@/lib/db';
+import { loadMatchesDB, saveMatchDB } from '@/lib/db';
+import { canonicalMatchId, firstTimeMatch, mergeMatchIds, previousSwipeIndex, reshuffleDiscoverCards } from '@/lib/discoverMatch';
 import { playMatchChime, playSuperLikeZap, playSwipeTick } from '@/lib/neonAudio';
 import { hapticMatch, hapticSuperLike, hapticSwipe } from '@/lib/haptics';
 import { SafeImage } from '@/components/SafeImage';
@@ -86,7 +87,7 @@ export function DiscoverSwipe({
   onHome,
   onMatch,
 }: DiscoverSwipeProps) {
-  const [deck] = useState<DiscoverCard[]>(() => profiles ?? buildDefaultDeck());
+  const [deck, setDeck] = useState<DiscoverCard[]>(() => profiles ?? buildDefaultDeck());
   const [index, setIndex] = useState(0);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragX, setDragX] = useState(0);
@@ -105,42 +106,76 @@ export function DiscoverSwipe({
   const { coins, spend, earn } = useCoinsStore();
   const startXRef = useRef(0);
   const isTransitioning = useRef(false);
+  const rewardedMatches = useRef(new Set<string>());
   const current = deck[index];
 
   useEffect(() => {
+    let mounted = true;
     try {
-      const raw = window.localStorage.getItem(MATCHES_KEY);
-      if (raw) setMatchIds(JSON.parse(raw));
-      const today = new Date().toISOString().slice(0, 10);
+      const raw: unknown = JSON.parse(window.localStorage.getItem(MATCHES_KEY) || '[]');
+      const stored = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : [];
+      const all = mergeMatchIds(stored, [...rewardedMatches.current]);
+      rewardedMatches.current = new Set(all);
+      setMatchIds(all);
+      const today = new Date().toISOString().slice(0,10);
       setSuperLikeUsedToday(window.localStorage.getItem(SUPERLIKE_DATE_KEY) === today);
-    } catch {
-      // Ignore
-    }
+    } catch { /* tolerate corrupt local browser data */ }
+    void loadMatchesDB().then(ids => {
+      if (!mounted) return;
+      const merged = mergeMatchIds([...rewardedMatches.current], ids);
+      rewardedMatches.current = new Set(merged);
+      setMatchIds(merged);
+      try { window.localStorage.setItem(MATCHES_KEY, JSON.stringify(merged)); }
+      catch { /* browser storage is optional */ }
+    }).catch(() => { /* IndexedDB can be disabled */ });
+    return () => { mounted = false; };
   }, []);
 
-  const recordMatch = useCallback(
-    (card: DiscoverCard, bonus = 0) => {
-      const cleanId = card.id.replace(/^secret-/, '');
+  const recordMatch = useCallback((card: DiscoverCard, bonus = 0) => {
+    const cleanId = canonicalMatchId(card.id);
+    let stored: string[] = [];
+    try {
+      const raw: unknown = JSON.parse(window.localStorage.getItem(MATCHES_KEY) || '[]');
+      if (Array.isArray(raw)) stored = raw.filter((v):v is string=>typeof v==='string');
+    } catch { /* duplicate rewards still guarded by the session's Set */ }
+    rewardedMatches.current = new Set(mergeMatchIds([...rewardedMatches.current], stored));
+    const isNew = firstTimeMatch(rewardedMatches.current, cleanId);
+    if (isNew) {
+      rewardedMatches.current.add(cleanId);
       saveMatch(cleanId);
-      void saveMatchDB(cleanId);
+      void saveMatchDB(cleanId).catch(() => { /* IndexedDB optional */ });
       bumpIntimacy(cleanId, Math.max(8, bonus));
       earn(10);
-      setMatchIds((prev) => {
-        const next = Array.from(new Set([...prev, cleanId]));
-        try {
-          window.localStorage.setItem(MATCHES_KEY, JSON.stringify(next));
-        } catch {
-          // Ignore
-        }
-        return next;
-      });
-      playMatchChime();
-      hapticMatch();
-      setMatchedBonus(bonus);
-      setMatchedCard({ ...card, id: cleanId });
-    },
-    [earn],
-  );
+    }
+    const all = [...rewardedMatches.current];
+    setMatchIds(all);
+    try { window.localStorage.setItem(MATCHES_KEY, JSON.stringify(all)); }
+    catch { /* localStorage optional */ }
+    playMatchChime();
+    hapticMatch();
+    setMatchedBonus(isNew ? bonus : 0);
+    setMatchedCard({ ...card, id: cleanId });
+  }, [earn]);
+
+  const undoLastSwipe = useCallback(() => {
+    if (isTransitioning.current || matchedCard || rizzTarget) return;
+    setIndex(i => previousSwipeIndex(i));
+    setPhotoIdx(0);
+    setDragX(0);
+    setIsDragging(false);
+    setAdmirerRevealed(false);
+    // An undo never reverses a persisted match or pays its reward again.
+  }, [matchedCard, rizzTarget]);
+
+  const shuffleAgain = useCallback(() => {
+    if (isTransitioning.current) return;
+    setDeck(cards => reshuffleDiscoverCards(cards));
+    setIndex(0);
+    setPhotoIdx(0);
+    setDragX(0);
+    setIsDragging(false);
+    setAdmirerRevealed(false);
+  }, []);
 
   const advanceDeck = useCallback(() => {
     setDragX(0);
@@ -231,6 +266,9 @@ export function DiscoverSwipe({
       } else if (e.key === 'ArrowUp' && !superLikeUsedToday) {
         e.preventDefault();
         handleSwipe('right', true);
+      } else if (e.key === 'Backspace' && index > 0) {
+        e.preventDefault();
+        undoLastSwipe();
       } else if (e.key === ' ' && current && !current.isSecretAdmirer) {
         e.preventDefault();
         playVoicePrompt(current.voiceSampleLine);
@@ -238,7 +276,7 @@ export function DiscoverSwipe({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, handleSwipe, matchedCard, playVoicePrompt, rizzTarget, superLikeUsedToday]);
+  }, [current, handleSwipe, index, matchedCard, playVoicePrompt, rizzTarget, superLikeUsedToday, undoLastSwipe]);
 
   function handleSubmitRizz(e: React.FormEvent) {
     e.preventDefault();
@@ -305,13 +343,14 @@ export function DiscoverSwipe({
             <p className="mt-1 text-xs text-[#a6a6c4]">Reshuffle to meet everyone again.</p>
             <button
               type="button"
-              onClick={() => {
-                isTransitioning.current = false;
-                setIndex(0);
-              }}
+              onClick={shuffleAgain}
               className="mt-4 rounded-full neon-btn-primary px-5 py-2 text-xs font-bold text-white"
             >
               Shuffle Deck
+            </button>
+            <button type="button" onClick={undoLastSwipe} disabled={index===0}
+              className="mt-3 rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-zinc-200 disabled:opacity-40">
+              Undo last swipe
             </button>
           </div>
         ) : (
@@ -465,8 +504,13 @@ export function DiscoverSwipe({
                 <Heart className="h-7 w-7 fill-current" aria-hidden="true" />
               </button>
             </div>
+            <button type="button" aria-label="Undo last swipe" onClick={undoLastSwipe}
+              disabled={index === 0 || Boolean(matchedCard) || Boolean(rizzTarget)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs text-zinc-200 hover:bg-white/10 disabled:opacity-40">
+              <RotateCcw className="h-3.5 w-3.5" /> Undo
+            </button>
             <p className="mt-2 text-[10px] text-[#a6a6c4]">
-              Shortcuts: ← Pass · → Like · ↑ Super-Like · Space Voice
+              Shortcuts: ← Pass · → Like · ↑ Super-Like · Backspace Undo · Space Voice
             </p>
           </>
         )}
@@ -530,7 +574,7 @@ export function DiscoverSwipe({
               />
               <h3 className="mt-3 text-lg font-extrabold">{matchedCard.name} liked you back</h3>
               <p className="mt-1 text-xs text-pink-200">
-                Starting affinity boosted +{matchedBonus}% · +10 Free 🪙
+                {matchedBonus > 0 ? `Starting affinity +${matchedBonus}% · 10 bonus coins` : 'Already matched · no duplicate rewards'}
               </p>
               <div className="mt-4 flex flex-col gap-2">
                 <button
