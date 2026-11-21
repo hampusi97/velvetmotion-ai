@@ -32,6 +32,7 @@ export interface Character {
   voiceId?: string;
   visualDna?: string;
   kinkSettings?: KinkSettings;
+  kinkDoctrine?: import("@/data/companions").CompanionKink;
   discovery?: import("./companionDiscovery").CompanionDiscovery;
   /** Inert imported metadata retained for card export, never executed as instructions. */
   cardData?: Record<string, unknown>;

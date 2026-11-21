@@ -35,6 +35,14 @@ const PORTRAIT_TO_VIDEO: Record<string, string> = {
   "/portraits/nadine-okoye.webp": "/videos/nadine-okoye.mp4",
   "/portraits/claire-bennett.webp": "/videos/claire-bennett.mp4",
   "/portraits/yumi-chen.webp": "/videos/yumi-chen.mp4",
+  "/portraits/camille-laurent.webp": "/videos/camille-laurent.mp4",
+  "/portraits/camille-laurent.jpg": "/videos/camille-laurent.mp4",
+  "/portraits/daisy-miller.webp": "/videos/daisy-miller.mp4",
+  "/portraits/daisy-miller.jpg": "/videos/daisy-miller.mp4",
+  "/portraits/yuki-sato.webp": "/videos/yuki-sato.mp4",
+  "/portraits/yuki-sato.jpg": "/videos/yuki-sato.mp4",
+  "/portraits/valeria-cruz.webp": "/videos/valeria-cruz.mp4",
+  "/portraits/valeria-cruz.jpg": "/videos/valeria-cruz.mp4",
 };
 
 const ID_TO_VIDEO: Record<string, string> = {
@@ -63,6 +71,10 @@ const ID_TO_VIDEO: Record<string, string> = {
   "nadine-okoye": "/videos/nadine-okoye.mp4",
   "claire-bennett": "/videos/claire-bennett.mp4",
   "yumi-chen": "/videos/yumi-chen.mp4",
+  "camille-laurent": "/videos/camille-laurent.mp4",
+  "daisy-miller": "/videos/daisy-miller.mp4",
+  "yuki-sato": "/videos/yuki-sato.mp4",
+  "valeria-cruz": "/videos/valeria-cruz.mp4",
 };
 
 export function resolveLiveVideoUrl(portraitSrc?: string, companionId?: string): string | null {

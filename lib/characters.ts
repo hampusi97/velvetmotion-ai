@@ -202,7 +202,7 @@ const FLAGSHIP_AS_CHARACTERS: Character[] = FLAGSHIP_COMPANIONS.map((f) => ({
   avatar: f.portraitUrl,
   voiceIntro: f.voiceSampleLine,
   initialMessage: f.greeting,
-  tags: [f.category, f.archetype, ...(f.isNew ? ["NEW"] : [])],
+  tags: [f.category, f.archetype, ...(f.kink?.tags || []), ...(f.isNew ? ["NEW"] : [])],
   intimacy: 65,
   voice: { label: f.voiceId, pitch: 1, rate: 0.96, style: f.personality },
   personality: f.personality,
@@ -211,7 +211,8 @@ const FLAGSHIP_AS_CHARACTERS: Character[] = FLAGSHIP_COMPANIONS.map((f) => ({
   figure: f.visualDna,
   visualDna: f.visualDna,
   voiceId: f.voiceId,
-  kink: f.archetype,
+  kink: f.kink?.tags?.length ? `${f.archetype} (${f.kink.tags.join(", ")})` : f.archetype,
+  kinkDoctrine: f.kink,
   reply: f.greeting,
 }));
 

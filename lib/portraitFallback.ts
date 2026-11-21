@@ -17,6 +17,10 @@ export const PORTRAIT_BY_ID: Record<string, string> = {
   "nadine-okoye": "/portraits/nadine-okoye.webp",
   "claire-bennett": "/portraits/claire-bennett.webp",
   "yumi-chen": "/portraits/yumi-chen.webp",
+  "camille-laurent": "/portraits/camille-laurent.webp",
+  "daisy-miller": "/portraits/daisy-miller.webp",
+  "yuki-sato": "/portraits/yuki-sato.webp",
+  "valeria-cruz": "/portraits/valeria-cruz.webp",
 
   // 36 Distinct Roster Companions (.jpg)
   "nova-g": "/portraits/nova-g.jpg",

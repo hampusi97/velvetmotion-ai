@@ -86,6 +86,8 @@ import { saveTribute } from "@/lib/rewards";
 import { MotionSequencePlayer } from "@/components/MotionSequencePlayer";
 import { VoiceCallModal } from "@/components/VoiceCallModal";
 import { MemoryVaultDrawer, MemoryVaultPanel, loadCategorizedMemories, saveCategorizedMemories, type MemoryCategory } from "@/components/MemoryVaultDrawer";
+import KinkStatusPanel from "@/components/KinkStatusPanel";
+import { buildStatusDirective, loadStoredKinkStatus } from "@/data/kinkDoctrine";
 import {
   buildProactiveFollowUp,
   detectExplicitMediaIntent,
@@ -512,7 +514,18 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       .map((m) => `- [${m.category}] ${m.text}`)
       .join("\n");
     const loreContext = buildLorebookContext(loadLorebook(character.id), recentUserText);
-    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext].filter(Boolean).join("\n");
+    const storedKink = loadStoredKinkStatus(
+      character.id,
+      character.kinkDoctrine
+        ? {
+            status: character.kinkDoctrine.status,
+            sphTier: character.kinkDoctrine.sphTier,
+            bullName: character.kinkDoctrine.bullName,
+          }
+        : undefined,
+    );
+    const standingBlock = storedKink ? buildStatusDirective(storedKink) : "";
+    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext, standingBlock].filter(Boolean).join("\n");
     return {
       id: character.id,
       name: character.name,
@@ -1940,7 +1953,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         </div>
 
         {rightTab === "memory" ? (
-          <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar space-y-3">
+            <KinkStatusPanel
+              companionId={character.id}
+              bullName={character.kinkDoctrine?.bullName}
+              defaultStatus={character.kinkDoctrine?.status}
+              defaultSphTier={character.kinkDoctrine?.sphTier}
+            />
             <MemoryVaultPanel characterId={character.id} characterName={character.name} />
           </div>
         ) : (
