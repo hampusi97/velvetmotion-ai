@@ -5,22 +5,51 @@ on:
   schedule:
     - cron: "0 */6 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   health-check:
-    name: Probe Live /api/health & Security Headers
+    name: Verify Cloudflare production health and current main commit
     runs-on: ubuntu-latest
+    timeout-minutes: 7
     steps:
-      - name: Check production endpoints
+      # Scheduled jobs can wait in the Actions queue while main advances.
+      # Fetch current main instead of checking the stale event SHA.
+      - name: Check out latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Verify actual public production metadata
+        env:
+          VERIFIED_PROVIDER: workers
+          WORKERS_PRODUCTION_URL: https://velvetmotion-ai.hampusi97.workers.dev
+          PAGES_PRODUCTION_URL: https://velvetmotion-ai.pages.dev
+        shell: bash
         run: |
-          for URL in "https://velvetmotion-ai.vercel.app" "https://velvetmotionai.vercel.app"; do
-            echo "==> Probing ${URL}/api/health"
-            STATUS=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 15 "${URL}/api/health" || echo "000")
-            echo "HTTP Status: ${STATUS}"
-            if [ "${STATUS}" = "200" ]; then
-              cat /tmp/health.json | head -c 500
-              echo ""
-              curl -sI --max-time 15 "${URL}/" | grep -iE "x-content-type-options|strict-transport-security|cross-origin-opener-policy|x-frame-options" || true
-            else
-              echo "Notice: ${URL}/api/health returned HTTP ${STATUS} (may still be deploying or waiting on Vercel Hobby window)."
-            fi
-          done
+          set -euo pipefail
+          export GITHUB_SHA="$(git rev-parse HEAD)"
+          node scripts/verify-cloudflare-public-commit.mjs
+
+      - name: Verify public home page is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --max-time 15 --retry 2 --retry-delay 3 \
+            --output /dev/null "https://velvetmotion-ai.hampusi97.workers.dev/"
+
+      - name: Record current main health result
+        shell: bash
+        run: |
+          echo "### Cloudflare production monitor" >> "$GITHUB_STEP_SUMMARY"
+          echo "Canonical site: https://velvetmotion-ai.hampusi97.workers.dev" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified latest checked-out main commit: \`$(git rev-parse HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Both public build metadata and the home page were reachable." >> "$GITHUB_STEP_SUMMARY"
