@@ -24,7 +24,7 @@ import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
 import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt, installPromptOverlapsComposer } from "@/components/InstallPrompt";
 import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
-import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
+import { DesktopUpdateProvider } from "@/components/DesktopAutoUpdater";
 import { ProactiveToast } from "@/components/ProactiveToast";
 
 function LoadingPanel() {
@@ -382,6 +382,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     view === "group";
 
   return (
+    <DesktopUpdateProvider>
     <div className="min-h-screen bg-[#08080e] text-[#f7f7fc] pb-16 lg:pb-0">
       <SiteHeader
         view={view}
@@ -575,7 +576,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       <MobileBottomNav active={view} onNavigate={navigate} />
       <InstallPrompt hidden={installPromptOverlapsComposer(view)} />
       <LiveUpdateBanner />
-      <DesktopAutoUpdater />
       {settingsOpen && <SettingsAndBackupDrawer open onClose={() => setSettingsOpen(false)} />}
 
       {studioModalOpen && <NeonErrorBoundary label="Studio Modal" onReset={() => setStudioModalOpen(false)}>
@@ -714,5 +714,6 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
         </div>
       )}
     </div>
+    </DesktopUpdateProvider>
   );
 }
