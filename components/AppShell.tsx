@@ -330,7 +330,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
 
   if (!adult) {
     return (
-      <main className="min-h-screen bg-[#05050a] text-white relative overflow-hidden">
+      <main id="main-content" className="min-h-screen bg-[#05050a] text-white relative overflow-hidden">
         <div className="absolute inset-0 blur-md scale-105 opacity-60 pointer-events-none">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3">
             {CHARACTERS.slice(0, 8).map((c) => (
@@ -396,7 +396,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
         <CandySidebar active={view} onNavigate={navigate} onOpenSettings={() => setSettingsOpen(true)} />
 
         <main
-          id="main"
+          id="main-content"
           aria-hidden={menuOpen || undefined}
           className={
             view === "home"

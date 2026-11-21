@@ -31,7 +31,7 @@ jobs:
         env:
           VERIFIED_PROVIDER: workers
           WORKERS_PRODUCTION_URL: https://velvetmotion-ai.hampusi97.workers.dev
-          PAGES_PRODUCTION_URL: https://velvetmotion-ai.pages.dev
+          PAGES_PRODUCTION_URL: https://velvetmotion-ai-git.pages.dev
         shell: bash
         run: |
           set -euo pipefail

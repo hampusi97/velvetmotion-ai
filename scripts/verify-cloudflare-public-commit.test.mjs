@@ -1,14 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DEFAULT_PAGES_PRODUCTION_URL,
+  DEFAULT_WORKERS_PRODUCTION_URL,
   expectedProductionShaMatches,
   probeProductionCommit,
   productionMetaUrl,
+  resolveProductionSiteUrl,
   verifyPublicProductionCommit,
 } from "./verify-cloudflare-public-commit.mjs";
 
 const sha = "634e2b0a2c8e1f1c560c81f7d444bc16a0b354d9";
-const siteUrl = "https://velvetmotion-ai.hampusi97.workers.dev";
+const siteUrl = DEFAULT_WORKERS_PRODUCTION_URL;
+const pagesSiteUrl = DEFAULT_PAGES_PRODUCTION_URL;
 
 function response(commitSha, opts = {}) {
   const res = new Response(
@@ -92,4 +96,15 @@ test("rejects invalid setup before sending any requests", async () => {
   await assert.rejects(()=>verifyPublicProductionCommit({
     siteUrl:"http://localhost:8787",sha,fetcher:async()=>{throw new Error("Unexpected fetch");},
   }),/HTTPS/);
+});
+
+test("defaults Cloudflare Pages production verification to velvetmotion-ai-git.pages.dev", () => {
+  assert.equal(pagesSiteUrl, "https://velvetmotion-ai-git.pages.dev");
+  assert.deepEqual(resolveProductionSiteUrl({ VERIFIED_PROVIDER: "pages" }), {
+    provider: "pages",
+    siteUrl: "https://velvetmotion-ai-git.pages.dev",
+  });
+  const u = productionMetaUrl(pagesSiteUrl, sha, 1);
+  assert.equal(u.origin, "https://velvetmotion-ai-git.pages.dev");
+  assert.equal(u.pathname, "/build-meta.json");
 });

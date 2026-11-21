@@ -63,10 +63,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: versions upload --preview-alias pr-${{ github.event.pull_request.number }}
 
-      # Cloudflare's own GitHub integration already deploys this Worker and Pages.
-      # If a second Wrangler deployment is not configured, verify the provider's
-      # completed success check for *this exact SHA* instead of falsely failing CI.
-      # This is not satisfied by a passing build, a preview, or a previous deploy.
       - name: Verify native Cloudflare Git deployment without Wrangler secrets
         id: native_cloudflare
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CF_TOKEN == '' && env.CF_ACCOUNT == ''
@@ -91,18 +87,18 @@ jobs:
       - name: Record direct Wrangler deployment
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && env.CF_TOKEN != '' && env.CF_ACCOUNT != ''
         run: |
-          echo "### VelvetMotion automatic website deploy" >> "$GITHUB_STEP_SUMMARY"
-          echo "Commit: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "Site: https://velvetmotion-ai.hampusi97.workers.dev" >> "$GITHUB_STEP_SUMMARY"
-          echo "Deployment was performed only after audit, lint, TypeScript and build passed." >> "$GITHUB_STEP_SUMMARY"
-      # Provider status proves its build finished, but not what users currently
-      # receive over HTTPS. Check the actual public origin and exact build SHA.
-      # Stable Workers/Pages hostnames were verified in the Cloudflare account.
+          {
+            echo "### VelvetMotion automatic website deploy"
+            echo "Commit: \`${GITHUB_SHA}\`"
+            echo "Site: https://velvetmotion-ai.hampusi97.workers.dev"
+            echo "Deployment was performed only after audit, lint, TypeScript and build passed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Point production verification at the live Git-connected Cloudflare Pages project.
       - name: Verify public production serves this exact commit
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           VERIFIED_PROVIDER: ${{ steps.native_cloudflare.outputs.provider }}
           WORKERS_PRODUCTION_URL: https://velvetmotion-ai.hampusi97.workers.dev
-          PAGES_PRODUCTION_URL: https://velvetmotion-ai.pages.dev
+          PAGES_PRODUCTION_URL: https://velvetmotion-ai-git.pages.dev
         run: node scripts/verify-cloudflare-public-commit.mjs
-

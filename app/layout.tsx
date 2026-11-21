@@ -90,6 +90,12 @@ export default function RootLayout({
         />
       </head>
       <body suppressHydrationWarning className="relative min-h-dvh bg-[#0e0a12] font-sans text-[#f7f7fc] antialiased">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-xl focus:bg-[#ff1e8e] focus:px-4 focus:py-2 focus:text-xs focus:font-bold focus:text-white"
+        >
+          Skip to main content
+        </a>
         <div className="vm-ambient-mesh" aria-hidden="true" />
         <div className="relative z-10">{children}</div>
         {cfAnalyticsToken ? (

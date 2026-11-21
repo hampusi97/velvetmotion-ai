@@ -7,6 +7,17 @@
 import { appendFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
+export const DEFAULT_WORKERS_PRODUCTION_URL = "https://velvetmotion-ai.hampusi97.workers.dev";
+export const DEFAULT_PAGES_PRODUCTION_URL = "https://velvetmotion-ai-git.pages.dev";
+
+export function resolveProductionSiteUrl(env = process.env) {
+  const provider = env.VERIFIED_PROVIDER === "pages" ? "pages" : "workers";
+  const siteUrl = provider === "pages"
+    ? (env.PAGES_PRODUCTION_URL || DEFAULT_PAGES_PRODUCTION_URL)
+    : (env.WORKERS_PRODUCTION_URL || DEFAULT_WORKERS_PRODUCTION_URL);
+  return { provider, siteUrl };
+}
+
 export function expectedProductionShaMatches(actual, expected) {
   if (typeof actual !== "string" || !/^[a-f0-9]{40}$/i.test(expected || "")) return false;
   const normalized = actual.trim().toLowerCase();
@@ -91,9 +102,8 @@ export async function verifyPublicProductionCommit({
 }
 
 async function main() {
-  const { GITHUB_SHA, VERIFIED_PROVIDER, WORKERS_PRODUCTION_URL, PAGES_PRODUCTION_URL, GITHUB_STEP_SUMMARY } = process.env;
-  const provider = VERIFIED_PROVIDER === "pages" ? "pages" : "workers";
-  const siteUrl = provider === "pages" ? PAGES_PRODUCTION_URL : WORKERS_PRODUCTION_URL;
+  const { GITHUB_SHA, GITHUB_STEP_SUMMARY } = process.env;
+  const { provider, siteUrl } = resolveProductionSiteUrl(process.env);
   if (!siteUrl) throw new Error(`Missing production URL for Cloudflare ${provider}`);
   const result = await verifyPublicProductionCommit({ siteUrl, sha: GITHUB_SHA });
   if (GITHUB_STEP_SUMMARY) {
