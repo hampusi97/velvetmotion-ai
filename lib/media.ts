@@ -225,7 +225,7 @@ export async function resolveBestMediaUrl(
     }
     if (comfyProbe.online) {
       try {
-        const blobUrl = await generateComfySfwPortrait({
+        const blob = await generateComfySfwPortrait({
           comfyUrl: comfyBase,
           prompt,
           checkpointName: comfyProbe.checkpoints[0],
@@ -233,7 +233,7 @@ export async function resolveBestMediaUrl(
           height: IMAGE_HEIGHT,
           seed,
         });
-        const stableUrl = await remoteImageToStableDataUrl(blobUrl).catch(() => blobUrl);
+        const stableUrl = await toStableDataUrl(blob);
         reportImg("comfyui-bridge");
         return {
           url: stableUrl,

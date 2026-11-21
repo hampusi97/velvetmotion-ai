@@ -124,8 +124,8 @@ export function buildSfwPortraitWorkflow(req: ComfyImageRequest): Record<string,
   };
 }
 
-/** Submits a workflow to ComfyUI, polls until completion, and returns a Blob URL for the generated PNG. */
-export async function generateComfySfwPortrait(req: ComfyImageRequest): Promise<string> {
+/** Submits a workflow to ComfyUI, polls until completion, and returns the generated image bytes. */
+export async function generateComfySfwPortrait(req: ComfyImageRequest): Promise<Blob> {
   const base = (req.comfyUrl || DEFAULT_COMFY_URL).replace(/\/$/, '');
 
   // Auto-select the first available checkpoint if caller did not specify one
@@ -190,7 +190,10 @@ export async function generateComfySfwPortrait(req: ComfyImageRequest): Promise<
       const imgRes = await fetch(`${base}/view?${viewParams.toString()}`);
       if (!imgRes.ok) throw new Error('Failed to fetch generated image from ComfyUI /view.');
       const blob = await imgRes.blob();
-      return URL.createObjectURL(blob);
+      if (!blob.size || !/^image\/(png|jpeg|webp)$/i.test(blob.type)) {
+        throw new Error('ComfyUI /view did not return a supported image.');
+      }
+      return blob;
     }
   }
 
