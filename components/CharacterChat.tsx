@@ -29,8 +29,10 @@ import {
 } from "lucide-react";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 import { startIntimacyAudio, stopIntimacyAudio, updateIntimacyAudioIntensity } from "@/lib/audioEngine";
-import { CHARACTERS, fallbackReply, type Character } from "@/lib/characters";
-import { chatDebugBadgeEnabled, continueCompanionScene, ensureVisibleReply, generateCompanionReply, sanitizeCompanionReply, type RouterMessage } from "@/lib/chatRouter";
+import { CHARACTERS, allCharacters, fallbackReply, type Character } from "@/lib/characters";
+import { COMPANION_LIBRARY_EVENT } from "@/lib/companionLibrary";
+import { safeCompanionAvatarUrl } from "@/lib/avatarOptimize";
+import { chatDebugBadgeEnabled, continueCompanionScene, ensureVisibleReply, generateCompanionReply, loadRouterSettings, sanitizeCompanionReply, type RouterMessage } from "@/lib/chatRouter";
 import { createChatTurnGuard, createTranscriptRevision, shouldCommitTurnToActiveView, type ChatTurnOutcome } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
 import {
@@ -171,6 +173,18 @@ const SEQUENCE_LINES: Record<SequenceKind, string> = {
 
 export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSelectCompanion }: CharacterChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [threadCompanions, setThreadCompanions] = useState<Character[]>(CHARACTERS);
+  useEffect(() => {
+    const refresh = () => setThreadCompanions(allCharacters());
+    refresh();
+    window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [awaitingReply, setAwaitingReply] = useState(false);
@@ -559,13 +573,19 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       .slice(-16)
       .map((m) => ({ role: m.role as "user" | "assistant", text: m.content }));
     const persona = buildPersonaPayload(userPrompt);
+    // Never pass a fabricated assistant reply off as a connected model result.
+    const requireConnectedModel = ["custom", "local", "openrouter"].includes(loadRouterSettings().provider);
     let routedText = "";
     let providerUsed = "character-voice-fallback";
     try {
       const routed = await generateCompanionReply(history, persona);
       providerUsed = routed.providerUsed;
+      if (requireConnectedModel && providerUsed === "in-character-fallback") {
+        throw new Error("The AI model isn\'t responding. Check your selected provider connection and retry.");
+      }
       routedText = ensureVisibleReply(routed.text, history, persona);
-    } catch {
+    } catch (error) {
+      if (requireConnectedModel) throw error;
       routedText = "";
     }
 
@@ -654,9 +674,10 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     }
   };
 
-  const send = async (overrideText?: string, bonusXp = 6) => {
+  const send = async (overrideText?: string, bonusXp = 6, retry = false) => {
     const text = (overrideText ?? input).trim();
     if (!text || !transcriptReady) return;
+    if (retry && !(messagesRef.current.at(-1)?.role === "user" && messagesRef.current.at(-1)?.content === text)) return;
     const guard = assertCompliance(text);
     if (!guard.ok) {
       setSafetyError(guard.reason);
@@ -667,8 +688,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
     if (!overrideText) setInput("");
     const userMsg: ChatMessage = { role: "user", content: text };
-    const next = [...messagesRef.current, userMsg];
-    turn.commit(next);
+    const next = retry ? messagesRef.current : [...messagesRef.current, userMsg];
+    if (!retry) turn.commit(next);
+    setReplyError(null);
     const mediaIntent = detectExplicitMediaIntent(text);
     let replied = false;
 
@@ -740,13 +762,11 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       const wantsVideo = mediaIntent?.kind === "video" && turn.isCurrent();
       turn.finish("success");
       if (wantsVideo) await generateSequence(/joi/i.test(text) ? "joi" : "sex");
-    } catch {
-      if (!replied) {
-        turn.commit([
-          ...next,
-          { role: "assistant", content: fallbackReply(character, text, romanceMode) },
-        ]);
+    } catch (error) {
+      if (!replied && turn.isCurrent()) {
+        setReplyError(error instanceof Error ? error.message : "The AI model isn\'t responding. Check your model settings and retry.");
       }
+      // Preserve the one real user turn. Do not fabricate an assistant answer on a failed request.
       turn.finish("error");
     }
   };
@@ -783,12 +803,9 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         );
       }
       turn.finish("success");
-    } catch {
-      turn.commit([
-        ...prior,
-        { role: "assistant", content: fallbackReply(character, lastUser, romanceMode) },
-        ...suffix,
-      ]);
+    } catch (error) {
+      if (turn.isCurrent()) setReplyError(error instanceof Error ? error.message : "The AI model isn't responding. Check your model settings and retry.");
+      // Keep the previous transcript instead of inserting a pretend model response.
       turn.finish("error");
     }
   };
@@ -1191,7 +1208,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           Active Threads
         </div>
         <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pt-2">
-          {CHARACTERS.slice(0, 14).map((c) => {
+          {threadCompanions.map((c) => {
             const isCur = c.id === character.id;
             return (
               <button
@@ -1205,7 +1222,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 }`}
               >
                 <div className="relative h-9 w-9 shrink-0">
-                  <SafeImage src={staticPortraitUrl(c.id)} alt={c.name} className="h-9 w-9 rounded-full object-cover object-top" />
+                  <SafeImage src={safeCompanionAvatarUrl(c.avatar) || staticPortraitUrl(c.id)} alt={c.name} className="h-9 w-9 rounded-full object-cover object-top" />
                   <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-[#00ffa3] ring-2 ring-[#05050a]" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -1232,7 +1249,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 ←
               </button>
               <SafeImage
-                src={staticPortraitUrl(character.id)}
+                src={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
                 alt={character.name}
                 className="h-10 w-10 rounded-full object-cover object-top border border-[#ff1e8e]/60 shrink-0"
               />
@@ -1317,8 +1334,20 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           </div>
         </header>
 
-        {(clipStatus || savedToast || safetyError) && (
+        {(clipStatus || savedToast || safetyError || replyError) && (
           <div className="shrink-0 px-2 pt-1.5 space-y-1">
+            {replyError && (
+              <div role="alert" className="rounded-xl border border-amber-400/30 bg-amber-400/5 px-3 py-2 text-xs leading-6 text-amber-200">
+                <p>{replyError}</p>
+                {messages.at(-1)?.role === "user" && (
+                  <button type="button" disabled={busy}
+                    onClick={() => void send(messages.at(-1)!.content, 6, true)}
+                    className="mt-1 font-semibold underline underline-offset-4 disabled:opacity-50">
+                    Retry message
+                  </button>
+                )}
+              </div>
+            )}
             {safetyError && (
               <div className="rounded-xl border border-rose-500/50 bg-rose-500/15 px-3 py-1.5 text-[11px] text-rose-200">
                 {safetyError}
@@ -1852,7 +1881,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       <aside className="hidden lg:flex flex-col rounded-3xl neon-glass p-4 space-y-4 overflow-hidden">
         <div className="flex items-center gap-3">
           <SafeImage
-            src={staticPortraitUrl(character.id)}
+            src={safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id)}
             alt={character.name}
             className="h-14 w-14 rounded-2xl object-cover object-top border border-[#ff1e8e]/50 shrink-0"
           />

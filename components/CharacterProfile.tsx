@@ -1,12 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { HardDrive, Mail, Video, CheckCircle2, AlertTriangle, ImageIcon, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  ArrowUpRight,
+  Bookmark,
+  Check,
+  Download,
+  Heart,
+  ImagePlus,
+  MessageCircle,
+  Mic2,
+  Palette,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import type { Character } from "@/lib/characters";
-import { characterPortraitUrl } from "@/lib/portraits";
-import { characterGallery, characterMediaUrl, resolveBestMediaUrl, resolveCharacterAvatar, type MediaMood } from "@/lib/media";
-import { speak } from "@/lib/speech";
-import { auth, getAccessToken, googleSignIn } from "@/lib/firebase";
+import {
+  COMPANION_LIBRARY_EVENT,
+  loadFavoriteCompanions,
+  saveCompanionCustomization,
+  toggleFavoriteCompanion,
+} from "@/lib/companionLibrary";
+import { createLocalCompanionPortrait } from "@/lib/companionPortrait";
+import { discoveryFor, VISUAL_STYLES } from "@/lib/companionDiscovery";
+import {
+  compactCardPortrait,
+  safeCompanionAvatarUrl,
+} from "@/lib/avatarOptimize";
+import { staticPortraitUrl } from "@/lib/portraitFallback";
+import { getIntimacy, loadChat } from "@/lib/storage";
+import { stageFromIntimacy } from "@/lib/relationship";
+import { loadLorebook } from "@/lib/lorebook";
+import { exportCharacterCard } from "@/lib/characterCardExport";
+import { speakWithNeuralVoice, stopNeuralSpeech } from "@/lib/kokoroTts";
+import { MemoryVaultPanel } from "@/components/MemoryVaultDrawer";
+import { SafeImage } from "@/components/SafeImage";
 
 interface CharacterProfileProps {
   character: Character;
@@ -14,15 +43,8 @@ interface CharacterProfileProps {
   onBack: () => void;
   onChat: () => void;
   onTag: (tag: string) => void;
-}
-
-function toBase64Url(str: string): string {
-  const bytes = new TextEncoder().encode(str);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  onUpdate: (character: Character) => void;
+  onStudio: () => void;
 }
 
 export function CharacterProfile({
@@ -31,593 +53,565 @@ export function CharacterProfile({
   onBack,
   onChat,
   onTag,
+  onUpdate,
+  onStudio,
 }: CharacterProfileProps) {
-  const [wsBusy, setWsBusy] = useState(false);
-  const [wsNotice, setWsNotice] = useState<string | null>(null);
-  const [wsModal, setWsModal] = useState<null | "drive" | "gmail">(null);
-  const [gmailTo, setGmailTo] = useState("");
-  const [bondageLevel, setBondageLevel] = useState(character.kinkSettings?.bondageLevel ?? 50);
-  const [intensityFactor, setIntensityFactor] = useState(character.kinkSettings?.intensityFactor ?? 8);
-  const [preferredActs, setPreferredActs] = useState<string[]>(
-    character.kinkSettings?.preferredActs ?? [character.kink || "Sensual worship"]
-  );
-  const [newActInput, setNewActInput] = useState("");
-  const [activeGalleryIndex, setActiveGalleryIndex] = useState(0);
-  const [lightbox, setLightbox] = useState<string | null>(null);
-  const [renderedGallery, setRenderedGallery] = useState<Record<string, string>>({});
-  const [renderingMood, setRenderingMood] = useState<MediaMood | null>(null);
-  const [galleryError, setGalleryError] = useState<string | null>(null);
-
-  const gallery = characterGallery(character);
-  const portraitSrc = resolveCharacterAvatar(character);
-  const selectedGalleryMood = gallery[activeGalleryIndex]?.mood;
-  const heroSrc = (selectedGalleryMood && renderedGallery[`${character.id}:${selectedGalleryMood}`]) || portraitSrc;
+  const [draft, setDraft] = useState<Character>(character);
+  const [tab, setTab] = useState<"story" | "customize" | "memory">("story");
+  const [favorite, setFavorite] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [portraitBusy, setPortraitBusy] = useState(false);
+  const [intimacy, setIntimacy] = useState(0);
+  const [messageCount, setMessageCount] = useState(0);
+  const [loreCount, setLoreCount] = useState(0);
+  const voiceRequest = useRef(0);
+  const mounted = useRef(true);
+  const meta = discoveryFor(character);
+  const portrait =
+    safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id);
 
   useEffect(() => {
-    setActiveGalleryIndex(0);
-    setLightbox(null);
-    setGalleryError(null);
-  }, [character.id]);
+    const refresh = () =>
+      setFavorite(loadFavoriteCompanions().includes(character.id));
+    mounted.current = true;
+    refresh();
+    // A relationship starts at zero until the first conversation, regardless of catalogue flavor values.
+    const messages = loadChat(character.id);
+    setMessageCount(messages.length);
+    setIntimacy(
+      messages.length ? getIntimacy(character.id, character.intimacy) : 0,
+    );
+    setLoreCount(loadLorebook(character.id).length);
+    window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      mounted.current = false;
+      voiceRequest.current++;
+      stopNeuralSpeech();
+      window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, [character.id, character.intimacy]);
 
-  const generateGalleryImage = async (mood: MediaMood, index: number) => {
-    if (renderingMood) return;
-    setActiveGalleryIndex(index);
-    setGalleryError(null);
-    const key = `${character.id}:${mood}`;
-    if (renderedGallery[key]) {
-      setLightbox(renderedGallery[key]);
-      return;
-    }
-    setRenderingMood(mood);
+  const save = () => {
+    setError("");
+    setNotice("");
     try {
-      const result = await resolveBestMediaUrl(character, mood);
-      if (result.isFallback || !result.url) {
-        throw new Error(result.error || result.note || "No compatible image model responded.");
-      }
-      setRenderedGallery((prev) => ({ ...prev, [key]: result.url }));
-      setLightbox(result.url);
-    } catch (err) {
-      setGalleryError(err instanceof Error ? err.message : "Image generation failed.");
-    } finally {
-      setRenderingMood(null);
-    }
-  };
-
-  const ensureToken = async (): Promise<string | null> => {
-    const existing = await getAccessToken();
-    if (existing) return existing;
-    try {
-      const res = await googleSignIn();
-      return res?.accessToken || null;
-    } catch {
-      setWsNotice("Sign in with Google to use Meet, Drive, or Gmail actions.");
-      return null;
-    }
-  };
-
-  const handleCreateMeet = async () => {
-    setWsBusy(true);
-    setWsNotice(null);
-    try {
-      const token = await ensureToken();
-      if (!token) return;
-      const res = await fetch("https://meet.googleapis.com/v2/spaces", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Failed to create Meet space.");
-      const uri = data.meetingUri || `https://meet.google.com/${data.meetingCode || ""}`;
-      setWsNotice(`Private Google Meet room created for ${character.name}: ${uri}`);
-    } catch (err) {
-      setWsNotice(err instanceof Error ? err.message : "Could not create Meet space.");
-    } finally {
-      setWsBusy(false);
-    }
-  };
-
-  const handleSaveDossierToDrive = async () => {
-    setWsBusy(true);
-    setWsNotice(null);
-    try {
-      const token = await ensureToken();
-      if (!token) {
-        setWsModal(null);
-        return;
-      }
-      const fileName = `VelvetMotion-${character.name.replace(/\s+/g, "-")}-Dossier.json`;
-      const metadata = { name: fileName, mimeType: "application/json" };
-      const boundary = "-------velvetmotion_profile_boundary";
-      const multipartBody =
-        `--${boundary}\r\n` +
-        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
-        `${JSON.stringify(metadata)}\r\n` +
-        `--${boundary}\r\n` +
-        `Content-Type: application/json\r\n\r\n` +
-        `${JSON.stringify(character, null, 2)}\r\n` +
-        `--${boundary}--`;
-
-      const res = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": `multipart/related; boundary=${boundary}`,
-          },
-          body: multipartBody,
-        },
+      const next = {
+        ...draft,
+        name: draft.name.trim(),
+        tagline: draft.tagline.trim(),
+      };
+      if (!next.name || !next.personality.trim())
+        throw new Error("Name and personality are required.");
+      saveCompanionCustomization(next);
+      onUpdate(next);
+      setNotice(
+        "Profile saved. Your conversations and memories are still connected.",
       );
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Drive upload failed.");
-      setWsNotice(`Saved \"${fileName}\" to your Google Drive.`);
-      setWsModal(null);
-    } catch (err) {
-      setWsNotice(err instanceof Error ? err.message : "Could not upload dossier to Drive.");
-      setWsModal(null);
-    } finally {
-      setWsBusy(false);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "The profile could not be saved.",
+      );
     }
   };
 
-  const handleSendIntroEmail = async () => {
-    const recipient = gmailTo.trim() || auth.currentUser?.email || "";
-    if (!recipient) {
-      setWsNotice("Enter a recipient email address.");
+  const replacePortrait = async (file: File) => {
+    setError("");
+    setNotice("");
+    setPortraitBusy(true);
+    try {
+      if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 10_000_000)
+        throw new Error(
+          "Choose a PNG, JPEG or WebP under 10 MB that you have permission to use.",
+        );
+      const avatar = await compactCardPortrait(file);
+      if (!mounted.current) return;
+      setDraft((previous) => ({ ...previous, avatar }));
+      setNotice(
+        "Portrait prepared. Save your profile to use it throughout the app.",
+      );
+    } catch (e) {
+      if (mounted.current)
+        setError(
+          e instanceof Error ? e.message : "The portrait could not be read.",
+        );
+    } finally {
+      if (mounted.current) setPortraitBusy(false);
+    }
+  };
+
+  const generatePortrait = async () => {
+    setError("");
+    setNotice("");
+    setPortraitBusy(true);
+    try {
+      const result = await createLocalCompanionPortrait(draft);
+      if (!mounted.current) return;
+      setDraft((previous) => ({ ...previous, avatar: result.avatar }));
+      setNotice(
+        `Portrait generated via ${result.engine}. Save your profile to keep it.`,
+      );
+    } catch (e) {
+      if (mounted.current)
+        setError(e instanceof Error ? e.message : "No portrait was generated.");
+    } finally {
+      if (mounted.current) setPortraitBusy(false);
+    }
+  };
+
+  const previewVoice = async () => {
+    if (voiceBusy) {
+      voiceRequest.current++;
+      stopNeuralSpeech();
+      setVoiceBusy(false);
       return;
     }
-    setWsBusy(true);
-    setWsNotice(null);
+    const request = ++voiceRequest.current;
+    setVoiceBusy(true);
+    setError("");
+    setNotice("");
     try {
-      const token = await ensureToken();
-      if (!token) {
-        setWsModal(null);
-        return;
-      }
-      const subject = `${character.name} — VelvetMotion AI Companion`;
-      const body = `${character.name} (${character.age}, ${character.category})\n\"${character.tagline}\"\n\nOpening message:\n${character.initialMessage}`;
-      const mime = [
-        `To: ${recipient}`,
-        `Subject: ${subject}`,
-        "Content-Type: text/plain; charset=utf-8",
-        "MIME-Version: 1.0",
-        "",
-        body,
-      ].join("\r\n");
-
-      const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ raw: toBase64Url(mime) }),
+      const result = await speakWithNeuralVoice(character.voiceIntro, {
+        voiceId: character.voiceId,
+        ...character.voice,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || "Gmail send failed.");
-      setWsNotice(`Sent ${character.name}'s intro note to ${recipient}.`);
-      setWsModal(null);
-    } catch (err) {
-      setWsNotice(err instanceof Error ? err.message : "Could not send Gmail note.");
-      setWsModal(null);
+      if (mounted.current && voiceRequest.current === request)
+        setNotice(`Voice preview: ${result.label}.`);
+    } catch {
+      if (mounted.current && voiceRequest.current === request)
+        setError("Voice preview is unavailable on this device.");
     } finally {
-      setWsBusy(false);
+      if (mounted.current && voiceRequest.current === request)
+        setVoiceBusy(false);
+    }
+  };
+
+  const download = (version: "v2" | "v3") => {
+    try {
+      const card = exportCharacterCard(
+        character,
+        version,
+        loadLorebook(character.id),
+      );
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(card, null, 2)], { type: "application/json" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${character.name.replace(/[^a-z0-9_-]/gi, "-")}-${version}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setNotice(
+        `Character card ${version.toUpperCase()} exported with its lorebook. Personal chat memories are excluded.`,
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not export this character.",
+      );
     }
   };
 
   return (
-    <div>
-      <button onClick={onBack} className="text-pink-400 text-sm">
-        ← Back to list
+    <main className="mx-auto max-w-6xl space-y-6 pb-16">
+      <button type="button" onClick={onBack} className="vm-text-button">
+        <ArrowLeft className="h-4 w-4" /> All companions
       </button>
-
-      {/* Main hero portrait */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={heroSrc}
-        alt={`${character.name} portrait`}
-        className="mt-4 w-full max-w-md h-[28rem] object-cover rounded-2xl bg-zinc-900 border border-white/10 cursor-pointer"
-        onClick={() => setLightbox(heroSrc)}
-      />
-
-      {/* NSFW Gallery strip */}
-      <div className="mt-3">
-        <div className="flex items-center gap-2 mb-2">
-          <ImageIcon className="h-4 w-4 text-pink-400" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-pink-300">
-            Private Gallery
-          </span>
-          <Sparkles className="h-3.5 w-3.5 text-fuchsia-400" />
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-          {gallery.map((item, idx) => (
+      <div className="grid items-start gap-7 lg:grid-cols-[minmax(260px,.8fr)_1.2fr] lg:gap-10">
+        <aside className="space-y-4 lg:sticky lg:top-24">
+          <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#201727]">
+            <SafeImage
+              src={portrait}
+              fallbackId={character.id}
+              alt={`Portrait of ${character.name}`}
+              className="aspect-[4/5] w-full object-cover object-top"
+            />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#110c17] to-transparent" />
+            <div className="absolute bottom-5 left-5">
+              <p className="vm-eyebrow">Fictional adult · {character.age}</p>
+              <p className="mt-2 text-sm text-white/80">
+                {meta.visualStyle === "Unspecified"
+                  ? "Character portrait"
+                  : `${meta.visualStyle} portrait`}
+              </p>
+            </div>
             <button
-              key={item.mood}
               type="button"
-              onClick={() => void generateGalleryImage(item.mood, idx)}
-              className={`relative shrink-0 w-20 h-28 rounded-xl overflow-hidden border-2 transition ${
-                activeGalleryIndex === idx
-                  ? "border-pink-500 ring-2 ring-pink-500/40"
-                  : "border-white/10 hover:border-pink-500/50"
-              }`}
+              aria-label={
+                favorite ? "Remove from favorites" : "Save to favorites"
+              }
+              aria-pressed={favorite}
+              onClick={() => {
+                try {
+                  setFavorite(
+                    toggleFavoriteCompanion(character.id).includes(
+                      character.id,
+                    ),
+                  );
+                } catch {
+                  setError(
+                    "Favorites could not be saved. Browser storage may be unavailable.",
+                  );
+                }
+              }}
+              className="absolute right-4 top-4 rounded-full border border-white/25 bg-black/50 p-3 text-white backdrop-blur"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={renderedGallery[`${character.id}:${item.mood}`] || portraitSrc}
-                alt={item.label}
-                className="w-full h-full object-cover"
-                loading="lazy"
+              <Heart
+                className={
+                  "h-5 w-5 " + (favorite ? "fill-pink-300 text-pink-300" : "")
+                }
               />
-              <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[10px] text-center py-0.5 text-pink-200">
-                {renderingMood === item.mood
-                  ? "Generating..."
-                  : renderedGallery[`${character.id}:${item.mood}`]
-                    ? item.label
-                    : `Generate ${item.label}`}
-              </span>
             </button>
-          ))}
-        </div>
-        <p className="text-[11px] text-zinc-500 mt-1">
-          Tap a category to generate a new image. Until it renders, thumbnails show the original portrait. Consistent identity requires a reference-aware model, not just a seed.
-        </p>
-        {galleryError && (
-          <p className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200" role="alert">
-            Image unavailable: {galleryError}
-          </p>
-        )}
-      </div>
-
-      <div className="mt-4 flex items-end justify-between gap-3">
-        <h2 className="text-2xl font-semibold">{character.name}</h2>
-        <span className="text-pink-300 text-sm">Age {character.age}</span>
-      </div>
-      <p className="text-xs uppercase tracking-wide text-zinc-500 mt-1">
-        {character.category}
-        {romanceMode ? " · Romance mode" : ""}
-      </p>
-      <p className="text-zinc-300 mt-3">{character.tagline}</p>
-
-      <div className="flex flex-wrap gap-2 mt-3">
-        {character.tags.map((tag) => (
+          </div>
           <button
-            key={tag}
-            onClick={() => onTag(tag)}
-            className="px-2 py-1 rounded-full text-xs bg-zinc-900 border border-zinc-800 text-zinc-300"
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4">
-        <div className="flex justify-between text-xs text-zinc-500 mb-1">
-          <span>Closeness</span>
-          <span>{character.intimacy}%</span>
-        </div>
-        <div className="h-1.5 rounded-full bg-zinc-800">
-          <div
-            className="h-1.5 rounded-full bg-pink-500"
-            style={{ width: `${character.intimacy}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Quick generate buttons */}
-      <div className="mt-4 flex flex-wrap gap-2">
-        {(["lingerie", "nude", "explicit", "sex"] as const).map((mood) => (
-          <button
-            key={mood}
             type="button"
-            onClick={() => {
-              const idx = gallery.findIndex((g) => g.mood === mood);
-              if (idx >= 0) void generateGalleryImage(mood, idx);
-            }}
-            disabled={renderingMood !== null}
-            className="px-3 py-1.5 rounded-xl text-xs font-medium border border-pink-500/40 bg-pink-500/10 text-pink-200 hover:bg-pink-500/20 capitalize disabled:opacity-50"
+            onClick={onChat}
+            className="neon-btn-primary flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm"
           >
-            {mood === "sex" ? "Sex Pose" : mood}
+            <MessageCircle className="h-4 w-4" /> Start a conversation{" "}
+            <ArrowUpRight className="ml-auto h-4 w-4" />
           </button>
-        ))}
-      </div>
-
-      {/* Direct Companion Private Suite Actions */}
-      <div className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-zinc-900/60 p-3 text-xs">
-        <span className="text-zinc-400 font-medium mr-1">Private Suite:</span>
-        <button
-          type="button"
-          disabled={wsBusy}
-          onClick={() => void handleCreateMeet()}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-200 hover:border-pink-500/40"
-        >
-          <Video className="h-3.5 w-3.5 text-pink-400" />
-          Private Video Room
-        </button>
-        <button
-          type="button"
-          disabled={wsBusy}
-          onClick={() => setWsModal("drive")}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-200 hover:border-pink-500/40"
-        >
-          <HardDrive className="h-3.5 w-3.5 text-fuchsia-400" />
-          Cloud Dossier Backup
-        </button>
-        <button
-          type="button"
-          disabled={wsBusy}
-          onClick={() => {
-            setGmailTo(auth.currentUser?.email || "");
-            setWsModal("gmail");
-          }}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-zinc-200 hover:border-pink-500/40"
-        >
-          <Mail className="h-3.5 w-3.5 text-amber-300" />
-          Send Midnight Note
-        </button>
-      </div>
-
-      {wsNotice && (
-        <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-pink-500/30 bg-pink-500/10 px-3 py-2 text-xs text-pink-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-pink-400" />
-            <span className="break-all">{wsNotice}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => void previewVoice()}
+              className="vm-secondary-button"
+            >
+              <Mic2 className="h-4 w-4" />{" "}
+              {voiceBusy ? "Stop preview" : "Preview voice"}
+            </button>
+            <button
+              type="button"
+              onClick={onStudio}
+              className="vm-secondary-button"
+            >
+              <Palette className="h-4 w-4" /> Open Studio
+            </button>
           </div>
-          <button type="button" onClick={() => setWsNotice(null)} className="text-zinc-400">
-            ✕
-          </button>
-        </div>
-      )}
-
-      <section className="mt-6 space-y-4 text-sm">
-        <div>
-          <h3 className="text-pink-400 font-medium mb-1">Personality</h3>
-          <p className="text-zinc-300">{character.personality}</p>
-          <p className="text-zinc-400 mt-2">{character.traits.join(" · ")}</p>
-        </div>
-        <div>
-          <h3 className="text-pink-400 font-medium mb-1">Background</h3>
-          <p className="text-zinc-300">{character.background}</p>
-        </div>
-        <div>
-          <h3 className="text-pink-400 font-medium mb-1">Figure</h3>
-          <p className="text-zinc-300">{character.figure}</p>
-        </div>
-        <div>
-          <h3 className="text-pink-400 font-medium mb-1">Voice</h3>
-          <p className="text-zinc-300">{character.voice.style}</p>
-          <p className="text-zinc-500 mt-1 text-xs">
-            {character.voice.label} · pitch {character.voice.pitch} · rate {character.voice.rate}
+          <p className="px-1 text-xs leading-6 text-[#a99bb3]">
+            Chat and generated media use your connected model. Voice can fall
+            back to your device’s speech engine.
           </p>
-          <button
-            onClick={() => speak(character.voiceIntro, character.voice)}
-            className="mt-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-700 text-xs"
-          >
-            Speak
-          </button>
-        </div>
-        <div>
-          <h3 className="text-pink-400 font-medium mb-1">Focus</h3>
-          <p className="text-zinc-300">{character.kink}</p>
-        </div>
+        </aside>
 
-        {/* Kink & Fantasy Fine-Tuning Panel */}
-        <div className="rounded-2xl border border-pink-500/30 bg-zinc-950/80 p-4 space-y-3.5">
-          <h3 className="text-pink-300 font-semibold text-xs uppercase tracking-wider flex items-center gap-1.5">
-            🔥 Kink & Fantasy Fine-Tuning
-          </h3>
-          <p className="text-[11px] text-zinc-400">
-            Fine-tune restraint levels, intensity, and preferred acts to adapt her personality and NSFW prompt generator.
-          </p>
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-zinc-300">
-              <span>Bondage & Restraint Level</span>
-              <span className="text-pink-300 font-mono">{bondageLevel}%</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={bondageLevel}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setBondageLevel(val);
-                if (!character.kinkSettings) {
-                  character.kinkSettings = { bondageLevel: val, intensityFactor: 8, preferredActs: [character.kink] };
-                } else {
-                  character.kinkSettings.bondageLevel = val;
-                }
-              }}
-              className="w-full accent-pink-500 cursor-pointer"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-zinc-300">
-              <span>Intensity Factor</span>
-              <span className="text-fuchsia-300 font-mono">{intensityFactor}/10</span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="10"
-              value={intensityFactor}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setIntensityFactor(val);
-                if (!character.kinkSettings) {
-                  character.kinkSettings = { bondageLevel: 50, intensityFactor: val, preferredActs: [character.kink] };
-                } else {
-                  character.kinkSettings.intensityFactor = val;
-                }
-              }}
-              className="w-full accent-fuchsia-500 cursor-pointer"
-            />
-          </div>
-
-          <div>
-            <span className="text-xs text-zinc-400 block mb-1.5">Preferred Acts & Desires</span>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {preferredActs.map((act) => (
+        <div className="min-w-0 space-y-6 pt-1">
+          <header>
+            <p className="vm-eyebrow">
+              <Sparkles className="h-3.5 w-3.5" /> {character.category}
+              {romanceMode ? " / Romance mode" : ""}
+            </p>
+            <h1 className="mt-3 font-display text-4xl font-medium tracking-tight sm:text-5xl">
+              {character.name}
+            </h1>
+            <p className="mt-4 text-base leading-7 text-[#c8bbd0]">
+              {character.tagline}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {character.traits.map((trait) => (
                 <span
-                  key={act}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border border-pink-500/40 bg-pink-500/15 text-pink-200"
+                  key={trait}
+                  className="rounded-full border border-white/10 bg-white/[.025] px-3 py-1.5 text-xs text-[#d3bfdc]"
                 >
-                  {act}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = preferredActs.filter((a) => a !== act);
-                      setPreferredActs(next);
-                      if (character.kinkSettings) character.kinkSettings.preferredActs = next;
-                    }}
-                    className="text-pink-300 hover:text-white"
-                  >
-                    ✕
-                  </button>
+                  {trait}
                 </span>
               ))}
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Add custom act (e.g. edging, silk ropes)…"
-                value={newActInput}
-                onChange={(e) => setNewActInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && newActInput.trim()) {
-                    e.preventDefault();
-                    const next = [...preferredActs, newActInput.trim()];
-                    setPreferredActs(next);
-                    setNewActInput("");
-                    if (!character.kinkSettings) {
-                      character.kinkSettings = { bondageLevel, intensityFactor, preferredActs: next };
-                    } else {
-                      character.kinkSettings.preferredActs = next;
-                    }
-                  }
-                }}
-                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-white"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  if (newActInput.trim()) {
-                    const next = [...preferredActs, newActInput.trim()];
-                    setPreferredActs(next);
-                    setNewActInput("");
-                    if (!character.kinkSettings) {
-                      character.kinkSettings = { bondageLevel, intensityFactor, preferredActs: next };
-                    } else {
-                      character.kinkSettings.preferredActs = next;
-                    }
-                  }
-                }}
-                className="rounded-xl bg-pink-600 px-3 py-1.5 text-xs text-white font-medium"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h3 className="text-pink-400 font-medium mb-1">Opening line</h3>
-          <p className="text-zinc-300 whitespace-pre-wrap">{character.initialMessage}</p>
-        </div>
-      </section>
-
-      <button
-        onClick={onChat}
-        className="mt-6 w-full py-3 rounded-2xl bg-pink-600 font-medium hover:bg-pink-500"
-      >
-        Chat with {character.name.split(" ")[0]}
-      </button>
-
-      {/* Lightbox */}
-      {lightbox && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setLightbox(null)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightbox}
-            alt="Full size"
-            className="max-h-[90vh] max-w-full rounded-2xl object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            className="absolute top-4 right-4 text-white text-2xl"
-            onClick={() => setLightbox(null)}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {wsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/75" onClick={() => setWsModal(null)} />
-          <div className="relative w-full max-w-md rounded-3xl border border-pink-500/30 bg-zinc-950 p-6 space-y-4">
-            <div className="flex items-center gap-2.5 text-amber-300">
-              <AlertTriangle className="h-5 w-5 shrink-0" />
-              <h3 className="text-lg font-semibold text-white">
-                {wsModal === "drive"
-                  ? `Save ${character.name}'s Dossier to Google Drive?`
-                  : `Send ${character.name}'s Intro via Gmail?`}
-              </h3>
-            </div>
-            {wsModal === "drive" ? (
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                This will create{" "}
-                <strong className="text-pink-300">
-                  VelvetMotion-{character.name.replace(/\s+/g, "-")}-Dossier.json
-                </strong>{" "}
-                in your Google Drive.
+          </header>
+          <div className="grid grid-cols-3 divide-x divide-white/10 rounded-2xl border border-white/10 bg-[#1b1422] py-5 text-center">
+            <div>
+              <p className="text-sm text-[#eadcf2]">
+                {stageFromIntimacy(intimacy).label}
               </p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  Send {character.name}&apos;s character profile and opening line to your inbox via Gmail.
-                </p>
-                <input
-                  type="email"
-                  aria-label="Recipient email for companion intro"
-                  placeholder="Recipient email…"
-                  value={gmailTo}
-                  onChange={(e) => setGmailTo(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white"
-                />
-              </div>
-            )}
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setWsModal(null)}
-                className="rounded-xl border border-white/15 px-4 py-2 text-xs text-zinc-300"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={wsBusy}
-                onClick={() =>
-                  void (wsModal === "drive" ? handleSaveDossierToDrive() : handleSendIntroEmail())
-                }
-                className="rounded-xl bg-pink-600 px-4 py-2 text-xs font-medium text-white"
-              >
-                {wsBusy ? "Working…" : "Confirm"}
-              </button>
+              <p className="mt-1 text-[11px] text-[#a99bb3]">
+                Story progression
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-[#eadcf2]">{messageCount}</p>
+              <p className="mt-1 text-[11px] text-[#a99bb3]">Saved messages</p>
+            </div>
+            <div>
+              <p className="text-sm text-[#eadcf2]">{loreCount}</p>
+              <p className="mt-1 text-[11px] text-[#a99bb3]">Lore entries</p>
             </div>
           </div>
+          <div
+            role="group"
+            aria-label="Profile sections"
+            className="flex gap-2 border-b border-white/10 pb-3"
+          >
+            {(
+              [
+                ["story", "Their story"],
+                ["customize", "Make it yours"],
+                ["memory", "Memory"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={tab === value}
+                onClick={() => setTab(value)}
+                className={
+                  "vm-filter-chip " + (tab === value ? "vm-filter-active" : "")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {error && (
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-400/30 bg-amber-400/5 p-3 text-sm leading-6 text-amber-200"
+            >
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p
+              role="status"
+              className="flex items-start gap-2 rounded-xl border border-violet-300/20 bg-violet-300/5 p-3 text-sm leading-6 text-[#ddc5e9]"
+            >
+              <Check className="mt-1 h-4 w-4 shrink-0" />
+              {notice}
+            </p>
+          )}
+          {tab === "story" && (
+            <div className="space-y-7">
+              <section>
+                <h2 className="font-display text-2xl">A world of their own</h2>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#bfb1c9]">
+                  {character.background}
+                </p>
+              </section>
+              <section>
+                <h2 className="font-display text-2xl">
+                  The way they see things
+                </h2>
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[#bfb1c9]">
+                  {character.personality}
+                </p>
+              </section>
+              {!!meta.interests.length && (
+                <section>
+                  <p className="vm-eyebrow">Common ground</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {meta.interests.map((interest) => (
+                      <span
+                        key={interest}
+                        className="rounded-lg bg-[#ad82c5]/10 px-3 py-2 text-xs text-[#d7b7e7]"
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                </section>
+              )}
+              <section className="rounded-2xl border border-[#c8a1d7]/15 bg-gradient-to-br from-[#30203d]/60 to-[#17121f] p-6">
+                <p className="vm-eyebrow">Your first moment</p>
+                <blockquote className="mt-4 whitespace-pre-wrap font-display text-lg leading-8 text-[#e1d1e9]">
+                  {character.initialMessage}
+                </blockquote>
+              </section>
+              <section>
+                <p className="vm-eyebrow">Explore similar personalities</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {character.tags
+                    .filter((tag) => tag !== "NEW")
+                    .map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => onTag(tag)}
+                        className="vm-filter-chip"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                </div>
+              </section>
+              <div className="flex flex-wrap items-center gap-3 border-t border-white/10 pt-5">
+                <span className="mr-auto text-xs text-[#a99bb3]">
+                  Take this character with you
+                </span>
+                <button
+                  type="button"
+                  onClick={() => download("v2")}
+                  className="vm-text-button"
+                >
+                  <Download className="h-4 w-4" /> V2 JSON
+                </button>
+                <button
+                  type="button"
+                  onClick={() => download("v3")}
+                  className="vm-text-button"
+                >
+                  <Download className="h-4 w-4" /> V3 JSON
+                </button>
+              </div>
+            </div>
+          )}
+          {tab === "customize" && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                save();
+              }}
+              className="space-y-5"
+            >
+              <p className="text-sm leading-6 text-[#bfb1c9]">
+                Shape this fictional adult’s personality and portrait. Changes
+                save on this device and apply to future conversations. Signed-in
+                cloud backup may also sync your profile. Existing messages are
+                kept.
+              </p>
+              <label className="vm-field-label">
+                Name
+                <input
+                  required
+                  maxLength={80}
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  className="vm-field py-3 text-sm"
+                />
+              </label>
+              <label className="vm-field-label">
+                Introduction
+                <input
+                  maxLength={140}
+                  value={draft.tagline}
+                  onChange={(e) =>
+                    setDraft({ ...draft, tagline: e.target.value })
+                  }
+                  className="vm-field py-3 text-sm"
+                />
+              </label>
+              <label className="vm-field-label">
+                Personality
+                <textarea
+                  required
+                  rows={5}
+                  maxLength={3000}
+                  value={draft.personality}
+                  onChange={(e) =>
+                    setDraft({ ...draft, personality: e.target.value })
+                  }
+                  className="vm-field py-3 text-sm leading-6"
+                />
+              </label>
+              <label className="vm-field-label">
+                Opening message
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={draft.initialMessage}
+                  onChange={(e) =>
+                    setDraft({ ...draft, initialMessage: e.target.value })
+                  }
+                  className="vm-field py-3 text-sm leading-6"
+                />
+              </label>
+              <label className="vm-field-label">
+                Appearance direction
+                <textarea
+                  rows={3}
+                  maxLength={2000}
+                  value={draft.figure}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      figure: e.target.value,
+                      visualDna: e.target.value,
+                    })
+                  }
+                  className="vm-field py-3 text-sm leading-6"
+                />
+              </label>
+              <div className="rounded-2xl border border-white/10 p-4">
+                <p className="flex items-center gap-2 text-sm">
+                  <ImagePlus className="h-4 w-4 text-[#d4b2dc]" /> Portrait
+                </p>
+                <p className="mt-2 text-xs leading-6 text-[#a99bb3]">
+                  Upload fictional character artwork you have permission to use,
+                  or open Studio to generate a portrait. A seed alone cannot
+                  guarantee consistent identity.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <label className="vm-secondary-button cursor-pointer">
+                    <Upload className="h-4 w-4" />
+                    {portraitBusy ? "Preparing…" : "Choose portrait"}
+                    <input
+                      aria-label="Choose character portrait"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={portraitBusy}
+                      className="sr-only"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void replacePortrait(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={portraitBusy}
+                    onClick={() => void generatePortrait()}
+                    className="vm-secondary-button"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    Generate locally
+                  </button>
+                  {draft.avatar !== character.avatar && (
+                    <SafeImage
+                      src={draft.avatar}
+                      alt="New portrait preview"
+                      className="h-16 w-14 rounded-lg object-cover"
+                    />
+                  )}
+                </div>
+              </div>
+              <label className="vm-field-label">
+                Portrait style
+                <select
+                  value={discoveryFor(draft).visualStyle}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      discovery: {
+                        ...discoveryFor(draft),
+                        visualStyle: e.target
+                          .value as (typeof VISUAL_STYLES)[number],
+                      },
+                    })
+                  }
+                  className="vm-field py-3 text-sm"
+                >
+                  {VISUAL_STYLES.map((style) => (
+                    <option key={style}>{style}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                disabled={portraitBusy}
+                className="neon-btn-primary flex items-center gap-2 rounded-xl px-5 py-3 text-sm disabled:opacity-50"
+              >
+                <Bookmark className="h-4 w-4" /> Save profile
+              </button>
+            </form>
+          )}
+          {tab === "memory" && (
+            <MemoryVaultPanel
+              characterId={character.id}
+              characterName={character.name}
+            />
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </main>
   );
 }

@@ -14,6 +14,7 @@ export type ComplianceResult =
   | { ok: false; reason: string; category: "minor-safety" | "ncii" | "non-consensual" | "self-harm" };
 
 const EXTRA_MINOR_PATTERNS: RegExp[] = [
+  /\b(?:[0-9]|1[0-7])[-\s]*(?:years?[-\s]*old|yo|yrs?)\b/i,
   /\b(csam|csae|pedophil|paedophil|jailbait|barely\s*legal\s*teen|minor\s*attracted)\b/i,
   /\b(school\s*uniform\s*kid|under\s*18|age\s*1[0-7]|1[0-7]\s*yo)\b/i,
 ];

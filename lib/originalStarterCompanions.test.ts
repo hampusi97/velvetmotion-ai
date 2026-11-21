@@ -5,9 +5,9 @@ import { validateCharacterCompliance } from "./complianceFilter";
 import { safeCompanionAvatarUrl } from "./avatarOptimize";
 
 test("all starter companions are distinct fictional adults with independent personalities", () => {
-  assert.equal(ORIGINAL_STARTER_COMPANIONS.length, 6);
-  assert.equal(new Set(ORIGINAL_STARTER_COMPANIONS.map(x => x.id)).size, 6);
-  assert.equal(new Set(ORIGINAL_STARTER_COMPANIONS.map(x => x.name)).size, 6);
+  assert.equal(ORIGINAL_STARTER_COMPANIONS.length, 10);
+  assert.equal(new Set(ORIGINAL_STARTER_COMPANIONS.map(x => x.id)).size, 10);
+  assert.equal(new Set(ORIGINAL_STARTER_COMPANIONS.map(x => x.name)).size, 10);
   for (const c of ORIGINAL_STARTER_COMPANIONS) {
     assert.ok(c.age >= 21);
     assert.ok(c.name.length > 4);

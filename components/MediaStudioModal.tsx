@@ -3,6 +3,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Download, BookmarkPlus, Film, MessageSquare, Sparkles, Lock, Upload } from 'lucide-react';
 import { CompanionProfile, FLAGSHIP_COMPANIONS } from '@/data/companions';
+import { allCharacters } from '@/lib/characters';
+import { COMPANION_LIBRARY_EVENT, notifyCompanionLibrary } from '@/lib/companionLibrary';
+import { safeCompanionAvatarUrl } from '@/lib/avatarOptimize';
+import { staticPortraitUrl } from '@/lib/portraitFallback';
 import {
   generateStudioVideoClip,
   VIDEO_DURATIONS,
@@ -100,6 +104,7 @@ export default function MediaStudioModal({
 }: MediaStudioModalProps) {
   const [tab, setTab] = useState<'photo' | 'video' | 'upload'>(initialTab);
   const [selectedId, setSelectedId] = useState(activeChatCompanionId || FLAGSHIP_COMPANIONS[0].id);
+  const [studioCompanions, setStudioCompanions] = useState<Array<Pick<CompanionProfile, 'id' | 'name' | 'age' | 'archetype' | 'portraitUrl' | 'visualDna'>>>(FLAGSHIP_COMPANIONS);
   const [sceneId, setSceneId] = useState<string>(SCENE_PRESETS[0].id);
   const [studioStyle, setStudioStyle] = useState<(typeof STUDIO_STYLES)[number]>('Neon Noir');
   const [aspectId, setAspectId] = useState<(typeof ASPECT_RATIOS)[number]['id']>('2:3');
@@ -166,9 +171,26 @@ export default function MediaStudioModal({
     };
   }, [isOpen, standalone]);
 
+  useEffect(() => {
+    if (!isOpen && !standalone) return;
+    const refresh = () => {
+      const cast = allCharacters().map(c => ({
+        id: c.id, name: c.name, age: c.age, archetype: c.category,
+        portraitUrl: safeCompanionAvatarUrl(c.avatar) || staticPortraitUrl(c.id),
+        visualDna: c.visualDna || c.figure,
+      }));
+      setStudioCompanions(cast);
+      const active = cast.find(c => c.id === activeChatCompanionId);
+      if (active) { setSelectedId(active.id); setVideoSourceUrl(active.portraitUrl); }
+    };
+    refresh();
+    window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
+    return () => window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
+  }, [isOpen, standalone, activeChatCompanionId]);
+
   if (!isOpen && !standalone) return null;
 
-  const companion = FLAGSHIP_COMPANIONS.find((c) => c.id === selectedId) ?? FLAGSHIP_COMPANIONS[0];
+  const companion = studioCompanions.find((c) => c.id === selectedId) ?? studioCompanions[0];
   const aspect = ASPECT_RATIOS.find((a) => a.id === aspectId) ?? ASPECT_RATIOS[0];
 
   async function handleGeneratePhoto() {
@@ -527,6 +549,7 @@ export default function MediaStudioModal({
     void saveCustomCompanionDB(created.id, created as unknown as Record<string, unknown>);
     emitVaultUpdated();
 
+    notifyCompanionLibrary();
     onCompanionCreated?.(created);
     setStatusMsg(`${created.name} added to your roster!`);
     if (!standalone) window.setTimeout(() => onClose(), 800);
@@ -608,17 +631,17 @@ export default function MediaStudioModal({
         <div className="space-y-3 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-[11px] text-[#a6a6c4]">Companion</label>
-              <select
+              <label htmlFor="studio-companion" className="mb-1 block text-[11px] text-[#a6a6c4]">Companion</label>
+              <select id="studio-companion"
                 value={selectedId}
                 onChange={(e) => {
                   setSelectedId(e.target.value);
-                  const found = FLAGSHIP_COMPANIONS.find((c) => c.id === e.target.value);
+                  const found = studioCompanions.find((c) => c.id === e.target.value);
                   if (found) setVideoSourceUrl(found.portraitUrl);
                 }}
                 className="w-full rounded-xl border border-white/15 bg-[#05050a] px-3 py-2 text-xs text-white focus:border-[#00f5ff] focus:outline-none"
               >
-                {FLAGSHIP_COMPANIONS.map((c) => (
+                {studioCompanions.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}, {c.age} — {c.archetype}
                   </option>
@@ -847,9 +870,9 @@ export default function MediaStudioModal({
             >
               {generatedPhoto && <option value={generatedPhoto}>Latest Studio Photo</option>}
               {uploadedPreview && <option value={uploadedPreview}>My uploaded portrait</option>}
-              {FLAGSHIP_COMPANIONS.map((c) => (
+              {studioCompanions.map((c) => (
                 <option key={c.id} value={c.portraitUrl}>
-                  {c.name} — Flagship Portrait
+                  {c.name} — Portrait
                 </option>
               ))}
               {getGallery()

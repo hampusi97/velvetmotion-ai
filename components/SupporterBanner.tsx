@@ -46,9 +46,9 @@ export function SupporterBanner({ onOpenWallet }: { onOpenWallet: () => void }) 
         <div className="flex items-start gap-2.5 pr-4">
           <Heart className="mt-0.5 h-4 w-4 shrink-0 text-[#ff5678] fill-current" />
           <p className="text-xs leading-relaxed text-zinc-300">
-            <strong className="text-white">VelvetMotion.ai is 100% free — no message caps, no paywalled memory.</strong>{" "}
-            If you love the app and want to help cover our custom domain &amp; daily updates, you can drop a{" "}
-            <strong className="text-[#ff8aa1]">$3 tip</strong> to keep the servers running.
+            <strong className="text-white">VelvetMotion has no platform message or memory paywall.</strong>{" "}
+            Connected AI services may have costs or limits. If you enjoy the app, an optional{" "}
+            <strong className="text-[#ff8aa1]">$3 tip</strong> helps support development.
           </p>
         </div>
 
