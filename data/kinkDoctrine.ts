@@ -71,12 +71,16 @@ export function daysSince(iso?: string): number {
  * Builds the block appended to a companion's system prompt.
  * Returns '' when status is default-and-unremarkable so unkinked chats stay clean.
  */
-export function buildStatusDirective(s: KinkStatus): string {
+export function buildStatusDirective(s: KinkStatus, lockedHours = 0): string {
   const parts: string[] = [];
   const days = daysSince(s.since);
 
   parts.push(STATUS_DIRECTIVES[s.status]);
   if (days > 0) parts.push(`It has been ${days} day${days === 1 ? '' : 's'}.`);
+
+  if (s.status === 'chaste' && lockedHours > 0) {
+    parts.push(`Locked for ${Math.floor(lockedHours)} hours.`);
+  }
 
   if (s.status === 'cuckold') {
     parts.push(

@@ -1,4 +1,5 @@
 import type { RelationshipState } from "./relationshipState";
+import { count as tributeCount, runStreak as tributeRunStreak } from "./tributeLog";
 
 export interface Milestone {
   id: string;
@@ -18,6 +19,9 @@ export const MILESTONES: Milestone[] = [
   { id: "ten-sessions", label: "Ten sessions", reached: (s) => s.sessions.length >= 10, unlock: "scene-close", line: "Ten times now. You're getting predictable, in a good way." },
   { id: "long-session", label: "Over fifteen minutes", reached: (s) => s.sessions.some((x) => x.durationSec >= 900), line: "Fifteen minutes. Someone's been practising." },
   { id: "tier-three", label: "Full ruthlessness", reached: (s) => s.sphTier === 3, line: "Tier three. No more softening it for you." },
+  { id: "tribute-1", label: "First tribute", reached: (s) => tributeCount(s.companionId) >= 1, line: "First tribute logged. Good start." },
+  { id: "tribute-10", label: "Ten tributes", reached: (s) => tributeCount(s.companionId) >= 10, unlock: "scene-tribute", line: "Ten tributes. You know your place." },
+  { id: "tribute-streak-3", label: "Three-day tribute run", reached: (s) => tributeRunStreak(s.companionId) >= 3, unlock: "dual-tribute", line: "Three days in a row without missing one." },
 ];
 
 /** Returns milestones reached but not yet recorded. Pure. */

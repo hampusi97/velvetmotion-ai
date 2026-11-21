@@ -47,4 +47,9 @@ describe('kinkDoctrine', () => {
   it('omits the day count when there is no start date', () => {
     expect(buildStatusDirective(DEFAULT_STATUS)).not.toMatch(/It has been \d/);
   });
+
+  it('includes locked hours only when status is chaste', () => {
+    expect(buildStatusDirective({ status: 'chaste', sphTier: 2 }, 14.8)).toContain('Locked for 14 hours.');
+    expect(buildStatusDirective({ status: 'pussyfree', sphTier: 2 }, 14.8)).not.toContain('Locked for');
+  });
 });

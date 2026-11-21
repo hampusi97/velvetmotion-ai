@@ -1,8 +1,12 @@
 import { fetchWithRetry } from "./netRetry";
 
+export type ChatContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | ChatContentPart[];
 }
 
 /** Keyless default. OpenAI-compatible shape, so the same call also drives custom endpoints. */

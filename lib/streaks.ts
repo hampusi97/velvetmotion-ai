@@ -14,12 +14,12 @@ export interface GoonStats {
 
 export function getGoonStats(): GoonStats {
   const s = loadState(GLOBAL_ID);
-  const streak = Math.max(1, s.streak.current || 1);
+  const streak = s.streak.current;
   const totalSec = s.sessions.reduce((acc, rec) => acc + rec.durationSec, 0);
-  const totalMinutes = Math.max(5, Math.round(totalSec / 60) || 24);
-  const sessions = Math.max(1, s.sessions.length || 4);
+  const totalMinutes = Math.round(totalSec / 60);
+  const sessions = s.sessions.length;
   const maxEdges = s.sessions.reduce((acc, rec) => Math.max(acc, rec.edges), 0);
-  const maxIntensity = Math.min(100, Math.max(85, 70 + maxEdges * 5));
+  const maxIntensity = sessions > 0 ? Math.min(100, Math.max(10, 70 + maxEdges * 5)) : 0;
 
   let rankTitle = "Novice Seeker";
   if (streak >= 14 || maxIntensity >= 95) rankTitle = "Supreme Goon God";

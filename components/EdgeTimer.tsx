@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
-import { loadState, recordSession, saveState, type SessionRecord } from "@/lib/relationshipState";
 
 const PACES = [
   { label: "Slow", seconds: 45 },
@@ -16,93 +15,108 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function tierFromPace(label: string): 1 | 2 | 3 {
+  if (label === "Slow") return 1;
+  if (label === "Medium") return 2;
+  return 3;
+}
+
 export function EdgeTimer({
   onHome,
-  companionId,
+  companion,
   onSessionEnd,
 }: {
-  onHome?: () => void;
-  companionId?: string;
-  onSessionEnd?: (session: SessionRecord) => void;
+  onHome: () => void;
+  companion?: { id: string; name: string; avatar: string };
+  onSessionEnd?: (s: { durationSec: number; edges: number; tier: 1 | 2 | 3 }) => void;
 }) {
   const [girl, setGirl] = useState<Character | null>(() =>
-    companionId ? CHARACTERS.find((c) => c.id === companionId) ?? CHARACTERS[0] : null,
+    companion ? CHARACTERS.find((c) => c.id === companion.id) ?? CHARACTERS[0] : null,
   );
   const [pace, setPace] = useState(PACES[0]);
   const [left, setLeft] = useState(0);
   const [running, setRunning] = useState(false);
   const [failed, setFailed] = useState(false);
   const [score, setScore] = useState(0);
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const startedAtRef = useRef<string | null>(null);
+
+  const startedAtRef = useRef<number | null>(null);
+  const edgesRef = useRef(0);
+  const paceLabelRef = useRef(PACES[0].label);
+  const reportedRef = useRef(false);
+  const onSessionEndRef = useRef(onSessionEnd);
+  onSessionEndRef.current = onSessionEnd;
+
+  const emitSessionEndOnce = () => {
+    if (reportedRef.current || startedAtRef.current === null) return;
+    reportedRef.current = true;
+    const durationSec = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+    onSessionEndRef.current?.({
+      durationSec,
+      edges: edgesRef.current,
+      tier: tierFromPace(paceLabelRef.current),
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      emitSessionEndOnce();
+    };
+  }, []);
 
   useEffect(() => {
     if (!running || left <= 0) return;
-    const id = setInterval(() => {
-      setLeft((s) => s - 1);
-      setElapsedSec((e) => e + 1);
-    }, 1000);
+    const id = setInterval(() => setLeft((s) => s - 1), 1000);
     return () => clearInterval(id);
   }, [running, left]);
-
-  const finishSession = (finalEdges: number) => {
-    const activeGirl = girl || CHARACTERS[0];
-    const rel = loadState(activeGirl.id);
-    const rec: SessionRecord = {
-      id: `edge-${Date.now()}`,
-      startedAt: startedAtRef.current || new Date().toISOString(),
-      durationSec: Math.max(1, elapsedSec),
-      edges: Math.max(1, finalEdges),
-      tier: rel.sphTier,
-    };
-    saveState(recordSession(rel, rec));
-    onSessionEnd?.(rec);
-  };
 
   useEffect(() => {
     if (left === 0 && running) {
       setRunning(false);
-      const nextScore = score + 1;
-      setScore(nextScore);
-      finishSession(nextScore);
+      setScore((s) => s + 1);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [left, running]);
 
   const start = () => {
-    const g = companionId
-      ? CHARACTERS.find((c) => c.id === companionId) ?? pick(CHARACTERS)
+    const g = companion
+      ? CHARACTERS.find((c) => c.id === companion.id) ?? pick(CHARACTERS)
       : pick(CHARACTERS);
     const p = pick(PACES);
-    startedAtRef.current = new Date().toISOString();
+    if (startedAtRef.current === null) {
+      startedAtRef.current = Date.now();
+      reportedRef.current = false;
+    }
+    paceLabelRef.current = p.label;
     setGirl(g);
     setPace(p);
     setLeft(p.seconds);
-    setElapsedSec(0);
     setRunning(true);
     setFailed(false);
   };
 
   const fail = () => {
+    edgesRef.current += 1;
     setRunning(false);
     setFailed(true);
-    finishSession(score);
     setScore(0);
+    try {
+      localStorage.setItem("vm-edge-lock", String(Date.now() + 60000));
+    } catch {}
+  };
+
+  const handleHome = () => {
+    emitSessionEndOnce();
+    onHome();
   };
 
   return (
     <div className="mx-auto max-w-md space-y-5">
-      {onHome && (
-        <button type="button" onClick={onHome} className="text-pink-400 text-sm hover:text-pink-300">
-          ← Home
-        </button>
-      )}
+      <button type="button" onClick={handleHome} className="text-pink-400 text-sm hover:text-pink-300">
+        ← Home
+      </button>
       <h2 className="text-2xl font-extrabold bg-gradient-to-r from-pink-300 to-fuchsia-300 bg-clip-text text-transparent">
         Edge Timer
       </h2>
-      <p className="text-sm text-zinc-400">
-        She sets the pace. Survive the timer or restart. Edges: {score} · {elapsedSec}s
-      </p>
+      <p className="text-sm text-zinc-400">She sets the pace. Survive the timer or restart. Score: {score}</p>
       <button
         type="button"
         onClick={start}
@@ -113,12 +127,12 @@ export function EdgeTimer({
       {girl && (
         <div className="rounded-3xl border border-fuchsia-500/30 bg-zinc-900/60 overflow-hidden">
           <img
-            src={characterMediaUrl(girl, running ? "nude" : "lingerie")}
+            src={companion?.avatar || characterMediaUrl(girl, running ? "nude" : "lingerie")}
             alt=""
             className="aspect-[3/4] w-full object-cover"
           />
           <div className="p-4 text-center space-y-2">
-            <div className="text-lg font-bold text-cream">{girl.name}</div>
+            <div className="text-lg font-bold text-cream">{companion?.name || girl.name}</div>
             <div className="text-3xl font-black text-pink-300">{left}s</div>
             <div className="text-sm text-fuchsia-300">{pace.label} pace</div>
             {running && (
@@ -130,7 +144,7 @@ export function EdgeTimer({
                 I failed — restart
               </button>
             )}
-            {failed && <p className="text-xs text-red-300">Restarted. Session logged.</p>}
+            {failed && <p className="text-xs text-red-300">Restarted. Score reset.</p>}
           </div>
         </div>
       )}

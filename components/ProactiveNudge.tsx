@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getCompanionById } from "@/data/companions";
+import { MILESTONES } from "@/lib/milestones";
+import { renderMilestoneCard, shareCard } from "@/lib/milestoneCard";
 import { maybeUnpromptedPhoto } from "@/lib/unpromptedPhoto";
 import { SafeImage } from "@/components/SafeImage";
 import { useRelationship } from "./useRelationship";
@@ -35,6 +37,18 @@ export default function ProactiveNudge({
 
   if (hidden || !decision.should || !decision.line) return null;
 
+  const onShare = async () => {
+    const milestone = MILESTONES.find((m) => m.id === decision.milestoneId);
+    const blob = await renderMilestoneCard({
+      label: milestone?.label || "Milestone",
+      line: decision.line || "",
+      streak: rel.state.streak.current,
+      companionName: name,
+      portraitDataUrl: photoUrl || portraitUrl,
+    });
+    if (blob) await shareCard(blob, `${companionId}-${decision.milestoneId || "milestone"}.png`);
+  };
+
   return (
     <div className="flex items-start gap-3 rounded-xl border border-fuchsia-400/30 bg-fuchsia-400/5 p-3">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -52,17 +66,28 @@ export default function ProactiveNudge({
           />
         )}
       </div>
-      <button
-        type="button"
-        onClick={() => {
-          rel.dismissProactive();
-          if (decision.kind === "milestone") rel.claimMilestones();
-          setHidden(true);
-        }}
-        className="shrink-0 rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-400 hover:border-white/25 hover:text-white"
-      >
-        Got it
-      </button>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {decision.kind === "milestone" && (
+          <button
+            type="button"
+            onClick={() => void onShare()}
+            className="rounded border border-fuchsia-400/40 bg-fuchsia-400/15 px-2 py-1 text-[10px] uppercase tracking-wider text-fuchsia-200 hover:border-fuchsia-400"
+          >
+            Share
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            rel.dismissProactive();
+            if (decision.kind === "milestone") rel.claimMilestones();
+            setHidden(true);
+          }}
+          className="rounded border border-white/10 px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-400 hover:border-white/25 hover:text-white"
+        >
+          Got it
+        </button>
+      </div>
     </div>
   );
 }
