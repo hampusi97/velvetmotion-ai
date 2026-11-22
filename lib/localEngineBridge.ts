@@ -39,7 +39,7 @@ let latestMetrics: SpeedMetrics = {};
 
 export function reportGenerationSpeed(next: SpeedMetrics) {
   latestMetrics = { ...latestMetrics, ...next };
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
     window.dispatchEvent(new CustomEvent("vm:engine-metrics", { detail: latestMetrics }));
   }
 }

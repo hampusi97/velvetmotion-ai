@@ -13,6 +13,8 @@ import { loadRouterSettings } from "./chatRouter";
 import { generateComfySfwPortrait, probeComfyUi } from "./comfyBridge";
 import { generateLocalImage } from "./comfyClient";
 import { generateHordeImage } from "./aiHorde";
+import { lockIdentity } from "./identityLock";
+import { generateConfiguredImage, generatePollinationsImage } from "./imageProviders";
 import { fetchWorkerImage } from "./imageWorker";
 import { remoteImageToStableDataUrl, toStableDataUrl } from "./imageStore";
 import { checkContentSafety } from "./safety";
@@ -165,14 +167,17 @@ export async function resolveBestMediaUrl(
     return { url: staticPortraitUrl(character.id || "chloe"), note: reason, isFallback: true, error: reason };
   }
 
-  const prompt = buildPrompt(character, mood, extra);
+  const rawPrompt = buildPrompt(character, mood, extra);
   const settings = typeof window !== "undefined" ? getMediaSettings() : null;
   // A shared face seed keeps companion identity more stable across generations.
   const base = settings?.aggressiveFaceLock
     ? Math.max(1, faceSeed(character))
     : randomGenerationSeed();
   // Add a random offset so each generation differs even with face lock on.
-  const seed = (base + Math.floor(Math.random() * 999_999)) % 2_000_000_000 || 1;
+  const requestedSeed = (base + Math.floor(Math.random() * 999_999)) % 2_000_000_000 || 1;
+  const locked = lockIdentity(rawPrompt, character.id, requestedSeed);
+  const prompt = locked.prompt;
+  const seed = locked.seed;
   // Never route mature requests through the general-purpose, SFW-only worker.
   const requiresAdultEngine = NSFW_MOODS.has(mood) || /\b(nude|nudity|explicit|nsfw|sexual)\b/i.test(extra);
   const routerSettings = typeof window !== "undefined" ? loadRouterSettings() : { provider: "auto" as const };
@@ -281,6 +286,32 @@ export async function resolveBestMediaUrl(
       errors.push(`Flux Worker (${worker.reason}): ${worker.detail}`);
     }
 
+    // Priority 2.5: Configured Image Endpoint & Pollinations Flux (ahead of AI Horde queue)
+    const hostedReq = {
+      prompt,
+      seed,
+      width: 512,
+      height: 768,
+      nsfw: requiresAdultEngine,
+    };
+    if (settings?.imageEndpoint) {
+      try {
+        const url = await generateConfiguredImage(settings.imageEndpoint, hostedReq);
+        reportImg("configured-image-api");
+        return { url, note: "Configured image API", seed, engine: "configured-image-api" };
+      } catch (e) {
+        errors.push(`Configured image API: ${e instanceof Error ? e.message : "failed"}`);
+      }
+    }
+
+    try {
+      const url = await generatePollinationsImage(hostedReq);
+      reportImg("pollinations-flux");
+      return { url, note: "Pollinations Flux", seed, engine: "pollinations-flux" };
+    } catch (e) {
+      errors.push(`Pollinations: ${e instanceof Error ? e.message : "failed"}`);
+    }
+
     // Priority 3: AI Horde Fallback (strictly capped <= 512x768, 20 steps, n=1 for 0-kudos compatibility)
     try {
       const horde = await generateHordeImage({
@@ -302,27 +333,6 @@ export async function resolveBestMediaUrl(
       }
     } catch (e) {
       errors.push(e instanceof Error ? e.message : "AI Horde failed");
-    }
-
-    // Priority 4: Pollinations classic (safe=false) for NSFW when Horde censors
-    if (requiresAdultEngine) {
-      try {
-        const p = encodeURIComponent(prompt.slice(0, 400));
-        const url = `https://image.pollinations.ai/prompt/${p}?width=512&height=768&seed=${seed}&safe=false&nologo=true`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (res.ok && res.headers.get("content-type")?.includes("image")) {
-          const blob = await res.blob();
-          const dataUrl = await new Promise<string>((resolve) => {
-            const r = new FileReader();
-            r.onload = () => resolve(r.result as string);
-            r.readAsDataURL(blob);
-          });
-          reportImg("pollinations-nsfw");
-          return { url: dataUrl, note: "Pollinations (uncensored)", seed, engine: "pollinations-nsfw" };
-        }
-      } catch (e) {
-        errors.push(e instanceof Error ? e.message : "Pollinations failed");
-      }
     }
 
     const reason = errors.join(" · ") || "All compatible image generators are offline, unsupported, or rate-limited";
