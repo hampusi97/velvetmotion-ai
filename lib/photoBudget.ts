@@ -1,4 +1,5 @@
-const KEY = (id: string) => `velvet:photobudget:${id}`;
+import { KEYS } from "./storageKeys";
+
 const PER_DAY = 2;
 
 const memoryStore = new Map<string, string>();
@@ -22,7 +23,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function remaining(companionId: string): number {
   try {
-    const raw = readRaw(KEY(companionId));
+    const raw = readRaw(KEYS.photoBudget(companionId));
     if (!raw) return PER_DAY;
     const { day, used } = JSON.parse(raw) as { day?: string; used?: number };
     return day === today() ? Math.max(0, PER_DAY - (used || 0)) : PER_DAY;
@@ -34,10 +35,10 @@ export function remaining(companionId: string): number {
 export function consume(companionId: string): boolean {
   if (remaining(companionId) <= 0) return false;
   try {
-    const raw = readRaw(KEY(companionId));
+    const raw = readRaw(KEYS.photoBudget(companionId));
     const parsed = raw ? (JSON.parse(raw) as { day?: string; used?: number }) : {};
     const used = parsed.day === today() ? (parsed.used || 0) + 1 : 1;
-    writeRaw(KEY(companionId), JSON.stringify({ day: today(), used }));
+    writeRaw(KEYS.photoBudget(companionId), JSON.stringify({ day: today(), used }));
     return true;
   } catch {
     return false;

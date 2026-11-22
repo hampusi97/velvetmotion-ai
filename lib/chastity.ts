@@ -1,3 +1,5 @@
+import { KEYS } from "./storageKeys";
+
 export interface ChastityState {
   locked: boolean;
   lockedAt?: string;
@@ -5,7 +7,6 @@ export interface ChastityState {
   denials: number;
 }
 
-const KEY = (id: string) => `velvet:chastity:${id}`;
 const fallbackStore = new Map<string, string>();
 
 function getRaw(key: string): string | null {
@@ -27,7 +28,7 @@ export const empty = (): ChastityState => ({ locked: false, requests: [], denial
 
 export function load(companionId: string): ChastityState {
   try {
-    const raw = getRaw(KEY(companionId));
+    const raw = getRaw(KEYS.chastity(companionId));
     if (!raw) return empty();
     const p = JSON.parse(raw) as Partial<ChastityState>;
     return {
@@ -43,7 +44,7 @@ export function load(companionId: string): ChastityState {
 
 export function save(companionId: string, s: ChastityState): void {
   try {
-    setRaw(KEY(companionId), JSON.stringify(s));
+    setRaw(KEYS.chastity(companionId), JSON.stringify(s));
   } catch {
     /* */
   }
@@ -51,7 +52,7 @@ export function save(companionId: string, s: ChastityState): void {
 
 /** Used in tests to seed raw storage directly (including corrupt payloads). */
 export function setRawForTest(companionId: string, raw: string): void {
-  setRaw(KEY(companionId), raw);
+  setRaw(KEYS.chastity(companionId), raw);
 }
 
 /** Minimum wait before a request may be granted, in hours. Rises with each denial. */

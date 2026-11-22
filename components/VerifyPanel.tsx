@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { CompanionProfile } from "@/data/companions";
+import { KEYS } from "@/lib/storageKeys";
 import { verifyPhoto, type Verdict } from "@/lib/verification";
-
-const KEY = (id: string) => `velvet:verify:${id}`;
 
 export default function VerifyPanel({
   companion,
@@ -18,7 +17,7 @@ export default function VerifyPanel({
 
   useEffect(() => {
     try {
-      const raw = window.localStorage.getItem(KEY(companion.id));
+      const raw = window.localStorage.getItem(KEYS.verify(companion.id));
       if (raw) setVerdict(JSON.parse(raw) as Verdict);
     } catch {
       /* */
@@ -38,7 +37,7 @@ export default function VerifyPanel({
       const res = await verifyPhoto(companion, photoDataUrl, claim.trim() || "pussyfree");
       setVerdict(res);
       try {
-        window.localStorage.setItem(KEY(companion.id), JSON.stringify(res));
+        window.localStorage.setItem(KEYS.verify(companion.id), JSON.stringify(res));
       } catch {
         /* */
       }

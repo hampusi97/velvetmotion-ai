@@ -26,6 +26,8 @@ import { InstallPrompt, installPromptOverlapsComposer } from "@/components/Insta
 import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
 import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
 import { ProactiveToast } from "@/components/ProactiveToast";
+import StatusOnboarding from "@/components/StatusOnboarding";
+import { migrateLegacyState } from "@/lib/migrateStorage";
 
 function LoadingPanel() {
   return <div role="status" className="rounded-2xl border border-white/10 bg-[#19121f] p-8 text-sm text-[#c6b5cf]">Opening your atelier…</div>;
@@ -195,6 +197,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   }, [initialView]);
 
   useEffect(() => {
+    migrateLegacyState();
     try {
       const params = new URLSearchParams(window.location.search);
       // Query parameters must never silently bypass the adult confirmation gate.
@@ -404,6 +407,9 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
               : containerClass + (suppressFooter ? " flex-1 py-2 min-w-0" : " flex-1 py-6 min-w-0")
           }
         >
+          <div className="px-3 pt-2">
+            <StatusOnboarding />
+          </div>
           {view === "home" && <VelvetExploreShowcase />}
 
           {(view === "girls" || view === "romance") && (

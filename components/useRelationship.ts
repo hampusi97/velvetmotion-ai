@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { loadGlobal } from "@/lib/globalSettings";
 import {
   emptyState,
   loadState,
@@ -16,23 +17,55 @@ import {
 import { dueMilestones } from "@/lib/milestones";
 import { decideProactive, markProactive } from "@/lib/proactiveEngine";
 
+function hydrateWithGlobals(companionId: string): RelationshipState {
+  const loaded = loadState(companionId);
+  const hasActivity =
+    Boolean(loaded.since) ||
+    loaded.sessions.length > 0 ||
+    Boolean(loaded.lastSeen) ||
+    Boolean(loaded.lastProactive) ||
+    loaded.milestones.length > 0;
+  if (hasActivity) return loaded;
+  const g = loadGlobal();
+  return {
+    ...loaded,
+    status: g.defaultStatus,
+    sphTier: g.defaultSphTier,
+    nickname: loaded.nickname ?? g.nickname,
+  };
+}
+
 export function useRelationship(companionId: string) {
   const [state, setState] = useState<RelationshipState>(() => emptyState(companionId));
 
   useEffect(() => {
-    setState(recordVisit(loadState(companionId)));
+    const visited = recordVisit(hydrateWithGlobals(companionId));
+    saveState(visited);
+    setState(visited);
+
+    const onSync = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail === companionId) {
+        setState(loadState(companionId));
+      }
+    };
+    window.addEventListener("rel-state-sync", onSync);
+    return () => window.removeEventListener("rel-state-sync", onSync);
   }, [companionId]);
 
-  useEffect(() => {
-    if (state.companionId) saveState(state);
-  }, [state]);
-
-  const patch = useCallback((fn: (s: RelationshipState) => RelationshipState) => {
-    setState((prev) => fn(prev));
-  }, []);
+  const patch = useCallback(
+    (fn: (s: RelationshipState) => RelationshipState) => {
+      const current = loadState(companionId);
+      const next = fn(current);
+      saveState(next);
+      setState(next);
+    },
+    [companionId],
+  );
 
   const claimMilestones = useCallback(() => {
-    const due = dueMilestones(state);
+    const current = loadState(companionId);
+    const due = dueMilestones(current);
     if (!due.length) return [];
     patch((s) => ({
       ...s,
@@ -40,13 +73,18 @@ export function useRelationship(companionId: string) {
       unlocks: [...s.unlocks, ...due.flatMap((m) => (m.unlock ? [m.unlock] : []))],
     }));
     return due;
-  }, [state, patch]);
+  }, [companionId, patch]);
 
   return {
     state,
     patch,
     setStatus: (s: UserStatus) => patch((prev) => setStatus(prev, s)),
-    setSphTier: (sphTier: 1 | 2 | 3) => patch((prev) => ({ ...prev, sphTier })),
+    setSphTier: (sphTier: 1 | 2 | 3) =>
+      patch((prev) => ({
+        ...prev,
+        sphTier,
+        since: prev.since ?? new Date().toISOString(),
+      })),
     setNickname: (n: string) => patch((prev) => setNickname(prev, n)),
     logSession: (s: SessionRecord) => patch((prev) => recordSession(prev, s)),
     claimMilestones,

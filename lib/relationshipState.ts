@@ -4,6 +4,7 @@
  * Supersedes the ad-hoc persistence in progression / relationship / streaks /
  * rewards. Versioned so a schema change never silently drops a streak.
  */
+import { KEYS } from "./storageKeys";
 
 export type UserStatus = "pussyfree" | "released" | "cuckold" | "chaste";
 
@@ -33,8 +34,6 @@ export interface RelationshipState {
 }
 
 const MAX_SESSIONS = 50;
-const KEY = (id: string) => `velvet:rel:${id}`;
-const LEGACY_KINK_KEY = (id: string) => `velvet:kink:${id}`;
 
 export function emptyState(companionId: string): RelationshipState {
   return {
@@ -52,9 +51,9 @@ export function emptyState(companionId: string): RelationshipState {
 export function loadState(companionId: string): RelationshipState {
   if (typeof window === "undefined") return emptyState(companionId);
   try {
-    const raw = window.localStorage.getItem(KEY(companionId));
+    const raw = window.localStorage.getItem(KEYS.rel(companionId));
     if (raw) return migrate(JSON.parse(raw), companionId);
-    const legacy = window.localStorage.getItem(LEGACY_KINK_KEY(companionId));
+    const legacy = window.localStorage.getItem(KEYS.kinkLegacy(companionId));
     if (legacy) {
       const migrated = migrate(JSON.parse(legacy), companionId);
       saveState(migrated);
@@ -66,11 +65,15 @@ export function loadState(companionId: string): RelationshipState {
   }
 }
 
-export function saveState(state: RelationshipState): void {
+export function saveState(state: RelationshipState, opts?: { throwOnError?: boolean }): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY(state.companionId), JSON.stringify(state));
-  } catch {
+    window.localStorage.setItem(KEYS.rel(state.companionId), JSON.stringify(state));
+    if (typeof window.dispatchEvent === "function" && typeof CustomEvent === "function") {
+      window.dispatchEvent(new CustomEvent("rel-state-sync", { detail: state.companionId }));
+    }
+  } catch (err) {
+    if (opts?.throwOnError) throw err;
     /* quota or private mode — state stays in memory for the session */
   }
 }
@@ -117,7 +120,12 @@ export function recordVisit(state: RelationshipState): RelationshipState {
   if (state.streak.lastDay === day) return { ...state, lastSeen: new Date().toISOString() };
 
   const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const current = state.streak.lastDay === yesterday ? state.streak.current + 1 : 1;
+  const current =
+    state.streak.lastDay === yesterday
+      ? state.streak.current + 1
+      : !state.streak.lastDay && state.streak.current > 0
+        ? state.streak.current
+        : 1;
 
   return {
     ...state,

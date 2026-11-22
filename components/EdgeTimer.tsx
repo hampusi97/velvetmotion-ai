@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { characterMediaUrl } from "@/lib/media";
+import { KEYS } from "@/lib/storageKeys";
 
 const PACES = [
   { label: "Slow", seconds: 45 },
@@ -99,7 +100,7 @@ export function EdgeTimer({
     setFailed(true);
     setScore(0);
     try {
-      localStorage.setItem("vm-edge-lock", String(Date.now() + 60000));
+      localStorage.setItem(KEYS.edgeLock, String(Date.now() + 60000));
     } catch {}
   };
 

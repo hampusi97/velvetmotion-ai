@@ -1,3 +1,4 @@
+import { KEYS } from "./storageKeys";
 import type { TributeChallenge } from "./tributes";
 
 export interface TributeRun {
@@ -8,7 +9,6 @@ export interface TributeRun {
   intensity: TributeChallenge["intensity"];
 }
 
-const KEY = (id: string) => `velvet:tributes:${id}`;
 const MAX = 100;
 const fallbackStore = new Map<string, string>();
 
@@ -29,7 +29,7 @@ function setRaw(key: string, value: string): void {
 
 export function load(companionId: string): TributeRun[] {
   try {
-    const raw = getRaw(KEY(companionId));
+    const raw = getRaw(KEYS.tribute(companionId));
     return raw ? (JSON.parse(raw) as TributeRun[]).slice(0, MAX) : [];
   } catch {
     return [];
@@ -39,7 +39,7 @@ export function load(companionId: string): TributeRun[] {
 export function log(companionId: string, run: TributeRun): TributeRun[] {
   const next = [run, ...load(companionId)].slice(0, MAX);
   try {
-    setRaw(KEY(companionId), JSON.stringify(next));
+    setRaw(KEYS.tribute(companionId), JSON.stringify(next));
   } catch {
     /* */
   }

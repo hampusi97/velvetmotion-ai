@@ -35,7 +35,7 @@ test("discovery filters and favorites persist, with an actionable empty state", 
   await expect(
     page.getByRole("heading", { name: /Extraordinary characters/ }),
   ).toBeVisible();
-  await expect(page.locator("article.girl-card")).toHaveCount(47);
+  await expect(page.locator("article.girl-card")).toHaveCount(51);
   await page
     .getByRole("button", { name: /Save .* to favorites/ })
     .first()
@@ -60,7 +60,7 @@ test("discovery filters and favorites persist, with an actionable empty state", 
   await page
     .getByRole("button", { name: "Explore all companions", exact: true })
     .click();
-  await expect(page.locator("article.girl-card")).toHaveCount(47);
+  await expect(page.locator("article.girl-card")).toHaveCount(51);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

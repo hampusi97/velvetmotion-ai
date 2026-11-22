@@ -2,7 +2,7 @@
 export * from "./relationshipState";
 import { loadState, recordSession, recordVisit, saveState } from "./relationshipState";
 
-const GLOBAL_ID = "global-streaks";
+const GLOBAL_ID = "__legacy__";
 
 export interface GoonStats {
   streak: number;
