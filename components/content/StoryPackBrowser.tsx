@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Volume2, VolumeX, Play, Pause } from "lucide-react";
+import { Volume2, VolumeX, Play, Square } from "lucide-react";
 import {
   ALL_STORY_PACKS,
   CONTENT_DISCLAIMER,
   EXPANDED_STORY_IDS,
   getStoryPack,
 } from "@/lib/content";
-import type { StoryPack, StoryScene, StoryTag } from "@/lib/content/types";
+import { CONTENT_THEME_LABELS, type ContentTheme, type StoryPack, type StoryScene, type StoryTag } from "@/lib/content/types";
 import { speak, stopSpeaking } from "@/lib/speech";
 import { staticPortraitUrl } from "@/lib/portraitFallback";
 
@@ -26,13 +26,14 @@ function chapterTitle(pack: StoryPack, sceneId: string): string {
 }
 
 function storyTagLabel(tag: StoryTag | "ALL") {
-  if (tag === "INTERRACIAL") return "Interracial romance";
+  if (tag === "INTERRACIAL") return CONTENT_THEME_LABELS.interracial;
+  if (tag === "KINK") return CONTENT_THEME_LABELS.kink;
   return tag === "ALL" ? "All stories" : tag;
 }
 
-export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly = false }: {
+export function StoryPackBrowser({ initialPackId = null, initialTheme = null }: {
   initialPackId?: string | null;
-  initialInterracialOnly?: boolean;
+  initialTheme?: ContentTheme | null;
 }) {
   const [packId, setPackId] = useState<string | null>(initialPackId);
   const [sceneId, setSceneId] = useState<string | null>(() => {
@@ -40,9 +41,10 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
     return getStoryPack(initialPackId)?.scenes[0]?.id ?? null;
   });
   const [history, setHistory] = useState<string[]>([]);
-  const [tag, setTag] = useState<StoryTag | "ALL">(initialInterracialOnly ? "INTERRACIAL" : "ALL");
-  const [autoVoice, setAutoVoice] = useState(true);
+  const [tag, setTag] = useState<StoryTag | "ALL">(initialTheme === "interracial" ? "INTERRACIAL" : initialTheme === "kink" ? "KINK" : "ALL");
+  const [autoVoice, setAutoVoice] = useState(() => initialPackId === null || getStoryPack(initialPackId)?.tag !== "KINK");
   const [playing, setPlaying] = useState(false);
+  const narrationRequest = useRef(0);
 
   useEffect(() => {
     if (initialPackId) {
@@ -64,36 +66,51 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
   const face = pack ? faceFor(pack.id) : "chloe";
   const portrait = pack?.character.portraitUrl || staticPortraitUrl(face);
 
-  useEffect(() => {
-    if (autoVoice && scene && playing) {
-      speak(`${scene.title}. ${scene.text}`, { pitch: 1.02, rate: 0.9 });
-    }
-  }, [autoVoice, scene, playing]);
+  const stopNarration = () => {
+    narrationRequest.current += 1;
+    stopSpeaking();
+    setPlaying(false);
+  };
+
+  const narrate = (target: StoryScene) => {
+    if (!("speechSynthesis" in window)) return;
+    const request = ++narrationRequest.current;
+    setPlaying(true);
+    speak(`${target.title}. ${target.text}`, { pitch: 1.02, rate: 0.9 }, {
+      onEnd: () => {
+        if (request === narrationRequest.current) setPlaying(false);
+      },
+    });
+  };
 
   const openPack = (id: string) => {
     const next = getStoryPack(id);
-    if (!next) return;
-    stopSpeaking();
+    const first = next?.scenes[0];
+    if (!next || !first) return;
+    stopNarration();
     setPackId(id);
-    setSceneId(next.scenes[0]?.id ?? null);
+    setSceneId(first.id);
     setHistory([]);
-    setPlaying(true);
+    if (next.tag === "KINK" && id !== packId) setAutoVoice(false);
+    else if (autoVoice) narrate(first);
   };
 
   const goTo = (nextSceneId: string) => {
-    if (!sceneId) return;
-    stopSpeaking();
+    const next = pack?.scenes.find((item) => item.id === nextSceneId);
+    if (!sceneId || !next) return;
+    stopNarration();
     setHistory((prev) => [...prev, sceneId]);
     setSceneId(nextSceneId);
-    setPlaying(true);
+    if (autoVoice) narrate(next);
   };
 
   const goBack = () => {
-    const previous = history[history.length - 1];
+    const previous = pack?.scenes.find((item) => item.id === history[history.length - 1]);
     if (!previous) return;
-    stopSpeaking();
+    stopNarration();
     setHistory((prev) => prev.slice(0, -1));
-    setSceneId(previous);
+    setSceneId(previous.id);
+    if (autoVoice) narrate(previous);
   };
 
   if (!pack || !scene) {
@@ -104,6 +121,11 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
         {tag === "INTERRACIAL" && (
           <Link href="/joi/?theme=interracial" className="mb-3 inline-flex text-sm font-medium text-pink-200 underline-offset-4 hover:underline">
             Browse guided romance sessions
+          </Link>
+        )}
+        {tag === "KINK" && (
+          <Link href="/joi/?theme=kink" className="mb-3 inline-flex text-sm font-medium text-pink-200 underline-offset-4 hover:underline">
+            Browse guided kink sessions
           </Link>
         )}
         <div className="flex flex-wrap gap-2 mb-4 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -137,6 +159,7 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
                 <div className="absolute inset-x-0 bottom-0 p-2.5">
                   <div className="font-semibold text-sm text-white leading-tight">{item.title}</div>
                   <div className="text-[10px] text-zinc-300 mt-0.5">{item.character.name} · {item.scenes.length} scenes</div>
+                  {item.tag === "KINK" && <p className="line-clamp-3 text-[11px] leading-snug text-zinc-100 mt-1">{item.desc}</p>}
                   {expanded && <span className="text-[9px] text-pink-300">Expanded</span>}
                 </div>
               </button>
@@ -158,7 +181,7 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
           <button
-            onClick={() => { stopSpeaking(); setPackId(null); setSceneId(null); setHistory([]); setPlaying(false); }}
+            onClick={() => { stopNarration(); setPackId(null); setSceneId(null); setHistory([]); }}
             className="text-sm text-white bg-black/40 backdrop-blur px-3 py-1.5 rounded-full"
           >
             ← Stories
@@ -168,8 +191,8 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
             onClick={() => {
               const next = !autoVoice;
               setAutoVoice(next);
-              if (!next) stopSpeaking();
-              else { setPlaying(true); speak(`${scene.title}. ${scene.text}`, { pitch: 1.02, rate: 0.9 }); }
+              if (!next) stopNarration();
+              else narrate(scene);
             }}
             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs backdrop-blur ${
               autoVoice ? "border-pink-400 bg-pink-500/30 text-white" : "border-white/30 bg-black/40 text-zinc-200"
@@ -194,11 +217,11 @@ export function StoryPackBrowser({ initialPackId = null, initialInterracialOnly 
           <div className="text-[11px] uppercase tracking-wide text-pink-300/80">{chapterTitle(pack, scene.id)}</div>
           <button
             type="button"
-            onClick={() => { setPlaying(true); speak(`${scene.title}. ${scene.text}`, { pitch: 1.02, rate: 0.9 }); }}
+            onClick={() => playing ? stopNarration() : narrate(scene)}
             className="inline-flex items-center gap-1 rounded-full border border-pink-500/40 bg-pink-500/15 px-3 py-1.5 text-xs text-pink-100"
           >
-            {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {playing ? "Speaking" : "Speak"}
+            {playing ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {playing ? "Stop narration" : "Speak"}
           </button>
         </div>
         <h3 className="font-semibold text-lg mb-2 text-cream">{scene.title}</h3>

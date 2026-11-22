@@ -1,5 +1,12 @@
 /** Shared catalog types for story packs and JOI scenarios. */
 
+export type ContentTheme = "interracial" | "kink";
+
+export const CONTENT_THEME_LABELS: Record<ContentTheme, string> = {
+  interracial: "Interracial romance",
+  kink: "Kink roleplay",
+};
+
 export type StoryTag =
   | "CUCK"
   | "GROUP"
@@ -11,6 +18,7 @@ export type StoryTag =
   | "SCI-FI"
   | "SPH"
   | "INTERRACIAL"
+  | "KINK"
   | "BNWO";
 
 export type Accent =
@@ -89,6 +97,7 @@ export interface JoiStep {
   title: string;
   instruction: string;
   suggestedSeconds: number;
+  optional?: boolean;
 }
 
 export interface JoiScenario {

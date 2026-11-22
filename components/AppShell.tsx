@@ -14,6 +14,7 @@ import { decodeSharedCharacterHash } from "@/lib/shareCardUrl";
 import { saveCustomCompanionDB } from "@/lib/db";
 import { emitVaultUpdated, useFirebaseCloudSync } from "@/lib/firebaseSync";
 import { dismissProactive, startProactiveWatcher, type ProactivePing } from "@/lib/proactiveIdle";
+import type { ContentTheme } from "@/lib/content/types";
 import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
@@ -114,7 +115,7 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   const [view, setView] = useState<ShellRouteView>(initialView);
   const [storyPackId, setStoryPackId] = useState<string | null>(null);
   const [guidedScenarioId, setGuidedScenarioId] = useState<string | null>(null);
-  const [interracialOnly, setInterracialOnly] = useState(false);
+  const [contentTheme, setContentTheme] = useState<ContentTheme | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customCharacter, setCustomCharacter] = useState<Character | null>(null);
   const [romanceMode, setRomanceMode] = useState(false);
@@ -270,9 +271,10 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
       const params = new URLSearchParams(searchStr);
       const qView = parseView(params.get("view"));
       const qId = params.get("companion") || params.get("id");
+      const theme = params.get("theme");
       setStoryPackId(params.get("pack"));
       setGuidedScenarioId(params.get("session"));
-      setInterracialOnly(params.get("theme") === "interracial");
+      setContentTheme(theme === "interracial" || theme === "kink" ? theme : null);
       if (window.location.pathname === "/") {
         if (qView) {
           hadQueryViewRef.current = true;
@@ -519,8 +521,8 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
           {view === "edge" && <EdgeTimer onHome={() => setView("home")} />}
           {view === "scenario" && <SpicyScenarioSimulator onHome={() => setView("home")} onStartChat={(id, p) => openChatById(id, p)} />}
           {view === "tribute" && <TributeBrowser />}
-          {view === "packs" && <StoryPackBrowser key={`${storyPackId}:${interracialOnly}`} initialPackId={storyPackId} initialInterracialOnly={interracialOnly} />}
-          {view === "joi" && <JoiBrowser key={`${guidedScenarioId}:${interracialOnly}`} initialScenarioId={guidedScenarioId} initialInterracialOnly={interracialOnly} />}
+          {view === "packs" && <StoryPackBrowser key={`${storyPackId}:${contentTheme}`} initialPackId={storyPackId} initialTheme={contentTheme} />}
+          {view === "joi" && <JoiBrowser key={`${guidedScenarioId}:${contentTheme}`} initialScenarioId={guidedScenarioId} initialTheme={contentTheme} />}
           {view === "import" && <CardImport onHome={() => setView("home")} onOpen={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "share" && <ShareImport onHome={() => setView("home")} onImport={(c) => { setCustomCharacter(c); setSelectedId(c.id); setView("chat"); }} />}
           {view === "lounge" && <UserLounge onHome={() => setView("home")} />}

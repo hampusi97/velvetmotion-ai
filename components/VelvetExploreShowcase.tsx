@@ -325,6 +325,7 @@ export default function VelvetExploreShowcase({ returning }: { returning?: React
             {([
               ['Create a companion', '/create/'],
               ['Interracial stories', '/?view=packs&theme=interracial'],
+              ['Kink roleplay', '/?view=packs&theme=kink'],
               ['Guided audio', '/joi/'],
               ['Group chat', '/group/'],
             ] as const).map(([label, href]) => (
