@@ -39,4 +39,18 @@ test("Tauri desktop startup avoids CSP hash lockout and Service Worker hijacking
   const shell = readFileSync("components/AppShell.tsx", "utf8");
   assert.ok(shell.includes('id="vm-boot-shell"'), "AppShell must render a visible boot shell before hydration");
   assert.ok(shell.includes("__VM_HYDRATED__"), "AppShell must signal client hydration completion");
+
+  const mainWin = cfg.app?.windows?.[0] || {};
+  assert.ok(
+    typeof mainWin.additionalBrowserArgs === "string" &&
+      mainWin.additionalBrowserArgs.includes("--disable-gpu-compositing") &&
+      mainWin.additionalBrowserArgs.includes("CalculateNativeWinOcclusion"),
+    "Windows WebView2 config must disable DirectComposition GPU compositing and native occlusion by default",
+  );
+
+  const mainRs = readFileSync("src-tauri/src/main.rs", "utf8");
+  assert.ok(
+    mainRs.includes("additional_browser_args") && mainRs.includes("webview-v3-safe"),
+    "main.rs must pass browser args directly to WebviewWindowBuilder with an isolated v3 WebView2 data directory",
+  );
 });

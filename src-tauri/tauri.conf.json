@@ -19,7 +19,9 @@
         "minWidth": 390,
         "minHeight": 680,
         "resizable": true,
-        "backgroundColor": "#100c13"
+        "backgroundColor": "#100c13",
+        "create": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion --disable-gpu --disable-gpu-compositing --disable-renderer-backgrounding"
       }
     ],
     "security": {

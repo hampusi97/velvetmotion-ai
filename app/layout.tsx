@@ -111,11 +111,7 @@ export default function RootLayout({
       }
     }
     var bootErrs=[];
-    var record=function(msg){if(msg&&bootErrs.length<3)bootErrs.push(String(msg).slice(0,220));};
-    window.addEventListener('error',function(ev){record((ev&&ev.message)||'Script load error');});
-    window.addEventListener('unhandledrejection',function(ev){var r=ev&&ev.reason;record((r&&r.message)||r||'Unhandled startup rejection');});
-    window.addEventListener('securitypolicyviolation',function(ev){record('CSP blocked '+(ev.effectiveDirective||ev.violatedDirective||'resource'));});
-    setTimeout(function(){
+    var showFallback=function(){
       if(window.__VM_HYDRATED__)return;
       var box=document.getElementById('vm-boot-fallback');
       if(!box)return;
@@ -123,9 +119,10 @@ export default function RootLayout({
       var detail=document.getElementById('vm-boot-error');
       if(detail){detail.textContent=bootErrs.length?bootErrs.join(' | '):'The interface did not finish loading in time.';}
       var reloadBtn=document.getElementById('vm-boot-reload');
-      if(reloadBtn){reloadBtn.addEventListener('click',function(){location.reload();});}
+      if(reloadBtn&&!reloadBtn.__vmWired){reloadBtn.__vmWired=true;reloadBtn.addEventListener('click',function(){location.reload();});}
       var resetBtn=document.getElementById('vm-boot-reset');
-      if(resetBtn){
+      if(resetBtn&&!resetBtn.__vmWired){
+        resetBtn.__vmWired=true;
         resetBtn.addEventListener('click',function(){
           var tasks=[];
           if('serviceWorker' in navigator){tasks.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}).catch(function(){}));}
@@ -133,7 +130,22 @@ export default function RootLayout({
           Promise.all(tasks).finally(function(){location.reload();});
         });
       }
-    },6000);
+    };
+    var record=function(msg,immediate){
+      if(msg&&bootErrs.length<3)bootErrs.push(String(msg).slice(0,220));
+      if(immediate)setTimeout(showFallback,450);
+    };
+    window.addEventListener('error',function(ev){
+      var t=ev&&ev.target;
+      if(t&&(t.tagName==='SCRIPT'||t.tagName==='LINK')){
+        record('Failed to load '+(t.src||t.href||t.tagName),true);
+        return;
+      }
+      record((ev&&ev.message)||'Script execution error',true);
+    },true);
+    window.addEventListener('unhandledrejection',function(ev){var r=ev&&ev.reason;record((r&&r.message)||r||'Unhandled startup rejection',false);});
+    window.addEventListener('securitypolicyviolation',function(ev){record('CSP blocked '+(ev.effectiveDirective||ev.violatedDirective||'resource'),true);});
+    setTimeout(showFallback,3500);
   }catch(e){}
 })();`,
           }}
