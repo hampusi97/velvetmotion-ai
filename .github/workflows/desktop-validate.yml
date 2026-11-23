@@ -62,3 +62,32 @@ jobs:
         run: cargo check --manifest-path src-tauri/Cargo.toml
       - name: Type-check signed updater build
         run: cargo check --manifest-path src-tauri/Cargo.toml --features signed-updater
+
+  check-desktop-windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Install Rust with rustfmt
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build native desktop frontend
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: "1"
+      - name: Run Rust unit tests on Windows
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Type-check native desktop app on Windows
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Type-check signed updater build on Windows
+        run: cargo check --manifest-path src-tauri/Cargo.toml --features signed-updater

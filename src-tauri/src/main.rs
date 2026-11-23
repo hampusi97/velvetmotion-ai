@@ -163,6 +163,50 @@ fn software_gpu_flag_path(app_data_dir: &std::path::Path) -> std::path::PathBuf 
     app_data_dir.join("software-gpu.flag")
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn stale_webview2_cache_paths(app_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    // Clear only transient Service Worker, HTTP, and GPU shader caches that can
+    // trap WebView2 on a black screen across updates or GPU driver regressions.
+    // Never touch Local Storage, IndexedDB, or Cookies so user data stays safe.
+    let relative_segments: &[&[&str]] = &[
+        &["EBWebView", "Default", "Service Worker"],
+        &["EBWebView", "Default", "Cache"],
+        &["EBWebView", "Default", "Code Cache"],
+        &["EBWebView", "Default", "GPUCache"],
+        &["EBWebView", "GrShaderCache"],
+        &["EBWebView", "GraphiteDawnCache"],
+        &["EBWebView", "DawnGraphiteCache"],
+        &["EBWebView", "DawnWebGPUCache"],
+        &["EBWebView", "ShaderCache"],
+    ];
+    relative_segments
+        .iter()
+        .map(|segments| {
+            let mut path = app_dir.to_path_buf();
+            for segment in *segments {
+                path.push(segment);
+            }
+            path
+        })
+        .collect()
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn build_software_gpu_args(existing: &str) -> String {
+    let mut args = if existing.trim().is_empty() {
+        "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection".to_string()
+    } else {
+        existing.trim().to_string()
+    };
+    if !args.contains("--disable-gpu") {
+        args.push_str(" --disable-gpu");
+    }
+    if !args.contains("--disable-gpu-compositing") {
+        args.push_str(" --disable-gpu-compositing");
+    }
+    args
+}
+
 #[cfg(target_os = "windows")]
 fn prepare_windows_webview2_startup() {
     let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") else {
@@ -170,20 +214,7 @@ fn prepare_windows_webview2_startup() {
     };
     let app_dir = std::path::PathBuf::from(local_app_data).join("ai.velvetmotion.desktop");
 
-    // Clear only transient Service Worker, HTTP, and GPU shader caches that can
-    // trap WebView2 on a black screen across updates or GPU driver regressions.
-    // Never touch Local Storage, IndexedDB, or Cookies so user data stays safe.
-    let stale_caches = [
-        "EBWebView/Default/Service Worker",
-        "EBWebView/Default/Cache",
-        "EBWebView/Default/Code Cache",
-        "EBWebView/Default/GPUCache",
-        "EBWebView/GrShaderCache",
-        "EBWebView/GraphiteDawnCache",
-        "EBWebView/ShaderCache",
-    ];
-    for rel in stale_caches {
-        let dir = app_dir.join(rel);
+    for dir in stale_webview2_cache_paths(&app_dir) {
         if dir.exists() {
             let _ = std::fs::remove_dir_all(&dir);
         }
@@ -197,14 +228,7 @@ fn prepare_windows_webview2_startup() {
 
     if cli_software || env_software || flag_software {
         let existing = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
-        let mut args = if existing.trim().is_empty() {
-            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection".to_string()
-        } else {
-            existing
-        };
-        if !args.contains("--disable-gpu") {
-            args.push_str(" --disable-gpu --disable-gpu-compositing");
-        }
+        let args = build_software_gpu_args(&existing);
         std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", args);
     }
 }
@@ -318,4 +342,49 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running VelvetMotion Desktop");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn stale_caches_preserve_user_storage_and_clear_sw_and_gpu_caches() {
+        let root = Path::new("app-data");
+        let paths = stale_webview2_cache_paths(root);
+        let rendered: Vec<String> = paths
+            .iter()
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .collect();
+
+        assert!(rendered
+            .iter()
+            .any(|p| p.ends_with("EBWebView/Default/Service Worker")));
+        assert!(rendered
+            .iter()
+            .any(|p| p.ends_with("EBWebView/DawnGraphiteCache")));
+        assert!(rendered
+            .iter()
+            .any(|p| p.ends_with("EBWebView/Default/GPUCache")));
+
+        for forbidden in ["Local Storage", "IndexedDB", "Cookies"] {
+            assert!(
+                !rendered.iter().any(|p| p.contains(forbidden)),
+                "must never delete user storage directory {forbidden}"
+            );
+        }
+    }
+
+    #[test]
+    fn software_gpu_args_preserve_defaults_and_avoid_duplicates() {
+        let fresh = build_software_gpu_args("");
+        assert!(fresh.contains("--disable-gpu"));
+        assert!(fresh.contains("--disable-gpu-compositing"));
+        assert!(fresh.contains("msSmartScreenProtection"));
+
+        let merged = build_software_gpu_args("--proxy-server=http://127.0.0.1:8080 --disable-gpu");
+        assert!(merged.contains("--proxy-server=http://127.0.0.1:8080"));
+        assert_eq!(merged.matches("--disable-gpu-compositing").count(), 1);
+    }
 }
