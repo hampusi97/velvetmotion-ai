@@ -35,9 +35,26 @@ import firebaseConfig from "../firebase-applet-config.json";
 import blueprint from "../firebase-blueprint.json";
 import { characterPortraitUrl } from "./portraits";
 
-export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+import type { FirebaseApp } from "firebase/app";
+import type { Auth } from "firebase/auth";
+import type { Firestore } from "firebase/firestore";
+
+let _app: FirebaseApp | null = null;
+let _db: Firestore | null = null;
+let _auth: Auth | null = null;
+
+try {
+  _app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  _db = getFirestore(_app, firebaseConfig.firestoreDatabaseId);
+  _auth = getAuth(_app);
+} catch (error) {
+  console.warn("[VelvetMotion] Firebase offline fallback (local-first mode):", error);
+}
+
+export const isFirebaseAvailable = Boolean(_app && _db && _auth);
+export const app = _app as FirebaseApp;
+export const db = _db as Firestore;
+export const auth = (_auth ?? { currentUser: null }) as Auth;
 
 // All Google Workspace scopes enabled for Google Meet, Google Chat, Gmail, and Google Drive
 export const SCOPES = [
@@ -134,7 +151,7 @@ export function handleFirestoreError(
 
 let connectionTested = false;
 export async function testConnection(): Promise<void> {
-  if (typeof window === "undefined" || connectionTested) return;
+  if (typeof window === "undefined" || connectionTested || !isFirebaseAvailable) return;
   connectionTested = true;
   try {
     await getDocFromServer(doc(db, "catalog", "status"));
@@ -143,7 +160,7 @@ export async function testConnection(): Promise<void> {
   }
 }
 
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && isFirebaseAvailable) {
   void testConnection();
 }
 
@@ -162,7 +179,7 @@ export function initAuth(
   onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void,
 ): Unsubscribe {
-  if (typeof window === "undefined") return () => {};
+  if (typeof window === "undefined" || !isFirebaseAvailable) return () => {};
   // Complete any redirect-based OAuth flow (critical for Tauri v2 desktop webviews & mobile browsers)
   void getRedirectResult(auth)
     .then((redirectCred) => {

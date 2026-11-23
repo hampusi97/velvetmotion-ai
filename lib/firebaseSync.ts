@@ -11,6 +11,7 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import {
   auth,
   handleFirestoreError,
+  isFirebaseAvailable,
   OperationType,
   readVaultDocFromFirestore,
   syncVaultDocToFirestore,
@@ -219,7 +220,7 @@ export function useFirebaseCloudSync() {
   });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !isFirebaseAvailable) return;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const runSync = async (user: User | null) => {

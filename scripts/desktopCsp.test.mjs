@@ -14,3 +14,29 @@ test("Tauri permits only the expected local ComfyUI media source", () => {
   assert.ok(!media.split(/\s+/).includes("http:"), "never open media-src to every insecure HTTP origin");
   assert.ok(!media.includes("unsafe-eval"), "media-src should not permit executable code");
 });
+
+test("Tauri desktop startup avoids CSP hash lockout and Service Worker hijacking", () => {
+  const cfg = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
+  const disabled = cfg.app?.security?.dangerousDisableAssetCspModification;
+  assert.ok(
+    Array.isArray(disabled) && disabled.includes("script-src") && disabled.includes("style-src"),
+    "Tauri must disable script-src/style-src hash modification so Next.js inline hydration scripts are not blocked",
+  );
+  const csp = cfg.app?.security?.csp || "";
+  assert.ok(csp.includes("worker-src 'self' blob:"), "CSP should permit same-origin and blob workers");
+
+  const layout = readFileSync("app/layout.tsx", "utf8");
+  assert.ok(layout.includes("tauri.localhost"), "layout.tsx must detect Tauri desktop host before registering SW");
+  assert.ok(layout.includes("vm-boot-fallback"), "layout.tsx must wire startup watchdog recovery UI");
+
+  const sw = readFileSync("public/sw.js", "utf8");
+  assert.ok(sw.includes("tauri.localhost"), "sw.js must never intercept Tauri desktop origin");
+  assert.ok(!sw.includes('PRECACHE = ["/"'), "sw.js must not precache / HTML with rotating chunk hashes");
+
+  const pwa = readFileSync("lib/pwaProactive.ts", "utf8");
+  assert.ok(pwa.includes("tauri.localhost"), "pwaProactive.ts must skip SW registration inside Tauri");
+
+  const shell = readFileSync("components/AppShell.tsx", "utf8");
+  assert.ok(shell.includes('id="vm-boot-shell"'), "AppShell must render a visible boot shell before hydration");
+  assert.ok(shell.includes("__VM_HYDRATED__"), "AppShell must signal client hydration completion");
+});

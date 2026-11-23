@@ -85,7 +85,57 @@ export default function RootLayout({
         <meta name="theme-color" content="#0e0a12" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var n=localStorage.getItem('vm-neon-intensity');if(n==='subtle'||n==='hyper'){document.documentElement.setAttribute('data-neon',n);}if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}}catch(e){}`,
+            __html: `try{var n=localStorage.getItem('vm-neon-intensity');if(n==='subtle'||n==='hyper'){document.documentElement.setAttribute('data-neon',n);}}catch(e){}
+(function(){
+  try{
+    var isDesktop=!!(window.__TAURI_INTERNALS__||window.isTauri||location.hostname==='tauri.localhost'||location.protocol==='tauri:');
+    if('serviceWorker' in navigator){
+      if(isDesktop){
+        var hadCtrl=!!navigator.serviceWorker.controller;
+        var clean=function(){
+          var jobs=[];
+          try{jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}).catch(function(){}));}catch(e){}
+          if('caches' in window){try{jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}).catch(function(){}));}catch(e){}}
+          Promise.all(jobs).then(function(){
+            try{
+              if(hadCtrl&&!sessionStorage.getItem('vm-sw-cleaned')){
+                sessionStorage.setItem('vm-sw-cleaned','1');
+                location.reload();
+              }
+            }catch(e){}
+          });
+        };
+        clean();
+      }else{
+        window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});
+      }
+    }
+    var bootErrs=[];
+    var record=function(msg){if(msg&&bootErrs.length<3)bootErrs.push(String(msg).slice(0,220));};
+    window.addEventListener('error',function(ev){record((ev&&ev.message)||'Script load error');});
+    window.addEventListener('unhandledrejection',function(ev){var r=ev&&ev.reason;record((r&&r.message)||r||'Unhandled startup rejection');});
+    window.addEventListener('securitypolicyviolation',function(ev){record('CSP blocked '+(ev.effectiveDirective||ev.violatedDirective||'resource'));});
+    setTimeout(function(){
+      if(window.__VM_HYDRATED__)return;
+      var box=document.getElementById('vm-boot-fallback');
+      if(!box)return;
+      box.style.display='block';
+      var detail=document.getElementById('vm-boot-error');
+      if(detail){detail.textContent=bootErrs.length?bootErrs.join(' | '):'The interface did not finish loading in time.';}
+      var reloadBtn=document.getElementById('vm-boot-reload');
+      if(reloadBtn){reloadBtn.addEventListener('click',function(){location.reload();});}
+      var resetBtn=document.getElementById('vm-boot-reset');
+      if(resetBtn){
+        resetBtn.addEventListener('click',function(){
+          var tasks=[];
+          if('serviceWorker' in navigator){tasks.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}).catch(function(){}));}
+          if('caches' in window){tasks.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}).catch(function(){}));}
+          Promise.all(tasks).finally(function(){location.reload();});
+        });
+      }
+    },6000);
+  }catch(e){}
+})();`,
           }}
         />
       </head>

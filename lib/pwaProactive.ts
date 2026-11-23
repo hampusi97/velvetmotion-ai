@@ -33,5 +33,11 @@ export function showProactiveNotification(title: string, body: string, tag = "vm
 
 export function registerServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  const isTauri =
+    Boolean((window as unknown as { __TAURI_INTERNALS__?: unknown; isTauri?: unknown }).__TAURI_INTERNALS__) ||
+    Boolean((window as unknown as { isTauri?: unknown }).isTauri) ||
+    window.location.hostname === "tauri.localhost" ||
+    window.location.protocol === "tauri:";
+  if (isTauri) return;
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
