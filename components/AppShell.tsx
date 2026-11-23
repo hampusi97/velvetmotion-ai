@@ -197,6 +197,11 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
   }, [initialView]);
 
   useEffect(() => {
+    try {
+      (window as unknown as { __VM_HYDRATED__?: boolean }).__VM_HYDRATED__ = true;
+    } catch {
+      /* ignore */
+    }
     migrateLegacyState();
     try {
       const params = new URLSearchParams(window.location.search);
@@ -329,7 +334,41 @@ export function AppShell({ initialView = "home" }: { initialView?: ShellRouteVie
     };
   }, [pathname]);
 
-  if (adult === null) return <div className="min-h-screen bg-[#05050a]" />;
+  if (adult === null) {
+    return (
+      <main
+        id="vm-boot-shell"
+        className="min-h-screen bg-[#0e0a12] text-[#f7f7fc] flex items-center justify-center p-6"
+      >
+        <div className="max-w-sm w-full rounded-3xl border border-white/10 bg-[#19121f]/95 p-8 text-center space-y-3 shadow-2xl">
+          <div className="text-4xl font-display font-black bg-gradient-to-r from-[#ff1e8e] to-[#00f5ff] bg-clip-text text-transparent">
+            V
+          </div>
+          <p className="text-base font-bold tracking-tight text-white">VelvetMotion AI</p>
+          <p className="text-xs text-[#c6b5cf]">Opening your atelier…</p>
+          <div id="vm-boot-fallback" style={{ display: "none" }} className="pt-4 space-y-3 border-t border-white/10">
+            <p id="vm-boot-error" className="text-xs text-rose-300 leading-relaxed" />
+            <div className="flex flex-col gap-2">
+              <button
+                id="vm-boot-reload"
+                type="button"
+                className="w-full rounded-xl neon-btn-primary py-2.5 text-xs font-bold text-white"
+              >
+                Reload VelvetMotion
+              </button>
+              <button
+                id="vm-boot-reset"
+                type="button"
+                className="w-full rounded-xl border border-white/15 bg-white/5 py-2 text-xs text-zinc-200 hover:bg-white/10"
+              >
+                Clear Cache &amp; Reload
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   if (!adult) {
     return (

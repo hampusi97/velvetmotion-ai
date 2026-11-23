@@ -159,7 +159,88 @@ fn toggle_boss_key(app: AppHandle) {
     }
 }
 
+fn software_gpu_flag_path(app_data_dir: &std::path::Path) -> std::path::PathBuf {
+    app_data_dir.join("software-gpu.flag")
+}
+
+#[cfg(target_os = "windows")]
+fn prepare_windows_webview2_startup() {
+    let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") else {
+        return;
+    };
+    let app_dir = std::path::PathBuf::from(local_app_data).join("ai.velvetmotion.desktop");
+
+    // Clear only transient Service Worker, HTTP, and GPU shader caches that can
+    // trap WebView2 on a black screen across updates or GPU driver regressions.
+    // Never touch Local Storage, IndexedDB, or Cookies so user data stays safe.
+    let stale_caches = [
+        "EBWebView/Default/Service Worker",
+        "EBWebView/Default/Cache",
+        "EBWebView/Default/Code Cache",
+        "EBWebView/Default/GPUCache",
+        "EBWebView/GrShaderCache",
+        "EBWebView/GraphiteDawnCache",
+        "EBWebView/ShaderCache",
+    ];
+    for rel in stale_caches {
+        let dir = app_dir.join(rel);
+        if dir.exists() {
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    let cli_software = std::env::args().any(|a| a == "--disable-gpu" || a == "--safe-graphics");
+    let env_software = std::env::var("VELVETMOTION_SOFTWARE_GPU")
+        .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "yes"))
+        .unwrap_or(false);
+    let flag_software = software_gpu_flag_path(&app_dir).exists();
+
+    if cli_software || env_software || flag_software {
+        let existing = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").unwrap_or_default();
+        let mut args = if existing.trim().is_empty() {
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection".to_string()
+        } else {
+            existing
+        };
+        if !args.contains("--disable-gpu") {
+            args.push_str(" --disable-gpu --disable-gpu-compositing");
+        }
+        std::env::set_var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", args);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn prepare_windows_webview2_startup() {
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+}
+
+fn reload_main_window(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.set_focus();
+        let _ = win.eval("window.location.reload()");
+    }
+}
+
+fn toggle_safe_graphics_and_restart(app: &AppHandle) {
+    if let Ok(dir) = app.path().app_local_data_dir() {
+        let _ = std::fs::create_dir_all(&dir);
+        let flag = software_gpu_flag_path(&dir);
+        if flag.exists() {
+            let _ = std::fs::remove_file(&flag);
+        } else {
+            let _ = std::fs::write(&flag, b"1");
+        }
+    }
+    app.restart();
+}
+
 fn main() {
+    prepare_windows_webview2_startup();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_shell::init())
@@ -192,15 +273,27 @@ fn main() {
 
             let show_item =
                 MenuItem::with_id(app, "toggle", "Show / Stealth Hide", true, None::<&str>)?;
+            let reload_item =
+                MenuItem::with_id(app, "reload", "Reload Window", true, None::<&str>)?;
+            let safe_gpu_item = MenuItem::with_id(
+                app,
+                "safe_gpu",
+                "Toggle Safe Graphics Mode & Restart",
+                true,
+                None::<&str>,
+            )?;
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit VelvetMotion", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let menu =
+                Menu::with_items(app, &[&show_item, &reload_item, &safe_gpu_item, &quit_item])?;
 
             let mut tray =
                 TrayIconBuilder::new()
                     .menu(&menu)
                     .on_menu_event(|app, event| match event.id.as_ref() {
                         "toggle" => toggle_boss_key(app.clone()),
+                        "reload" => reload_main_window(app),
+                        "safe_gpu" => toggle_safe_graphics_and_restart(app),
                         "quit" => app.exit(0),
                         _ => {}
                     });
@@ -210,6 +303,11 @@ fn main() {
             tray.build(app)?;
 
             let _ = app.global_shortcut().register("CmdOrCtrl+Shift+H");
+
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
 
             // Always render the bundled local UI. Never silently navigate the
             // privileged native window to a remotely editable website.
