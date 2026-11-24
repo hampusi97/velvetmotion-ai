@@ -17,6 +17,8 @@ import {
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
 import { FotoXTemplates, type SceneTemplate } from '@/components/FotoXTemplates';
+import { EffectsGrid } from '@/components/EffectsGrid';
+import type { Effect } from '@/data/effects';
 import { getMediaSettings, saveMediaSettings } from '@/lib/mediaSettings';
 import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
 import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
@@ -118,7 +120,7 @@ export default function MediaStudioModal({
   onCompanionCreated,
   onDropIntoChat,
 }: MediaStudioModalProps) {
-  const [tab, setTab] = useState<'photo' | 'video' | 'upload' | 'templates'>(initialTab);
+  const [tab, setTab] = useState<'photo' | 'video' | 'upload' | 'templates' | 'tools'>(initialTab);
   const [selectedId, setSelectedId] = useState(activeChatCompanionId || FLAGSHIP_COMPANIONS[0].id);
   const [studioCompanions, setStudioCompanions] = useState<Array<Pick<CompanionProfile, 'id' | 'name' | 'age' | 'archetype' | 'portraitUrl' | 'visualDna'>>>(FLAGSHIP_COMPANIONS);
   const [sceneId, setSceneId] = useState<string>(SCENE_PRESETS[0].id);
@@ -213,6 +215,14 @@ export default function MediaStudioModal({
     setDurationSec(tpl.duration > 8 ? 8 : tpl.duration === 5 ? 5 : 5);
     setTab('video');
     setStatusMsg(`Scene set: ${tpl.title} (${tpl.duration}s). Generate on Video tab.`);
+  }
+
+
+  function applyEffect(effect: Effect) {
+    setCustomPrompt(effect.prompt);
+    setNsfwMode(effect.nsfw);
+    setTab('photo');
+    setStatusMsg(`Effect set: ${effect.label}. Generate on Photo tab.`);
   }
 
   if (!isOpen && !standalone) return null;
@@ -631,6 +641,7 @@ export default function MediaStudioModal({
             ['video', 'Shorts Video'],
             ['upload', 'Face Lock / V2'],
             ['templates', 'Scenes'],
+            ['tools', 'Tools'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -1056,6 +1067,13 @@ export default function MediaStudioModal({
       {tab === 'templates' && (
         <div className="space-y-3 text-xs">
           <FotoXTemplates onPick={applyTemplate} />
+        </div>
+      )}
+
+
+      {tab === 'tools' && (
+        <div className="space-y-3 text-xs">
+          <EffectsGrid onPick={applyEffect} />
         </div>
       )}
 

@@ -24,8 +24,8 @@ export function GoonRoom({
   useEffect(() => {
     setCoins(getCoins());
     try {
-      const s = localStorage.getItem("vm-goon-streak");
-      if (s) setStreak(parseInt(s, 10) || 0);
+      const { getGoonStats } = require("@/lib/streaks");
+      setStreak(getGoonStats().streak || 0);
     } catch {}
   }, []);
 
@@ -62,7 +62,8 @@ export function GoonRoom({
     const nextStreak = streak + 1;
     setStreak(nextStreak);
     try {
-      localStorage.setItem("vm-goon-streak", String(nextStreak));
+      const { recordGoonActivity } = require("@/lib/streaks");
+      recordGoonActivity(Math.max(1, Math.floor(timer / 60)), 10);
     } catch {}
     setNotice(`Session ended. +${bonus} coins. Streak ${nextStreak}. Open chat to generate while the heat is high.`);
   };

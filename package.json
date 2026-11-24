@@ -18,6 +18,7 @@
     "deploy:rules:cloudshell": "npx -y firebase-tools@latest login --no-localhost && npm run deploy:rules",
     "deploy:auth": "npx -y firebase-tools@latest deploy --only auth --project ivory-sunset-mxq1s",
     "deploy:firebase": "npx -y firebase-tools@latest deploy --only auth,firestore:rules --project ivory-sunset-mxq1s",
+    "verify": "tsc --noEmit && npm run lint && npm test && npm run build",
     "test:e2e": "playwright test"
   },
   "dependencies": {
