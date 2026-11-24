@@ -18,14 +18,9 @@ import { SiteHeader } from "@/components/site-header";
 import { CandySidebar } from "@/components/CandySidebar";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import VelvetExploreShowcase from "@/components/VelvetExploreShowcase";
-import { CharacterRoster } from "@/components/CharacterRoster";
-import { CollectionGalleryView, PrivateContentView } from "@/components/CollectionAndPrivateViews";
 import { NeonErrorBoundary } from "@/components/NeonErrorBoundary";
 import { SupporterBanner } from "@/components/SupporterBanner";
 import { InstallPrompt, installPromptOverlapsComposer } from "@/components/InstallPrompt";
-import { LiveUpdateBanner } from "@/components/LiveUpdateBanner";
-import { DesktopAutoUpdater } from "@/components/DesktopAutoUpdater";
-import { ProactiveToast } from "@/components/ProactiveToast";
 import StatusOnboarding from "@/components/StatusOnboarding";
 import { migrateLegacyState } from "@/lib/migrateStorage";
 
@@ -33,6 +28,12 @@ function LoadingPanel() {
   return <div role="status" className="rounded-2xl border border-white/10 bg-[#19121f] p-8 text-sm text-[#c6b5cf]">Opening your atelier…</div>;
 }
 
+const CharacterRoster = dynamic(() => import("@/components/CharacterRoster").then(m => m.CharacterRoster), { loading: LoadingPanel });
+const CollectionGalleryView = dynamic(() => import("@/components/CollectionAndPrivateViews").then(m => m.CollectionGalleryView), { loading: LoadingPanel });
+const PrivateContentView = dynamic(() => import("@/components/CollectionAndPrivateViews").then(m => m.PrivateContentView), { loading: LoadingPanel });
+const LiveUpdateBanner = dynamic(() => import("@/components/LiveUpdateBanner").then(m => m.LiveUpdateBanner), { ssr: false });
+const DesktopAutoUpdater = dynamic(() => import("@/components/DesktopAutoUpdater").then(m => m.DesktopAutoUpdater), { ssr: false });
+const ProactiveToast = dynamic(() => import("@/components/ProactiveToast").then(m => m.ProactiveToast), { ssr: false });
 const CharacterProfile = dynamic(() => import("@/components/CharacterProfile").then(m => m.CharacterProfile), { loading: LoadingPanel });
 const CharacterChat = dynamic(() => import("@/components/CharacterChat").then(m => m.CharacterChat), { loading: LoadingPanel });
 const CreateGirlWizard = dynamic(() => import("@/components/CreateGirlWizard").then(m => m.CreateGirlWizard), { loading: LoadingPanel });

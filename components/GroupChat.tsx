@@ -25,6 +25,7 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [typingSpeaker, setTypingSpeaker] = useState<{ name: string; slot: 0 | 1 } | null>(null);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, "idle" | "thinking">>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const guardRef = useRef(createChatTurnGuard("group-setup"));
   const mountedRef = useRef(true);
@@ -55,6 +56,7 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
     setTypingSpeaker(null);
     setStarted(true);
     const [a, b] = girls;
+    setAgentStatuses({ [a.id]: "idle", [b.id]: "idle" });
     setMessages([
       {
         role: "girl",
@@ -90,8 +92,11 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
     const [a, b] = girls;
     const next: Msg[] = [...messages, { role: "user", content: text }];
     const isCurrent = () => mountedRef.current && guardRef.current.isCurrent(generation, originId);
-    if (isCurrent()) setMessages(next);
-    if (isCurrent()) setTypingSpeaker({ name: a.name.split(" ")[0], slot: 0 });
+    if (isCurrent()) {
+      setMessages(next);
+      setTypingSpeaker({ name: a.name.split(" ")[0], slot: 0 });
+      setAgentStatuses({ [a.id]: "thinking", [b.id]: "idle" });
+    }
 
     const personaA = {
       id: a.id,
@@ -125,8 +130,9 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
 
     try {
       const historyA = toHistory(next);
-      const resA = await generateCompanionReply(historyA, personaA);
-      const textA = ensureVisibleReply(resA.text, historyA, personaA) || buildContextAwareFallback(historyA, personaA);
+      const [settledA] = await Promise.allSettled([generateCompanionReply(historyA, personaA)]);
+      const rawA = settledA.status === "fulfilled" ? settledA.value.text : "";
+      const textA = ensureVisibleReply(rawA, historyA, personaA) || buildContextAwareFallback(historyA, personaA);
       const msgA: Msg = {
         role: "girl",
         characterId: a.id,
@@ -135,13 +141,17 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
         content: textA,
       };
       const afterA = [...next, msgA];
-      if (isCurrent()) setMessages(afterA);
+      if (isCurrent()) {
+        setMessages(afterA);
+        setAgentStatuses({ [a.id]: "idle", [b.id]: "thinking" });
+      }
       earnCompanionXp(a.id, 4);
 
       if (isCurrent()) setTypingSpeaker({ name: b.name.split(" ")[0], slot: 1 });
       const historyB = toHistory(afterA);
-      const resB = await generateCompanionReply(historyB, personaB);
-      const textB = ensureVisibleReply(resB.text, historyB, personaB) || buildContextAwareFallback(historyB, personaB);
+      const [settledB] = await Promise.allSettled([generateCompanionReply(historyB, personaB)]);
+      const rawB = settledB.status === "fulfilled" ? settledB.value.text : "";
+      const textB = ensureVisibleReply(rawB, historyB, personaB) || buildContextAwareFallback(historyB, personaB);
       if (isCurrent()) {
         setMessages([...afterA, {
           role: "girl",
@@ -150,6 +160,7 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
           slot: 1,
           content: textB,
         }]);
+        setAgentStatuses({ [a.id]: "idle", [b.id]: "idle" });
       }
       earnCompanionXp(b.id, 4);
       guardRef.current.settle(generation, "success");
@@ -160,14 +171,19 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
       const textB = buildContextAwareFallback(toHistory(afterA), personaB);
       if (isCurrent()) {
         setMessages([...afterA, { role: "girl", characterId: b.id, name: b.name, slot: 1, content: textB }]);
+        setAgentStatuses({ [a.id]: "idle", [b.id]: "idle" });
       }
       guardRef.current.settle(generation, "error");
     } finally {
       if (guardRef.current.isCurrent(generation, originId)) {
         guardRef.current.clearThinking(generation);
-        if (mountedRef.current) setTypingSpeaker(null);
+        if (mountedRef.current) {
+          setTypingSpeaker(null);
+          setAgentStatuses({ [a.id]: "idle", [b.id]: "idle" });
+        }
       } else if (mountedRef.current && guardRef.current.snapshot().conversationId === originId) {
         setTypingSpeaker(null);
+        setAgentStatuses({ [a.id]: "idle", [b.id]: "idle" });
       }
     }
   };
@@ -253,8 +269,27 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
               />
             ))}
           </div>
-          <div className="text-sm font-bold text-[#f7f7fc] truncate">
-            {girls.map((g) => g.name.split(" ")[0]).join(" × ")}
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-[#f7f7fc] truncate">
+              {girls.map((g) => g.name.split(" ")[0]).join(" × ")}
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-0.5">
+              {girls.map((g, idx) => {
+                const st = agentStatuses[g.id] || "idle";
+                return (
+                  <span
+                    key={g.id}
+                    className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                      idx === 0
+                        ? "bg-[#ff1e8e]/15 text-[#ff1e8e]"
+                        : "bg-[#00f5ff]/15 text-[#00f5ff]"
+                    }`}
+                  >
+                    {g.name.split(" ")[0]}: {st}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </div>
         <button

@@ -148,6 +148,9 @@ export default function MediaStudioModal({
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [generationStatus, setGenerationStatus] = useState<
+    'idle' | 'processing' | 'success' | 'error' | 'overwrite_pending'
+  >('idle');
   const localEngine = useLocalEngineStatus();
   const [comfyCheckpoints, setComfyCheckpoints] = useState<string[]>([]);
   const [selectedCheckpoint, setSelectedCheckpoint] = useState(() => getMediaSettings().comfyCheckpoint);
@@ -193,7 +196,11 @@ export default function MediaStudioModal({
   const companion = studioCompanions.find((c) => c.id === selectedId) ?? studioCompanions[0];
   const aspect = ASPECT_RATIOS.find((a) => a.id === aspectId) ?? ASPECT_RATIOS[0];
 
-  async function handleGeneratePhoto() {
+  async function handleGeneratePhoto(confirmOverwrite = false) {
+    if (generatedPhoto && !confirmOverwrite) {
+      setGenerationStatus('overwrite_pending');
+      return;
+    }
     const preset = SCENE_PRESETS.find((p) => p.id === sceneId) ?? SCENE_PRESETS[0];
     const custom = customPrompt.trim();
     const prompt = custom
@@ -223,6 +230,7 @@ export default function MediaStudioModal({
     const safeNegative = negativePrompt.trim().slice(0, 360);
 
     setPhotoBusy(true);
+    setGenerationStatus('processing');
     setErrorMsg(null);
     setStatusMsg(null);
 
@@ -249,6 +257,7 @@ export default function MediaStudioModal({
             setVideoSourceUrl(blobUrl);
             setEngineBadge(engineLabel);
             handleSaveToCollection(blobUrl, 'studio-photo');
+            setGenerationStatus('success');
             setStatusMsg(`Rendered via ${engineLabel} in ${elapsedSec}s (seed ${parsedSeed}) · Auto-saved to Photo Diary & Collection`);
             return;
           } catch {
@@ -274,8 +283,10 @@ export default function MediaStudioModal({
       setVideoSourceUrl(result.imageUrl);
       setEngineBadge(result.engine);
       handleSaveToCollection(result.imageUrl, wantsNsfw ? 'selfie' : 'studio-photo');
+      setGenerationStatus('success');
       setStatusMsg(`Rendered via ${result.engine} in ${result.elapsedSec}s (seed ${result.seed}) · Auto-saved to Photo Diary & Collection`);
     } catch (err) {
+      setGenerationStatus('error');
       setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
     } finally {
       setPhotoBusy(false);
@@ -780,6 +791,31 @@ export default function MediaStudioModal({
           >
             {photoBusy ? 'Generating Neon Portrait...' : 'Generate Photo'}
           </button>
+
+          {generationStatus === 'processing' && (
+            <p className="text-[11px] text-[#00f5ff] animate-pulse">✨ Generating your velvet magic...</p>
+          )}
+          {generationStatus === 'overwrite_pending' && (
+            <div className="rounded-xl border border-amber-500/60 bg-amber-950/40 p-3 space-y-2">
+              <p className="text-xs text-amber-200 font-semibold">Current studio preview exists. Overwrite with a new render? (Your previous shot is already saved in Collection.)</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleGeneratePhoto(true)}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-500"
+                >
+                  Yes, Overwrite
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGenerationStatus('idle')}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-zinc-200 hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {comfyCheckpoints.length > 0 && (
             <div className="rounded-xl border border-emerald-300/20 bg-emerald-500/5 px-3 py-2">
