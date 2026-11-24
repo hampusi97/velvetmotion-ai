@@ -1,0 +1,70 @@
+name: Auto Branch & Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: "Target feature branch name to create or update"
+        required: true
+        default: "feature/new-login-system"
+        type: string
+      commit_message:
+        description: "Commit message for any staged changes"
+        required: true
+        default: "Added automated branch update"
+        type: string
+      merge_to_main:
+        description: "Also merge the feature branch into main"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BRANCH_NAME: ${{ inputs.branch_name }}
+      COMMIT_MESSAGE: ${{ inputs.commit_message }}
+      MERGE_TO_MAIN: ${{ inputs.merge_to_main }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and switch to branch
+        run: |
+          set -euo pipefail
+          case "$BRANCH_NAME" in
+            ""|*..*|*" "*|*~*|*^*|*:*|*\?*|*\**|*\[*|*\\*)
+              echo "::error::Invalid branch name: $BRANCH_NAME"
+              exit 1
+              ;;
+          esac
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH_NAME"
+
+      - name: Commit and push branch
+        run: |
+          set -euo pipefail
+          git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "$COMMIT_MESSAGE"
+          fi
+          git push -u origin "$BRANCH_NAME" --force-with-lease
+
+      - name: Merge into main (optional)
+        if: inputs.merge_to_main == true
+        run: |
+          set -euo pipefail
+          git checkout main
+          git merge --no-edit "$BRANCH_NAME"
+          git push origin main
