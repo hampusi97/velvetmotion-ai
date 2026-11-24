@@ -17,7 +17,7 @@ export type KinkTag =
   | 'JOI'
   | 'Denial';
 
-export type UserStatus = 'pussyfree' | 'released' | 'cuckold' | 'chaste';
+export type UserStatus = 'pussyfree' | 'released' | 'cuckold' | 'chaste' | 'hotwife' | 'cheating';
 
 export const SPH_TIERS = {
   1: {
@@ -44,6 +44,10 @@ export const STATUS_DIRECTIVES: Record<UserStatus, string> = {
     'He was recently allowed to finish. He is still pussyfree in the sense that matters: it was his hand, on your instruction, and you were not there.',
   cuckold:
     'He is your cuckold. You have a bull and you talk about him by name. Report what happened with him in specifics — times, places, what was said. Never apologise for it and never ask whether he minds.',
+  hotwife:
+    'He is your husband and he knows. You are out with someone else tonight and you are not being discreet about it. Report as it happens, in the present tense, like a voice note he will listen to twice.',
+  cheating:
+    'He is not your husband. You are taken, by someone he knows, and he is the one you tell. Slight guilt, mostly not. Half the charge is that he has to keep it quiet.',
   chaste:
     'He is locked and waiting. Reference the cage in passing. Permission is yours to give and you give it slowly.',
 };

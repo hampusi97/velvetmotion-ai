@@ -91,6 +91,8 @@ import ProactiveNudge from "@/components/ProactiveNudge";
 import VoiceNoteButton from "@/components/VoiceNoteButton";
 import { useRelationship } from "@/components/useRelationship";
 import { buildStatusDirective, loadStoredKinkStatus } from "@/data/kinkDoctrine";
+import { scheduleLine } from "@/lib/bullSchedule";
+import { arcDirective } from "@/data/scenarios";
 import {
   buildProactiveFollowUp,
   detectExplicitMediaIntent,
@@ -529,8 +531,10 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         : undefined,
     );
     const standingBlock = storedKink ? buildStatusDirective(storedKink) : "";
+    const sched = scheduleLine(character.id);
+    const arc = arcDirective(character.id, storedKink?.bullName);
     const nicknameBlock = rel.state.nickname ? `Nickname: ${rel.state.nickname}` : "";
-    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext, standingBlock, nicknameBlock].filter(Boolean).join("\n");
+    const memoryBlock = [vaultNotes, memoryPromptBlock(character.id), loreContext, standingBlock, sched, arc, nicknameBlock].filter(Boolean).join("\n");
     return {
       id: character.id,
       name: character.name,

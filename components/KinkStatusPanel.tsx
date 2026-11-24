@@ -9,6 +9,8 @@ const LABELS: Record<UserStatus, string> = {
   released: "Recently released",
   cuckold: "Cuckold",
   chaste: "Locked",
+  hotwife: "Hotwife",
+  cheating: "Cheating",
 };
 
 export default function KinkStatusPanel({

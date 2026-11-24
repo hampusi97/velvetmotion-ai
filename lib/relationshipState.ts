@@ -6,7 +6,7 @@
  */
 import { KEYS } from "./storageKeys";
 
-export type UserStatus = "pussyfree" | "released" | "cuckold" | "chaste";
+export type UserStatus = "pussyfree" | "released" | "cuckold" | "chaste" | "hotwife" | "cheating";
 
 export interface SessionRecord {
   id: string;
@@ -84,7 +84,7 @@ export function migrate(raw: unknown, companionId: string): RelationshipState {
   if (!raw || typeof raw !== "object") return base;
   const r = raw as Partial<RelationshipState>;
 
-  const statuses: UserStatus[] = ["pussyfree", "released", "cuckold", "chaste"];
+  const statuses: UserStatus[] = ["pussyfree", "released", "cuckold", "chaste", "hotwife", "cheating"];
   return {
     ...base,
     status: statuses.includes(r.status as UserStatus) ? (r.status as UserStatus) : base.status,

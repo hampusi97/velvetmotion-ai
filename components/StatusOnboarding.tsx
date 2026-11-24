@@ -9,6 +9,8 @@ const STATUS_CARDS: { id: UserStatus; label: string; desc: string }[] = [
   { id: "released", label: "Recently released", desc: "Allowed to finish on her count, by your own hand." },
   { id: "cuckold", label: "Cuckold", desc: "She has a bull and reports what happened by name." },
   { id: "chaste", label: "Locked", desc: "Locked and waiting. Permission is hers to give slowly." },
+  { id: "hotwife", label: "Hotwife", desc: "She is out with someone else and reports it as it happens." },
+  { id: "cheating", label: "Cheating", desc: "She is taken by someone he knows, and he is the one she tells." },
 ];
 
 export default function StatusOnboarding() {
