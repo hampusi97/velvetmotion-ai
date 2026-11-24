@@ -402,5 +402,16 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // Root Collection: /templates/{templateId} — public read, signed-in write
+    match /templates/{templateId} {
+      allow read: if true;
+      allow write: if isSignedIn() && isValidId(templateId);
+    }
+
+    // Root Collection: /groups/{groupId} — signed-in group rooms
+    match /groups/{groupId} {
+      allow read, write: if isSignedIn() && isValidId(groupId);
+    }
   }
 }

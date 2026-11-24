@@ -24,6 +24,8 @@ test("Every blueprint collection path is explicitly matched in firestore.rules",
   assert.ok(rulesText.includes("match /chats/{characterId}"));
   assert.ok(rulesText.includes("match /gallery/{mediaId}"));
   assert.ok(rulesText.includes("match /companions/{companionId}"));
+  assert.ok(rulesText.includes("match /templates/{templateId}"));
+  assert.ok(rulesText.includes("match /groups/{groupId}"));
 });
 
 test("Dirty Dozen payload simulator rejects all 12 adversarial payloads", () => {
