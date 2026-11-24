@@ -119,7 +119,7 @@ export async function pushAllLocalStateToFirebase(): Promise<boolean> {
     ),
     syncVaultDocToFirestore("customCompanions", JSON.stringify(snap.customCompanions), now),
   ]);
-  return results.some(Boolean);
+  return results.every(Boolean);
 }
 
 export async function pullCloudStateAndMerge(): Promise<boolean> {
@@ -244,11 +244,11 @@ export function useFirebaseCloudSync() {
         syncing: true,
       }));
       await pullCloudStateAndMerge();
-      await pushAllLocalStateToFirebase();
+      const ok = await pushAllLocalStateToFirebase();
       setStatus((s) => ({
         ...s,
         syncing: false,
-        lastSyncedAt: Date.now(),
+        lastSyncedAt: ok ? Date.now() : s.lastSyncedAt,
       }));
     };
 
@@ -260,8 +260,8 @@ export function useFirebaseCloudSync() {
       if (!auth.currentUser) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        void pushAllLocalStateToFirebase().then(() => {
-          setStatus((s) => ({ ...s, lastSyncedAt: Date.now() }));
+        void pushAllLocalStateToFirebase().then((ok) => {
+          if (ok) setStatus((s) => ({ ...s, lastSyncedAt: Date.now() }));
         });
       }, 2500);
     };
@@ -282,7 +282,7 @@ export function useFirebaseCloudSync() {
     setStatus((s) => ({ ...s, syncing: true }));
     await pullCloudStateAndMerge();
     const ok = await pushAllLocalStateToFirebase();
-    setStatus((s) => ({ ...s, syncing: false, lastSyncedAt: Date.now() }));
+    setStatus((s) => ({ ...s, syncing: false, lastSyncedAt: ok ? Date.now() : s.lastSyncedAt }));
     return ok;
   };
 

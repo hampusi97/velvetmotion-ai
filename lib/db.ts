@@ -3,6 +3,18 @@
  * Static-export safe; browser-only.
  */
 import Dexie, { type Table } from "dexie";
+import {
+  BACKUP_TABLES,
+  MAX_BACKUP_BYTES,
+  emptyBackup,
+  isBackupStorageKey,
+  previewDeviceBackup,
+  planBackupStorage,
+  rollbackBackupStorage,
+  type RestorePolicy,
+  type DeviceBackup,
+} from "./deviceBackup";
+import { notifyCompanionLibrary } from "./companionLibrary";
 
 export interface ChatRow {
   id: string;
@@ -107,7 +119,9 @@ export async function saveChatDB(characterId: string, messages: unknown[]) {
   await d.chats.put({ id: characterId, messages, updatedAt: Date.now() });
 }
 
-export async function loadChatDB(characterId: string): Promise<unknown[] | null> {
+export async function loadChatDB(
+  characterId: string,
+): Promise<unknown[] | null> {
   const d = getDb();
   if (!d) return null;
   const row = await d.chats.get(characterId);
@@ -152,16 +166,24 @@ export async function deleteGalleryDB(id: string): Promise<void> {
   if (db) await db.gallery.delete(id);
 }
 
-export async function loadGalleryDB(characterId?: string): Promise<GalleryRow[]> {
+export async function loadGalleryDB(
+  characterId?: string,
+): Promise<GalleryRow[]> {
   const d = getDb();
   if (!d) return [];
   if (characterId) {
-    return d.gallery.where("characterId").equals(characterId).reverse().sortBy("createdAt");
+    return d.gallery
+      .where("characterId")
+      .equals(characterId)
+      .reverse()
+      .sortBy("createdAt");
   }
   return d.gallery.orderBy("createdAt").reverse().toArray();
 }
 
-export async function saveChatBranchDB(branch: Omit<BranchRow, "id">): Promise<BranchRow> {
+export async function saveChatBranchDB(
+  branch: Omit<BranchRow, "id">,
+): Promise<BranchRow> {
   const full: BranchRow = {
     ...branch,
     id: `${branch.characterId}::${branch.branchId}`,
@@ -171,13 +193,21 @@ export async function saveChatBranchDB(branch: Omit<BranchRow, "id">): Promise<B
   return full;
 }
 
-export async function listChatBranchesDB(characterId: string): Promise<BranchRow[]> {
+export async function listChatBranchesDB(
+  characterId: string,
+): Promise<BranchRow[]> {
   const d = getDb();
   if (!d) return [];
-  return d.branches.where("characterId").equals(characterId).sortBy("createdAt");
+  return d.branches
+    .where("characterId")
+    .equals(characterId)
+    .sortBy("createdAt");
 }
 
-export async function deleteChatBranchDB(characterId: string, branchId: string) {
+export async function deleteChatBranchDB(
+  characterId: string,
+  branchId: string,
+) {
   const d = getDb();
   if (!d) return;
   await d.branches.delete(`${characterId}::${branchId}`);
@@ -189,13 +219,18 @@ export async function saveProgressionDB(row: ProgressionRow) {
   await d.progression.put(row);
 }
 
-export async function loadProgressionDB(characterId: string): Promise<ProgressionRow | null> {
+export async function loadProgressionDB(
+  characterId: string,
+): Promise<ProgressionRow | null> {
   const d = getDb();
   if (!d) return null;
   return (await d.progression.get(characterId)) ?? null;
 }
 
-export async function saveCustomCompanionDB(id: string, data: Record<string, unknown>) {
+export async function saveCustomCompanionDB(
+  id: string,
+  data: Record<string, unknown>,
+) {
   const d = getDb();
   if (!d) return;
   await d.companions.put({ id, data, createdAt: Date.now() });
@@ -213,94 +248,114 @@ export async function saveSettingDB(key: string, value: unknown) {
   await d.settings.put({ key, value, updatedAt: Date.now() });
 }
 
-export async function loadSettingDB<T = unknown>(key: string): Promise<T | null> {
+export async function loadSettingDB<T = unknown>(
+  key: string,
+): Promise<T | null> {
   const d = getDb();
   if (!d) return null;
   const row = await d.settings.get(key);
   return (row?.value as T) ?? null;
 }
 
-export interface FullBackupPayload {
-  schema: "velvetmotion-backup-v2";
-  exportedAt: string;
-  localStorage: Record<string, string>;
-  indexedDb: {
-    chats: ChatRow[];
-    memory: MemoryRow[];
-    matches: MatchRow[];
-    gallery: GalleryRow[];
-    progression: ProgressionRow[];
-    companions: CompanionRow[];
-    settings: SettingRow[];
-  };
-}
+export type FullBackupPayload = DeviceBackup;
 
 export async function exportFullBackupJson(): Promise<string> {
-  const ls: Record<string, string> = {};
-  if (typeof window !== "undefined") {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
-      if (k && (k.startsWith("vm-") || k.startsWith("velvet"))) {
-        const val = window.localStorage.getItem(k);
-        if (val !== null) ls[k] = val;
-      }
-    }
+  if (typeof window === "undefined")
+    throw new Error("Backups need browser storage.");
+  const payload = emptyBackup();
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (!key || !isBackupStorageKey(key)) continue;
+    const value = window.localStorage.getItem(key);
+    if (value !== null) payload.localStorage[key] = value;
   }
   const d = getDb();
-  const indexedDb = d
-    ? {
-        chats: await d.chats.toArray(),
-        memory: await d.memory.toArray(),
-        matches: await d.matches.toArray(),
-        gallery: await d.gallery.toArray(),
-        progression: await d.progression.toArray(),
-        companions: await d.companions.toArray(),
-        settings: await d.settings.toArray(),
+  if (!d) throw new Error("The local database is unavailable.");
+  await d.transaction(
+    "r",
+    BACKUP_TABLES.map((name) => d.table(name)),
+    async () => {
+      for (const name of BACKUP_TABLES) {
+        const rows = await d.table(name).toArray();
+        payload.indexedDb[name] =
+          name === "settings"
+            ? rows.filter((row) => isBackupStorageKey(row.key))
+            : rows;
       }
-    : { chats: [], memory: [], matches: [], gallery: [], progression: [], companions: [], settings: [] };
-
-  const payload: FullBackupPayload = {
-    schema: "velvetmotion-backup-v2",
-    exportedAt: new Date().toISOString(),
-    localStorage: ls,
-    indexedDb,
-  };
-  return JSON.stringify(payload, null, 2);
+    },
+  );
+  const json = JSON.stringify(payload, null, 2);
+  if (new TextEncoder().encode(json).byteLength > MAX_BACKUP_BYTES)
+    throw new Error(
+      "This backup exceeds 50 MB. Export large media separately before creating a portable backup.",
+    );
+  return json;
 }
 
-export async function importFullBackupJson(rawText: string): Promise<{ restoredKeys: number; restoredRows: number }> {
-  const parsed = JSON.parse(rawText) as Partial<FullBackupPayload> & Record<string, unknown>;
-  let restoredKeys = 0;
+export async function importFullBackupJson(
+  rawText: string,
+  policy: RestorePolicy = "keep-existing",
+): Promise<{ restoredKeys: number; restoredRows: number }> {
+  if (typeof window === "undefined")
+    throw new Error("Restoring needs browser storage.");
+  const { backup } = previewDeviceBackup(rawText);
+  const d = getDb();
+  if (!d) throw new Error("The local database is unavailable.");
+  let changes = planBackupStorage(window.localStorage, backup, policy);
   let restoredRows = 0;
-
-  if (parsed && parsed.schema === "velvetmotion-backup-v2" && parsed.localStorage) {
-    for (const [k, v] of Object.entries(parsed.localStorage)) {
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(k, String(v));
-        restoredKeys++;
-      }
-    }
-    const d = getDb();
-    if (d && parsed.indexedDb) {
-      if (parsed.indexedDb.chats?.length) { await d.chats.bulkPut(parsed.indexedDb.chats); restoredRows += parsed.indexedDb.chats.length; }
-      if (parsed.indexedDb.memory?.length) { await d.memory.bulkPut(parsed.indexedDb.memory); restoredRows += parsed.indexedDb.memory.length; }
-      if (parsed.indexedDb.matches?.length) { await d.matches.bulkPut(parsed.indexedDb.matches); restoredRows += parsed.indexedDb.matches.length; }
-      if (parsed.indexedDb.gallery?.length) { await d.gallery.bulkPut(parsed.indexedDb.gallery); restoredRows += parsed.indexedDb.gallery.length; }
-      if (parsed.indexedDb.progression?.length) { await d.progression.bulkPut(parsed.indexedDb.progression); restoredRows += parsed.indexedDb.progression.length; }
-      if (parsed.indexedDb.companions?.length) { await d.companions.bulkPut(parsed.indexedDb.companions); restoredRows += parsed.indexedDb.companions.length; }
-      if (parsed.indexedDb.settings?.length) { await d.settings.bulkPut(parsed.indexedDb.settings); restoredRows += parsed.indexedDb.settings.length; }
-    }
-    window.dispatchEvent(new Event("vm:coins-changed"));
-    return { restoredKeys, restoredRows };
+  let restoredKeys = 0;
+  const attempted: typeof changes = [];
+  try {
+    await d.transaction(
+      "rw",
+      BACKUP_TABLES.map((name) => d.table(name)),
+      async () => {
+        const writes = new Map<string, Record<string, unknown>[]>();
+        // Resolve conflicts inside the same database transaction before any mutations.
+        for (const name of BACKUP_TABLES) {
+          const incoming = backup.indexedDb[name];
+          const keys = incoming.map((row) =>
+            String(name === "settings" ? row.key : row.id),
+          );
+          const existing = await d.table(name).bulkGet(keys);
+          const selected = incoming.filter((row, index) => {
+            if (policy === "use-backup") return true;
+            if (name === "chats") {
+              const key = `vm-chat-${row.id}`;
+              if (existing[index])
+                changes = changes.filter((change) => change.key !== key);
+              // Either current chat store wins over a backup when preserving existing content.
+              if (existing[index] || window.localStorage.getItem(key) !== null)
+                return false;
+            }
+            return !existing[index];
+          });
+          writes.set(name, selected);
+        }
+        for (const change of changes) {
+          attempted.push(change);
+          window.localStorage.setItem(change.key, change.after);
+          restoredKeys++;
+        }
+        for (const name of BACKUP_TABLES) {
+          const selected = writes.get(name)!;
+          if (!selected.length) continue;
+          await d.table(name).bulkPut(selected);
+          restoredRows += selected.length;
+        }
+      },
+    );
+  } catch (error) {
+    const rolledBack = rollbackBackupStorage(window.localStorage, attempted);
+    const detail =
+      error instanceof Error ? error.message : "Storage is unavailable.";
+    throw new Error(
+      rolledBack
+        ? `Restore failed; database changes were cancelled and local changes were rolled back. ${detail}`
+        : `Restore failed and some local values could not be rolled back. Keep your backup file and free browser storage before retrying. ${detail}`,
+    );
   }
-
-  // Backward-compatible flat key/value JSON import
-  for (const [k, v] of Object.entries(parsed || {})) {
-    if (typeof window !== "undefined" && typeof v === "string") {
-      window.localStorage.setItem(k, v);
-      restoredKeys++;
-    }
-  }
-  window.dispatchEvent(new Event("vm:coins-changed"));
+  notifyCompanionLibrary();
+  window.dispatchEvent(new Event("vm:device-backup-restored"));
   return { restoredKeys, restoredRows };
 }
