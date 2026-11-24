@@ -16,6 +16,7 @@ import {
 } from '@/lib/canvasVideoExporter';
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
+import { FotoXTemplates, type SceneTemplate } from '@/components/FotoXTemplates';
 import { getMediaSettings, saveMediaSettings } from '@/lib/mediaSettings';
 import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
 import { generateFictionalReferenceVariation } from '@/lib/referenceImageGenerator';
@@ -117,7 +118,7 @@ export default function MediaStudioModal({
   onCompanionCreated,
   onDropIntoChat,
 }: MediaStudioModalProps) {
-  const [tab, setTab] = useState<'photo' | 'video' | 'upload'>(initialTab);
+  const [tab, setTab] = useState<'photo' | 'video' | 'upload' | 'templates'>(initialTab);
   const [selectedId, setSelectedId] = useState(activeChatCompanionId || FLAGSHIP_COMPANIONS[0].id);
   const [studioCompanions, setStudioCompanions] = useState<Array<Pick<CompanionProfile, 'id' | 'name' | 'age' | 'archetype' | 'portraitUrl' | 'visualDna'>>>(FLAGSHIP_COMPANIONS);
   const [sceneId, setSceneId] = useState<string>(SCENE_PRESETS[0].id);
@@ -204,6 +205,15 @@ export default function MediaStudioModal({
     window.addEventListener(COMPANION_LIBRARY_EVENT, refresh);
     return () => window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
   }, [isOpen, standalone, activeChatCompanionId]);
+
+
+  function applyTemplate(tpl: SceneTemplate) {
+    setCustomPrompt(tpl.prompt);
+    setNsfwMode(true);
+    setDurationSec(tpl.duration > 8 ? 8 : tpl.duration === 5 ? 5 : 5);
+    setTab('video');
+    setStatusMsg(`Scene set: ${tpl.title} (${tpl.duration}s). Generate on Video tab.`);
+  }
 
   if (!isOpen && !standalone) return null;
 
@@ -620,6 +630,7 @@ export default function MediaStudioModal({
             ['photo', 'Photo Studio'],
             ['video', 'Shorts Video'],
             ['upload', 'Face Lock / V2'],
+            ['templates', 'Scenes'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -1038,6 +1049,13 @@ export default function MediaStudioModal({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+
+      {tab === 'templates' && (
+        <div className="space-y-3 text-xs">
+          <FotoXTemplates onPick={applyTemplate} />
         </div>
       )}
 
