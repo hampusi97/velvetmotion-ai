@@ -1,0 +1,56 @@
+name: Uncensored AI Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Prompt to send to Uncensored AI"
+        required: true
+        default: "How does antigravity work?"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  query-uncensored-ai:
+    name: Query Uncensored AI and Commit Response
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Query Uncensored AI API and write answer.txt
+        env:
+          UNCENSORED_AI_API_KEY: ${{ secrets.UNCENSORED_AI_API_KEY }}
+          PROMPT: ${{ inputs.prompt }}
+        run: |
+          set -euo pipefail
+          PAYLOAD="$(jq -n --arg prompt "$PROMPT" '{prompt: $prompt}')"
+
+          if [ -n "${UNCENSORED_AI_API_KEY:-}" ]; then
+            RESPONSE_JSON="$(curl -sS -f -X POST https://uncensored.ai/api/v1/response \
+              -H "Authorization: Bearer ${UNCENSORED_AI_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD")"
+            echo "$RESPONSE_JSON" | jq -r '.response // .choices[0].message.content // tostring' > answer.txt
+          else
+            echo "::warning::UNCENSORED_AI_API_KEY secret is not configured; falling back to local src.velvetmotion generator."
+            python3 -c 'import os; from src.velvetmotion import generate_response; print(generate_response(os.environ["PROMPT"]))' > answer.txt
+          fi
+
+      - name: Commit and push answer.txt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add answer.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Added AI response"
+            git push origin HEAD:main
+          else
+            echo "No changes to answer.txt to commit."
+          fi
