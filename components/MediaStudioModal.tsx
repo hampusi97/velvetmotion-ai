@@ -54,10 +54,14 @@ const SELF_AVATAR_STYLES = [
   { id: 'lingerie', label: 'Lingerie', prompt: 'wearing elegant lace lingerie, soft bedroom light, photoreal', nsfw: true },
   { id: 'nude', label: 'Nude', prompt: 'nude, natural body, soft window light, photorealistic skin texture', nsfw: true },
   { id: 'boudoir', label: 'Boudoir', prompt: 'intimate boudoir pose, silk sheets, candlelight, photoreal', nsfw: true },
-  { id: 'cowgirl', label: 'Cowgirl', prompt: 'cowgirl sex pose, bedroom, natural motion, photoreal adult', nsfw: true },
+  { id: 'cowgirl', label: 'Cowgirl', prompt: 'cowgirl sex pose on bed, bedroom, natural motion, photoreal adult', nsfw: true },
   { id: 'doggy', label: 'Doggy', prompt: 'doggy style sex pose, bedroom, photoreal adult', nsfw: true },
+  { id: 'missionary', label: 'Missionary', prompt: 'missionary sex pose, bedroom, looking at camera, photoreal adult', nsfw: true },
   { id: 'blowjob', label: 'Oral', prompt: 'oral sex scene, photoreal adult, natural lighting', nsfw: true },
   { id: 'joi', label: 'JOI', prompt: 'looking at camera, dirty talk expression, bedroom, photoreal adult', nsfw: true },
+  { id: 'shower', label: 'Shower', prompt: 'in the shower, wet skin, steam, nude, photoreal adult', nsfw: true },
+  { id: 'breeding', label: 'Breeding', prompt: 'intimate breeding scene, bedroom, photoreal adult', nsfw: true },
+  { id: 'sph', label: 'SPH', prompt: 'small penis humiliation expression, looking at camera, bedroom, photoreal adult', nsfw: true },
 ] as const;
 
 const STUDIO_STYLES = ['Candid Flash', 'Neon Noir', 'Studio Glamour', 'Anime/3D'] as const;
@@ -1039,6 +1043,9 @@ export default function MediaStudioModal({
 
       {tab === 'upload' && (
         <div className="space-y-3 text-xs">
+          <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100">
+            <strong>Private Self-Avatar:</strong> Upload your own photo, confirm it is you, and unlock explicit styles (nude, sex poses, JOI). Stays private. Local engine preferred for best results.
+          </div>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
