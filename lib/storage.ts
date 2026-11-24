@@ -124,7 +124,7 @@ export function addToGallery(item: Omit<GalleryItem, "id" | "createdAt">) {
   try {
     localStorage.setItem(GALLERY_KEY, JSON.stringify(next));
   } catch {
-    /* quota */
+    return;
   }
   const validType = (["portrait", "lingerie", "nude", "explicit", "video"].includes(item.type)
     ? item.type

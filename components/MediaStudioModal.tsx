@@ -15,6 +15,7 @@ import {
   type VideoMotionPreset,
 } from '@/lib/canvasVideoExporter';
 import { generateComfySfwPortrait, probeComfyUi } from '@/lib/comfyBridge';
+import { blobToDataUrl } from '@/lib/imageStore';
 import { generateStudioPicture } from '@/lib/mediaGenerator';
 import { getMediaSettings, saveMediaSettings } from '@/lib/mediaSettings';
 import { VoiceDesigner, DEFAULT_VOICE_DESIGN, type VoiceDesign } from '@/components/VoiceDesigner';
@@ -127,7 +128,17 @@ export default function MediaStudioModal({
   const [negativePrompt, setNegativePrompt] = useState("watermarks, extra fingers, distorted faces");
   const [nsfwMode, setNsfwMode] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [generatedPhoto, setGeneratedPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<{
+    url: string;
+    companion: Pick<CompanionProfile, 'id' | 'name'>;
+    type: string;
+    style: string;
+  } | null>(null);
+  const generatedPhoto = photo?.url;
+  const photoExtension = generatedPhoto?.startsWith('data:image/jpeg') ? 'jpg'
+    : generatedPhoto?.startsWith('data:image/webp') ? 'webp'
+    : generatedPhoto?.startsWith('data:image/png') ? 'png'
+    : undefined;
   const [photoRevealed, setPhotoRevealed] = useState(true);
   const [engineBadge, setEngineBadge] = useState<string | null>(null);
 
@@ -248,7 +259,7 @@ export default function MediaStudioModal({
             const t0 = performance.now();
             const activeCheckpoint = comfyInfo.checkpoints.includes(selectedCheckpoint)
               ? selectedCheckpoint : comfyInfo.checkpoints[0];
-            const blobUrl = await generateComfySfwPortrait({
+            const blob = await generateComfySfwPortrait({
               prompt,
               checkpointName: activeCheckpoint,
               width: aspect.width,
@@ -257,12 +268,8 @@ export default function MediaStudioModal({
             });
             const elapsedSec = Number(((performance.now() - t0) / 1000).toFixed(1));
             const engineLabel = `ComfyUI (${activeCheckpoint || 'Local :8188'})`;
-            setGeneratedPhoto(blobUrl);
-            setPhotoRevealed(true);
-            setVideoSourceUrl(blobUrl);
-            setEngineBadge(engineLabel);
-            handleSaveToCollection(blobUrl, 'studio-photo');
-            setStatusMsg(`Rendered via ${engineLabel} in ${elapsedSec}s (seed ${parsedSeed}) · Auto-saved to Photo Diary & Collection`);
+            const url = await blobToDataUrl(blob);
+            showGeneratedPhoto(url, engineLabel, elapsedSec, parsedSeed, false);
             return;
           } catch {
             /* Fall back seamlessly to studio pipeline / Cloudflare Image Worker GET /generate */
@@ -282,12 +289,7 @@ export default function MediaStudioModal({
         negativePrompt,
       });
 
-      setGeneratedPhoto(result.imageUrl);
-      setPhotoRevealed(!wantsNsfw);
-      setVideoSourceUrl(result.imageUrl);
-      setEngineBadge(result.engine);
-      handleSaveToCollection(result.imageUrl, wantsNsfw ? 'selfie' : 'studio-photo');
-      setStatusMsg(`Rendered via ${result.engine} in ${result.elapsedSec}s (seed ${result.seed}) · Auto-saved to Photo Diary & Collection`);
+      showGeneratedPhoto(result.imageUrl, result.engine, result.elapsedSec, result.seed, wantsNsfw);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Photo generation failed.');
     } finally {
@@ -462,24 +464,51 @@ export default function MediaStudioModal({
     }
   }
 
-  function handleSaveToCollection(url: string, type = 'studio') {
+  function showGeneratedPhoto(url: string, engine: string, elapsedSec: number, seed: number, hidden: boolean) {
+    const type = hidden ? 'selfie' : 'studio-photo';
+    setPhoto({ url, companion, type, style: studioStyle });
+    setPhotoRevealed(!hidden);
+    setVideoSourceUrl(url);
+    setEngineBadge(engine);
+    const saved = saveToCollection(url, type, companion, studioStyle);
+    setStatusMsg(`Rendered via ${engine} in ${elapsedSec}s (seed ${seed}).${saved ? ' Saved to Collection.' : ''}`);
+  }
+
+  function saveToCollection(
+    url: string,
+    type: string,
+    owner: Pick<CompanionProfile, 'id' | 'name'> = companion,
+    style: string = studioStyle,
+  ) {
+    setErrorMsg(null);
+    if (url.startsWith('blob:')) {
+      setErrorMsg('This preview is temporary. Download the file to keep it.');
+      return false;
+    }
+    if (getGallery().some((item) => item.characterId === owner.id && item.type === type && item.url === url)) {
+      return true;
+    }
     const saved = addToGallery({
-      characterId: companion.id,
-      characterName: companion.name,
+      characterId: owner.id,
+      characterName: owner.name,
       type,
       url,
-      prompt: `${companion.name} · ${studioStyle}`,
+      prompt: `${owner.name} · ${style}`,
     });
-    if (saved) {
-      void saveGalleryDB({
-        id: saved.id,
-        characterId: saved.characterId,
-        url: saved.url,
-        mood: type,
-        createdAt: saved.createdAt,
-      });
+    if (!saved) {
+      setErrorMsg('Collection could not save this file. Browser storage may be full or unavailable. Download your result or free space and try again.');
+      return false;
     }
-    setStatusMsg('Saved permanently to Collection!');
+    void saveGalleryDB({
+      id: saved.id,
+      characterId: saved.characterId,
+      url: saved.url,
+      mood: type,
+      createdAt: saved.createdAt,
+    }).catch(() => {
+      // Collection uses the local gallery. A failed diary mirror does not undo that save.
+    });
+    return true;
   }
 
   function handleDropToChat(url: string) {
@@ -635,10 +664,10 @@ export default function MediaStudioModal({
       </div>
 
       {errorMsg && (
-        <p className="rounded-xl border border-rose-500/45 bg-rose-500/15 px-3 py-2 text-xs text-rose-200">{errorMsg}</p>
+        <p role="alert" className="rounded-xl border border-rose-500/45 bg-rose-500/15 px-3 py-2 text-xs text-rose-200">{errorMsg}</p>
       )}
       {statusMsg && (
-        <p className="rounded-xl border border-[#00ffa3]/40 bg-[#00ffa3]/12 px-3 py-2 text-xs text-[#00ffa3]">{statusMsg}</p>
+        <p role="status" className="rounded-xl border border-[#00ffa3]/40 bg-[#00ffa3]/12 px-3 py-2 text-xs text-[#00ffa3]">{statusMsg}</p>
       )}
 
       {tab === 'photo' && (
@@ -834,14 +863,20 @@ export default function MediaStudioModal({
               <div className="flex flex-wrap justify-center gap-2">
                 <a
                   href={generatedPhoto}
-                  download={`velvetmotion-${companion.id}.png`}
+                  download={photoExtension ? `velvetmotion-${photo?.companion.id}.${photoExtension}` : 'velvetmotion-photo'}
                   className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] font-semibold"
                 >
-                  <Download className="h-3.5 w-3.5" /> PNG
+                  <Download className="h-3.5 w-3.5" /> Download photo
                 </a>
                 <button
                   type="button"
-                  onClick={() => handleSaveToCollection(generatedPhoto, 'studio-photo')}
+                  onClick={() => {
+                    if (photo && saveToCollection(photo.url, photo.type, photo.companion, photo.style)) {
+                      setStatusMsg('Saved to Collection.');
+                    } else {
+                      setStatusMsg(null);
+                    }
+                  }}
                   className="inline-flex items-center gap-1 rounded-full border border-[#00f5ff]/45 bg-[#00f5ff]/15 px-3 py-1.5 text-[11px] font-bold text-[#00f5ff]"
                 >
                   <BookmarkPlus className="h-3.5 w-3.5" /> Save to Collection
@@ -890,7 +925,7 @@ export default function MediaStudioModal({
                 </option>
               ))}
               {getGallery()
-                .filter((g) => g.url && !g.url.startsWith('blob:'))
+                .filter((g) => g.type !== 'video' && g.url && !g.url.startsWith('blob:'))
                 .slice(0, 10)
                 .map((g) => (
                   <option key={g.id} value={g.url}>
@@ -1016,7 +1051,9 @@ export default function MediaStudioModal({
                       setErrorMsg('This is a temporary video URL. Download the clip to keep it; permanent video storage is not connected yet.');
                       return;
                     }
-                    handleSaveToCollection(generatedVideoUrl, 'video');
+                    setStatusMsg(saveToCollection(generatedVideoUrl, 'video')
+                      ? 'Video link saved to Collection. Download the clip to keep an offline copy.'
+                      : null);
                   }}
                   className="inline-flex items-center gap-1 rounded-full border border-[#ff5678]/45 bg-[#2a1820] px-3.5 py-1.5 text-xs font-bold text-white"
                 >
