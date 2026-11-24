@@ -72,6 +72,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Sweetheart',
     tagline: 'Warm late-night confidante who secretly steals your hoodies',
     portraitUrl: '/portraits/chloe-parker.webp',
+    previewVideoUrl: '/videos/chloe-parker.webm',
     visualDna:
       '22-year-old woman with warm chestnut waves, soft hazel eyes, natural freckles, wearing an oversized cream off-shoulder knit sweater in a cozy lamp-lit bedroom, candid smartphone portrait, natural skin texture, shallow depth of field',
     voiceId: 'af_heart',
@@ -103,6 +104,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Athletic',
     tagline: 'Sun-kissed beach club regular with endless teasing energy',
     portraitUrl: '/portraits/maya-solis.webp',
+    previewVideoUrl: '/videos/maya-solis.webm',
     visualDna:
       '24-year-old sun-kissed Latina woman with long dark wavy hair, glowing bronzed skin, bright playful smile, wearing a sleek pastel pink swimsuit beside a sunset infinity pool, golden-hour natural photography, crisp DSLR detail',
     voiceId: 'af_bella',
@@ -134,6 +136,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Luxury',
     tagline: 'Razor-sharp creative director who only lets her guard down with you',
     portraitUrl: '/portraits/sloane-kensington.webp',
+    previewVideoUrl: '/videos/sloane-kensington.webm',
     visualDna:
       '28-year-old woman with sleek jet-black hair, piercing green eyes, sculpted cheekbones, wearing a tailored black silk blazer in a glass penthouse overlooking city lights at night, moody luxury editorial photography',
     voiceId: 'bf_emma',
@@ -164,6 +167,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Goth',
     tagline: '2 AM vinyl collector with dark eyeliner and unfiltered honesty',
     portraitUrl: '/portraits/raven-vance.webp',
+    previewVideoUrl: '/videos/raven-vance.webm',
     visualDna:
       '25-year-old alt woman with short glossy black wolf-cut hair, subtle silver piercings, winged dark eyeliner, wearing a black mesh top and silver choker in a dimly lit room with purple neon and vinyl records, candid film photography',
     voiceId: 'af_nicole',
@@ -195,6 +199,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Anime',
     tagline: 'Playful duo partner who turns every match into a flirty wager',
     portraitUrl: '/portraits/sora-takahashi.webp',
+    previewVideoUrl: '/videos/sora-takahashi.webm',
     visualDna:
       '22-year-old East Asian woman with silky dark hair with soft bangs, warm brown eyes, wearing a cropped pastel hoodie with gaming headphones around her neck in a cozy pink-and-cyan RGB gaming room, crisp candid webcam-style portrait',
     voiceId: 'af_sky',
@@ -224,6 +229,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Luxury',
     tagline: 'Convertible sunset drives, rooftop wine, and zero awkward silences',
     portraitUrl: '/portraits/dalia-moreau.webp',
+    previewVideoUrl: '/videos/dalia-moreau.webm',
     visualDna:
       '26-year-old Mediterranean woman with long dark espresso hair, warm olive skin, full lips, wearing an off-shoulder rose-pink top inside a car at golden hour, sunlit candid smartphone selfie, realistic skin texture',
     voiceId: 'af_sarah',
@@ -254,6 +260,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Athletic',
     tagline: 'Morning mirror selfies, sweet check-ins, and effortless chemistry',
     portraitUrl: '/portraits/lena-brooks.webp',
+    previewVideoUrl: '/videos/lena-brooks.webm',
     visualDna:
       '23-year-old woman with honey-blonde hair in a loose high ponytail, bright blue-green eyes, athletic toned build, wearing a sage-green matching yoga set in a bright sunlit modern apartment, candid natural-light mirror selfie',
     voiceId: 'af_heart',
@@ -282,6 +289,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Luxury',
     tagline: 'Velvet-voiced mixologist who turns every drink into a midnight dare',
     portraitUrl: '/portraits/aria-velasco.webp',
+    previewVideoUrl: '/videos/aria-velasco.webm',
     visualDna:
       '27-year-old woman with glossy dark brunette waves, warm amber eyes, subtle gold jewelry, wearing a fitted burgundy off-shoulder top behind a moody amber-lit cocktail lounge bar, cinematic shallow-DOF portrait',
     voiceId: 'af_bella',
@@ -312,6 +320,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Cyberpunk',
     tagline: 'Neon-lit hacker who only trusts you with her encrypted channel',
     portraitUrl: '/portraits/nova-park.webp',
+    previewVideoUrl: '/videos/nova-park.webm',
     visualDna:
       '23-year-old Korean-American woman with sleek silver-streaked black bob hair, sharp dark eyes, wearing a cropped matte-black techwear jacket in a rain-streaked neon-blue and magenta city apartment, cinematic night photography',
     voiceId: 'af_nicole',
@@ -342,6 +351,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Luxury',
     tagline: 'Effortlessly magnetic gallery curator with a taste for late-night romance',
     portraitUrl: '/portraits/nadine-okoye.webp',
+    previewVideoUrl: '/videos/nadine-okoye.webm',
     visualDna:
       '29-year-old Black woman with radiant deep brown skin, glossy braided updo, warm expressive eyes, gold hoop earrings, wearing an emerald satin dress in a candlelit art gallery loft, editorial natural-light photography',
     voiceId: 'bf_emma',
@@ -371,6 +381,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Sweetheart',
     tagline: 'Quiet bookshop romantic who says the boldest things after dark',
     portraitUrl: '/portraits/claire-bennett.webp',
+    previewVideoUrl: '/videos/claire-bennett.webm',
     visualDna:
       '24-year-old woman with auburn wavy hair pinned loosely back, thin gold-rimmed glasses, warm green eyes, wearing a soft sage cardigan in a cozy lamp-lit indie bookshop, candid warm natural photography',
     voiceId: 'af_sarah',
@@ -398,6 +409,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'Anime',
     tagline: 'Creative costume designer who loves turning your fantasies into scenes',
     portraitUrl: '/portraits/yumi-chen.webp',
+    previewVideoUrl: '/videos/yumi-chen.webm',
     visualDna:
       '23-year-old East Asian woman with long silky midnight-blue tinted hair, bright expressive eyes, soft glam makeup, wearing a stylish sakura-pink satin jacket in a Tokyo-inspired neon studio, crisp vibrant photography',
     voiceId: 'af_sky',
@@ -427,6 +439,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'BNWO',
     tagline: 'Will not look at a whiteboi twice, then won\'t stop texting him',
     portraitUrl: '/portraits/camille-laurent.webp',
+    previewVideoUrl: '/videos/camille-laurent.webm',
     visualDna:
       '29-year-old French woman with dark blunt-cut hair, red lip, sharp cheekbones, wearing a black silk slip dress against a cream marble ledge in a dim Parisian apartment at dusk, editorial fashion photography, film grain, single warm window light',
     voiceId: 'bf_emma',
@@ -458,6 +471,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'JOI',
     tagline: 'Cheerful, countdown-timed, and completely uninterested in letting you rush',
     portraitUrl: '/portraits/daisy-miller.webp',
+    previewVideoUrl: '/videos/daisy-miller.webm',
     visualDna:
       '23-year-old white American woman with blonde tousled hair and glossy lips, wearing a cropped white ribbed tank top, warm gold rim light on a black studio backdrop, editorial glamour photography, film grain',
     voiceId: 'af_sky',
@@ -488,6 +502,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'BNWO',
     tagline: 'Says almost nothing and every word of it lands',
     portraitUrl: '/portraits/yuki-sato.webp',
+    previewVideoUrl: '/videos/yuki-sato.webm',
     visualDna:
       '25-year-old Japanese woman with long straight black hair and blunt fringe, white shirt slipping off one shoulder, cool diffused window light on a pale grey backdrop, minimal editorial photography, fine film grain',
     voiceId: 'af_nicole',
@@ -517,6 +532,7 @@ export const FLAGSHIP_COMPANIONS: CompanionProfile[] = [
     category: 'BNWO',
     tagline: 'Tells the whole street, then tells you what they said',
     portraitUrl: '/portraits/valeria-cruz.webp',
+    previewVideoUrl: '/videos/valeria-cruz.webm',
     visualDna:
       '27-year-old Colombian woman with long dark curls and gold hoops, wearing a bronze satin slip, warm hard rim light on a black studio backdrop, glossy editorial photography',
     voiceId: 'af_bella',
