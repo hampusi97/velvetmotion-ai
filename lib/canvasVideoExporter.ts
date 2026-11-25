@@ -122,10 +122,20 @@ export async function renderCanvasMotionWebm(
   if (!ctx) throw new Error("Canvas 2D unavailable.");
 
   const stream = canvas.captureStream(30);
-  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-    ? "video/webm;codecs=vp9"
-    : "video/webm";
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 2_600_000 });
+  const candidateMimes = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4;codecs=avc1",
+    "video/mp4",
+  ];
+  const chosenMime =
+    typeof MediaRecorder.isTypeSupported === "function"
+      ? candidateMimes.find((m) => MediaRecorder.isTypeSupported(m))
+      : undefined;
+  const recorder = chosenMime
+    ? new MediaRecorder(stream, { mimeType: chosenMime, videoBitsPerSecond: 2_600_000 })
+    : new MediaRecorder(stream);
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data);
@@ -134,7 +144,8 @@ export async function renderCanvasMotionWebm(
   const done = new Promise<string>((resolve, reject) => {
     recorder.onstop = () => {
       if (signal?.aborted) { reject(videoCanceledError()); return; }
-      const blob = new Blob(chunks, { type: "video/webm" });
+      const actualMime = recorder.mimeType || chosenMime || "video/webm";
+      const blob = new Blob(chunks, { type: actualMime });
       resolve(URL.createObjectURL(blob));
     };
     recorder.onerror = () => reject(new Error("Canvas video recording failed."));
@@ -144,12 +155,22 @@ export async function renderCanvasMotionWebm(
   const totalMs = Math.max(1500, Math.round((durationSec * 1000) / speed));
   const start = performance.now();
   let frame = 0;
+  let timerHandle = 0;
   let cancelFrame: (() => void) | undefined;
+
+  const scheduleNext = (cb: (now: number) => void) => {
+    if (typeof document !== "undefined" && document.hidden) {
+      timerHandle = window.setTimeout(() => cb(performance.now()), 33);
+    } else {
+      frame = requestAnimationFrame(cb);
+    }
+  };
 
   try {
     await new Promise<void>((resolve, reject) => {
       const cancel = () => {
         cancelAnimationFrame(frame);
+        if (timerHandle) clearTimeout(timerHandle);
         reject(videoCanceledError());
       };
       cancelFrame = cancel;
@@ -193,13 +214,13 @@ export async function renderCanvasMotionWebm(
           ctx!.fillRect(0, 0, canvas.width, canvas.height);
           ctx!.globalAlpha = 1;
         }
-        if (t < 1) frame = requestAnimationFrame(drawFrame);
+        if (t < 1) scheduleNext(drawFrame);
         else {
           recorder.stop();
           resolve();
         }
       }
-      frame = requestAnimationFrame(drawFrame);
+      scheduleNext(drawFrame);
     });
     if (signal?.aborted) throw videoCanceledError();
     return await done;
@@ -268,6 +289,19 @@ async function pollVideoJob(initial: VideoBackendResponse, endpoint: string, sig
     }
   }
   throw new Error("Video job did not finish within the polling window.");
+}
+
+export function detectBrowserRecorderFormat(): "mp4" | "webm" {
+  if (typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function") {
+    const webmSupported =
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ||
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp8") ||
+      MediaRecorder.isTypeSupported("video/webm");
+    if (!webmSupported && (MediaRecorder.isTypeSupported("video/mp4;codecs=avc1") || MediaRecorder.isTypeSupported("video/mp4"))) {
+      return "mp4";
+    }
+  }
+  return "webm";
 }
 
 export async function generateStudioVideoClip(
@@ -373,7 +407,7 @@ export async function generateStudioVideoClip(
     videoUrl: webmUrl,
     engine: "Browser motion effect (animated still)",
     isGenerative: false,
-    videoFormat: "webm",
+    videoFormat: detectBrowserRecorderFormat(),
     warning: backendError || (req.comfyOnline
       ? "ComfyUI is reachable, but no AI video workflow endpoint is configured."
       : "Configure a compatible image-to-video endpoint for genuine AI motion."),

@@ -115,6 +115,7 @@ export function buildDynamicSystemPrompt(params: {
     '5. Stay strictly fictional adults (18+) only.',
     '6. Do NOT write [Image of ...] or [Photo of ...] brackets in text replies unless sending an actual photo.',
     '7. Never reveal planning. Do not add a second message about what the user asked or how you will answer.',
+    '8. When the user asks you to send, show, or take a photo, selfie, picture, or video, NEVER claim you cannot send or share images — VelvetMotion automatically captures and attaches your real photo or video clip directly to your reply! Respond playfully in character as if snapping and sending it right now.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -122,18 +123,21 @@ export function buildDynamicSystemPrompt(params: {
 
 const INLINE_IMAGE_TAG_RX = /\[(?:image|photo|selfie)(?:\s+of|\s*:)?\s+([^\]]+)\]/gi;
 
-const MEDIA_VERB = "(?:send|show|generate|make|take|snap|give|share)";
-const IMAGE_NOUN = "(?:selfies?|photos?|pictures?|pics?|images?|nudes?)";
-const VIDEO_NOUN = "(?:videos?|clips?)";
-const SEE_PHRASE = "(?:let me see|can i see|i want to see)";
+const MEDIA_VERB = "(?:send|show|generate|make|take|snap|give|share|drop|post)";
+const IMAGE_NOUN = "(?:selfies?|photos?|pictures?|pics?|images?|nudes?|shots?)";
+const VIDEO_NOUN = "(?:videos?|clips?|animations?)";
+const SEE_PHRASE = "(?:let me see|can i see|i want to see|can i get|let's see)";
+const TOKEN_GAP = "(?:\\s+[\\w'-]+[,]?){0,8}";
+const OUTFIT_SHOW_REQUEST =
+  /\b(?:show\s+me|let\s+me\s+see|can\s+i\s+see)\s+(?:what\s+you(?:'re|\s+are)\s+wearing|your\s+outfit|yourself(?:\s+right\s+now)?)\b/i;
 
-/** Verbs that actually ask for media. "Pick" / "epic" / "spicy" must not match. */
+/** Verbs that actually ask for media. "Pick" / "epic" / "spicy" / "Picture this:" must not match. */
 const EXPLICIT_IMAGE_REQUEST = new RegExp(
-  `\\b${MEDIA_VERB}\\b(?:\\s+\\w+){0,6}\\s+\\b${IMAGE_NOUN}\\b(?!-)|\\b${SEE_PHRASE}\\b(?:\\s+\\w+){0,5}\\s+\\b${IMAGE_NOUN}\\b(?!-)`,
+  `\\b${MEDIA_VERB}\\b${TOKEN_GAP}\\s+\\b${IMAGE_NOUN}\\b(?!-)|\\b${SEE_PHRASE}\\b${TOKEN_GAP}\\s+\\b${IMAGE_NOUN}\\b(?!-)`,
   "i",
 );
 const EXPLICIT_VIDEO_REQUEST = new RegExp(
-  `\\b${MEDIA_VERB}\\b(?:\\s+\\w+){0,6}\\s+\\b${VIDEO_NOUN}\\b(?!-)|\\b${SEE_PHRASE}\\b(?:\\s+\\w+){0,5}\\s+\\b${VIDEO_NOUN}\\b(?!-)`,
+  `\\b${MEDIA_VERB}\\b${TOKEN_GAP}\\s+\\b${VIDEO_NOUN}\\b(?!-)|\\b${SEE_PHRASE}\\b${TOKEN_GAP}\\s+\\b${VIDEO_NOUN}\\b(?!-)`,
   "i",
 );
 
@@ -148,7 +152,7 @@ export type ExplicitMediaIntent = {
  * are not requests.
  */
 const NEGATED_MEDIA_REQUEST =
-  /\b(?:do not|don't|dont|never|stop)\b(?:\s+\w+){0,4}\s+\b(?:send|show|generate|make|take|snap|give|share)\b/i;
+  /\b(?:do not|don't|dont|never|stop)\b(?:\s+[\w'-]+){0,4}\s+\b(?:send|show|generate|make|take|snap|give|share|drop|post)\b/i;
 
 export function detectExplicitMediaIntent(text: string): ExplicitMediaIntent | null {
   const raw = (text || "").trim();
@@ -156,9 +160,11 @@ export function detectExplicitMediaIntent(text: string): ExplicitMediaIntent | n
   const videoAt = raw.search(EXPLICIT_VIDEO_REQUEST);
   const imageAt = raw.search(EXPLICIT_IMAGE_REQUEST);
   if (videoAt >= 0 && (imageAt < 0 || videoAt <= imageAt)) {
-    return { kind: "video", prompt: raw.slice(0, 180) };
+    return { kind: "video", prompt: raw.slice(0, 220) };
   }
-  if (imageAt >= 0) return { kind: "image", prompt: raw.slice(0, 180) };
+  if (imageAt >= 0 || OUTFIT_SHOW_REQUEST.test(raw)) {
+    return { kind: "image", prompt: raw.slice(0, 220) };
+  }
   return null;
 }
 
@@ -270,15 +276,21 @@ export function sanitizeCompanionReply(raw: string, companionName: string): stri
     .replace(typingStageRx, ' ')
     .split('\n')
     .map((line) => line.replace(typingStageRx, ' ').replace(/\s{2,}/g, ' ').trim())
-    .filter((line) => line.length > 0 && !/^(?:User|System|Context|Bio)\s*:/i.test(line))
+    .filter(
+      (line) =>
+        line.length > 0 &&
+        !/^(?:User|System|Context|Bio|Instruction|Prompt)\s*:/i.test(line) &&
+        !/^Now,?\s+respond\s+in\s+the\s+same\s+style\b/i.test(line),
+    )
     .join('\n')
     .replace(prefixRx, '')
     .trim();
 
   if (!text || text.length < 2) return '';
+  const normalizedCheck = text.replace(/[\u2018\u2019]/g, "'");
   if (
-    /be a robot|as an ai\b|as a language model|i cannot fulfill|i am unable to respond|how can i (?:help|assist) you|as an assistant\b/i.test(
-      text,
+    /be a robot|as an ai\b|as a language model|i cannot fulfill|i can't fulfill|i'm sorry,?\s+i can't|i'm afraid i can't|can't share that|cannot share that|(?:can't|cannot|unable to)\s+(?:send|share|provide|generate|show)\s+(?:any\s+)?(?:images|photos|pictures|pics|videos|selfies|media|visuals)|i cannot assist with|i can't assist with|i am unable to respond|how can i (?:help|assist) you|as an assistant\b/i.test(
+      normalizedCheck,
     )
   ) {
     return '';
