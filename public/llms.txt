@@ -1,0 +1,36 @@
+# VelvetMotion AI — Repository Context for Online AI Assistants (`hampusi97/velvetmotion-ai`)
+
+> Live Web App: https://velvetmotion-ai-git.pages.dev
+> Live AI Repo Builder Bridge: https://velvetmotion-ai-git.pages.dev/builder/
+> GitHub Repository: https://github.com/hampusi97/velvetmotion-ai
+
+## 1. Architecture & Tech Stack
+- **Frontend (`app/`, `components/`, `lib/`, `data/`)**: Next.js 15 (`output: "export"`, static HTML/JS export), React 18, TypeScript 5 (`strict`), Tailwind CSS, Lucide icons (`lucide-react`).
+  - Because `next.config.ts` uses `output: "export"`, do NOT create Next.js server-only API routes (`app/api/...`). All browser features run client-side using `localStorage` / IndexedDB (`Dexie`), local engines (`Ollama`, `KoboldCpp`, `ComfyUI`), or client-side HTTPS APIs (`lib/chatRouter.ts`, `lib/chatProviders.ts`).
+- **Desktop App (`src-tauri/`)**: Tauri v2 (`Rust`) native desktop shell for Windows (`.exe` / `.msi`), macOS (`aarch64` / `x86_64`), and Linux (`.deb` / `.rpm` / `.AppImage`) with Ed25519 signed in-app auto-updates.
+- **Python Autonomous Agent & Utilities (`src/`, `workers/`)**:
+  - `src/agent.py` — Autonomous multi-tool GitHub Actions coding agent (`search_code`, `read_file`, `replace_in_file`, `write_file`, `run_checks`, `web_search`, `fetch_url`).
+  - `src/velvetmotion.py` — Companion character card & branching story scenario generator (`generate_response`, `build_character_card`, `build_story_scenarios`).
+  - `src/utils/__init__.py` — Prompt utilities (`normalize_prompt`, `slugify_prompt`, `truncate_prompt`).
+  - `workers/local_media_proxy.py` — Local media/CORS bridge for ComfyUI/TTS.
+
+## 2. Key Repository Files
+- `components/AppShell.tsx` — Main client application shell (keep `/` First Load JS `< 350 kB` by using `next/dynamic` for secondary views).
+- `components/CharacterChat.tsx` & `components/GroupChat.tsx` — 1-on-1 and multi-companion chat interfaces.
+- `components/MediaStudioModal.tsx` — Image & motion generation studio with overwrite protection.
+- `components/SettingsAndBackupDrawer.tsx` — Local Ultra mode, LLM router settings, cloud sync, and hardware readiness diagnostics (`lib/utils/hardwareCheck.ts`).
+- `lib/characters.ts` & `data/companions.ts` — Companion roster (every portrait in `lib/portraitFallback.ts` must map 1-to-1 to a real file in `public/portraits/`).
+- `lib/content/story/added.ts` & `lib/content/index.ts` — Interactive branching story packs (`STORY_PACKS`).
+- `.github/workflows/uncensored-ai.yml` — Autonomous GitHub Actions workflow that applies your code blocks directly to this repository.
+
+## 3. How to Output Code So GitHub Actions Applies It Automatically
+When the user asks you to build a feature, edit a component, or fix a bug for `hampusi97/velvetmotion-ai`, output complete, valid TypeScript/Python files using `<<<FILE: relative/path/to/file.ext>>>` blocks:
+
+<<<FILE: src/utils/example_helper.py>>>
+"""Example Python module."""
+
+def greet_companion(name: str) -> str:
+    return f"Welcome back, {name}."
+<<<END_FILE>>>
+
+(Standard Markdown code blocks preceded by `### relative/path/to/file.ext` or ```` ```tsx relative/path/to/file.tsx ```` are also automatically detected and committed by `src/agent.py`.)
