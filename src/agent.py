@@ -251,6 +251,27 @@ def execute_tool_call(
     return f"Unknown tool: {tool_name}"
 
 
+def _extract_message_text_and_tools(data: Dict[str, Any]) -> str:
+    """Extract assistant content and convert any native OpenAI `tool_calls` into `<<<TOOL>>>` blocks."""
+    choice = (data.get("choices") or [{}])[0]
+    msg = choice.get("message") or {}
+    parts: List[str] = []
+    content = (msg.get("content") or "").strip()
+    if content:
+        parts.append(content)
+    for tc in msg.get("tool_calls") or []:
+        fn = tc.get("function") or {}
+        name = fn.get("name") or ""
+        raw_args = fn.get("arguments") or "{}"
+        if name:
+            try:
+                parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except Exception:
+                parsed_args = {"query": str(raw_args)}
+            parts.append(f"<<<TOOL>>>{json.dumps({'tool': name, 'args': parsed_args})}<<<END_TOOL>>>")
+    return "\n".join(parts).strip()
+
+
 def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] = None) -> TupleResult:
     """Query the 3-tier LLM router: OpenRouter -> Keyless Pollinations OpenAI -> local fallback."""
     api_key = os.environ.get("UNCENSORED_AI_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or ""
@@ -266,15 +287,16 @@ def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] 
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) VelvetMotion/1.0",
                     "X-Title": "VelvetMotion Autonomous Agent",
                 },
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-                if text.strip():
-                    return TupleResult(text=text.strip(), provider=f"OpenRouter ({chosen_model})")
+                text = _extract_message_text_and_tools(data)
+                if text:
+                    return TupleResult(text=text, provider=f"OpenRouter ({chosen_model})")
         except Exception:
             pass
 
@@ -290,16 +312,19 @@ def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] 
         req = urllib.request.Request(
             "https://text.pollinations.ai/openai",
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) VelvetMotion/1.0",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+            text = _extract_message_text_and_tools(data)
             live_model = data.get("model") or "openai"
-            if text.strip():
+            if text:
                 return TupleResult(
-                    text=text.strip(),
+                    text=text,
                     provider=f"Keyless Live LLM ({live_model} via text.pollinations.ai)",
                 )
     except Exception:
@@ -389,17 +414,22 @@ def run_agent_task(
                 tool_logs.append(f"[Step {step + 1}] {err_msg}")
                 observations.append(err_msg)
 
-        messages.append({"role": "assistant", "content": last_text})
+        messages[0] = {
+            "role": "system",
+            "content": "You are the VelvetMotion Autonomous Coding Agent. Tools have already been executed and their results are provided below. Do NOT call any more tools. Provide your complete final answer and any `<<<FILE: path>>>...<<<END_FILE>>>` blocks now.",
+        }
+        messages.append({"role": "assistant", "content": "Executed requested tool calls."})
         messages.append(
             {
                 "role": "user",
                 "content": "\n\n".join(observations)
-                + "\n\nNow provide your final response and any `<<<FILE: path>>>...<<<END_FILE>>>` blocks needed.",
+                + f"\n\nOriginal request: {prompt}\nProvide your complete final response now without calling further tools.",
             }
         )
 
+    cleaned_final = TOOL_BLOCK_RE.sub("", last_text).strip() or last_text
     return AgentRunResult(
-        response=last_text,
+        response=cleaned_final,
         provider=last_provider,
         modified_files=modified_files,
         tool_logs=tool_logs,
