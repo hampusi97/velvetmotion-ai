@@ -4,24 +4,32 @@ on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: "Task prompt OR <<<FILE: path>>> blocks pasted from an external uncensored AI website"
+        description: "What should the AI fix, build, or write in this repo?"
         required: true
-        default: "Search the web or inspect the repo and write a clean utility function."
+        default: "Inspect src/utils/__init__.py and add a clean truncate_prompt(prompt: str, max_len: int = 200) -> str helper with docstring."
         type: string
+      action_mode:
+        description: "How should the AI apply changes?"
+        required: false
+        default: "edit-and-commit"
+        type: choice
+        options:
+          - edit-and-commit
+          - open-pr
+          - auto-fix-ci
+      engine:
+        description: "AI Engine (auto = Fast GPU + retry; dolphin-uncensored = 100% Uncensored Dolphin 7B on GitHub Runner)"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - dolphin-uncensored
+          - openrouter
       target_file:
-        description: "Default file path to write the agent's response summary to"
+        description: "File to save the agent run summary/output to"
         required: false
         default: "answer.txt"
-        type: string
-      create_pr:
-        description: "Open a Pull Request instead of committing directly to main"
-        required: false
-        default: false
-        type: boolean
-      model:
-        description: "OpenRouter model ID (when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY secret is set)"
-        required: false
-        default: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
         type: string
   issues:
     types: [opened]
@@ -33,29 +41,70 @@ permissions:
 
 jobs:
   query-uncensored-ai:
-    name: Run Autonomous AI Coding Agent
+    name: Run Autonomous Self-Healing AI Agent
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.actor == github.repository_owner && github.event_name == 'issues') ||
       (github.actor == github.repository_owner && github.event_name == 'issue_comment' &&
-       (startsWith(github.event.comment.body, '/ai ') || startsWith(github.event.comment.body, '@ai ')))
+       (startsWith(github.event.comment.body, '/ai ') ||
+        startsWith(github.event.comment.body, '@ai ') ||
+        startsWith(github.event.comment.body, 'fix:')))
     permissions:
       contents: write
       issues: write
       pull-requests: write
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Run autonomous multi-tool agent (web_search, fetch_url, read/write code)
+      - name: Cache Uncensored Dolphin Ollama model weights
+        if: inputs.engine == 'dolphin-uncensored'
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama
+          key: ollama-dolphin-mistral-7b-v1
+
+      - name: Start local Uncensored Dolphin-Mistral 7B on GitHub Runner
+        if: inputs.engine == 'dolphin-uncensored'
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve >/tmp/ollama.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:11434/api/tags >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          ollama pull dolphin-mistral:7b
+
+      - name: Gather failed CI logs (when action_mode == auto-fix-ci)
+        id: cilogs
+        if: inputs.action_mode == 'auto-fix-ci'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          FAILED_RUN_ID="$(gh run list --repo "$GITHUB_REPOSITORY" --status failure --limit 1 --json databaseId --jq '.[0].databaseId // empty' || true)"
+          if [ -n "$FAILED_RUN_ID" ]; then
+            echo "Found failed run ID: $FAILED_RUN_ID"
+            gh run view "$FAILED_RUN_ID" --repo "$GITHUB_REPOSITORY" --log-failed | tail -n 120 > /tmp/failed_ci.log || true
+          else
+            echo "No failed CI runs found; running repo health check instead." > /tmp/failed_ci.log
+          fi
+
+      - name: Run autonomous multi-tool agent (search_code, read/write/replace, run_checks, web_search)
         env:
           UNCENSORED_AI_API_KEY: ${{ secrets.UNCENSORED_AI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          VELVETMOTION_AGENT_MODEL: ${{ inputs.model }}
+          VELVETMOTION_AGENT_ENGINE: ${{ inputs.engine || 'auto' }}
           EVENT_NAME: ${{ github.event_name }}
+          ACTION_MODE: ${{ inputs.action_mode || 'edit-and-commit' }}
           INPUT_PROMPT: ${{ inputs.prompt }}
           INPUT_TARGET_FILE: ${{ inputs.target_file }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
@@ -68,15 +117,29 @@ jobs:
           from src.agent import resolve_safe_path, run_agent_task, write_file
 
           event_name = os.environ.get("EVENT_NAME", "workflow_dispatch")
+          action_mode = os.environ.get("ACTION_MODE", "edit-and-commit")
+
           if event_name == "issue_comment":
               raw = os.environ.get("COMMENT_BODY", "")
-              for prefix in ("/ai ", "@ai "):
+              for prefix in ("/ai ", "@ai ", "fix:"):
                   if raw.startswith(prefix):
-                      raw = raw[len(prefix):]
+                      raw = raw[len(prefix):].strip()
                       break
               prompt = raw
           elif event_name == "issues":
-              prompt = f"Issue: {os.environ.get('ISSUE_TITLE', '')}\n\n{os.environ.get('ISSUE_BODY', '')}"
+              prompt = (
+                  f"GitHub Issue: {os.environ.get('ISSUE_TITLE', '')}\n\n"
+                  f"{os.environ.get('ISSUE_BODY', '')}\n\n"
+                  "Inspect the repository, fix or implement what this issue describes using replace_in_file or write_file, and summarize your changes."
+              )
+          elif action_mode == "auto-fix-ci" and os.path.exists("/tmp/failed_ci.log"):
+              with open("/tmp/failed_ci.log", "r", encoding="utf-8", errors="replace") as fh:
+                  ci_log = fh.read()
+              prompt = (
+                  f"{os.environ.get('INPUT_PROMPT', '')}\n\n"
+                  f"Latest CI failure log:\n```\n{ci_log}\n```\n"
+                  "Find the root cause in the repository and fix the broken files using replace_in_file or write_file."
+              )
           else:
               prompt = os.environ.get("INPUT_PROMPT", "")
 
@@ -86,40 +149,40 @@ jobs:
           except ValueError:
               target_file = "answer.txt"
 
-          result = run_agent_task(prompt, workspace_root=".", max_steps=3)
-          write_file(".", target_file, result.response + ("\n" if not result.response.endswith("\n") else ""))
+          result = run_agent_task(prompt, workspace_root=".", max_steps=4)
+
+          report_lines = [result.response.strip()]
+          if result.modified_files:
+              report_lines.append(
+                  f"\n\n---\n**Modified Repository Files:** `{', '.join(result.modified_files)}`"
+              )
+          report_text = "\n".join(report_lines) + "\n"
+
+          write_file(".", target_file, report_text)
           if target_file != "answer.txt":
-              write_file(".", "answer.txt", result.response + ("\n" if not result.response.endswith("\n") else ""))
+              write_file(".", "answer.txt", report_text)
 
           summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
           if summary_path:
               with open(summary_path, "a", encoding="utf-8") as fh:
-                  fh.write("## Autonomous AI Coding Agent Result\n")
+                  fh.write("## Autonomous Self-Healing AI Agent Result\n")
                   fh.write(f"- **Provider Tier:** `{result.provider}`\n")
-                  fh.write(f"- **Output File:** `{target_file}`\n")
+                  fh.write(f"- **Action Mode:** `{action_mode}`\n")
                   if result.modified_files:
-                      fh.write(f"- **Modified Files:** `{', '.join(result.modified_files)}`\n")
+                      fh.write(f"- **Modified Code Files:** `{', '.join(result.modified_files)}`\n")
                   if result.tool_logs:
-                      fh.write("- **Tool Calls Executed:**\n")
+                      fh.write("- **Tool Execution Trace:**\n")
                       for entry in result.tool_logs:
                           fh.write(f"  - `{entry}`\n")
                   fh.write("\n### Agent Output\n\n")
-                  fh.write(result.response + "\n")
+                  fh.write(report_text)
           PY
 
-      - name: Reply on GitHub Issue or Pull Request
-        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          set -euo pipefail
-          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file answer.txt
-
       - name: Commit or open Pull Request with agent changes
+        id: gitpush
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CREATE_PR: ${{ inputs.create_pr }}
+          ACTION_MODE: ${{ inputs.action_mode || 'edit-and-commit' }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -127,18 +190,37 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "No file changes to commit."
+            echo "commit_info=No repository file changes were needed." >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          if [ "${CREATE_PR:-false}" = "true" ]; then
+          if [ "$ACTION_MODE" = "open-pr" ]; then
             BRANCH="ai/agent-${GITHUB_RUN_ID}"
             git checkout -b "$BRANCH"
             git commit -m "AI Autonomous Agent: apply code updates"
             git push -u origin "$BRANCH"
-            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-              --title "AI Autonomous Agent: apply code updates (run ${GITHUB_RUN_ID})" \
-              --body-file answer.txt
+            PR_URL="$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "AI Autonomous Agent: code updates (run ${GITHUB_RUN_ID})" \
+              --body-file answer.txt)"
+            echo "commit_info=Opened Pull Request: ${PR_URL}" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "Added AI response"
+            git commit -m "AI Autonomous Agent: apply updates"
             git push origin HEAD:main
+            SHA="$(git rev-parse --short HEAD)"
+            echo "commit_info=Committed directly to main (${SHA})" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Reply on GitHub Issue or Pull Request
+        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMIT_INFO: ${{ steps.gitpush.outputs.commit_info }}
+        run: |
+          set -euo pipefail
+          {
+            cat answer.txt
+            echo ""
+            echo "_Status: ${COMMIT_INFO}_"
+          } > /tmp/issue_reply.md
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file /tmp/issue_reply.md

@@ -11,12 +11,16 @@ from src.agent import (
     TupleResult,
     apply_external_ai_blocks,
     is_public_https_url,
+    is_refusal_response,
     read_file,
     replace_in_file,
     resolve_safe_path,
     run_agent_task,
+    run_checks,
+    search_code,
     write_file,
 )
+from src.utils import slugify_prompt
 
 
 class TestAutonomousAgent(unittest.TestCase):
@@ -33,6 +37,27 @@ class TestAutonomousAgent(unittest.TestCase):
         self.assertFalse(is_public_https_url("https://127.0.0.1:8080/secret"))
         self.assertFalse(is_public_https_url("https://localhost/admin"))
         self.assertFalse(is_public_https_url("https://user:pass@example.com/path"))
+
+    def test_is_refusal_response_detects_standard_refusals(self) -> None:
+        self.assertTrue(is_refusal_response("I'm sorry, I can't assist with that request."))
+        self.assertTrue(is_refusal_response("As an AI, I cannot generate this content."))
+        self.assertFalse(is_refusal_response("def compute_score(x: int) -> int:\n    return x * 2"))
+
+    def test_search_code_and_run_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            write_file(tmp, "src/sample.py", "def magic_widget_fn() -> int:\n    return 42\n")
+            write_file(
+                tmp,
+                "src/tests/test_sample.py",
+                "import unittest\nfrom src.sample import magic_widget_fn\nclass T(unittest.TestCase):\n    def test_ok(self):\n        self.assertEqual(magic_widget_fn(), 42)\n",
+            )
+            hits = search_code(tmp, "magic_widget_fn")
+            self.assertIn("src/sample.py", hits)
+            checks_out = run_checks(tmp)
+            self.assertIn("PASS", checks_out)
+
+    def test_slugify_prompt_helper(self) -> None:
+        self.assertEqual(slugify_prompt("  Hello   Velvet World  "), "hello-velvet-world")
 
     def test_apply_external_ai_blocks_writes_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
