@@ -558,23 +558,25 @@ export async function generateCompanionReply(
   const llmRes = await tryOpenAIChatTiers(chatMessages, persona.name, runtime);
   if (llmRes?.text.trim()) return publishReply(persona, llmRes);
 
-  // Tier 4: Free Cloud Route (AI Horde text) — secondary provider when auto/horde is selected.
   const provider = runtimeSettings(runtime).provider;
+
+  // Fast hosted GPU chat (~1.8s) first in live auto mode; if it refuses mature content
+  // (filtered by sanitizeCompanionReply) or rate-limits, cascade to uncensored AI Horde.
+  if (provider === "auto" && !runtime?.fetchImpl) {
+    try {
+      const freeRaw = await freeChat(chatMessages, { signal: AbortSignal.timeout(12_000) });
+      const freeClean = sanitizeCompanionReply(freeRaw, persona.name);
+      if (freeClean) return publishReply(persona, { text: freeClean, providerUsed: "pollinations-free" });
+    } catch {
+      /* cascade to uncensored AI Horde */
+    }
+  }
+
+  // Tier 4: Uncensored Cloud Route (AI Horde text)
   if (provider === "auto" || provider === "ai-horde") {
     const hordeRaw = await callHordeText(persona, history, runtime);
     const hordeClean = sanitizeCompanionReply(hordeRaw, persona.name);
     if (hordeClean) return publishReply(persona, { text: hordeClean, providerUsed: "ai-horde" });
-  }
-
-  // Final hosted keyless provider attempt before falling back to in-character voice
-  if (provider === "auto" && !runtime?.fetchImpl) {
-    try {
-      const freeRaw = await freeChat(chatMessages);
-      const freeClean = sanitizeCompanionReply(freeRaw, persona.name);
-      if (freeClean) return publishReply(persona, { text: freeClean, providerUsed: "pollinations-free" });
-    } catch {
-      /* fall through to in-character fallback */
-    }
   }
 
   const fallback = buildContextAwareFallback(history, persona);

@@ -84,4 +84,22 @@ describe("fetchWithRetry", () => {
     );
     assert.equal(calls, 1);
   });
+
+  it("retries HTTP 402 FREE_LIMIT responses using JSON Retry after Ns cooldown", async () => {
+    let calls = 0;
+    global.fetch = (async () => {
+      calls += 1;
+      if (calls === 1) {
+        return new Response(
+          JSON.stringify({ status: 402, error: { code: "FREE_LIMIT", message: "Free limit reached. Retry after 0.02s" } }),
+          { status: 402, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("ok", { status: 200 });
+    }) as typeof fetch;
+
+    const res = await fetchWithRetry("https://example.test/pollinations", { method: "GET" }, { attempts: 3, label: "poll-402" });
+    assert.equal(res.status, 200);
+    assert.equal(calls, 2);
+  });
 });

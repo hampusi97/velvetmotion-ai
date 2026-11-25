@@ -8,9 +8,20 @@ import { SafeImage } from "@/components/SafeImage";
 import { buildContextAwareFallback, ensureVisibleReply, generateCompanionReply, type RouterMessage } from "@/lib/chatRouter";
 import { createChatTurnGuard } from "@/lib/chatTurn";
 import { assertCompliance } from "@/lib/complianceFilter";
+import { detectExplicitMediaIntent } from "@/lib/dynamicChatEngine";
+import { resolveBestMediaUrl } from "@/lib/media";
 import { earnCompanionXp } from "@/lib/progression";
+import { buildContextualMediaSpec } from "@/lib/sceneRequest";
 
-type Msg = { role: "user" | "girl"; content: string; name?: string; characterId?: string; slot?: 0 | 1 };
+type Msg = {
+  role: "user" | "girl";
+  content: string;
+  name?: string;
+  characterId?: string;
+  slot?: 0 | 1;
+  imageUrl?: string;
+  note?: string;
+};
 
 function pickDefaultPair(): [string, string] {
   const priya = CHARACTERS.find((c) => c.id === "priya" || /priya/i.test(c.name))?.id;
@@ -152,17 +163,50 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
       const [settledB] = await Promise.allSettled([generateCompanionReply(historyB, personaB)]);
       const rawB = settledB.status === "fulfilled" ? settledB.value.text : "";
       const textB = ensureVisibleReply(rawB, historyB, personaB) || buildContextAwareFallback(historyB, personaB);
-      if (isCurrent()) {
-        setMessages([...afterA, {
+      const afterB: Msg[] = [
+        ...afterA,
+        {
           role: "girl",
           characterId: b.id,
           name: b.name,
           slot: 1,
           content: textB,
-        }]);
+        },
+      ];
+      if (isCurrent()) {
+        setMessages(afterB);
         setAgentStatuses({ [a.id]: "idle", [b.id]: "idle" });
       }
       earnCompanionXp(b.id, 4);
+
+      const mediaIntent = detectExplicitMediaIntent(text);
+      if (mediaIntent?.kind === "image" && isCurrent()) {
+        const lower = text.toLowerCase();
+        const firstA = a.name.split(" ")[0].toLowerCase();
+        const firstB = b.name.split(" ")[0].toLowerCase();
+        const onlyA = lower.includes(firstA) && !lower.includes(firstB);
+        const onlyB = lower.includes(firstB) && !lower.includes(firstA);
+        const spec = buildContextualMediaSpec({
+          userText: text,
+          assistantReply: `${textA} ${textB}`,
+          recentMessages: afterB,
+        });
+        const subject = onlyA ? a : onlyB ? b : a;
+        const promptExtra =
+          onlyA || onlyB
+            ? spec.visualPrompt
+            : `two women together, ${a.visualDna || a.figure} alongside ${b.visualDna || b.figure}, ${spec.visualPrompt}`;
+        const resolved = await resolveBestMediaUrl(subject, onlyA || onlyB ? spec.mood : "dual", promptExtra);
+        if (!resolved.isFallback && resolved.url && isCurrent()) {
+          const targetIdx = onlyA ? afterB.length - 2 : afterB.length - 1;
+          setMessages(
+            afterB.map((item, idx) =>
+              idx === targetIdx ? { ...item, imageUrl: resolved.url, note: resolved.note } : item,
+            ),
+          );
+        }
+      }
+
       guardRef.current.settle(generation, "success");
     } catch {
       const historyA = toHistory(next);
@@ -328,7 +372,17 @@ export function GroupChat({ onHome }: { onHome: () => void }) {
                     {m.name}
                   </div>
                 )}
-                {m.content}
+                <div className="whitespace-pre-wrap">{m.content}</div>
+                {m.imageUrl && (
+                  <div className="mt-2 overflow-hidden rounded-xl border border-white/15">
+                    <SafeImage
+                      src={m.imageUrl}
+                      alt={m.name || "Group photo"}
+                      fallbackId={m.characterId}
+                      className="w-full max-h-72 object-cover"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );

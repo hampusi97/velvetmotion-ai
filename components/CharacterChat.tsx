@@ -77,7 +77,8 @@ import {
 } from "@/lib/storage";
 import { GIFTS, addGift, getGiftsFor } from "@/lib/gifts";
 import { characterMediaUrl, resolveBestMediaUrl, type MediaMood } from "@/lib/media";
-import { generateStudioVideoClip } from "@/lib/canvasVideoExporter";
+import { generateStudioVideoClip, type VideoMotionPreset } from "@/lib/canvasVideoExporter";
+import { buildContextualMediaSpec } from "@/lib/sceneRequest";
 import { useLocalEngineStatus } from "@/lib/localEngineBridge";
 import { enhanceSequenceWithVideo, runSequenceGeneration, type SequenceKind } from "@/lib/videoModes";
 import { LIVE_ACTION_PRESETS, type LiveActionPreset } from "@/lib/liveActionPresets";
@@ -629,13 +630,15 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     baseBatch: ChatMessage[],
     targetIdx: number,
     scenePrompt: string,
+    mood: MediaMood = "scene",
+    label = "Scene Photo",
     commit: (next: ChatMessage[]) => void = persist,
     alive: () => boolean = () => mountedRef.current,
   ) => {
     if (!alive()) return;
     setGeneratingPhoto(true);
     try {
-      const resolved = await resolveBestMediaUrl(character, "scene", scenePrompt);
+      const resolved = await resolveBestMediaUrl(character, mood, scenePrompt);
       const valid =
         resolved.url.startsWith("http://") ||
         resolved.url.startsWith("https://") ||
@@ -649,14 +652,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
             ...msg,
             isFallback: true,
             error: resolved.error || resolved.note || "Scene photo generator unavailable",
-            mediaType: "scene",
-            retrySpec: { mood: "scene" as MediaMood, label: "Scene Photo", cost: 0, extra: scenePrompt },
+            mediaType: mood,
+            retrySpec: { mood, label, cost: 0, extra: scenePrompt },
           };
         }
         return {
           ...msg,
           imageUrl: resolved.url,
-          mediaType: "scene",
+          mediaType: mood,
           note: resolved.note,
         };
       });
@@ -665,7 +668,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         addToGallery({
           characterId: character.id,
           characterName: character.name,
-          type: "scene",
+          type: mood,
           url: resolved.url,
           prompt: scenePrompt,
         });
@@ -673,10 +676,13 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
           id: `inline-${Date.now()}`,
           characterId: character.id,
           url: resolved.url,
-          mood: "scene",
+          mood,
           createdAt: Date.now(),
         }).then(refreshDiary);
-        if (alive()) setRevealed((s) => new Set(s).add(targetIdx));
+        if (alive()) {
+          setRevealed((s) => new Set(s).add(targetIdx));
+          setActiveMedia({ url: resolved.url, type: mood, note: resolved.note });
+        }
       }
     } catch {
       commit(
@@ -686,7 +692,7 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
                 ...msg,
                 isFallback: true,
                 error: "Scene photo generator unavailable",
-                mediaType: "scene",
+                mediaType: mood,
               }
             : msg,
         ),
@@ -750,11 +756,23 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         }
       }
 
-      if (mediaIntent?.kind === "image" && turn.isCurrent()) {
+      const contextualSpec =
+        mediaIntent || imagePrompts.length > 0
+          ? buildContextualMediaSpec({
+              userText: text,
+              assistantReply: replyText,
+              inlineImagePrompt: imagePrompts[0] || "",
+              recentMessages: next,
+            })
+          : null;
+
+      if ((mediaIntent?.kind === "image" || (!mediaIntent && imagePrompts.length > 0)) && contextualSpec && turn.isCurrent()) {
         await attachInlinePhotoAt(
           latestBatch,
           latestBatch.length - 1,
-          imagePrompts[0] || mediaIntent.prompt,
+          contextualSpec.visualPrompt,
+          contextualSpec.mood,
+          contextualSpec.label,
           turn.commit,
           turn.isCurrent,
         );
@@ -783,7 +801,14 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
 
       const wantsVideo = mediaIntent?.kind === "video" && turn.isCurrent();
       turn.finish("success");
-      if (wantsVideo) await generateSequence(/joi/i.test(text) ? "joi" : "sex");
+      if (wantsVideo && contextualSpec) {
+        await generateSequence(/joi/i.test(text) ? "joi" : "sex", {
+          mood: contextualSpec.mood,
+          visualPrompt: contextualSpec.visualPrompt,
+          motionId: contextualSpec.motionId,
+          attachToLastAssistant: true,
+        });
+      }
     } catch (error) {
       if (!replied && turn.isCurrent()) {
         setReplyError(error instanceof Error ? error.message : "The AI model isn\'t responding. Check your model settings and retry.");
@@ -815,11 +840,19 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
       ];
       turn.commit(updated);
       turn.clearThinking();
-      if (mediaIntent?.kind === "image" && turn.isCurrent()) {
+      if ((mediaIntent?.kind === "image" || imagePrompts.length > 0) && turn.isCurrent()) {
+        const spec = buildContextualMediaSpec({
+          userText: lastUser,
+          assistantReply: nextReply,
+          inlineImagePrompt: imagePrompts[0] || "",
+          recentMessages: prior,
+        });
         await attachInlinePhotoAt(
           updated,
           prior.length,
-          imagePrompts[0] || mediaIntent.prompt,
+          spec.visualPrompt,
+          spec.mood,
+          spec.label,
           turn.commit,
           turn.isCurrent,
         );
@@ -1002,17 +1035,42 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
     }
   };
 
-  const generateSequence = async (kind: SequenceKind) => {
+  const generateSequence = async (
+    kind: SequenceKind,
+    customSpec?: {
+      mood?: MediaMood;
+      visualPrompt?: string;
+      motionId?: VideoMotionPreset["id"];
+      attachToLastAssistant?: boolean;
+    },
+  ) => {
     const turn = beginTurn({ thinking: false });
     if (!turn) return;
     const seed = messagesRef.current;
-    if (turn.isCurrent()) setClipStatus("Checking compatible video generator...");
+    if (turn.isCurrent()) setClipStatus("Rendering scene & motion clip...");
     try {
       const result = runSequenceGeneration(character, kind);
-      const existingLiveImg = [...seed].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
-      let baseImageUrl = existingLiveImg || "";
+      let baseImageUrl = "";
+      if (customSpec?.visualPrompt) {
+        const liveShot = await resolveBestMediaUrl(
+          character,
+          customSpec.mood || (kind === "joi" ? "joi" : "seductive"),
+          customSpec.visualPrompt,
+        );
+        if (!liveShot.isFallback && liveShot.url) {
+          baseImageUrl = liveShot.url;
+        }
+      }
       if (!baseImageUrl) {
-        const liveShot = await resolveBestMediaUrl(character, kind === "joi" ? "joi" : "seductive", "cinematic framing");
+        const existingLiveImg = [...seed].reverse().find((m) => m.imageUrl && !m.isFallback)?.imageUrl;
+        baseImageUrl = existingLiveImg || "";
+      }
+      if (!baseImageUrl) {
+        const liveShot = await resolveBestMediaUrl(
+          character,
+          kind === "joi" ? "joi" : "seductive",
+          customSpec?.visualPrompt || "cinematic framing",
+        );
         if (liveShot.isFallback || !liveShot.url) {
           throw new Error(liveShot.error || "A source image couldn't be generated. Connect an image model first.");
         }
@@ -1032,10 +1090,12 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         try {
           const webmClip = await generateStudioVideoClip({
             imageUrl: url,
-            motionId: kind === "joi" ? "club-light-pulse" : "slow-zoom-blink",
+            motionId: customSpec?.motionId || (kind === "joi" ? "club-light-pulse" : "slow-zoom-blink"),
             durationSec: 5,
             speed: kind === "joi" ? 1.25 : 1,
-            prompt: `${character.name} ${kind} video clip`,
+            prompt: customSpec?.visualPrompt
+              ? `${character.name} · ${customSpec.visualPrompt}`
+              : `${character.name} ${kind} video clip`,
             comfyOnline: engineStatus.comfyOnline,
           });
           videoUrl = webmClip.videoUrl;
@@ -1045,16 +1105,35 @@ export function CharacterChat({ character, romanceMode, onBack, onOpen3D, onSele
         }
       }
 
-      const mediaMsg: ChatMessage = {
-        role: "assistant",
-        content: SEQUENCE_LINES[kind],
-        imageUrl: url,
-        videoUrl: videoUrl || undefined,
-        frames,
-        mediaType: kind,
-        note,
-      };
-      turn.commit([...seed, mediaMsg]);
+      if (customSpec?.attachToLastAssistant && seed.at(-1)?.role === "assistant") {
+        const targetIdx = seed.length - 1;
+        const attached = seed.map((m, idx) =>
+          idx === targetIdx
+            ? {
+                ...m,
+                imageUrl: url,
+                videoUrl: videoUrl || undefined,
+                frames,
+                mediaType: kind,
+                note,
+              }
+            : m,
+        );
+        turn.commit(attached);
+        if (turn.isCurrent()) setRevealed((s) => new Set(s).add(targetIdx));
+      } else {
+        const mediaMsg: ChatMessage = {
+          role: "assistant",
+          content: SEQUENCE_LINES[kind],
+          imageUrl: url,
+          videoUrl: videoUrl || undefined,
+          frames,
+          mediaType: kind,
+          note,
+        };
+        turn.commit([...seed, mediaMsg]);
+      }
+
       if (turn.isCurrent()) {
         setActiveMedia({
           url,
