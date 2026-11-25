@@ -177,6 +177,61 @@ jobs:
       - name: Test fail-closed desktop publication gate
         run: node --test scripts/verify-desktop-release.test.mjs scripts/verify-desktop-release-with-retry.test.mjs
 
+      - name: Reconcile multi-platform latest.json from uploaded .sig assets
+        if: vars.TAURI_UPDATER_PUBKEY != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "*.sig" --pattern "latest.json" --dir "$TMP_DIR" --clobber || true
+          node - "$TMP_DIR" "$TAG" "$VERSION" "$GITHUB_REPOSITORY" <<'EOF'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const [dir, tag, version, repo] = process.argv.slice(2);
+          const latestPath = path.join(dir, "latest.json");
+          let manifest = {
+            version,
+            notes: `VelvetMotion Desktop ${tag}`,
+            pub_date: new Date().toISOString(),
+            platforms: {},
+          };
+          if (fs.existsSync(latestPath)) {
+            try {
+              const existing = JSON.parse(fs.readFileSync(latestPath, "utf8"));
+              if (existing && typeof existing === "object") {
+                manifest = { ...manifest, ...existing, version, platforms: { ...(existing.platforms || {}) } };
+              }
+            } catch {}
+          }
+          const baseUrl = `https://github.com/${repo}/releases/download/${tag}/`;
+          const candidates = [
+            ["windows-x86_64", `VelvetMotion.AI_${version}_x64-setup.exe`],
+            ["windows-x86_64", `VelvetMotion.AI_${version}_x64_en-US.msi`],
+            ["darwin-aarch64", "VelvetMotion.AI_aarch64.app.tar.gz"],
+            ["darwin-x86_64", "VelvetMotion.AI_x64.app.tar.gz"],
+            ["linux-x86_64", `VelvetMotion.AI_${version}_amd64.AppImage`],
+          ];
+          for (const [platform, assetName] of candidates) {
+            const sigFile = path.join(dir, `${assetName}.sig`);
+            if (!manifest.platforms[platform] && fs.existsSync(sigFile)) {
+              const signature = fs.readFileSync(sigFile, "utf8").trim();
+              if (signature.length >= 50) {
+                manifest.platforms[platform] = {
+                  signature,
+                  url: `${baseUrl}${assetName}`,
+                };
+              }
+            }
+          }
+          fs.writeFileSync(latestPath, JSON.stringify(manifest, null, 2) + "\n");
+          EOF
+          gh release upload "$TAG" "$TMP_DIR/latest.json" --repo "$GITHUB_REPOSITORY" --clobber
+
       - name: Verify complete installers and signed manifests
         shell: bash
         env:

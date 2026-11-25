@@ -115,13 +115,15 @@ export function VoiceCallUI({ character, onClose }: Props) {
   }, [camActive, videoMode]);
 
   useEffect(() => {
+    const audioHandle = audioRef;
+    const recogHandle = recogRef;
     return () => {
       activeRef.current = false;
       stopSpeaking();
       stopCamera();
       try {
-        audioRef.current?.pause();
-        recogRef.current?.stop();
+        audioHandle.current?.pause();
+        recogHandle.current?.stop();
       } catch {
         /* */
       }

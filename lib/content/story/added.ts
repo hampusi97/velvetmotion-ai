@@ -392,4 +392,58 @@ export const ADDED_STORY_PACKS: StoryPack[] = [
       },
     ],
   },
+  {
+    id: "neon-observatory",
+    title: "After-Hours at the Sky Observatory",
+    tag: "ROMANCE",
+    desc: "A locked glass dome, a meteor shower, and the pianist who brought the key",
+    summary:
+      "Seraphina Vale, 28, leaves the jazz lounge after midnight with a brass key to the hilltop sky observatory. Under the open dome shutter and city glow, she stops hiding why she invited only you.",
+    accent: "violet",
+    character: {
+      name: "Seraphina Vale",
+      age: 28,
+      role: "Midnight jazz pianist with a private key to the observatory dome",
+      summary:
+        "Warm, witty, and observant. She plays guarded melodies for crowds and saves her honest voice for after hours.",
+    },
+    chapters: [
+      { id: "dome", title: "The Glass Dome", sceneIds: ["arrival", "telescope", "terrace"] },
+      { id: "archive", title: "Under the Shutter", sceneIds: ["confession", "starlight"] },
+    ],
+    scenes: [
+      {
+        id: "arrival",
+        title: "Above the Neon District",
+        text: "The brass key turns with a soft click, and the observatory door yields to the cool night air. Seraphina Vale steps inside ahead of you, twenty-eight, her midnight silk dress catching the violet glow of the city below. Above you, the curved glass dome opens toward a sky already streaked with the first meteors of the shower.\n\n\"I promised you a better view than the piano booth,\" she says, setting two glasses on the chart table. \"No crowd, no last call, and nobody asking for requests. Just the skyline and whatever we decide to say now that the door is locked.\"\n\nShe leans against the brass railing, watching you with warm amber eyes that have been waiting all evening.",
+        choices: [
+          { id: "scope", label: "Adjust the telescope toward the horizon with her", nextSceneId: "telescope" },
+          { id: "balcony", label: "Share a quiet drink on the balcony terrace", nextSceneId: "terrace" },
+        ],
+      },
+      {
+        id: "telescope",
+        title: "Focus Ring",
+        nextSceneId: "confession",
+        text: "You step behind her at the brass telescope. Seraphina guides your hand to the focus ring, her fingers warm and steady over yours. Instead of looking through the eyepiece, she tilts her head back until her dark waves brush your collarbone.\n\n\"I didn't actually bring you up here for astronomy,\" she murmurs, her voice dropping into that velvet alto register she uses on her favorite ballads. \"I brought you because every time you sat by the piano this month, I lost my place in the bridge. Turn around and look at me instead.\"",
+      },
+      {
+        id: "terrace",
+        title: "City Glow",
+        nextSceneId: "confession",
+        text: "Out on thestone terrace, the wind is warm and smells of night-blooming jasmine from the hillside below. Seraphina stands close enough that her silk sleeve brushes your wrist, both of you looking out over the neon river of the city.\n\n\"People confess everything to a pianist after midnight,\" she says softly, turning to face you. \"Tonight it's my turn. I've been writing songs about the way you look at me from across the room, and I'm tired of leaving the best part unfinished.\"",
+      },
+      {
+        id: "confession",
+        title: "No More Accompaniment",
+        nextSceneId: "starlight",
+        text: "When she kisses you, there is nothing rehearsed about it. Seraphina's palm cups your jaw, her breath catching as you pull her flush against you under the open dome shutter. She laughs softly against your mouth, warm and unhurried.\n\n\"Come inside onto the velvet daybed by the star charts,\" she whispers, her fingers already undoing the clasp at her shoulder. \"Tell me you want this as much as I do—I want every minute of tonight to be ours.\"\n\nYou answer with your hands at her waist, and thesilk slips away in the silver light of the dome.",
+      },
+      {
+        id: "starlight",
+        title: "Until Dawn Light",
+        text: "On the wide cushioned couch beneath the chart archive, Seraphina moves with the same unhurried rhythm she brings to a midnight solo—deep, attentive, and completely focused on your face. Every breath and whispered word echoes softly under the curved glass roof while the meteor shower burns quietly across the dark above.\n\nAfterward, wrapped in your jacket with her head resting on your chest, she traces a constellation in the air and smiles. \"Best encore I've ever played,\" she murmurs. \"Don't go before sunrise. I want to walk down the hill with you when the city wakes up.\"",
+      },
+    ],
+  },
 ];

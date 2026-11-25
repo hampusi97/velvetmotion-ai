@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Cloud, Copy, Cpu, Download, ExternalLink, RefreshCw, Shield, Sparkles, Upload, X } from "lucide-react";
 import { exportFullBackupJson, importFullBackupJson } from "@/lib/db";
 import { loadRouterSettings, saveRouterSettings } from "@/lib/chatRouter";
@@ -11,6 +11,7 @@ import { googleSignIn, signInAnonymousGuest } from "@/lib/firebase";
 import { getRecommendedPresetsForRam, VOICE_ENGINE_OPTIONS } from "@/data/localModelCatalog";
 import { COMPANION_TEXT_MODELS, installedModelNames, isModelInstalled } from "@/data/companionTextModels";
 import { getPreferredVoiceEngine, setPreferredVoiceEngine, type VoiceEngineId } from "@/lib/kokoroTts";
+import { checkHardwareReadiness, type HardwareReadiness } from "@/lib/utils/hardwareCheck";
 import {
   DAVIDAU_RECOMMENDED_GGUFS,
   DAVIDAU_RESOURCES,
@@ -59,6 +60,18 @@ export function SettingsAndBackupDrawer({
   const engine = useLocalEngineStatus();
   const { status: cloudStatus, syncNow } = useFirebaseCloudSync();
   const ramCatalog = getRecommendedPresetsForRam(engine.ramGb);
+  const [hwReadiness, setHwReadiness] = useState<HardwareReadiness | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    void checkHardwareReadiness().then((res) => {
+      if (active) setHwReadiness(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   if (!open) return null;
 
@@ -295,6 +308,37 @@ export function SettingsAndBackupDrawer({
               HW: {engine.specs.totalRamGb} GB RAM ({engine.specs.availableRamGb} GB free) · {engine.specs.cpuCores} CPU cores · {engine.specs.os}
               {engine.isDesktop ? " · Tauri Desktop Shell" : " · Browser"}
             </p>
+          )}
+          {hwReadiness && (
+            <div className="flex flex-wrap gap-1.5 text-[10px]" data-testid="hardware-readiness-badges">
+              <span
+                className={`rounded-full border px-2 py-0.5 font-semibold ${
+                  hwReadiness.gpu
+                    ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                }`}
+              >
+                WebGL GPU: {hwReadiness.gpu ? "Ready" : "Software Fallback"}
+              </span>
+              <span
+                className={`rounded-full border px-2 py-0.5 font-semibold ${
+                  hwReadiness.memory || engine.ramGb >= 8
+                    ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "border-amber-400/40 bg-amber-400/10 text-amber-300"
+                }`}
+              >
+                8GB+ Memory: {hwReadiness.memory || engine.ramGb >= 8 ? "Ready" : "Standard"}
+              </span>
+              <span
+                className={`rounded-full border px-2 py-0.5 font-semibold ${
+                  hwReadiness.audio
+                    ? "border-[#00ffa3]/40 bg-[#00ffa3]/10 text-[#00ffa3]"
+                    : "border-zinc-500/40 bg-zinc-500/10 text-zinc-400"
+                }`}
+              >
+                Web Audio: {hwReadiness.audio ? "Ready" : "Unavailable"}
+              </span>
+            </div>
           )}
           <p className="text-[11px] text-[#a6a6c4]">{recommendText}</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px]">
