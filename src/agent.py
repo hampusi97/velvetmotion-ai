@@ -414,17 +414,22 @@ def run_agent_task(
                 tool_logs.append(f"[Step {step + 1}] {err_msg}")
                 observations.append(err_msg)
 
-        messages.append({"role": "assistant", "content": last_text})
+        messages[0] = {
+            "role": "system",
+            "content": "You are the VelvetMotion Autonomous Coding Agent. Tools have already been executed and their results are provided below. Do NOT call any more tools. Provide your complete final answer and any `<<<FILE: path>>>...<<<END_FILE>>>` blocks now.",
+        }
+        messages.append({"role": "assistant", "content": "Executed requested tool calls."})
         messages.append(
             {
                 "role": "user",
                 "content": "\n\n".join(observations)
-                + "\n\nNow provide your final response and any `<<<FILE: path>>>...<<<END_FILE>>>` blocks needed.",
+                + f"\n\nOriginal request: {prompt}\nProvide your complete final response now without calling further tools.",
             }
         )
 
+    cleaned_final = TOOL_BLOCK_RE.sub("", last_text).strip() or last_text
     return AgentRunResult(
-        response=last_text,
+        response=cleaned_final,
         provider=last_provider,
         modified_files=modified_files,
         tool_logs=tool_logs,

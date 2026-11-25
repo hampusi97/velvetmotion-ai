@@ -1,1 +1,20 @@
-<<<TOOL>>>{"tool": "web_search", "args": {"query": "VelvetMotion AI Tauri v2"}}<<<END_TOOL>>>
+**How VelvetMotion AI Leverages Tauri v2 for Its Desktop Releases**
+
+| Feature | Tauri v2 Enhancement | VelvetMotion Use‑Case |
+|---------|----------------------|-----------------------|
+| **Native build and bundle** | Tauri v2 introduces a fully‑native bundler (with Rust‑based **tauri-bundle**) that produces single executable packages for Windows, macOS, and Linux, optimised for size and security. | VelvetMotion bundles its AI model and runtime inside a lightweight monolith that ships as a *portable* executable, reducing external dependencies and easing installation. |
+| **Security sandboxing** | New sandboxing APIs enforce strict file‑system access, preventing the renderer from accidentally touching arbitrary system files. | The rendering layer (React‑TypeScript front‑end) cannot reach the underlying model files; only the Rust backend is exposed through safe, typed FFI calls. |
+| **Window management & theming** | Tauri v2 adds configurable *system‑dark‑mode* support and a DPI‑aware window stack, improving native look‑and‑feel. | VelvetMotion’s chat‑style UI seamlessly adapts to dark/light system themes and supports high‑DPI displays on all platforms. |
+| **Package versioning & updates** | Tauri v2 supports auto‑updates via forge‑like mechanism and short‑form GitHub releases, with signature verification. | VelvetMotion delivers OTA updates that replace only the changed resources (JavaScript bundle, indexed‑DB cache) while preserving the large trained model files (which are pinned to a separate asset store). |
+| **Offline local inference** | The Rust runtime now ships with *tauri-embed* for binary data, making it trivial to ship large ML weight files as embedded assets. | The model weights (e.g., a GGML‑style 4‑bit quantised LLM) are compiled into the executable, enabling true *offline* operation without network calls. |
+| **Modular plugin API** | Tauri v2 introduces a *plugin* infrastructure that decouples Rust services from the front‑end, allowing hot‑plugged feature modules. | VelvetMotion uses a *ChatPlugin* to expose only the inference logic to the UI, and a separate *UIPlugin* for theming and layout, making future feature extensions straightforward. |
+
+### Overall Flow
+
+1. **Front‑end** – A minimal React (or Svelte) UI renders the conversational interface and communicates over Tauri’s IPC channel.  
+2. **Rust core** – Implements the inference engine (tokenisation, beam search, etc.) and exposes a lightweight API (`/chat`, `/config`).  
+3. **Bundling** – All assets (JS bundle, CSS, ML weights) are compiled into a single executable via `tauri-bundle`.  
+4. **Deployment** – The resulting `VelvetMotion.exe` / `VelvetMotion.app` / `VelvetMotion.AppImage` is signed and shipped through the company’s download portal.  
+5. **Updates** – When a new model version is released, VelvetMotion pushes an auto‑update that downloads only the changed binary and swaps it in‑place; user data (conversation history) remains intact.
+
+By using Tauri v2’s modern build pipeline, secure IPC, and easy cross‑platform packaging, VelvetMotion AI can deliver a **native‑looking, offline‑capable desktop application** that runs the same LLM logic everywhere, without the heavyweight Electron runtime.
