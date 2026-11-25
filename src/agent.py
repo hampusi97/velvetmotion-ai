@@ -266,6 +266,7 @@ def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] 
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) VelvetMotion/1.0",
                     "X-Title": "VelvetMotion Autonomous Agent",
                 },
                 method="POST",
@@ -290,7 +291,10 @@ def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] 
         req = urllib.request.Request(
             "https://text.pollinations.ai/openai",
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) VelvetMotion/1.0",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
