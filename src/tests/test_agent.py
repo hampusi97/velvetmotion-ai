@@ -77,6 +77,28 @@ class TestAutonomousAgent(unittest.TestCase):
             content = read_file(tmp, "src/demo/hello.py")
             self.assertIn("def greet() -> str:", content)
 
+    def test_apply_standard_markdown_blocks_from_online_ai(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            online_ai_reply = (
+                "### `src/demo/first.py`\n"
+                "```python\n"
+                "def first() -> int:\n"
+                "    return 1\n"
+                "```\n\n"
+                "```python src/demo/second.py\n"
+                "def second() -> int:\n"
+                "    return 2\n"
+                "```\n\n"
+                "```python\n"
+                "# filepath: src/demo/third.py\n"
+                "def third() -> int:\n"
+                "    return 3\n"
+                "```\n"
+            )
+            modified = apply_external_ai_blocks(online_ai_reply, tmp)
+            self.assertEqual(modified, ["src/demo/first.py", "src/demo/second.py", "src/demo/third.py"])
+            self.assertIn("def second() -> int:", read_file(tmp, "src/demo/second.py"))
+
     def test_run_agent_task_executes_tools_and_applies_edits(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             write_file(tmp, "notes.txt", "status: old\n")

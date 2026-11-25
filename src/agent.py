@@ -420,15 +420,85 @@ def replace_in_file(workspace_root: str, relative_path: str, target: str, replac
     return os.path.relpath(safe_path, os.path.realpath(workspace_root)).replace("\\", "/")
 
 
+SAFE_REPO_PATH_RE = re.compile(
+    r"(?:^|[\s`:*_\"'])((?:app|components|lib|data|src|scripts|public|docs|workers)/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+)(?:$|[\s`:*_\"'])"
+)
+FENCED_BLOCK_RE = re.compile(
+    r"```([^\r\n`]*)\r?\n(.*?)\r?\n```",
+    re.DOTALL,
+)
+FIRST_LINE_COMMENT_PATH_RE = re.compile(
+    r"^\s*(?://|#|/\*+|<!--)\s*(?:file(?:path|name)?\s*:\s*)?((?:app|components|lib|data|src|scripts|public|docs|workers)/[A-Za-z0-9_./-]+\.[A-Za-z0-9]+)",
+    re.IGNORECASE,
+)
+
+
+def extract_markdown_code_files(text: str) -> List[tuple[str, str]]:
+    """Extract `(relative_path, code)` pairs from standard Markdown code blocks produced by online AI chats."""
+    extracted: List[tuple[str, str]] = []
+    source = text or ""
+    for match in FENCED_BLOCK_RE.finditer(source):
+        info_str = (match.group(1) or "").strip()
+        code_body = match.group(2)
+        if not code_body.strip():
+            continue
+
+        candidate_path: Optional[str] = None
+
+        # 1. Check fence info string: ```tsx components/Foo.tsx or ```tsx:components/Foo.tsx
+        normalized_info = info_str.replace(":", " ")
+        info_match = SAFE_REPO_PATH_RE.search(normalized_info)
+        if info_match:
+            candidate_path = info_match.group(1)
+
+        # 2. Check first line inside code block: // filepath: components/Foo.tsx or # src/foo.py
+        if not candidate_path:
+            first_line = code_body.splitlines()[0] if code_body.splitlines() else ""
+            comment_match = FIRST_LINE_COMMENT_PATH_RE.match(first_line)
+            if comment_match:
+                candidate_path = comment_match.group(1)
+
+        # 3. Check immediately preceding heading / bold filename line above the fence
+        if not candidate_path:
+            preceding = source[: match.start()].rstrip().splitlines()
+            if preceding:
+                last_heading_line = preceding[-1].strip()
+                if len(last_heading_line) <= 140 and (
+                    last_heading_line.startswith("#")
+                    or "`" in last_heading_line
+                    or "**" in last_heading_line
+                    or last_heading_line.lower().startswith("file")
+                ):
+                    heading_match = SAFE_REPO_PATH_RE.search(last_heading_line)
+                    if heading_match:
+                        candidate_path = heading_match.group(1)
+
+        if candidate_path:
+            extracted.append((candidate_path, code_body))
+    return extracted
+
+
 def apply_external_ai_blocks(text: str, workspace_root: str) -> List[str]:
-    """Parse and apply all `<<<FILE: path>>>...<<<END_FILE>>>` blocks found in `text`."""
+    """Parse and apply `<<<FILE: path>>>` blocks AND standard Markdown file blocks from online AI chats."""
     modified: List[str] = []
     for match in FILE_BLOCK_RE.finditer(text or ""):
         rel_path = match.group(1).strip()
         file_content = match.group(2)
-        saved_rel = write_file(workspace_root, rel_path, file_content)
-        if saved_rel not in modified:
-            modified.append(saved_rel)
+        try:
+            saved_rel = write_file(workspace_root, rel_path, file_content)
+            if saved_rel not in modified:
+                modified.append(saved_rel)
+        except ValueError:
+            continue
+
+    if not modified:
+        for rel_path, file_content in extract_markdown_code_files(text or ""):
+            try:
+                saved_rel = write_file(workspace_root, rel_path, file_content)
+                if saved_rel not in modified:
+                    modified.append(saved_rel)
+            except ValueError:
+                continue
     return modified
 
 
