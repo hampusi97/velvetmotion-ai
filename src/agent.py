@@ -177,8 +177,8 @@ AGENT_SYSTEM_PROMPT = """You are the VelvetMotion Autonomous Coding Agent runnin
 Your job is to inspect code, find and fix bugs, build features, and search the web using your tools:
 - `search_code` (`{"pattern": "..."}`) — Find where functions, components, or errors live in the repo.
 - `read_file` (`{"path": "..."}`) — Read a file before modifying it.
-- `replace_in_file` (`{"path": "...", "target": "...", "replacement": "..."}`) — Edit existing code cleanly.
-- `write_file` (`{"path": "...", "content": "..."}`) — Create or overwrite a file.
+- `replace_in_file` (`{"path": "...", "target": "...", "replacement": "..."}`) — Edit existing code cleanly (always include the full block in `target` so no duplicate trailing lines remain).
+- `write_file` (`{"path": "...", "content": "..."}`) — Create or overwrite a file with complete contents (preferred for files under 150 lines).
 - `run_checks` (`{}`) — Run unit tests and typechecks to verify your changes.
 - `list_files`, `web_search`, `fetch_url`.
 
