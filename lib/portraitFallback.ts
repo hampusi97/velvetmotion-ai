@@ -59,6 +59,7 @@ export const PORTRAIT_BY_ID: Record<string, string> = {
   "variety-kira": "/portraits/variety-kira.jpg",
   "anime-yumi": "/portraits/suzu-m.jpg",
   "mila-s": "/portraits/mila-s.jpg",
+  seraphina: "/portraits/valeria-cruz.jpg",
 };
 
 const FALLBACK_POOL = Object.values(PORTRAIT_BY_ID);

@@ -77,6 +77,7 @@ export function CharacterProfile({
     safeCompanionAvatarUrl(character.avatar) || staticPortraitUrl(character.id);
 
   useEffect(() => {
+    const requestCounter = voiceRequest;
     const refresh = () =>
       setFavorite(loadFavoriteCompanions().includes(character.id));
     mounted.current = true;
@@ -92,7 +93,7 @@ export function CharacterProfile({
     window.addEventListener("storage", refresh);
     return () => {
       mounted.current = false;
-      voiceRequest.current++;
+      requestCounter.current++;
       stopNeuralSpeech();
       window.removeEventListener(COMPANION_LIBRARY_EVENT, refresh);
       window.removeEventListener("storage", refresh);
