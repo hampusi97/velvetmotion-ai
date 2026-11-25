@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: "Coding task, question, or prompt for the AI"
+        description: "Task prompt OR <<<FILE: path>>> blocks pasted from an external uncensored AI website"
         required: true
-        default: "Write a clean Python utility function with type hints and unit test examples."
+        default: "Search the web or inspect the repo and write a clean utility function."
         type: string
       target_file:
-        description: "Repository file path to write the AI output/code to"
+        description: "Default file path to write the agent's response summary to"
         required: false
         default: "answer.txt"
         type: string
@@ -33,7 +33,7 @@ permissions:
 
 jobs:
   query-uncensored-ai:
-    name: Run AI Coding Assistant
+    name: Run Autonomous AI Coding Agent
     runs-on: ubuntu-latest
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -50,116 +50,62 @@ jobs:
         with:
           ref: main
 
-      - name: Query multi-tier AI coding assistant
+      - name: Run autonomous multi-tool agent (web_search, fetch_url, read/write code)
         env:
           UNCENSORED_AI_API_KEY: ${{ secrets.UNCENSORED_AI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          VELVETMOTION_AGENT_MODEL: ${{ inputs.model }}
           EVENT_NAME: ${{ github.event_name }}
           INPUT_PROMPT: ${{ inputs.prompt }}
           INPUT_TARGET_FILE: ${{ inputs.target_file }}
-          INPUT_MODEL: ${{ inputs.model }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from src.agent import resolve_safe_path, run_agent_task, write_file
 
-          if [ "$EVENT_NAME" = "issue_comment" ]; then
-            PROMPT="${COMMENT_BODY#/ai }"
-            PROMPT="${PROMPT#@ai }"
-          elif [ "$EVENT_NAME" = "issues" ]; then
-            PROMPT="Issue: ${ISSUE_TITLE}
+          event_name = os.environ.get("EVENT_NAME", "workflow_dispatch")
+          if event_name == "issue_comment":
+              raw = os.environ.get("COMMENT_BODY", "")
+              for prefix in ("/ai ", "@ai "):
+                  if raw.startswith(prefix):
+                      raw = raw[len(prefix):]
+                      break
+              prompt = raw
+          elif event_name == "issues":
+              prompt = f"Issue: {os.environ.get('ISSUE_TITLE', '')}\n\n{os.environ.get('ISSUE_BODY', '')}"
+          else:
+              prompt = os.environ.get("INPUT_PROMPT", "")
 
-          ${ISSUE_BODY}"
-          else
-            PROMPT="$INPUT_PROMPT"
-          fi
+          target_file = (os.environ.get("INPUT_TARGET_FILE") or "answer.txt").strip()
+          try:
+              resolve_safe_path(".", target_file)
+          except ValueError:
+              target_file = "answer.txt"
 
-          TARGET_FILE="${INPUT_TARGET_FILE:-answer.txt}"
-          case "$TARGET_FILE" in
-            ""|/*|*..*|*" "*|.git/*|.github/workflows/*)
-              echo "::warning::Unsafe target_file '$TARGET_FILE'; defaulting to answer.txt"
-              TARGET_FILE="answer.txt"
-              ;;
-          esac
-          echo "RESOLVED_TARGET_FILE=$TARGET_FILE" >> "$GITHUB_ENV"
+          result = run_agent_task(prompt, workspace_root=".", max_steps=3)
+          write_file(".", target_file, result.response + ("\n" if not result.response.endswith("\n") else ""))
+          if target_file != "answer.txt":
+              write_file(".", "answer.txt", result.response + ("\n" if not result.response.endswith("\n") else ""))
 
-          SYSTEM_PROMPT="You are VelvetMotion AI, an expert full-stack coding assistant (TypeScript, Next.js 15, React, Tauri v2 Rust, Python 3.12, and GitHub Actions) and creative writer. Provide complete, working code and clear explanations."
-          API_KEY="${UNCENSORED_AI_API_KEY:-${OPENROUTER_API_KEY:-}}"
-          USED_PROVIDER=""
-          AI_TEXT=""
-
-          # Tier 1: OpenRouter API (when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY is configured)
-          if [ -n "$API_KEY" ]; then
-            OR_PAYLOAD="$(jq -n \
-              --arg model "${INPUT_MODEL:-cognitivecomputations/dolphin-mistral-24b-venice-edition:free}" \
-              --arg sys "$SYSTEM_PROMPT" \
-              --arg prompt "$PROMPT" \
-              '{
-                model: $model,
-                messages: [
-                  { role: "system", content: $sys },
-                  { role: "user", content: $prompt }
-                ]
-              }')"
-            if OR_RESP="$(curl -sS -f -m 60 -X POST https://openrouter.ai/api/v1/chat/completions \
-              -H "Authorization: Bearer ${API_KEY}" \
-              -H "Content-Type: application/json" \
-              -H "HTTP-Referer: https://github.com/${GITHUB_REPOSITORY}" \
-              -H "X-Title: VelvetMotion AI" \
-              -d "$OR_PAYLOAD" 2>/dev/null)"; then
-              AI_TEXT="$(echo "$OR_RESP" | jq -r '.choices[0].message.content // .response // empty' | sed -e 's/^[[:space:]]*//')"
-              if [ -n "$AI_TEXT" ]; then
-                USED_PROVIDER="OpenRouter (${INPUT_MODEL})"
-              fi
-            fi
-          fi
-
-          # Tier 2: Keyless Live OpenAI-Compatible LLM API (works immediately without secrets)
-          if [ -z "$AI_TEXT" ]; then
-            FREE_PAYLOAD="$(jq -n \
-              --arg sys "$SYSTEM_PROMPT" \
-              --arg prompt "$PROMPT" \
-              '{
-                model: "openai",
-                referrer: "velvetmotion",
-                messages: [
-                  { role: "system", content: $sys },
-                  { role: "user", content: $prompt }
-                ]
-              }')"
-            if FREE_RESP="$(curl -sS -f -m 60 -X POST https://text.pollinations.ai/openai \
-              -H "Content-Type: application/json" \
-              -d "$FREE_PAYLOAD" 2>/dev/null)"; then
-              AI_TEXT="$(echo "$FREE_RESP" | jq -r '.choices[0].message.content // empty' | sed -e 's/^[[:space:]]*//')"
-              LIVE_MODEL="$(echo "$FREE_RESP" | jq -r '.model // "openai"')"
-              if [ -n "$AI_TEXT" ]; then
-                USED_PROVIDER="Keyless Live LLM (${LIVE_MODEL} via text.pollinations.ai)"
-              fi
-            fi
-          fi
-
-          # Tier 3: Deterministic Local Python Fallback (src.velvetmotion)
-          if [ -z "$AI_TEXT" ]; then
-            USED_PROVIDER="Local Python Fallback (src.velvetmotion)"
-            AI_TEXT="$(PROMPT="$PROMPT" python3 -c 'import os; from src.velvetmotion import generate_response; print(generate_response(os.environ["PROMPT"]))')"
-          fi
-
-          mkdir -p "$(dirname "$TARGET_FILE")"
-          printf '%s\n' "$AI_TEXT" > "$TARGET_FILE"
-          if [ "$TARGET_FILE" != "answer.txt" ]; then
-            printf '%s\n' "$AI_TEXT" > answer.txt
-          fi
-
-          {
-            echo "## Uncensored AI Coding Assistant Result"
-            echo "- **Provider Tier:** \`$USED_PROVIDER\`"
-            echo "- **Output File:** \`$TARGET_FILE\`"
-            echo ""
-            echo "### Generated Output"
-            echo ""
-            cat "$TARGET_FILE"
-          } >> "$GITHUB_STEP_SUMMARY"
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as fh:
+                  fh.write("## Autonomous AI Coding Agent Result\n")
+                  fh.write(f"- **Provider Tier:** `{result.provider}`\n")
+                  fh.write(f"- **Output File:** `{target_file}`\n")
+                  if result.modified_files:
+                      fh.write(f"- **Modified Files:** `{', '.join(result.modified_files)}`\n")
+                  if result.tool_logs:
+                      fh.write("- **Tool Calls Executed:**\n")
+                      for entry in result.tool_logs:
+                          fh.write(f"  - `{entry}`\n")
+                  fh.write("\n### Agent Output\n\n")
+                  fh.write(result.response + "\n")
+          PY
 
       - name: Reply on GitHub Issue or Pull Request
         if: github.event_name == 'issues' || github.event_name == 'issue_comment'
@@ -170,8 +116,7 @@ jobs:
           set -euo pipefail
           gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file answer.txt
 
-      - name: Commit or open Pull Request with AI output
-        if: github.event_name == 'workflow_dispatch'
+      - name: Commit or open Pull Request with agent changes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CREATE_PR: ${{ inputs.create_pr }}
@@ -179,21 +124,21 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$RESOLVED_TARGET_FILE" answer.txt
+          git add -A
           if git diff --cached --quiet; then
             echo "No file changes to commit."
             exit 0
           fi
 
-          if [ "$CREATE_PR" = "true" ]; then
-            BRANCH="ai/update-${GITHUB_RUN_ID}"
+          if [ "${CREATE_PR:-false}" = "true" ]; then
+            BRANCH="ai/agent-${GITHUB_RUN_ID}"
             git checkout -b "$BRANCH"
-            git commit -m "AI Coding Assistant: update ${RESOLVED_TARGET_FILE}"
+            git commit -m "AI Autonomous Agent: apply code updates"
             git push -u origin "$BRANCH"
             gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-              --title "AI Coding Assistant: update ${RESOLVED_TARGET_FILE}" \
+              --title "AI Autonomous Agent: apply code updates (run ${GITHUB_RUN_ID})" \
               --body-file answer.txt
           else
-            git commit -m "Added AI response (${RESOLVED_TARGET_FILE})"
+            git commit -m "Added AI response"
             git push origin HEAD:main
           fi

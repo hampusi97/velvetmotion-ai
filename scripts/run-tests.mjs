@@ -16,7 +16,7 @@ const commands = [
   [process.execPath, ["--import", "tsx", "--test", ...suites]],
   [process.execPath, ["--import", "tsx", "scripts/validate-content.ts"]],
   [process.execPath, ["scripts/smoke-test.mjs"]],
-  [process.platform === "win32" ? "python" : "python3", ["-B", "-m", "unittest", "workers/test_workers.py", "src/tests/test_velvetmotion.py"]],
+  [process.platform === "win32" ? "python" : "python3", ["-B", "-m", "unittest", "workers/test_workers.py", "src/tests/test_velvetmotion.py", "src/tests/test_agent.py"]],
 ];
 for (const [command, args] of commands) {
   const result = spawnSync(command, args, { stdio: "inherit" });
