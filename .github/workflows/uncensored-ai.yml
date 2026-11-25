@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: "Prompt to send to Uncensored AI"
+        description: "Prompt to send to the AI model"
         required: true
         default: "How does antigravity work?"
+        type: string
+      model:
+        description: "OpenRouter model ID (used when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY secret is set)"
+        required: false
+        default: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
         type: string
 
 permissions:
@@ -14,7 +19,7 @@ permissions:
 
 jobs:
   query-uncensored-ai:
-    name: Query Uncensored AI and Commit Response
+    name: Query AI Router and Commit Response
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,27 +29,88 @@ jobs:
         with:
           ref: main
 
-      - name: Query Uncensored AI API and write answer.txt
+      - name: Query multi-tier AI router and write answer.txt
         env:
           UNCENSORED_AI_API_KEY: ${{ secrets.UNCENSORED_AI_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           PROMPT: ${{ inputs.prompt }}
+          MODEL: ${{ inputs.model }}
         run: |
           set -euo pipefail
-          PAYLOAD="$(jq -n --arg prompt "$PROMPT" '{prompt: $prompt}')"
+          API_KEY="${UNCENSORED_AI_API_KEY:-${OPENROUTER_API_KEY:-}}"
+          USED_PROVIDER=""
+          AI_TEXT=""
 
-          if [ -n "${UNCENSORED_AI_API_KEY:-}" ]; then
-            RESPONSE_JSON="$(curl -sS -f -X POST https://uncensored.ai/api/v1/response \
-              -H "Authorization: Bearer ${UNCENSORED_AI_API_KEY}" \
+          # Tier 1: OpenRouter API (when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY is configured)
+          if [ -n "$API_KEY" ]; then
+            OR_PAYLOAD="$(jq -n \
+              --arg model "${MODEL:-cognitivecomputations/dolphin-mistral-24b-venice-edition:free}" \
+              --arg prompt "$PROMPT" \
+              '{
+                model: $model,
+                messages: [
+                  { role: "system", content: "You are VelvetMotion AI, a creative, direct, and uncensored roleplay and technical assistant." },
+                  { role: "user", content: $prompt }
+                ]
+              }')"
+            if OR_RESP="$(curl -sS -f -m 45 -X POST https://openrouter.ai/api/v1/chat/completions \
+              -H "Authorization: Bearer ${API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$PAYLOAD")"
-            echo "$RESPONSE_JSON" | jq -r '.response // .choices[0].message.content // tostring' > answer.txt
-          else
-            echo "::warning::UNCENSORED_AI_API_KEY secret is not configured; falling back to local src.velvetmotion generator."
-            python3 -c 'import os; from src.velvetmotion import generate_response; print(generate_response(os.environ["PROMPT"]))' > answer.txt
+              -H "HTTP-Referer: https://github.com/${GITHUB_REPOSITORY}" \
+              -H "X-Title: VelvetMotion AI" \
+              -d "$OR_PAYLOAD" 2>/dev/null)"; then
+              AI_TEXT="$(echo "$OR_RESP" | jq -r '.choices[0].message.content // .response // empty' | sed -e 's/^[[:space:]]*//')"
+              if [ -n "$AI_TEXT" ]; then
+                USED_PROVIDER="OpenRouter (${MODEL})"
+              fi
+            fi
           fi
+
+          # Tier 2: Keyless Live OpenAI-Compatible LLM API (works immediately without secrets)
+          if [ -z "$AI_TEXT" ]; then
+            FREE_PAYLOAD="$(jq -n \
+              --arg prompt "$PROMPT" \
+              '{
+                model: "openai",
+                referrer: "velvetmotion",
+                messages: [
+                  { role: "system", content: "You are VelvetMotion AI, a creative, direct, and helpful assistant." },
+                  { role: "user", content: $prompt }
+                ]
+              }')"
+            if FREE_RESP="$(curl -sS -f -m 45 -X POST https://text.pollinations.ai/openai \
+              -H "Content-Type: application/json" \
+              -d "$FREE_PAYLOAD" 2>/dev/null)"; then
+              AI_TEXT="$(echo "$FREE_RESP" | jq -r '.choices[0].message.content // empty' | sed -e 's/^[[:space:]]*//')"
+              LIVE_MODEL="$(echo "$FREE_RESP" | jq -r '.model // "openai"')"
+              if [ -n "$AI_TEXT" ]; then
+                USED_PROVIDER="Keyless Live LLM (${LIVE_MODEL} via text.pollinations.ai)"
+              fi
+            fi
+          fi
+
+          # Tier 3: Deterministic Local Python Fallback (src.velvetmotion)
+          if [ -z "$AI_TEXT" ]; then
+            USED_PROVIDER="Local Python Fallback (src.velvetmotion)"
+            AI_TEXT="$(python3 -c 'import os; from src.velvetmotion import generate_response; print(generate_response(os.environ["PROMPT"]))')"
+          fi
+
+          printf '%s\n' "$AI_TEXT" > answer.txt
+          echo "Generated response via: $USED_PROVIDER"
+
+          {
+            echo "## Uncensored AI Integration Result"
+            echo "- **Provider Tier:** \`$USED_PROVIDER\`"
+            echo "- **Prompt:** \`$PROMPT\`"
+            echo ""
+            echo "### Response (\`answer.txt\`)"
+            echo ""
+            cat answer.txt
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit and push answer.txt
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add answer.txt
