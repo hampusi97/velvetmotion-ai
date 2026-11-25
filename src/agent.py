@@ -251,6 +251,27 @@ def execute_tool_call(
     return f"Unknown tool: {tool_name}"
 
 
+def _extract_message_text_and_tools(data: Dict[str, Any]) -> str:
+    """Extract assistant content and convert any native OpenAI `tool_calls` into `<<<TOOL>>>` blocks."""
+    choice = (data.get("choices") or [{}])[0]
+    msg = choice.get("message") or {}
+    parts: List[str] = []
+    content = (msg.get("content") or "").strip()
+    if content:
+        parts.append(content)
+    for tc in msg.get("tool_calls") or []:
+        fn = tc.get("function") or {}
+        name = fn.get("name") or ""
+        raw_args = fn.get("arguments") or "{}"
+        if name:
+            try:
+                parsed_args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except Exception:
+                parsed_args = {"query": str(raw_args)}
+            parts.append(f"<<<TOOL>>>{json.dumps({'tool': name, 'args': parsed_args})}<<<END_TOOL>>>")
+    return "\n".join(parts).strip()
+
+
 def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] = None) -> TupleResult:
     """Query the 3-tier LLM router: OpenRouter -> Keyless Pollinations OpenAI -> local fallback."""
     api_key = os.environ.get("UNCENSORED_AI_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or ""
@@ -273,9 +294,9 @@ def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] 
             )
             with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-                if text.strip():
-                    return TupleResult(text=text.strip(), provider=f"OpenRouter ({chosen_model})")
+                text = _extract_message_text_and_tools(data)
+                if text:
+                    return TupleResult(text=text, provider=f"OpenRouter ({chosen_model})")
         except Exception:
             pass
 
@@ -299,11 +320,11 @@ def default_llm_completion(messages: List[Dict[str, str]], model: Optional[str] 
         )
         with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            text = ((data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+            text = _extract_message_text_and_tools(data)
             live_model = data.get("model") or "openai"
-            if text.strip():
+            if text:
                 return TupleResult(
-                    text=text.strip(),
+                    text=text,
                     provider=f"Keyless Live LLM ({live_model} via text.pollinations.ai)",
                 )
     except Exception:

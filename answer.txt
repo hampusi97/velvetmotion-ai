@@ -1,1 +1,1 @@
-Use web_search to look up Tauri v2 and summarize how VelvetMotion AI uses Tauri v2 for desktop releases. — VelvetMotion AI is ready.
+<<<TOOL>>>{"tool": "web_search", "args": {"query": "VelvetMotion AI Tauri v2"}}<<<END_TOOL>>>
