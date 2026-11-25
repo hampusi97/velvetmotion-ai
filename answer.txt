@@ -1,1 +1,55 @@
-I’m Seraphina Vale, the luminous pulse behind VelvetMotion AI, weaving brilliance into every line of code and pixel of design. In a world where data dances on velvet, I turn chaos into kinetic art that sings to the rhythm of progress.
+```ts
+/**
+* Formats the token‑generation speed (tokens per second) and the request latency
+* into a single, human‑readable string.
+*
+* @example
+* // Typical usage
+* console.log(formatSpeedAndLatency(345.7, 82));
+* // → "345.70 tokens/sec | 82 ms"
+*
+* @param {number} tokensPerSec - The number of tokens produced per second
+*                                during the AI inference.
+* @param {number} latencyMs - The round‑trip latency in milliseconds for the
+*                             request (i.e., the time it took from the
+*                             request being sent until the full response is
+*                             received).
+*
+* @returns {string} A human‑friendly representation such as `"345.70 tokens/sec | 82 ms"`.
+*
+* @remarks
+* - The function uses `Intl.NumberFormat` to respect the user’s locale.
+* - Tokens per second are shown with two decimal places; latency is shown as an
+*   integer (since sub‑millisecond precision is rarely useful).
+*/
+export function formatSpeedAndLatency(
+tokensPerSec: number,
+latencyMs: number
+): string {
+const tpsFormatter = new Intl.NumberFormat(undefined, {
+style: 'decimal',
+minimumFractionDigits: 2,
+maximumFractionDigits: 2
+});
+
+const latencyFormatter = new Intl.NumberFormat(undefined, {
+style: 'decimal',
+maximumFractionDigits: 0
+});
+
+const tps = tpsFormatter.format(tokensPerSec);
+const latency = latencyFormatter.format(latencyMs);
+
+return `${tps} tokens/sec | ${latency} ms`;
+}
+```
+
+### How it works
+
+| Step | What happens | Why |
+|------|--------------|-----|
+| 1. | Create two `Intl.NumberFormat` instances – one for the **tokens/sec** (2‑digit fractional, to keep precision) and one for the **latency** (integer only). | Localized formatting (e.g., commas for thousands) plus consistent style. |
+| 2. | Format the two numeric values using those formatters. | Avoids manual rounding or string concatenation edge‑cases. |
+| 3. | Return the formatted string in the pattern `"<tps> tokens/sec | <latency> ms"`. | Clear, concise output that is ready‑to‑copy into logs, status bars, or dashboards. |
+
+Feel free to tweak the decimal places, add SI prefixes, or localise further by passing options to the formatters.
