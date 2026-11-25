@@ -57,7 +57,11 @@ class TestAutonomousAgent(unittest.TestCase):
             self.assertIn("PASS", checks_out)
 
     def test_slugify_prompt_helper(self) -> None:
+        from src.utils import truncate_prompt
+
         self.assertEqual(slugify_prompt("  Hello   Velvet World  "), "hello-velvet-world")
+        self.assertEqual(truncate_prompt("short", max_len=10), "short")
+        self.assertEqual(truncate_prompt("abcdefghijk", max_len=5), "abcd…")
 
     def test_apply_external_ai_blocks_writes_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

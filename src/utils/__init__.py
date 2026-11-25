@@ -43,10 +43,3 @@ def truncate_prompt(prompt: str, max_len: int = 200) -> str:
         return prompt
     return prompt[:max_len - 1] + "…"
 
-    """Return a slugified version of the prompt.
-
-    The function normalizes the prompt, converts it to lowercase, and replaces
-    spaces with hyphens.  It is intended for creating identifier strings from
-    user prompts.
-    """
-    return normalize_prompt(prompt).lower().replace(" ", "-")
