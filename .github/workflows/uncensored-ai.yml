@@ -4,39 +4,87 @@ on:
   workflow_dispatch:
     inputs:
       prompt:
-        description: "Prompt to send to the AI model"
+        description: "Coding task, question, or prompt for the AI"
         required: true
-        default: "How does antigravity work?"
+        default: "Write a clean Python utility function with type hints and unit test examples."
         type: string
+      target_file:
+        description: "Repository file path to write the AI output/code to"
+        required: false
+        default: "answer.txt"
+        type: string
+      create_pr:
+        description: "Open a Pull Request instead of committing directly to main"
+        required: false
+        default: false
+        type: boolean
       model:
-        description: "OpenRouter model ID (used when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY secret is set)"
+        description: "OpenRouter model ID (when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY secret is set)"
         required: false
         default: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free"
         type: string
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
 
 jobs:
   query-uncensored-ai:
-    name: Query AI Router and Commit Response
+    name: Run AI Coding Assistant
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.actor == github.repository_owner && github.event_name == 'issues') ||
+      (github.actor == github.repository_owner && github.event_name == 'issue_comment' &&
+       (startsWith(github.event.comment.body, '/ai ') || startsWith(github.event.comment.body, '@ai ')))
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Query multi-tier AI router and write answer.txt
+      - name: Query multi-tier AI coding assistant
         env:
           UNCENSORED_AI_API_KEY: ${{ secrets.UNCENSORED_AI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          PROMPT: ${{ inputs.prompt }}
-          MODEL: ${{ inputs.model }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_PROMPT: ${{ inputs.prompt }}
+          INPUT_TARGET_FILE: ${{ inputs.target_file }}
+          INPUT_MODEL: ${{ inputs.model }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           set -euo pipefail
+
+          if [ "$EVENT_NAME" = "issue_comment" ]; then
+            PROMPT="${COMMENT_BODY#/ai }"
+            PROMPT="${PROMPT#@ai }"
+          elif [ "$EVENT_NAME" = "issues" ]; then
+            PROMPT="Issue: ${ISSUE_TITLE}
+
+          ${ISSUE_BODY}"
+          else
+            PROMPT="$INPUT_PROMPT"
+          fi
+
+          TARGET_FILE="${INPUT_TARGET_FILE:-answer.txt}"
+          case "$TARGET_FILE" in
+            ""|/*|*..*|*" "*|.git/*|.github/workflows/*)
+              echo "::warning::Unsafe target_file '$TARGET_FILE'; defaulting to answer.txt"
+              TARGET_FILE="answer.txt"
+              ;;
+          esac
+          echo "RESOLVED_TARGET_FILE=$TARGET_FILE" >> "$GITHUB_ENV"
+
+          SYSTEM_PROMPT="You are VelvetMotion AI, an expert full-stack coding assistant (TypeScript, Next.js 15, React, Tauri v2 Rust, Python 3.12, and GitHub Actions) and creative writer. Provide complete, working code and clear explanations."
           API_KEY="${UNCENSORED_AI_API_KEY:-${OPENROUTER_API_KEY:-}}"
           USED_PROVIDER=""
           AI_TEXT=""
@@ -44,16 +92,17 @@ jobs:
           # Tier 1: OpenRouter API (when UNCENSORED_AI_API_KEY or OPENROUTER_API_KEY is configured)
           if [ -n "$API_KEY" ]; then
             OR_PAYLOAD="$(jq -n \
-              --arg model "${MODEL:-cognitivecomputations/dolphin-mistral-24b-venice-edition:free}" \
+              --arg model "${INPUT_MODEL:-cognitivecomputations/dolphin-mistral-24b-venice-edition:free}" \
+              --arg sys "$SYSTEM_PROMPT" \
               --arg prompt "$PROMPT" \
               '{
                 model: $model,
                 messages: [
-                  { role: "system", content: "You are VelvetMotion AI, a creative, direct, and uncensored roleplay and technical assistant." },
+                  { role: "system", content: $sys },
                   { role: "user", content: $prompt }
                 ]
               }')"
-            if OR_RESP="$(curl -sS -f -m 45 -X POST https://openrouter.ai/api/v1/chat/completions \
+            if OR_RESP="$(curl -sS -f -m 60 -X POST https://openrouter.ai/api/v1/chat/completions \
               -H "Authorization: Bearer ${API_KEY}" \
               -H "Content-Type: application/json" \
               -H "HTTP-Referer: https://github.com/${GITHUB_REPOSITORY}" \
@@ -61,7 +110,7 @@ jobs:
               -d "$OR_PAYLOAD" 2>/dev/null)"; then
               AI_TEXT="$(echo "$OR_RESP" | jq -r '.choices[0].message.content // .response // empty' | sed -e 's/^[[:space:]]*//')"
               if [ -n "$AI_TEXT" ]; then
-                USED_PROVIDER="OpenRouter (${MODEL})"
+                USED_PROVIDER="OpenRouter (${INPUT_MODEL})"
               fi
             fi
           fi
@@ -69,16 +118,17 @@ jobs:
           # Tier 2: Keyless Live OpenAI-Compatible LLM API (works immediately without secrets)
           if [ -z "$AI_TEXT" ]; then
             FREE_PAYLOAD="$(jq -n \
+              --arg sys "$SYSTEM_PROMPT" \
               --arg prompt "$PROMPT" \
               '{
                 model: "openai",
                 referrer: "velvetmotion",
                 messages: [
-                  { role: "system", content: "You are VelvetMotion AI, a creative, direct, and helpful assistant." },
+                  { role: "system", content: $sys },
                   { role: "user", content: $prompt }
                 ]
               }')"
-            if FREE_RESP="$(curl -sS -f -m 45 -X POST https://text.pollinations.ai/openai \
+            if FREE_RESP="$(curl -sS -f -m 60 -X POST https://text.pollinations.ai/openai \
               -H "Content-Type: application/json" \
               -d "$FREE_PAYLOAD" 2>/dev/null)"; then
               AI_TEXT="$(echo "$FREE_RESP" | jq -r '.choices[0].message.content // empty' | sed -e 's/^[[:space:]]*//')"
@@ -92,31 +142,58 @@ jobs:
           # Tier 3: Deterministic Local Python Fallback (src.velvetmotion)
           if [ -z "$AI_TEXT" ]; then
             USED_PROVIDER="Local Python Fallback (src.velvetmotion)"
-            AI_TEXT="$(python3 -c 'import os; from src.velvetmotion import generate_response; print(generate_response(os.environ["PROMPT"]))')"
+            AI_TEXT="$(PROMPT="$PROMPT" python3 -c 'import os; from src.velvetmotion import generate_response; print(generate_response(os.environ["PROMPT"]))')"
           fi
 
-          printf '%s\n' "$AI_TEXT" > answer.txt
-          echo "Generated response via: $USED_PROVIDER"
+          mkdir -p "$(dirname "$TARGET_FILE")"
+          printf '%s\n' "$AI_TEXT" > "$TARGET_FILE"
+          if [ "$TARGET_FILE" != "answer.txt" ]; then
+            printf '%s\n' "$AI_TEXT" > answer.txt
+          fi
 
           {
-            echo "## Uncensored AI Integration Result"
+            echo "## Uncensored AI Coding Assistant Result"
             echo "- **Provider Tier:** \`$USED_PROVIDER\`"
-            echo "- **Prompt:** \`$PROMPT\`"
+            echo "- **Output File:** \`$TARGET_FILE\`"
             echo ""
-            echo "### Response (\`answer.txt\`)"
+            echo "### Generated Output"
             echo ""
-            cat answer.txt
+            cat "$TARGET_FILE"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Commit and push answer.txt
+      - name: Reply on GitHub Issue or Pull Request
+        if: github.event_name == 'issues' || github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          gh issue comment "$ISSUE_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file answer.txt
+
+      - name: Commit or open Pull Request with AI output
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CREATE_PR: ${{ inputs.create_pr }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add answer.txt
-          if ! git diff --cached --quiet; then
-            git commit -m "Added AI response"
-            git push origin HEAD:main
+          git add "$RESOLVED_TARGET_FILE" answer.txt
+          if git diff --cached --quiet; then
+            echo "No file changes to commit."
+            exit 0
+          fi
+
+          if [ "$CREATE_PR" = "true" ]; then
+            BRANCH="ai/update-${GITHUB_RUN_ID}"
+            git checkout -b "$BRANCH"
+            git commit -m "AI Coding Assistant: update ${RESOLVED_TARGET_FILE}"
+            git push -u origin "$BRANCH"
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+              --title "AI Coding Assistant: update ${RESOLVED_TARGET_FILE}" \
+              --body-file answer.txt
           else
-            echo "No changes to answer.txt to commit."
+            git commit -m "Added AI response (${RESOLVED_TARGET_FILE})"
+            git push origin HEAD:main
           fi
