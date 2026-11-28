@@ -165,6 +165,7 @@ export default function MediaStudioModal({
   const [videoIsGenerative, setVideoIsGenerative] = useState(false);
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm' | 'unknown'>('unknown');
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const selfieCameraRef = useRef<HTMLInputElement | null>(null);
 
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -435,6 +436,26 @@ export default function MediaStudioModal({
     } finally {
       setVideoDownloading(false);
     }
+  }
+
+  function clearUploadedPortrait() {
+    // Remove the current in-memory source and reset rights confirmations; this does not
+    // delete previously saved media or revoke files already submitted to a provider.
+    videoAbortRef.current?.abort();
+    setUploadedPreview(null);
+    setReferenceResult(null);
+    setUploadSourceKind(null);
+    setUploadRightsConfirmed(false);
+    setUploadedAdultMode(false);
+    setFictionalConfirmed(false);
+    setGeneratedVideoUrl(null);
+    setVideoSourceUrl(companion?.portraitUrl || FLAGSHIP_COMPANIONS[0].portraitUrl);
+    setVideoIsGenerative(false);
+    setVideoFormat('unknown');
+    setErrorMsg(null);
+    setStatusMsg('Portrait cleared from this Studio session. Previously saved media must be deleted separately.');
+    if (fileRef.current) fileRef.current.value = '';
+    if (selfieCameraRef.current) selfieCameraRef.current.value = '';
   }
 
   async function processFile(file: File) {
@@ -1135,6 +1156,28 @@ export default function MediaStudioModal({
               </>
             )}
           </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => selfieCameraRef.current?.click()}
+              className="rounded-full border border-cyan-300/40 bg-cyan-300/10 px-4 py-2 text-xs font-semibold text-cyan-100"
+            >
+              Take a selfie
+            </button>
+            {uploadedPreview && (
+              <button
+                type="button"
+                onClick={clearUploadedPortrait}
+                className="rounded-full border border-white/25 px-4 py-2 text-xs font-semibold text-zinc-200"
+              >
+                Clear uploaded portrait
+              </button>
+            )}
+          </div>
+          <p className="text-[10px] text-zinc-400">
+            On supported mobile devices, Take a selfie opens the front camera. Previewing a photo is local;
+            creating an animation sends the selected image to your configured video provider.
+          </p>
           {uploadedPreview && (
             <div className="rounded-2xl border border-pink-400/25 bg-pink-400/10 p-3 space-y-3">
               <p className="font-bold text-pink-200">Use this portrait</p>
@@ -1270,6 +1313,18 @@ export default function MediaStudioModal({
               if (f) void processFile(f);
             }}
             className="hidden"
+          />
+          <input
+            ref={selfieCameraRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            capture="user"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void processFile(f);
+            }}
+            className="hidden"
+            aria-label="Capture a self-portrait with the front-facing camera"
           />
 
           <div className="grid grid-cols-3 gap-2">
