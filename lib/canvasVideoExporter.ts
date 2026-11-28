@@ -10,7 +10,7 @@ import { getMediaSettings } from "./mediaSettings";
 import { generateComfyVideo, videoCanceledError } from "./comfyVideo";
 
 export interface VideoMotionPreset {
-  id: "slow-zoom-blink" | "neon-hair-sway" | "balcony-breeze" | "club-light-pulse";
+  id: "slow-zoom-blink" | "thrust-pulse" | "slow-grind" | "bounce" | "neon-hair-sway" | "balcony-breeze" | "club-light-pulse";
   label: string;
   dx: number;
   dy: number;
@@ -27,6 +27,33 @@ export const VIDEO_MOTION_PRESETS: VideoMotionPreset[] = [
     dy: -10,
     scaleEnd: 1.12,
     tint: "rgba(255, 86, 120, 0.14)",
+    pulseMode: "blink",
+  },
+  {
+    id: "thrust-pulse",
+    label: "Thrust Pulse",
+    dx: 4,
+    dy: 8,
+    scaleEnd: 1.18,
+    tint: "rgba(255, 30, 100, 0.2)",
+    pulseMode: "club",
+  },
+  {
+    id: "slow-grind",
+    label: "Slow Grind",
+    dx: -8,
+    dy: 6,
+    scaleEnd: 1.08,
+    tint: "rgba(200, 100, 80, 0.12)",
+    pulseMode: "sway",
+  },
+  {
+    id: "bounce",
+    label: "Bounce",
+    dx: 0,
+    dy: -16,
+    scaleEnd: 1.16,
+    tint: "rgba(255, 180, 100, 0.15)",
     pulseMode: "blink",
   },
   {
